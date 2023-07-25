@@ -1,5 +1,5 @@
 <template>
-  <div class="overflow-auto p-4 max-w-full my-auto flex flex-wrap h-full">
+  <div class="row content-box full-height">
     <woot-button
       v-if="showAddButton"
       color-scheme="success"
@@ -9,7 +9,7 @@
     >
       {{ $t('INTEGRATION_APPS.ADD_BUTTON') }}
     </woot-button>
-    <div v-if="showIntegrationHooks" class="w-full">
+    <div v-if="showIntegrationHooks" class="integration-hooks">
       <div v-if="isIntegrationMultiple">
         <multiple-integration-hooks
           :integration="integration"
@@ -148,3 +148,8 @@ export default {
   },
 };
 </script>
+<style scoped lang="scss">
+.integration-hooks {
+  width: 100%;
+}
+</style>

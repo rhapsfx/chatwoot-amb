@@ -1,6 +1,6 @@
 <template>
   <div
-    class="conversations-list-wrap flex-shrink-0 flex-basis-custom overflow-hidden flex flex-col border-r rtl:border-r-0 rtl:border-l border-slate-50 dark:border-slate-800/50"
+    class="conversations-list-wrap"
     :class="{
       hide: !showConversationList,
       'list--full-width': isOnExpandedLayout,
@@ -8,28 +8,26 @@
   >
     <slot />
     <div
-      class="flex items-center justify-between py-0 px-4"
-      :class="{
-        'pb-3 border-b border-slate-75 dark:border-slate-700': hasAppliedFiltersOrActiveFolders,
-      }"
+      class="chat-list__top"
+      :class="{ filter__applied: hasAppliedFiltersOrActiveFolders }"
     >
-      <div class="flex max-w-[85%] justify-center items-center">
+      <div class="flex-center chat-list__title">
         <h1
-          class="text-xl break-words overflow-hidden whitespace-nowrap text-ellipsis text-black-800 dark:text-slate-100 overflow-hidden whitespace-nowrap text-ellipsis mb-0"
+          class="page-sub-title text-truncate margin-bottom-0"
           :title="pageTitle"
         >
           {{ pageTitle }}
         </h1>
         <span
           v-if="!hasAppliedFiltersOrActiveFolders"
-          class="p-1 my-0.5 mx-1 rounded-md capitalize bg-slate-50 dark:bg-slate-800 text-xxs text-slate-600 dark:text-slate-300"
+          class="conversation--status-pill"
         >
           {{
             this.$t(`CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.${activeStatus}.TEXT`)
           }}
         </span>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="filter--actions">
         <div v-if="hasAppliedFilters && !hasActiveFolders">
           <woot-button
             v-tooltip.top-end="$t('FILTER.CUSTOM_VIEWS.ADD.SAVE_BUTTON')"
@@ -106,10 +104,7 @@
       @chatTabChange="updateAssigneeTab"
     />
 
-    <p
-      v-if="!chatListLoading && !conversationList.length"
-      class="overflow-auto p-4 flex justify-center items-center"
-    >
+    <p v-if="!chatListLoading && !conversationList.length" class="content-box">
       {{ $t('CHAT_LIST.LIST.404') }}
     </p>
     <conversation-bulk-actions
@@ -128,8 +123,8 @@
     />
     <div
       ref="activeConversation"
-      class="conversations-list flex-1"
-      :class="{ 'overflow-hidden': isContextMenuOpen }"
+      class="conversations-list"
+      :class="{ 'is-context-menu-open': isContextMenuOpen }"
     >
       <div>
         <conversation-card
@@ -154,20 +149,23 @@
         />
       </div>
       <div v-if="chatListLoading" class="text-center">
-        <span class="spinner mt-4 mb-4" />
+        <span class="spinner" />
       </div>
 
       <woot-button
         v-if="!hasCurrentPageEndReached && !chatListLoading"
         variant="clear"
         size="expanded"
-        class="load-more--button"
+        class="text-center"
         @click="loadMoreConversations"
       >
         {{ $t('CHAT_LIST.LOAD_MORE_CONVERSATIONS') }}
       </woot-button>
 
-      <p v-if="showEndOfListMessage" class="text-center text-muted p-4">
+      <p
+        v-if="showEndOfListMessage"
+        class="text-center text-muted end-of-list-text"
+      >
         {{ $t('CHAT_LIST.EOF') }}
       </p>
     </div>
@@ -958,43 +956,70 @@ export default {
   },
 };
 </script>
-<style scoped>
-@tailwind components;
-@layer components {
-  .flex-basis-clamp {
-    flex-basis: clamp(20rem, 4vw + 21.25rem, 27.5rem);
-  }
-}
-</style>
 
 <style scoped lang="scss">
-.conversations-list-wrap {
-  @apply flex-basis-clamp;
-
-  &.hide {
-    @apply hidden;
-  }
-
-  &.list--full-width {
-    @apply basis-full;
-  }
+.spinner {
+  margin-top: var(--space-normal);
+  margin-bottom: var(--space-normal);
 }
 
 .conversations-list {
-  @apply overflow-hidden hover:overflow-y-auto;
+  // Prevent the list from scrolling if the submenu is opened
+  &.is-context-menu-open {
+    overflow: hidden !important;
+  }
 }
 
-.load-more--button {
-  @apply text-center rounded-none;
+.conversations-list-wrap {
+  flex-shrink: 0;
+  flex-basis: clamp(20rem, 4vw + 21.25rem, 27.5rem);
+  overflow: hidden;
+
+  &.hide {
+    display: none;
+  }
+
+  &.list--full-width {
+    flex-basis: 100%;
+  }
+
+  .page-sub-title {
+    font-size: var(--font-size-two);
+  }
+}
+.filter--actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-smaller);
+}
+
+.filter__applied {
+  padding-bottom: var(--space-slab) !important;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tab--chat-type {
-  @apply py-0 px-4;
+  padding: 0 var(--space-normal);
 
   ::v-deep {
     .tabs {
-      @apply p-0;
+      padding: 0;
     }
   }
+}
+
+.conversation--status-pill {
+  background: var(--color-background);
+  border-radius: var(--border-radius-small);
+  color: var(--color-medium-gray);
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-medium);
+  margin: var(--space-micro) var(--space-small) 0;
+  padding: var(--space-smaller);
+  text-transform: capitalize;
+}
+
+.chat-list__title {
+  max-width: 85%;
 }
 </style>

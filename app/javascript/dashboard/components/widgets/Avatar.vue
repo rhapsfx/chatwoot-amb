@@ -38,18 +38,16 @@ export default {
 };
 </script>
 
-<style scoped>
-@tailwind components;
-@layer components {
-  .avatar-color {
-    background-image: linear-gradient(to top, #c2e1ff 0%, #d6ebff 100%);
-  }
-
-  .dark-avatar-color {
-    background-image: linear-gradient(to top, #135899 0%, #135899 100%);
-  }
-}
+<style lang="scss" scoped>
 .avatar-container {
-  @apply flex leading-[100%] font-medium items-center justify-center text-center cursor-default avatar-color dark:dark-avatar-color text-woot-600 dark:text-woot-200;
+  display: flex;
+  line-height: 100%;
+  font-weight: 500;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-image: linear-gradient(to top, var(--w-100) 0%, var(--w-75) 100%);
+  color: var(--w-600);
+  cursor: default;
 }
 </style>

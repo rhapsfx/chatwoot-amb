@@ -1,5 +1,5 @@
 <template>
-  <div class="resolve-actions relative flex items-center justify-end">
+  <div class="resolve-actions">
     <div class="button-group">
       <woot-button
         v-if="isOpen"
@@ -251,11 +251,23 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+.resolve-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .dropdown-pane {
-  @apply left-auto top-[2.625rem] mt-0.5 right-0 max-w-[12.5rem] min-w-[9.75rem];
+  left: unset;
+  top: 2.625rem;
+  margin-top: var(--space-micro);
+  right: 0;
+  max-width: 12.5rem;
+  min-width: 9.75rem;
 
   .dropdown-menu__item {
-    @apply mb-0;
+    margin-bottom: 0;
   }
 }
 </style>

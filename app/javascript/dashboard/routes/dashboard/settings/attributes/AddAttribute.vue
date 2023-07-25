@@ -1,10 +1,10 @@
 <template>
   <woot-modal :show.sync="show" :on-close="onClose">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header :header-title="$t('ATTRIBUTES_MGMT.ADD.TITLE')" />
 
-      <form class="flex w-full" @submit.prevent="addAttributes">
-        <div class="w-full">
+      <form class="row" @submit.prevent="addAttributes">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.attributeModel.$error }">
             {{ $t('ATTRIBUTES_MGMT.ADD.FORM.MODEL.LABEL') }}
             <select v-model="attributeModel">
@@ -86,7 +86,7 @@
               {{ $t('ATTRIBUTES_MGMT.ADD.FORM.TYPE.LIST.ERROR') }}
             </label>
           </div>
-          <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
+          <div class="modal-footer">
             <woot-submit-button
               :disabled="isButtonDisabled"
               :button-text="$t('ATTRIBUTES_MGMT.ADD.SUBMIT')"

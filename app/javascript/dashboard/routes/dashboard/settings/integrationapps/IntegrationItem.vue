@@ -1,13 +1,10 @@
 <template>
-  <div class="flex">
-    <div class="flex h-[6.25rem] w-[6.25rem]">
-      <img
-        :src="'/dashboard/images/integrations/' + integrationLogo"
-        class="max-w-full p-6"
-      />
+  <div class="row">
+    <div class="integration--image">
+      <img :src="'/dashboard/images/integrations/' + integrationLogo" />
     </div>
-    <div class="flex flex-col justify-center m-0 mx-4 flex-1">
-      <h3 class="text-xl text-slate-800 dark:text-slate-100">
+    <div class="integration--type column">
+      <h3 class="integration--title">
         {{ integrationName }}
       </h3>
       <p>
@@ -19,10 +16,10 @@
         }}
       </p>
     </div>
-    <div class="flex justify-center items-center mb-0 w-[15%]">
+    <div class="small-2 column button-wrap">
       <woot-label :title="labelText" :color-scheme="labelColor" />
     </div>
-    <div class="flex justify-center items-center mb-0 w-[15%]">
+    <div class="small-2 column button-wrap">
       <router-link
         :to="
           frontendURL(

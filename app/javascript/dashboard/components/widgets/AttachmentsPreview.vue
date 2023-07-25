@@ -1,37 +1,29 @@
 <template>
-  <div
-    class="preview-item__wrap flex flex-col overflow-auto mt-4 max-h-[12.5rem]"
-  >
+  <div class="preview-item__wrap">
     <div
       v-for="(attachment, index) in attachments"
       :key="attachment.id"
-      class="preview-item flex p-1 bg-slate-50 dark:bg-slate-800 rounded-md w-[15rem] mb-1"
+      class="preview-item"
     >
-      <div class="max-w-[4rem] flex-shrink-0 w-6 flex items-center">
+      <div class="thumb-wrap">
         <img
           v-if="isTypeImage(attachment.resource)"
           class="image-thumb"
           :src="attachment.thumb"
         />
-        <span v-else class="w-6 h-6 text-lg relative -top-px text-left">
-          📄
-        </span>
+        <span v-else class="attachment-thumb"> 📄 </span>
       </div>
-      <div class="max-w-[60%] min-w-[50%] overflow-hidden text-ellipsis ml-2">
-        <span
-          class="h-4 overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap"
-        >
+      <div class="file-name-wrap">
+        <span class="item">
           {{ fileName(attachment.resource) }}
         </span>
       </div>
-      <div class="w-[30%] justify-center">
-        <span
-          class="item overflow-hidden text-xs text-ellipsis whitespace-nowrap"
-        >
+      <div class="file-size-wrap">
+        <span class="item text-truncate">
           {{ formatFileSize(attachment.resource) }}
         </span>
       </div>
-      <div class="flex items-center justify-center">
+      <div class="remove-file-wrap">
         <woot-button
           v-if="!isTypeAudio(attachment.resource)"
           class="remove--attachment clear secondary"
@@ -78,20 +70,103 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+.preview-item__wrap {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  margin-top: var(--space-normal);
+  max-height: 12.5rem;
+}
+
+.preview-item {
+  display: flex;
+  padding: var(--space-slab) 0 0;
+  background: var(--color-background-light);
+  background: var(--b-50);
+  border-radius: var(--border-radius-normal);
+  width: 15rem;
+  padding: var(--space-smaller);
+  margin-bottom: var(--space-one);
+}
+
+.thumb-wrap {
+  max-width: var(--space-jumbo);
+  flex-shrink: 0;
+  width: var(--space-medium);
+  display: flex;
+  align-items: center;
+}
+
 .image-thumb {
-  @apply w-6 h-6 object-cover rounded-sm;
+  width: var(--space-medium);
+  height: var(--space-medium);
+  object-fit: cover;
+  border-radius: var(--border-radius-small);
+}
+
+.attachment-thumb {
+  width: var(--space-medium);
+  height: var(--space-medium);
+  font-size: var(--font-size-medium);
+  text-align: center;
+  position: relative;
+  top: -1px;
+  text-align: left;
 }
 
 .file-name-wrap,
 .file-size-wrap {
-  @apply flex items-center py-0 px-1;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-smaller);
 
   > .item {
-    @apply m-0 overflow-hidden text-xs font-medium;
+    margin: 0;
+    overflow: hidden;
+    font-size: var(--font-size-mini);
+    font-weight: var(--font-weight-medium);
   }
 }
 
+.preview-header {
+  padding: var(--space-slab) var(--space-slab) 0 var(--space-slab);
+}
+
+.file-name-wrap {
+  max-width: 60%;
+  min-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: var(--space-small);
+
+  .item {
+    height: var(--space-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.file-size-wrap {
+  width: 30%;
+  justify-content: center;
+}
+
+.remove-file-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .remove--attachment {
-  @apply w-6 h-6 rounded-md text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800;
+  width: var(--space-medium);
+  height: var(--space-medium);
+  border-radius: var(--space-medium);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-background);
+  }
 }
 </style>

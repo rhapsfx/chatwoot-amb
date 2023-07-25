@@ -212,26 +212,50 @@ export default {
 
 <style lang="scss" scoped>
 .search-page {
-  @apply flex flex-col w-full bg-white dark:bg-slate-900;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 .page-header {
-  @apply flex p-4;
+  display: flex;
+  padding: var(--space-normal);
 }
 .search-root {
-  @apply flex my-0 p-4 relative mx-auto max-w-[45rem] min-h-[20rem] flex-col w-full h-full bg-white dark:bg-slate-900;
+  margin: 0 auto;
+  max-width: 45rem;
+  min-height: 20rem;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-normal);
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  background: white;
+  margin-top: var(--space-medium);
 
   .search-results {
-    @apply flex-grow h-full overflow-y-auto py-0 px-2;
+    flex-grow: 1;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 var(--space-small);
   }
 }
 
 .empty {
-  @apply flex flex-col items-center justify-center py-6 px-4 rounded-md mt-8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-medium) var(--space-normal);
+  border-radius: var(--border-radius-medium);
+  margin-top: var(--space-large);
   .icon {
-    @apply text-slate-500 dark:text-slate-400;
+    color: var(--s-500);
   }
   .empty-state__text {
-    @apply text-center text-slate-500 dark:text-slate-400 m-2;
+    text-align: center;
+    color: var(--s-500);
+    margin: var(--space-small);
   }
 }
 </style>

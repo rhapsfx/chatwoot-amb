@@ -1,22 +1,13 @@
 <template>
-  <div class="flex items-center h-[2.375rem] min-w-0 py-0 px-1">
-    <span
-      class="inline-flex rounded mr-1 rtl:ml-1 rtl:mr-0 bg-slate-25 dark:bg-slate-700 p-0.5 items-center flex-shrink-0 justify-center w-6 h-6"
-    >
-      <fluent-icon
-        :icon="computedInboxIcon"
-        size="14"
-        class="text-slate-800 dark:text-slate-200"
-      />
+  <div class="option-item--inbox">
+    <span class="badge--icon">
+      <fluent-icon :icon="computedInboxIcon" size="14" />
     </span>
-    <div class="flex flex-col w-full min-w-0 ml-1 mr-1">
+    <div class="option__user-data">
       <h5 class="option__title">
         {{ name }}
       </h5>
-      <p
-        class="option__body overflow-hidden whitespace-nowrap text-ellipsis"
-        :title="inboxIdentifier"
-      >
+      <p class="option__body text-truncate" :title="inboxIdentifier">
         {{ inboxIdentifier || computedInboxType }}
       </p>
     </div>
@@ -67,10 +58,45 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.option-item--inbox {
+  display: flex;
+  align-items: center;
+  height: 2.375rem;
+  min-width: 0;
+  padding: 0 var(--space-smaller);
+}
+.badge--icon {
+  display: inline-flex;
+  border-radius: var(--border-radius-small);
+  margin-right: var(--space-smaller);
+  background: var(--s-25);
+  padding: var(--space-micro);
+  align-items: center;
+  flex-shrink: 0;
+  justify-content: center;
+  width: var(--space-medium);
+  height: var(--space-medium);
+}
+
+.option__user-data {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  margin-left: var(--space-smaller);
+  margin-right: var(--space-smaller);
+}
 .option__body {
-  @apply inline-block text-slate-600 dark:text-slate-200 leading-[1.3] min-w-0 m-0;
+  display: inline-block;
+  color: var(--s-600);
+  font-size: var(--font-size-small);
+  line-height: 1.3;
+  min-width: 0;
+  margin: 0;
 }
 .option__title {
-  @apply leading-[1.1] text-xs m-0 text-slate-800 dark:text-slate-100;
+  line-height: 1.1;
+  font-size: var(--font-size-mini);
+  margin: 0;
 }
 </style>

@@ -82,22 +82,37 @@ export default {
 
 <style scoped>
 input[type='file'] {
-  @apply hidden;
+  display: none;
 }
 .input-wrapper {
-  @apply flex h-9 bg-white dark:bg-slate-900 py-1 px-2 items-center text-xs cursor-pointer rounded-sm border border-dashed border-woot-100 dark:border-woot-500;
+  display: flex;
+  height: 39px;
+  background-color: var(--white);
+  border-radius: var(--border-radius-small);
+  border: 1px dashed var(--w-100);
+  padding: var(--space-smaller) var(--space-small);
+  align-items: center;
+  font-size: var(--font-size-mini);
+  cursor: pointer;
 }
 .success-icon {
-  @apply text-green-500 dark:text-green-600 mr-2;
+  margin-right: var(--space-small);
+  color: var(--g-500);
 }
 .error-icon {
-  @apply text-red-500 dark:text-red-600 mr-2;
+  margin-right: var(--space-small);
+  color: var(--r-500);
 }
 
 .processing {
-  @apply cursor-not-allowed opacity-90;
+  cursor: not-allowed;
+  opacity: 0.9;
 }
 .file-button {
-  @apply whitespace-nowrap overflow-hidden text-ellipsis w-full mb-0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  margin-bottom: 0;
 }
 </style>

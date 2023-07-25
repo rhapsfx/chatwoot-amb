@@ -1,16 +1,13 @@
 <template>
   <woot-modal :show.sync="show" :on-close="onClose">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header
         :header-title="$t('AGENT_MGMT.ADD.TITLE')"
         :header-content="$t('AGENT_MGMT.ADD.DESC')"
       />
 
-      <form
-        class="flex flex-col w-full items-start"
-        @submit.prevent="addAgent()"
-      >
-        <div class="w-full">
+      <form class="row" @submit.prevent="addAgent()">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.agentName.$error }">
             {{ $t('AGENT_MGMT.ADD.FORM.NAME.LABEL') }}
             <input
@@ -21,7 +18,7 @@
             />
           </label>
         </div>
-        <div class="w-full">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.agentType.$error }">
             {{ $t('AGENT_MGMT.ADD.FORM.AGENT_TYPE.LABEL') }}
             <select v-model="agentType">
@@ -34,7 +31,7 @@
             </span>
           </label>
         </div>
-        <div class="w-full">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.agentEmail.$error }">
             {{ $t('AGENT_MGMT.ADD.FORM.EMAIL.LABEL') }}
             <input
@@ -45,8 +42,8 @@
             />
           </label>
         </div>
-        <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
-          <div class="w-full">
+        <div class="modal-footer">
+          <div class="medium-12 columns">
             <woot-submit-button
               :disabled="
                 $v.agentEmail.$invalid ||

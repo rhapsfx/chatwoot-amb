@@ -1,8 +1,8 @@
 <template>
-  <div class="h-auto overflow-auto flex flex-col">
+  <div class="column content-box">
     <woot-modal-header :header-title="pageTitle" />
-    <form class="flex flex-col w-full" @submit.prevent="editCampaign">
-      <div class="w-full">
+    <form class="row" @submit.prevent="editCampaign">
+      <div class="medium-12 columns">
         <woot-input
           v-model="title"
           :label="$t('CAMPAIGN.ADD.FORM.TITLE.LABEL')"
@@ -97,7 +97,7 @@
           {{ $t('CAMPAIGN.ADD.FORM.TRIGGER_ONLY_BUSINESS_HOURS') }}
         </label>
       </div>
-      <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
+      <div class="modal-footer">
         <woot-button :is-loading="uiFlags.isCreating">
           {{ $t('CAMPAIGN.EDIT.UPDATE_BUTTON_TEXT') }}
         </woot-button>
@@ -282,15 +282,5 @@ export default {
 <style lang="scss" scoped>
 ::v-deep .ProseMirror-woot-style {
   height: 5rem;
-}
-
-.message-editor {
-  @apply px-3;
-
-  ::v-deep {
-    .ProseMirror-menubar {
-      @apply rounded-tl-[4px];
-    }
-  }
 }
 </style>

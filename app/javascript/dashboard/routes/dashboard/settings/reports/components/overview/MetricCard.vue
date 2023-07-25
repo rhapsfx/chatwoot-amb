@@ -50,61 +50,87 @@ export default {
 </script>
 <style lang="scss" scoped>
 .card {
-  @apply bg-white dark:bg-slate-800 border-slate-75 dark:border-slate-700;
   margin: var(--space-small) !important;
 
   .card-header--control-area {
+    opacity: 0.2;
     transition: opacity 0.2s ease-in-out;
-    @apply opacity-20;
   }
 
   &:hover {
     .card-header--control-area {
-      @apply opacity-100;
+      opacity: 1;
     }
   }
 }
 
 .card-header {
+  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(max-content, 50%));
   gap: var(--space-small) 0px;
-  @apply grid flex-grow w-full mb-6;
+  flex-grow: 1;
+  width: 100%;
+  margin-bottom: var(--space-medium);
 
   .card-header--title-area {
-    @apply flex items-center flex-row;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
 
     h5 {
-      @apply mb-0 text-slate-800 dark:text-slate-100;
+      margin-bottom: var(--zero);
     }
 
     .live {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      padding-right: var(--space-small);
+      padding-left: var(--space-small);
+      margin: var(--space-smaller);
       background: rgba(37, 211, 102, 0.1);
-      @apply flex flex-row items-center pr-2 pl-2 m-1 text-green-400 dark:text-green-400 text-xs;
+      color: var(--g-400);
+      font-size: var(--font-size-mini);
 
       .ellipse {
-        @apply bg-green-400 dark:bg-green-400 h-1 w-1 rounded-full mr-1 rtl:mr-0 rtl:ml-0;
+        background-color: var(--g-400);
+        height: var(--space-smaller);
+        width: var(--space-smaller);
+        border-radius: var(--border-radius-rounded);
+        margin-right: var(--space-smaller);
       }
     }
   }
 
   .card-header--control-area {
-    @apply flex flex-row items-center justify-end gap-2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: end;
+    gap: var(--space-small);
   }
 }
 
 .card-body {
   .metric-content {
-    @apply pb-2;
+    padding-bottom: var(--space-small);
     .heading {
-      @apply text-base text-slate-700 dark:text-slate-100;
+      font-size: var(--font-size-default);
     }
     .metric {
-      @apply text-woot-800 dark:text-woot-300 text-3xl mb-0 mt-1;
+      color: var(--w-800);
+      font-size: var(--font-size-bigger);
+      margin-bottom: var(--zero);
+      margin-top: var(--space-smaller);
     }
   }
 }
 
 .conversation-metric-loader {
-  @apply items-center flex text-base justify-center p-12;
+  align-items: center;
+  display: flex;
+  font-size: var(--font-size-default);
+  justify-content: center;
+  padding: var(--space-large);
 }
 </style>

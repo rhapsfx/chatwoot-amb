@@ -1,13 +1,13 @@
 <template>
   <woot-modal :show="show" :on-close="closeModal">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header :header-title="header" />
 
-      <form class="mx-0 flex flex-wrap" @submit.prevent="submit">
+      <form class="row" @submit.prevent="submit">
         <woot-input
           v-model.trim="app.title"
           :class="{ error: $v.app.title.$error }"
-          class="w-full"
+          class="medium-12 columns"
           :label="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.FORM.TITLE_LABEL')"
           :placeholder="
             $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.FORM.TITLE_PLACEHOLDER')
@@ -23,7 +23,7 @@
         <woot-input
           v-model.trim="app.content.url"
           :class="{ error: $v.app.content.url.$error }"
-          class="w-full"
+          class="medium-12 columns app--url_input"
           :label="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.FORM.URL_LABEL')"
           :placeholder="
             $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.FORM.URL_PLACEHOLDER')
@@ -36,17 +36,19 @@
           data-testid="app-url"
           @input="$v.app.content.url.$touch"
         />
-        <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
-          <woot-button
-            :is-loading="isLoading"
-            :is-disabled="$v.$invalid"
-            data-testid="label-submit"
-          >
-            {{ submitButtonLabel }}
-          </woot-button>
-          <woot-button class="button clear" @click.prevent="closeModal">
-            {{ $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.CREATE.FORM_CANCEL') }}
-          </woot-button>
+        <div class="modal-footer">
+          <div class="medium-12 columns">
+            <woot-button
+              :is-loading="isLoading"
+              :is-disabled="$v.$invalid"
+              data-testid="label-submit"
+            >
+              {{ submitButtonLabel }}
+            </woot-button>
+            <woot-button class="button clear" @click.prevent="closeModal">
+              {{ $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.CREATE.FORM_CANCEL') }}
+            </woot-button>
+          </div>
         </div>
       </form>
     </div>
@@ -155,3 +157,18 @@ export default {
   },
 };
 </script>
+
+<style scoped lang="scss">
+.content-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  .app--url_input {
+    flex: 1;
+  }
+  .app--url_add_btn {
+    margin-left: var(--space-one);
+    margin-top: var(--space-one);
+  }
+}
+</style>

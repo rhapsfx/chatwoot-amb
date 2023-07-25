@@ -147,23 +147,31 @@ export default {
 </script>
 <style lang="scss" scoped>
 .input-group-wrap .message {
-  @apply text-sm text-red-500 dark:text-red-500;
+  font-size: var(--font-size-small);
+  color: var(--r-500);
 }
 .input-group {
-  @apply border-b border-solid border-slate-75 dark:border-slate-700 my-1;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-smaller);
+  margin-top: var(--space-smaller);
 
   .input-group-label {
-    @apply border-transparent bg-transparent text-xs font-semibold pl-0;
+    border-color: transparent;
+    background: transparent;
+    font-size: var(--font-size-mini);
+    font-weight: var(--font-weight-bold);
+    padding-left: 0;
   }
   .input-group-field::v-deep input {
-    @apply mb-0 border-transparent;
+    margin-bottom: 0;
+    border-color: transparent;
   }
 }
 
 .input-group.error {
-  @apply border-b-red-500 dark:border-b-red-500;
+  border-bottom-color: var(--r-500);
   .input-group-label {
-    @apply text-red-500 dark:text-red-500;
+    color: var(--r-500);
   }
 }
 </style>

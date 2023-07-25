@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 overflow-auto p-4">
+  <div class="column content-box">
     <campaigns-table
       :campaigns="campaigns"
       :show-empty-result="showEmptyResult"
@@ -101,6 +101,12 @@ export default {
 
 <style scoped lang="scss">
 .button-wrapper {
-  @apply flex justify-end pb-2.5;
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: var(--space-one);
+}
+
+.content-box .page-top-bar::v-deep {
+  padding: var(--space-large) var(--space-large) var(--space-zero);
 }
 </style>

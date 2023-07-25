@@ -25,7 +25,7 @@
         </woot-tabs>
       </setting-intro-banner>
     </div>
-    <div class="overflow-auto p-4 max-w-full my-auto flex flex-wrap">
+    <div class="row content-box">
       <router-view />
     </div>
   </div>

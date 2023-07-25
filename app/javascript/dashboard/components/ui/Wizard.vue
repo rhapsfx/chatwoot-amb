@@ -11,10 +11,8 @@
       class="item"
       :class="{ active: isActive(item), over: isOver(item) }"
     >
-      <div class="flex items-center">
-        <h3
-          class="overflow-hidden whitespace-nowrap text-ellipsis leading-tight"
-        >
+      <div class="flex-align-center">
+        <h3 class="text-truncate">
           {{ item.title }}
         </h3>
         <span v-if="isOver(item)" class="completed">
@@ -44,7 +42,7 @@ export default {
   },
   computed: {
     classObject() {
-      return 'w-full';
+      return 'full-width';
     },
     activeIndex() {
       return this.items.findIndex(i => i.route === this.$route.name);

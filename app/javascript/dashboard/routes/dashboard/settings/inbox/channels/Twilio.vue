@@ -1,7 +1,7 @@
 <!-- Deprecated in favour of separate files for SMS and Whatsapp and also to implement new providers for each platform in the future-->
 <template>
-  <form class="mx-0 flex flex-wrap" @submit.prevent="createChannel()">
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+  <form class="row" @submit.prevent="createChannel()">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.channelName.$error }">
         {{ $t('INBOX_MGMT.ADD.TWILIO.CHANNEL_NAME.LABEL') }}
         <input
@@ -16,7 +16,7 @@
       </label>
     </div>
 
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div class="medium-8 columns">
       <label
         v-if="useMessagingService"
         :class="{ error: $v.messagingServiceSID.$error }"
@@ -36,10 +36,7 @@
       </label>
     </div>
 
-    <div
-      v-if="!useMessagingService"
-      class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]"
-    >
+    <div v-if="!useMessagingService" class="medium-8 columns">
       <label :class="{ error: $v.phoneNumber.$error }">
         {{ $t('INBOX_MGMT.ADD.TWILIO.PHONE_NUMBER.LABEL') }}
         <input
@@ -70,7 +67,7 @@
       </label>
     </div>
 
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.accountSID.$error }">
         {{ $t('INBOX_MGMT.ADD.TWILIO.ACCOUNT_SID.LABEL') }}
         <input
@@ -95,7 +92,7 @@
         {{ $t('INBOX_MGMT.ADD.TWILIO.API_KEY.USE_API_KEY') }}
       </label>
     </div>
-    <div v-if="useAPIKey" class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div v-if="useAPIKey" class="medium-8 columns">
       <label :class="{ error: $v.apiKeySID.$error }">
         {{ $t('INBOX_MGMT.ADD.TWILIO.API_KEY.LABEL') }}
         <input
@@ -109,7 +106,7 @@
         }}</span>
       </label>
     </div>
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.authToken.$error }">
         {{ $t(`INBOX_MGMT.ADD.TWILIO.${authTokeni18nKey}.LABEL`) }}
         <input
@@ -126,7 +123,7 @@
       </label>
     </div>
 
-    <div class="w-full">
+    <div class="medium-12 columns">
       <woot-submit-button
         :loading="uiFlags.isCreating"
         :button-text="$t('INBOX_MGMT.ADD.TWILIO.SUBMIT_BUTTON')"

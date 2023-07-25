@@ -1,6 +1,6 @@
 <template>
   <div class="dropdown-wrap">
-    <div class="mb-2 flex-shrink-0 flex-grow-0 flex-auto max-h-8">
+    <div class="search-wrap">
       <input
         ref="searchbar"
         v-model="search"
@@ -10,8 +10,8 @@
         :placeholder="inputPlaceholder"
       />
     </div>
-    <div class="flex justify-start items-start flex-auto overflow-auto">
-      <div class="w-full max-h-[10rem]">
+    <div class="list-scroll-container">
+      <div class="multiselect-dropdown--list">
         <woot-dropdown-menu>
           <woot-dropdown-item
             v-for="option in filteredOptions"
@@ -26,7 +26,7 @@
               }"
               @click="() => onclick(option)"
             >
-              <div class="flex items-center">
+              <div class="user-wrap">
                 <Thumbnail
                   v-if="hasThumbnail"
                   :src="option.thumbnail"
@@ -35,9 +35,9 @@
                   :status="option.availability_status"
                   has-border
                 />
-                <div class="flex items-center justify-between w-full min-w-0">
+                <div class="name-wrap">
                   <span
-                    class="leading-4 my-0 mx-2 overflow-hidden whitespace-nowrap text-ellipsis text-sm"
+                    class="name text-truncate text-block-title"
                     :title="option.name"
                   >
                     {{ option.name }}
@@ -48,10 +48,7 @@
             </woot-button>
           </woot-dropdown-item>
         </woot-dropdown-menu>
-        <h4
-          v-if="noResult"
-          class="w-full justify-center items-center flex text-slate-500 dark:text-slate-300 py-2 px-2.5 overflow-hidden whitespace-nowrap text-ellipsis text-sm"
-        >
+        <h4 v-if="noResult" class="no-result text-truncate text-block-title">
           {{ noSearchResult }}
         </h4>
       </div>
@@ -131,26 +128,92 @@ export default {
 
 <style lang="scss" scoped>
 .dropdown-wrap {
-  @apply w-full flex flex-col max-h-[12.5rem];
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: 12.5rem;
+}
+
+.search-wrap {
+  margin-bottom: var(--space-small);
+  flex: 0 0 auto;
+  max-height: var(--space-large);
 }
 
 .search-input {
-  @apply m-0 w-full border border-solid border-transparent h-8 text-sm text-slate-700 dark:text-slate-100 rounded-md focus:border-woot-500 bg-slate-50 dark:bg-slate-900;
+  margin: 0;
+  width: 100%;
+  border: 1px solid transparent;
+  height: var(--space-large);
+  font-size: var(--font-size-small);
+  padding: var(--space-small);
+  background-color: var(--color-background);
+
+  &:focus {
+    border: 1px solid var(--w-500);
+  }
+}
+
+.list-scroll-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.multiselect-dropdown--list {
+  width: 100%;
+  max-height: 10rem;
 }
 
 .multiselect-dropdown--item {
-  @apply justify-between w-full;
+  justify-content: space-between;
+  width: 100%;
 
   &.active {
-    @apply bg-slate-25 dark:bg-slate-700 border-slate-50 dark:border-slate-900 font-medium;
+    background: var(--s-25);
+    border-color: var(--s-50);
+    font-weight: var(--font-weight-medium);
   }
 
   &:focus {
-    @apply bg-slate-25 dark:bg-slate-700;
+    background-color: var(--color-background-light);
   }
 
   &:hover {
-    @apply bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100;
+    color: var(--s-800);
+    background-color: var(--color-background);
   }
+}
+
+.user-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.name-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+}
+
+.name {
+  line-height: var(--space-normal);
+  margin: 0 var(--space-small);
+}
+
+.icon {
+  margin-left: var(--space-smaller);
+}
+
+.no-result {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-small) var(--space-one);
 }
 </style>

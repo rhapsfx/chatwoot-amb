@@ -31,7 +31,7 @@
       :title="$t('INBOX_MGMT.SETTINGS_POPUP.AGENT_ASSIGNMENT')"
       :sub-title="$t('INBOX_MGMT.SETTINGS_POPUP.AGENT_ASSIGNMENT_SUB_TEXT')"
     >
-      <label class="w-[75%] settings-item">
+      <label class="medium-9 columns settings-item">
         <div class="enter-to-send--checkbox">
           <input
             id="enableAutoAssignment"
@@ -44,7 +44,7 @@
           </label>
         </div>
 
-        <p class="text-slate-600 dark:text-slate-400 pb-1 text-sm not-italic">
+        <p class="help-text">
           {{ $t('INBOX_MGMT.SETTINGS_POPUP.AUTO_ASSIGNMENT_SUB_TEXT') }}
         </p>
       </label>
@@ -62,7 +62,7 @@
           @blur="$v.maxAssignmentLimit.$touch"
         />
 
-        <p class="text-slate-600 dark:text-slate-400 pb-1 text-sm not-italic">
+        <p class="help-text">
           {{ $t('INBOX_MGMT.AUTO_ASSIGNMENT.MAX_ASSIGNMENT_LIMIT_SUB_TEXT') }}
         </p>
 

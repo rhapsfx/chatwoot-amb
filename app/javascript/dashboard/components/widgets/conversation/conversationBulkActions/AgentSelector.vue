@@ -2,7 +2,13 @@
   <div v-on-clickaway="onCloseAgentList" class="bulk-action__agents">
     <div class="triangle">
       <svg height="12" viewBox="0 0 24 12" width="24">
-        <path d="M20 12l-8-8-12 12" fill-rule="evenodd" stroke-width="1px" />
+        <path
+          d="M20 12l-8-8-12 12"
+          fill="var(--white)"
+          fill-rule="evenodd"
+          stroke="var(--s-50)"
+          stroke-width="1px"
+        />
       </svg>
     </div>
     <div class="header flex-between">
@@ -184,73 +190,110 @@ export default {
 
 <style scoped lang="scss">
 .bulk-action__agents {
-  @apply max-w-[75%] absolute right-2 top-12 origin-top-right w-auto z-20 min-w-[15rem] bg-white dark:bg-slate-800 rounded-lg border border-solid border-slate-50 dark:border-slate-700 shadow-md;
+  background-color: var(--white);
+  border-radius: var(--border-radius-large);
+  border: 1px solid var(--s-50);
+  box-shadow: var(--shadow-dropdown-pane);
+  max-width: 75%;
+  position: absolute;
+  right: var(--space-small);
+  top: var(--space-larger);
+  transform-origin: top right;
+  width: auto;
+  z-index: var(--z-index-twenty);
+  min-width: var(--space-giga);
   .header {
-    @apply p-2.5;
+    padding: var(--space-one);
 
     span {
-      @apply text-sm font-medium;
+      font-size: var(--font-size-small);
+      font-weight: var(--font-weight-medium);
     }
   }
 
   .container {
-    @apply overflow-y-auto max-h-[15rem];
+    max-height: var(--space-giga);
+    overflow-y: auto;
     .agent__list-container {
-      @apply h-full;
+      height: 100%;
     }
     .agent-list-search {
-      @apply py-0 px-2.5 bg-slate-50 dark:bg-slate-900 border border-solid border-slate-100 dark:border-slate-600/70 rounded-md;
+      padding: 0 var(--space-one);
+      border: 1px solid var(--s-100);
+      border-radius: var(--border-radius-medium);
+      background-color: var(--s-50);
       .search-icon {
-        @apply text-slate-400 dark:text-slate-200;
+        color: var(--s-400);
       }
 
       .agent--search_input {
-        @apply border-0 text-xs m-0 dark:bg-transparent bg-transparent h-[unset];
+        border: 0;
+        font-size: var(--font-size-mini);
+        margin: 0;
+        background-color: transparent;
+        height: unset;
       }
     }
   }
   .triangle {
+    display: block;
+    z-index: var(--z-index-one);
+    position: absolute;
+    top: var(--space-minus-slab);
     right: var(--triangle-position);
-    @apply block z-10 absolute -top-3 text-left;
-
-    svg path {
-      @apply fill-white dark:fill-slate-800 stroke-slate-50 dark:stroke-slate-600/50;
-    }
+    text-align: left;
   }
 }
 ul {
-  @apply m-0 list-none;
-
-  li {
-    &:last-child {
-      .agent-list-item {
-        @apply last:rounded-b-lg;
-      }
-    }
-  }
+  margin: 0;
+  list-style: none;
 }
 
 .agent-list-item {
-  @apply flex items-center p-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900;
+  display: flex;
+  align-items: center;
+  padding: var(--space-one);
+  cursor: pointer;
+  &:hover {
+    background-color: var(--s-50);
+  }
   span {
-    @apply text-sm;
+    font-size: var(--font-size-small);
   }
 }
 
 .agent-confirmation-container {
-  @apply flex flex-col h-full p-2.5;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-one);
   p {
-    @apply flex-grow;
+    flex-grow: 1;
   }
   .agent-confirmation-actions {
-    @apply w-full grid grid-cols-2 gap-2.5;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-one);
   }
 }
 .search-container {
-  @apply py-0 px-2.5 sticky top-0 z-20 bg-white dark:bg-slate-800;
+  padding: 0 var(--space-one);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-twenty);
+  background-color: var(--white);
 }
 
 .agent__list-loading {
-  @apply m-2.5 rounded-md bg-slate-25 dark:bg-slate-900 flex items-center justify-center flex-col p-5 h-[calc(95%-6.25rem)];
+  height: calc(95% - var(--space-one));
+  margin: var(--space-one);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--s-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: var(--space-two);
 }
 </style>

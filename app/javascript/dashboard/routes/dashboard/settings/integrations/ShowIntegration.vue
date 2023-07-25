@@ -1,12 +1,9 @@
 <template>
-  <div class="flex-shrink flex-grow overflow-auto p-4">
-    <div class="flex flex-col">
-      <div class="flex flex-col">
-        <div>
-          <div
-            v-if="integrationLoaded"
-            class="bg-white dark:bg-slate-800 border border-solid border-slate-75 dark:border-slate-700/50 rounded-sm mb-4 p-4"
-          >
+  <div class="column content-box">
+    <div class="row">
+      <div class="small-12 columns integrations-wrap">
+        <div class="row integrations">
+          <div v-if="integrationLoaded" class="small-12 columns integration">
             <integration
               :integration-id="integration.id"
               :integration-logo="integration.logo"
@@ -16,10 +13,7 @@
               :integration-action="integrationAction()"
             />
           </div>
-          <div
-            v-if="integration.enabled"
-            class="bg-white dark:bg-slate-800 border border-solid border-slate-75 dark:border-slate-700/50 rounded-sm mb-4 p-4"
-          >
+          <div v-if="integration.enabled" class="small-12 columns integration">
             <IntegrationHelpText />
           </div>
         </div>

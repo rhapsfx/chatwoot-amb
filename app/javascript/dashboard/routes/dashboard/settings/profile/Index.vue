@@ -1,16 +1,14 @@
 <template>
-  <div class="overflow-auto p-6">
+  <div class="columns profile--settings">
     <form @submit.prevent="updateUser('profile')">
-      <div
-        class="flex flex-row border-b border-slate-50 dark:border-slate-700 items-center flex p-4"
-      >
-        <div class="w-[25%] py-4 pr-6 ml-0">
+      <div class="small-12 row profile--settings--row">
+        <div class="columns small-3">
           <h4 class="block-title text-black-900 dark:text-slate-200">
             {{ $t('PROFILE_SETTINGS.FORM.PROFILE_SECTION.TITLE') }}
           </h4>
           <p>{{ $t('PROFILE_SETTINGS.FORM.PROFILE_SECTION.NOTE') }}</p>
         </div>
-        <div class="p-4 w-[45%]">
+        <div class="columns small-9 medium-5">
           <woot-avatar-uploader
             :label="$t('PROFILE_SETTINGS.FORM.PROFILE_IMAGE.LABEL')"
             :src="avatarUrl"
@@ -72,10 +70,8 @@
       </div>
     </form>
     <message-signature />
-    <div
-      class="border-b border-slate-50 dark:border-slate-700 items-center flex p-4 text-black-900 dark:text-slate-300 row"
-    >
-      <div class="w-[25%] py-4 pr-6 ml-0">
+    <div class="profile--settings--row text-black-900 dark:text-slate-300 row">
+      <div class="columns small-3">
         <h4 class="block-title text-black-900 dark:text-slate-200">
           {{ $t('PROFILE_SETTINGS.FORM.SEND_MESSAGE.TITLE') }}
         </h4>
@@ -83,11 +79,11 @@
           {{ $t('PROFILE_SETTINGS.FORM.SEND_MESSAGE.NOTE') }}
         </p>
       </div>
-      <div class="p-4 w-[45%] flex flex-row">
+      <div class="columns small-9 medium-5 card-preview">
         <button
           v-for="keyOption in keyOptions"
           :key="keyOption.key"
-          class="cursor-pointer mr-4"
+          class="preview-button"
           @click="toggleEditorMessageKey(keyOption.key)"
         >
           <preview-card
@@ -101,10 +97,8 @@
     </div>
     <change-password v-if="!globalConfig.disableUserProfileUpdate" />
     <notification-settings />
-    <div
-      class="border-b border-slate-50 dark:border-slate-700 items-center flex p-4 text-black-900 dark:text-slate-300 row"
-    >
-      <div class="w-[25%] py-4 pr-6 ml-0">
+    <div class="profile--settings--row text-black-900 dark:text-slate-300 row">
+      <div class="columns small-3">
         <h4 class="block-title text-black-900 dark:text-slate-200">
           {{ $t('PROFILE_SETTINGS.FORM.ACCESS_TOKEN.TITLE') }}
         </h4>
@@ -117,7 +111,7 @@
           }}
         </p>
       </div>
-      <div class="p-4 w-[45%]">
+      <div class="columns small-9 medium-5">
         <masked-text :value="currentUser.access_token" />
       </div>
     </div>
@@ -277,3 +271,38 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+@import '~dashboard/assets/scss/variables.scss';
+@import '~dashboard/assets/scss/mixins.scss';
+
+.profile--settings {
+  overflow: auto;
+  padding: 24px;
+}
+
+.profile--settings--row {
+  @include border-normal-bottom;
+  align-items: center;
+  display: flex;
+  padding: $space-normal;
+
+  .small-3 {
+    padding: $space-normal $space-medium $space-normal 0;
+  }
+
+  .small-9 {
+    padding: $space-normal;
+  }
+
+  .card-preview {
+    display: flex;
+    flex-direction: row;
+
+    .preview-button {
+      cursor: pointer;
+      margin-right: var(--space-normal);
+    }
+  }
+}
+</style>

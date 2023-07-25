@@ -1,5 +1,5 @@
 <template>
-  <div class="flex actions--container relative items-center gap-2">
+  <div class="flex-container actions--container">
     <woot-button
       v-if="!currentChat.muted"
       v-tooltip="$t('CONTACT_PANEL.MUTE_CONTACT')"
@@ -87,15 +87,31 @@ export default {
 };
 </script>
 <style scoped lang="scss">
+.actions--container {
+  align-items: center;
+
+  .resolve-actions {
+    margin-left: var(--space-small);
+  }
+}
+
 .more--button {
-  @apply items-center flex ml-2 rtl:ml-0 rtl:mr-2;
+  align-items: center;
+  display: flex;
+  margin-left: var(--space-small);
+}
+
+.actions--container {
+  position: relative;
 }
 
 .dropdown-pane {
-  @apply -right-2 top-12;
+  right: var(--space-minus-small);
+  top: 48px;
 }
 
 .icon {
-  @apply mr-1 rtl:mr-0 rtl:ml-1 min-w-[1rem];
+  margin-right: var(--space-smaller);
+  min-width: var(--space-normal);
 }
 </style>

@@ -1,9 +1,9 @@
 <template>
   <modal :show.sync="show" :on-close="onClose">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header :header-title="pageTitle" />
-      <form class="flex flex-col w-full" @submit.prevent="editCannedResponse()">
-        <div class="w-full">
+      <form class="row medium-8" @submit.prevent="editCannedResponse()">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.shortCode.$error }">
             {{ $t('CANNED_MGMT.EDIT.FORM.SHORT_CODE.LABEL') }}
             <input
@@ -15,7 +15,7 @@
           </label>
         </div>
 
-        <div class="w-full">
+        <div class="medium-12 columns">
           <label :class="{ error: $v.content.$error }">
             {{ $t('CANNED_MGMT.EDIT.FORM.CONTENT.LABEL') }}
           </label>
@@ -31,19 +31,21 @@
             />
           </div>
         </div>
-        <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
-          <woot-submit-button
-            :disabled="
-              $v.content.$invalid ||
-                $v.shortCode.$invalid ||
-                editCanned.showLoading
-            "
-            :button-text="$t('CANNED_MGMT.EDIT.FORM.SUBMIT')"
-            :loading="editCanned.showLoading"
-          />
-          <button class="button clear" @click.prevent="onClose">
-            {{ $t('CANNED_MGMT.EDIT.CANCEL_BUTTON_TEXT') }}
-          </button>
+        <div class="modal-footer">
+          <div class="medium-12 columns">
+            <woot-submit-button
+              :disabled="
+                $v.content.$invalid ||
+                  $v.shortCode.$invalid ||
+                  editCanned.showLoading
+              "
+              :button-text="$t('CANNED_MGMT.EDIT.FORM.SUBMIT')"
+              :loading="editCanned.showLoading"
+            />
+            <button class="button clear" @click.prevent="onClose">
+              {{ $t('CANNED_MGMT.EDIT.CANCEL_BUTTON_TEXT') }}
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -139,15 +141,19 @@ export default {
 <style scoped lang="scss">
 ::v-deep {
   .ProseMirror-menubar {
-    @apply hidden;
+    display: none;
   }
 
   .ProseMirror-woot-style {
-    @apply min-h-[12.5rem];
+    min-height: 12.5rem;
 
     p {
-      @apply text-base;
+      font-size: var(--font-size-default);
     }
+  }
+
+  .message-editor {
+    border: 1px solid var(--s-200);
   }
 }
 </style>

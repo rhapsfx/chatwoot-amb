@@ -2,7 +2,13 @@
   <div v-on-clickaway="onClose" class="labels-container">
     <div class="triangle">
       <svg height="12" viewBox="0 0 24 12" width="24">
-        <path d="M20 12l-8-8-12 12" fill-rule="evenodd" stroke-width="1px" />
+        <path
+          d="M20 12l-8-8-12 12"
+          fill="var(--white)"
+          fill-rule="evenodd"
+          stroke="var(--s-50)"
+          stroke-width="1px"
+        />
       </svg>
     </div>
     <div class="header flex-between">
@@ -44,11 +50,7 @@
               :value="label.title"
               class="label-checkbox"
             />
-            <span
-              class="label-title overflow-hidden whitespace-nowrap text-ellipsis"
-            >
-              {{ label.title }}
-            </span>
+            <span class="label-title text-truncate">{{ label.title }}</span>
             <span
               class="label-pill"
               :style="{ backgroundColor: label.color }"
@@ -59,7 +61,6 @@
       <footer class="labels-list__footer">
         <woot-button
           size="small"
-          is-expanded
           color-scheme="primary"
           :disabled="!selectedLabels.length"
           @click="$emit('assign', selectedLabels)"
@@ -107,115 +108,178 @@ export default {
 
 <style scoped lang="scss">
 .labels-list {
-  @apply flex flex-col max-h-[15rem] min-h-[auto];
+  display: flex;
+  flex-direction: column;
+  max-height: var(--space-giga);
+  min-height: auto;
 
   .labels-list__header {
-    @apply bg-white dark:bg-slate-800 py-0 px-2.5;
+    background-color: var(--white);
+    padding: 0 var(--space-one);
   }
 
   .labels-list__body {
-    @apply flex-1 overflow-y-auto py-2.5 mx-0;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-one) 0;
   }
 
   .labels-list__footer {
-    @apply p-2;
+    padding: var(--space-small);
 
     button {
-      @apply w-full;
-
-      .button__content {
-        @apply text-center;
-      }
+      width: 100%;
     }
   }
 }
 
 .label-list-search {
-  @apply bg-slate-50 dark:bg-slate-900 py-0 px-2.5 border border-solid border-slate-100 dark:border-slate-600/70 rounded-md;
+  background-color: var(--s-50);
+  border-radius: var(--border-radius-medium);
+  border: 1px solid var(--s-100);
+  padding: 0 var(--space-one);
 
   .search-icon {
-    @apply text-slate-400 dark:text-slate-200;
+    color: var(--s-400);
   }
 
   .label--search_input {
-    @apply border-0 text-xs m-0 dark:bg-transparent bg-transparent h-[unset];
+    background-color: transparent;
+    border: 0;
+    font-size: var(--font-size-mini);
+    height: unset;
+    margin: 0;
   }
 }
 
 .labels-container {
-  @apply absolute right-2 top-12 origin-top-right w-auto z-20 max-w-[15rem] min-w-[15rem] bg-white dark:bg-slate-800 rounded-lg border border-solid border-slate-50 dark:border-slate-700 shadow-md;
+  background-color: var(--white);
+  border-radius: var(--border-radius-large);
+  border: 1px solid var(--s-50);
+  box-shadow: var(--shadow-dropdown-pane);
+  max-width: var(--space-giga);
+  min-width: var(--space-giga);
+  position: absolute;
+  right: var(--space-small);
+  top: var(--space-larger);
+  transform-origin: top right;
+  width: auto;
+  z-index: var(--z-index-twenty);
 
   .header {
-    @apply p-2.5;
+    padding: var(--space-one);
 
     span {
-      @apply text-sm font-medium;
+      font-size: var(--font-size-small);
+      font-weight: var(--font-weight-medium);
     }
   }
 
   .container {
-    @apply max-h-[15rem] overflow-y-auto;
+    max-height: var(--space-giga);
+    overflow-y: auto;
 
     .label__list-container {
-      @apply h-full;
+      height: 100%;
+    }
+    .label-list-search {
+      padding: 0 var(--space-one);
+      border: 1px solid var(--s-100);
+      border-radius: var(--border-radius-medium);
+      background-color: var(--s-50);
+      .search-icon {
+        color: var(--s-400);
+      }
+
+      .label--search_input {
+        border: 0;
+        font-size: var(--font-size-mini);
+        margin: 0;
+        background-color: transparent;
+        height: unset;
+      }
     }
   }
 
   .triangle {
+    display: block;
+    position: absolute;
     right: var(--triangle-position);
-    @apply block z-10 absolute text-left -top-3;
-
-    svg path {
-      @apply fill-white dark:fill-slate-800 stroke-slate-50 dark:stroke-slate-600/50;
-    }
+    text-align: left;
+    top: var(--space-minus-slab);
+    z-index: var(--z-index-one);
   }
 }
 
 ul {
-  @apply m-0 list-none;
+  margin: 0;
+  list-style: none;
 }
 
 .labels-placeholder {
-  @apply p-2;
+  padding: var(--space-small);
 }
 
 .label__list-item {
-  @apply my-1 mx-0 py-0 px-2.5;
+  margin: var(--space-smaller) 0;
+  padding: 0 var(--space-one);
 
   .item {
-    @apply items-center rounded-md cursor-pointer flex py-1 px-2.5 hover:bg-slate-50 dark:hover:bg-slate-900;
+    align-items: center;
+    border-radius: var(--border-radius-medium);
+    cursor: pointer;
+    display: flex;
+    padding: var(--space-smaller) var(--space-one);
+
+    &:hover {
+      background-color: var(--s-50);
+    }
 
     &.label-selected {
-      @apply bg-slate-50 dark:bg-slate-900;
+      background-color: var(--s-50);
     }
 
     span {
-      @apply text-sm;
+      font-size: var(--font-size-small);
     }
 
     .label-checkbox {
-      @apply my-0 mr-2.5 ml-0;
+      margin: 0 var(--space-one) 0 0;
     }
 
     .label-title {
-      @apply flex-grow w-full;
+      flex-grow: 1;
+      width: 100%;
     }
 
     .label-pill {
-      @apply bg-slate-50 rounded-md h-3 w-3 flex-shrink-0 border border-solid border-slate-50 dark:border-slate-900;
+      background-color: var(--s-50);
+      border-radius: var(--border-radius-medium);
+      height: var(--space-slab);
+      width: var(--space-slab);
+      flex-shrink: 0;
+      border: 1px solid var(--color-border-light);
     }
   }
 }
 
 .search-container {
-  @apply bg-white py-0 px-2.5 sticky top-0 z-20;
+  background-color: var(--white);
+  padding: 0 var(--space-one);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-twenty);
 }
 
 .actions-container {
-  @apply bg-white dark:bg-slate-900 bottom-0 p-2 sticky z-20;
+  background-color: var(--white);
+  bottom: 0;
+  padding: var(--space-small);
+  position: sticky;
+  z-index: var(--z-index-twenty);
 
   button {
-    @apply w-full;
+    width: 100%;
   }
 }
 </style>

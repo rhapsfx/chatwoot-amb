@@ -6,6 +6,20 @@
 
 <style lang="scss">
 kbd.hotkey {
-  @apply inline-flex p-0.5 leading-[0.625rem] min-w-[1rem] tracking-wide uppercase text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-600 text-xxs border border-solid border-slate-75 dark:border-slate-600 rounded flex-shrink-0 items-center select-none justify-center;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  user-select: none;
+  justify-content: center;
+  padding: var(--space-micro);
+  min-width: var(--space-normal);
+  font-size: var(--font-size-micro);
+  border-radius: var(--space-smaller);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  text-transform: uppercase;
+  color: var(--color-body);
+  letter-spacing: var(--space-micro);
+  line-height: var(--font-size-micro);
 }
 </style>

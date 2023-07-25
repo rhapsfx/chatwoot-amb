@@ -511,82 +511,94 @@ export default {
 <style lang="scss">
 .wrap {
   > .bubble {
-    @apply min-w-[128px];
+    min-width: 128px;
 
     &.is-image,
     &.is-video {
-      @apply p-0 overflow-hidden;
+      padding: 0;
+      overflow: hidden;
 
       .image,
       .video {
-        @apply max-w-[20rem] p-0.5;
+        max-width: 20rem;
+        padding: var(--space-micro);
 
         > img,
         > video {
-          @apply rounded-lg;
+          border-radius: var(--border-radius-medium);
         }
         > video {
-          @apply h-full w-full object-cover;
+          height: 100%;
+          object-fit: cover;
+          width: 100%;
         }
       }
       .video {
-        @apply h-[11.25rem];
+        height: 11.25rem;
       }
     }
 
     &.is-image.is-text > .message-text__wrap,
     &.is-video.is-text > .message-text__wrap {
-      @apply max-w-[20rem] py-2 px-4;
+      max-width: 20rem;
+      padding: var(--space-small) var(--space-normal);
     }
 
     &.is-private .file.message-text__wrap {
       .file--icon {
-        @apply text-woot-400 dark:text-woot-400;
+        color: var(--w-400);
       }
       .text-block-title {
-        @apply text-slate-700 dark:text-slate-700;
+        color: #3c4858;
       }
       .download.button {
-        @apply text-woot-400 dark:text-woot-400;
+        color: var(--w-400);
       }
     }
 
     &.is-private.is-text > .message-text__wrap .link {
-      @apply text-woot-700 dark:text-woot-700;
+      color: var(--w-700);
     }
     &.is-private.is-text > .message-text__wrap .prosemirror-mention-node {
-      @apply font-bold bg-none rounded-sm p-0 text-slate-700 dark:text-slate-700 underline;
+      font-weight: var(--font-weight-black);
+      background: none;
+      border-radius: var(--border-radius-small);
+      padding: 0;
+      color: var(--color-body);
+      text-decoration: underline;
     }
 
     &.is-from-bot {
-      @apply bg-violet-400 dark:bg-violet-400;
-
+      background: var(--v-400);
       .message-text--metadata .time {
-        @apply text-violet-50 dark:text-violet-50;
+        color: var(--v-50);
       }
       &.is-private .message-text--metadata .time {
-        @apply text-slate-400 dark:text-slate-400;
+        color: var(--s-400);
       }
     }
 
     &.is-failed {
-      @apply bg-red-200 dark:bg-red-200;
+      background: var(--r-200);
 
       .message-text--metadata .time {
-        @apply text-red-50 dark:text-red-50;
+        color: var(--r-50);
       }
     }
   }
 
   &.is-pending {
-    @apply relative opacity-80;
+    position: relative;
+    opacity: 0.8;
 
     .spinner {
-      @apply absolute bottom-1 right-1;
+      position: absolute;
+      bottom: var(--space-smaller);
+      right: var(--space-smaller);
     }
 
     > .is-image.is-text.bubble > .message-text__wrap {
-      @apply p-0;
+      padding: 0;
     }
   }
 }
@@ -596,97 +608,135 @@ export default {
 }
 
 .sender--info {
-  @apply items-center text-black-700 dark:text-black-100 inline-flex py-1 px-0;
+  align-items: center;
+  color: var(--b-700);
+  display: inline-flex;
+  padding: var(--space-smaller) 0;
 
   .sender--available-name {
-    @apply text-xs ml-1;
+    font-size: var(--font-size-mini);
+    margin-left: var(--space-smaller);
   }
 }
 
 .message-failed--alert {
-  @apply text-red-900 dark:text-red-900 flex-grow text-right mt-1 mr-1 mb-0 ml-0;
+  color: var(--r-900);
+  flex-grow: 1;
+  text-align: right;
+  margin-top: var(--space-smaller) var(--space-smaller) 0 0;
 }
 
 li.left,
 li.right {
-  @apply flex items-end;
+  display: flex;
+  align-items: flex-end;
 }
 
 li.left.has-tweet-menu .context-menu {
-  @apply mb-6;
+  margin-bottom: var(--space-medium);
 }
 
 li.has-bg {
-  @apply bg-woot-75 dark:bg-woot-600;
+  background: var(--w-75);
 }
 
 li.right .context-menu-wrap {
-  @apply ml-auto;
+  margin-left: auto;
 }
 
 li.right {
-  @apply flex-row-reverse justify-end;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
 
   .wrap.is-pending {
-    @apply ml-auto;
+    margin-left: auto;
   }
 
   .wrap.is-failed {
-    @apply flex items-end ml-auto;
+    display: flex;
+    align-items: flex-end;
+    margin-left: auto;
   }
 }
 
 .has-context-menu {
-  @apply bg-slate-50 dark:bg-slate-700;
+  background: var(--color-background);
 }
 
 .context-menu {
-  @apply relative;
+  position: relative;
 }
 
 /* Markdown styling */
 
 .bubble .text-content {
   p code {
-    @apply bg-slate-75 dark:bg-slate-700 inline-block leading-none rounded-sm p-1;
+    background-color: var(--s-75);
+    display: inline-block;
+    line-height: 1;
+
+    border-radius: var(--border-radius-small);
+    padding: var(--space-smaller);
   }
 
   pre {
-    @apply bg-slate-75 dark:bg-slate-700 block border-slate-75 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-md p-2 mt-1 mb-2 leading-relaxed whitespace-pre-wrap;
+    background-color: var(--s-75);
+    border-color: var(--s-75);
+    color: var(--s-800);
+    border-radius: var(--border-radius-normal);
+    padding: var(--space-small);
+    margin-top: var(--space-smaller);
+    margin-bottom: var(--space-small);
+    display: block;
+    line-height: 1.7;
+    white-space: pre-wrap;
 
     code {
-      @apply bg-transparent text-slate-800 dark:text-slate-100 p-0;
+      background-color: transparent;
+      color: var(--s-800);
+      padding: 0;
     }
   }
 
   blockquote {
-    @apply border-l-4 mx-0 my-1 pt-2 pr-2 pb-0 pl-4 border-slate-75 border-solid dark:border-slate-700 text-slate-800 dark:text-slate-100;
+    border-left: var(--space-micro) solid var(--s-75);
+    color: var(--s-800);
+    margin: var(--space-smaller) 0;
+    padding: var(--space-small) var(--space-small) 0 var(--space-normal);
   }
 }
 
 .right .bubble .text-content {
   p code {
-    @apply bg-woot-600 dark:bg-woot-600 text-white dark:text-white;
+    background-color: var(--w-600);
+    color: var(--white);
   }
 
   pre {
-    @apply bg-woot-800 dark:bg-woot-800 border-woot-700 dark:border-woot-700 text-white dark:text-white;
+    background-color: var(--w-800);
+    border-color: var(--w-700);
+    color: var(--white);
 
     code {
-      @apply bg-transparent text-white dark:text-white;
+      background-color: transparent;
+      color: var(--white);
     }
   }
 
   blockquote {
-    @apply border-l-4 border-solid border-woot-400 dark:border-woot-400 text-white dark:text-white;
+    border-left: var(--space-micro) solid var(--w-400);
+    color: var(--white);
 
     p {
-      @apply text-woot-75 dark:text-woot-75;
+      color: var(--w-75);
     }
   }
 }
 
 .story-reply-quote {
-  @apply mt-2 mx-4 mb-0 px-2 pb-0 pt-2 border-l-4 border-solid border-slate-75 dark:border-slate-600 text-slate-600 dark:text-slate-200;
+  border-left: var(--space-micro) solid var(--s-75);
+  color: var(--s-600);
+  margin: var(--space-small) var(--space-normal) 0;
+  padding: var(--space-small) var(--space-small) 0 var(--space-small);
 }
 </style>

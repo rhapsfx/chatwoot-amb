@@ -48,7 +48,6 @@
       :current-page="currentPage"
       :total-count="totalCount"
       :page-size="pageSize"
-      class="dark:bg-slate-900 border-t-0 pl-0 pr-0"
       @page-change="onPageChange"
     />
   </div>
@@ -141,53 +140,66 @@ export default {
 </script>
 <style lang="scss" scoped>
 .article-container {
-  @apply w-full;
+  width: 100%;
 
   .article-container--header {
-    @apply my-0 -mx-4 py-0 px-4 grid grid-cols-8 gap-4 border-b border-slate-100 dark:border-slate-700;
+    margin: 0 var(--space-minus-normal);
+    padding: 0 var(--space-normal);
+    display: grid;
+    gap: var(--space-normal);
+    border-bottom: 1px solid var(--s-100);
+    grid-template-columns: repeat(8, minmax(0, 1fr));
 
     @media (max-width: 1024px) {
-      @apply grid-cols-7;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
     }
 
     @media (max-width: 768px) {
-      @apply grid-cols-6;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
     }
 
     &.draggable {
       div.heading-item.heading-title {
-        @apply py-2 px-3.5;
+        padding: var(--space-small) var(--space-snug);
       }
     }
 
     div.heading-item {
-      @apply font-semibold capitalize text-sm text-right py-2 px-0 text-slate-700 dark:text-slate-100;
+      font-weight: var(--font-weight-bold);
+      text-transform: capitalize;
+      color: var(--s-700);
+      font-size: var(--font-size-small);
+      text-align: right;
+      padding: var(--space-small) 0;
 
       &.heading-title {
-        @apply text-left col-span-4;
+        text-align: left;
+        grid-column: span 4 / span 4;
       }
 
       @media (max-width: 1024px) {
         &.heading-read-count {
-          @apply hidden;
+          display: none;
         }
       }
 
       @media (max-width: 768px) {
         &.heading-read-count,
         &.heading-last-edited {
-          @apply hidden;
+          display: none;
         }
       }
     }
   }
 
   .footer {
-    @apply p-0 border-0;
+    padding: 0;
+    border: 0;
   }
 }
 
 .article-ghost-class {
-  @apply opacity-50 bg-slate-50 dark:bg-slate-800;
+  opacity: 0.5;
+  background-color: var(--s-50);
 }
 </style>

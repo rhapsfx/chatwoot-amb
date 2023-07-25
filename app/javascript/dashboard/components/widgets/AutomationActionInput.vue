@@ -16,7 +16,7 @@
         </option>
       </select>
       <div v-if="showActionInput" class="filter__answer--wrap">
-        <div v-if="inputType" class="w-full">
+        <div v-if="inputType">
           <div
             v-if="inputType === 'search_select'"
             class="multiselect-wrap--small"
@@ -201,80 +201,102 @@ export default {
 
 <style lang="scss" scoped>
 .filter {
-  @apply bg-slate-50 dark:bg-slate-800 p-2 border border-solid border-slate-75 dark:border-slate-600 rounded-md mb-2;
+  background: var(--color-background);
+  padding: var(--space-small);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-medium);
+  margin-bottom: var(--space-small);
 
   &.is-a-macro {
-    @apply mb-0 bg-white dark:bg-slate-700 p-0 border-0 rounded-none;
+    margin-bottom: 0;
+    background: var(--white);
+    padding: var(--space-zero);
+    border: unset;
+    border-radius: unset;
   }
 }
 
 .no-margin-bottom {
-  @apply mb-0;
+  margin-bottom: 0;
 }
 
 .filter.has-error {
-  @apply bg-red-50 dark:bg-red-100;
+  background: var(--r-50);
 }
 
 .filter-inputs {
-  @apply flex;
+  display: flex;
 }
 
 .filter-error {
-  @apply text-red-500 dark:text-red-600 block my-1 mx-0;
+  color: var(--r-500);
+  display: block;
+  margin: var(--space-smaller) 0;
 }
 
 .action__question,
 .filter__operator {
-  @apply mb-0 mr-1;
+  margin-bottom: var(--space-zero);
+  margin-right: var(--space-smaller);
 }
 
 .action__question {
-  @apply max-w-[50%];
+  max-width: 50%;
 }
 
 .action__question.full-width {
-  @apply max-w-full;
+  max-width: 100%;
 }
 
 .filter__answer--wrap {
-  @apply max-w-[50%] flex-grow mr-1 flex w-full items-center justify-start;
+  margin-right: var(--space-smaller);
+  flex-grow: 1;
+  max-width: 50%;
 
   input {
-    @apply mb-0;
+    margin-bottom: 0;
   }
 }
 .filter__answer {
   &.answer--text-input {
-    @apply mb-0;
+    margin-bottom: var(--space-zero);
   }
 }
 
 .filter__join-operator-wrap {
-  @apply relative z-20 m-0;
+  position: relative;
+  z-index: var(--z-index-twenty);
+  margin: var(--space-zero);
 }
 
 .filter__join-operator {
-  @apply flex items-center justify-center relative my-2.5 mx-0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: var(--space-one) var(--space-zero);
 
   .operator__line {
-    @apply absolute w-full border-b border-solid border-slate-75 dark:border-slate-600;
+    position: absolute;
+    width: 100%;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .operator__select {
+    position: relative;
+    width: auto;
     margin-bottom: var(--space-zero) !important;
-    @apply relative w-auto;
   }
 }
 
 .multiselect {
-  @apply mb-0;
+  margin-bottom: var(--space-zero);
 }
 .action-message {
-  @apply mt-2 mx-0 mb-0;
+  margin: var(--space-small) var(--space-zero) var(--space-zero);
 }
 // Prosemirror does not have a native way of hiding the menu bar, hence
 ::v-deep .ProseMirror-menubar {
-  @apply hidden;
+  display: none;
 }
 </style>

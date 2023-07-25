@@ -1,12 +1,12 @@
 <template>
-  <div class="wizard-body w-[75%] flex-shrink-0 flex-grow-0 max-w-[75%] h-auto">
+  <div class="wizard-body height-auto small-9 columns">
     <empty-state
       :title="$t('HELP_CENTER.PORTAL.ADD.CREATE_FLOW_PAGE.FINISH_PAGE.TITLE')"
       :message="
         $t('HELP_CENTER.PORTAL.ADD.CREATE_FLOW_PAGE.FINISH_PAGE.MESSAGE')
       "
     >
-      <div class="w-full text-center">
+      <div class="medium-12 columns text-center">
         <router-link
           class="button success nice"
           :to="{
@@ -37,6 +37,7 @@ export default {
 </script>
 <style lang="scss" scoped>
 .wizard-body {
-  @apply pb-3;
+  padding-top: var(--space-slab);
+  border: 1px solid transparent;
 }
 </style>

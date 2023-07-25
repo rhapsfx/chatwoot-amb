@@ -96,9 +96,7 @@ export default {
                 status={row.status}
               />
               <div class="user-block">
-                <h6 class="title overflow-hidden whitespace-nowrap text-ellipsis">
-                  {row.agent}
-                </h6>
+                <h6 class="title text-truncate">{row.agent}</h6>
                 <span class="sub-title">{row.email}</span>
               </div>
             </div>
@@ -138,7 +136,9 @@ export default {
 
 <style lang="scss" scoped>
 .agent-table-container {
-  @apply flex flex-col flex-1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 
   .ve-table {
     &::v-deep {
@@ -154,34 +154,47 @@ export default {
   }
 
   &::v-deep .ve-pagination {
-    @apply bg-transparent dark:bg-transparent;
+    background-color: transparent;
   }
 
   &::v-deep .ve-pagination-select {
-    @apply hidden;
+    display: none;
   }
 
   .row-user-block {
-    @apply items-center flex text-left;
+    align-items: center;
+    display: flex;
+    text-align: left;
 
     .user-block {
-      @apply items-start flex flex-col min-w-0 my-0 mx-2;
+      align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      margin: 0 var(--space-small);
 
       .title {
-        @apply text-sm m-0 leading-[1.2] text-slate-800 dark:text-slate-100;
+        font-size: var(--font-size-small);
+        margin: var(--zero);
+        line-height: 1.2;
       }
       .sub-title {
-        @apply text-xs text-slate-600 dark:text-slate-200;
+        font-size: var(--font-size-mini);
       }
     }
   }
 
   .table-pagination {
-    @apply mt-4 text-right;
+    margin-top: var(--space-normal);
+    text-align: right;
   }
 }
 
 .agents-loader {
-  @apply items-center flex text-base justify-center p-8;
+  align-items: center;
+  display: flex;
+  font-size: var(--font-size-default);
+  justify-content: center;
+  padding: var(--space-large);
 }
 </style>

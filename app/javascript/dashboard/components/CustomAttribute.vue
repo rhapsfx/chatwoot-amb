@@ -1,7 +1,7 @@
 <template>
-  <div class="py-3 px-4">
-    <div class="flex items-center mb-1">
-      <h4 class="text-block-title flex items-center m-0 w-full error">
+  <div class="custom-attribute">
+    <div class="title-wrap">
+      <h4 class="text-block-title title error">
         <div v-if="isAttributeTypeCheckbox" class="checkbox-wrap">
           <input
             v-model="editedValue"
@@ -10,7 +10,7 @@
             @change="onUpdate"
           />
         </div>
-        <div class="flex items-center justify-between w-full">
+        <div class="name-button__wrap">
           <span
             class="attribute-name"
             :class="{ error: $v.editedValue.$error }"
@@ -24,7 +24,7 @@
             size="medium"
             color-scheme="secondary"
             icon="delete"
-            class-names="flex justify-end w-4"
+            class-names="delete-button"
             @click="onDelete"
           />
         </div>
@@ -47,10 +47,7 @@
             <woot-button size="small" icon="checkmark" @click="onUpdate" />
           </div>
         </div>
-        <span
-          v-if="shouldShowErrorMessage"
-          class="text-red-400 dark:text-red-500 text-sm block font-normal -mt-px w-full"
-        >
+        <span v-if="shouldShowErrorMessage" class="error-message">
           {{ errorMessage }}
         </span>
       </div>
@@ -64,17 +61,14 @@
           :href="value"
           target="_blank"
           rel="noopener noreferrer"
-          class="value inline-block rounded-sm mb-0 break-all py-0.5 px-1"
+          class="value"
         >
           {{ urlValue }}
         </a>
-        <p
-          v-else
-          class="value inline-block rounded-sm mb-0 break-all py-0.5 px-1"
-        >
+        <p v-else class="value">
           {{ displayValue || '---' }}
         </p>
-        <div class="flex max-w-[2rem] gap-1 ml-1 rtl:mr-1 rtl:ml-0">
+        <div class="action-buttons__wrap">
           <woot-button
             v-if="showActions"
             v-tooltip="$t('CUSTOM_ATTRIBUTES.ACTIONS.COPY')"
@@ -275,45 +269,98 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.custom-attribute {
+  padding: var(--space-slab) var(--space-normal);
+}
+
+.title-wrap {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-mini);
+}
+.title {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  width: 100%;
+}
 .checkbox-wrap {
-  @apply flex items-center;
+  display: flex;
+  align-items: center;
 }
 .checkbox {
-  @apply my-0 mr-2 ml-0;
+  margin: 0 var(--space-small) 0 0;
+}
+.name-button__wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 .attribute-name {
-  @apply w-full text-slate-800 dark:text-slate-100;
+  width: 100%;
   &.error {
-    @apply text-red-400 dark:text-red-500;
+    color: var(--r-400);
   }
 }
-
-.edit-button {
-  @apply hidden;
+.title--icon {
+  width: var(--space-two);
 }
-
+.edit-button {
+  display: none;
+}
+.delete-button {
+  display: flex;
+  justify-content: flex-end;
+  width: var(--space-normal);
+}
 .value--view {
-  @apply flex;
+  display: flex;
 
   &.is-editable:hover {
     .value {
-      @apply bg-slate-50 dark:bg-slate-700 mb-0;
+      background: var(--color-background);
+      margin-bottom: 0;
     }
     .edit-button {
-      @apply block;
+      display: block;
     }
   }
+
+  .action-buttons__wrap {
+    display: flex;
+    max-width: var(--space-larger);
+  }
+}
+.value {
+  display: inline-block;
+  min-width: var(--space-mega);
+  border-radius: var(--border-radius-small);
+  margin-bottom: 0;
+  word-break: break-all;
+  padding: var(--space-micro) var(--space-smaller);
+}
+.error-message {
+  color: var(--r-400);
+  display: block;
+  font-size: 0.875rem;
+  font-size: var(--font-size-small);
+  font-weight: 400;
+  margin-bottom: 0.625rem;
+  margin-top: -1rem;
+  width: 100%;
 }
 
 ::v-deep {
   .selector-wrap {
-    @apply m-0 top-1;
+    margin: 0;
+    top: var(--space-smaller);
     .selector-name {
-      @apply ml-0;
+      margin-left: 0;
     }
   }
   .name {
-    @apply ml-0;
+    margin-left: 0;
   }
 }
 </style>

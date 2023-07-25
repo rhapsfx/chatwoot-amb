@@ -1091,34 +1091,51 @@ export default {
 
 <style lang="scss" scoped>
 .send-button {
-  @apply mb-0;
+  margin-bottom: 0;
 }
 
 .message-signature-wrap {
-  @apply my-0 mx-4 px-1 flex max-h-[8vh] items-baseline justify-between hover:bg-slate-25 dark:hover:bg-slate-800 border border-dashed border-slate-100 dark:border-slate-700 rounded-sm overflow-auto;
+  margin: 0 var(--space-normal);
+  padding: var(--space-small);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px dashed var(--s-100);
+  border-radius: var(--border-radius-small);
+  max-height: 8vh;
+  overflow: auto;
+
+  &:hover {
+    background: var(--s-25);
+  }
 }
 
 .message-signature {
-  @apply w-fit m-0;
+  width: fit-content;
+  margin: 0;
 }
 
 .attachment-preview-box {
-  @apply bg-transparent py-0 px-4;
+  padding: 0 var(--space-normal);
+  background: transparent;
 }
 
 .reply-box {
-  @apply border-t border-slate-50 dark:border-slate-700 bg-white dark:bg-slate-900;
+  @apply border-r border-slate-50 dark:border-slate-700 bg-white dark:bg-slate-900;
 
   &.is-private {
-    @apply bg-yellow-50 dark:bg-yellow-50;
+    background: var(--y-50);
   }
 }
 .send-button {
-  @apply mb-0;
+  margin-bottom: 0;
 }
 
 .reply-box__top {
-  @apply relative py-0 px-4 -mt-px border-t border-solid border-slate-50 dark:border-slate-700;
+  position: relative;
+  padding: 0 var(--space-normal);
+  border-top: 1px solid var(--color-border);
+  margin-top: -1px;
 }
 
 .emoji-dialog {
@@ -1160,10 +1177,10 @@ export default {
   }
 }
 .message-signature {
-  @apply mb-0;
+  margin-bottom: 0;
 
   ::v-deep p:last-child {
-    @apply mb-0;
+    margin-bottom: 0;
   }
 }
 

@@ -256,25 +256,25 @@ export default {
 <style lang="scss" scoped>
 .right {
   .message-text--metadata {
-    @apply items-center;
+    align-items: center;
     .time {
-      @apply text-woot-100 dark:text-woot-100;
+      color: var(--w-100);
     }
 
     .action--icon {
-      @apply text-white dark:text-white;
+      color: var(--white);
 
       &.read-tick {
-        @apply text-violet-100 dark:text-violet-100;
+        color: var(--v-100);
       }
 
       &.read-indicator {
-        @apply text-green-200 dark:text-green-200;
+        color: var(--g-200);
       }
     }
 
     .lock--icon--private {
-      @apply text-slate-400 dark:text-slate-400;
+      color: var(--s-400);
     }
   }
 }
@@ -282,31 +282,41 @@ export default {
 .left {
   .message-text--metadata {
     .time {
-      @apply text-slate-400 dark:text-slate-200;
+      color: var(--s-400);
     }
   }
 }
 
 .message-text--metadata {
-  @apply items-start flex;
+  align-items: flex-start;
+  display: flex;
 
   .time {
-    @apply mr-2 block text-xxs leading-[1.8];
+    margin-right: var(--space-small);
+    display: block;
+    font-size: var(--font-size-micro);
+    line-height: 1.8;
   }
 
   .action--icon {
-    @apply mr-2 ml-2 text-slate-900 dark:text-slate-100;
+    margin-right: var(--space-small);
+    margin-left: var(--space-small);
+    color: var(--s-900);
   }
 
   a {
-    @apply text-slate-900 dark:text-slate-100;
+    color: var(--s-900);
   }
 }
 
 .activity-wrap {
   .message-text--metadata {
     .time {
-      @apply ml-2 rtl:mr-2 rtl:ml-0 flex text-center text-xxs text-slate-300 dark:text-slate-200;
+      color: var(--s-300);
+      display: flex;
+      text-align: center;
+      font-size: var(--font-size-micro);
+      margin-left: 0;
     }
   }
 }
@@ -315,28 +325,35 @@ export default {
 .is-video {
   .message-text--metadata {
     .time {
-      @apply bottom-1 text-white dark:text-slate-50 absolute right-2 whitespace-nowrap;
+      bottom: var(--space-smaller);
+      color: var(--white);
+      position: absolute;
+      right: var(--space-small);
+      white-space: nowrap;
 
       &.has-status-icon {
-        @apply right-8 leading-loose;
+        right: var(--space-large);
+        line-height: 2;
       }
     }
     .read-tick {
-      @apply absolute bottom-2 right-2;
+      position: absolute;
+      bottom: var(--space-small);
+      right: var(--space-small);
     }
   }
 }
 
 .is-private {
   .message-text--metadata {
-    @apply items-center;
+    align-items: center;
 
     .time {
-      @apply text-slate-400 dark:text-slate-400;
+      color: var(--s-400);
     }
 
     .icon {
-      @apply text-slate-400 dark:text-slate-400;
+      color: var(--s-400);
     }
   }
 
@@ -344,16 +361,18 @@ export default {
   &.is-video {
     .time {
       position: inherit;
-      @apply pl-2.5;
+      padding-left: var(--space-one);
     }
   }
 }
 
 .delivered-icon {
-  @apply ml-4;
+  margin-left: -var(--space-normal);
 }
 
 .read-indicator-wrap {
-  @apply leading-none flex items-center;
+  line-height: 1;
+  display: flex;
+  align-items: center;
 }
 </style>

@@ -57,36 +57,52 @@ export default {
 
 <style lang="scss" scoped>
 .option-item--user {
-  @apply flex items-center;
+  display: flex;
+  align-items: center;
 }
 .user-identifier {
-  @apply text-xs ml-0.5 text-slate-700 dark:text-slate-100;
+  font-size: var(--font-size-mini);
+  margin-left: var(--space-micro);
+  color: var(--s-700);
 }
 .option__user-data {
-  @apply flex flex-col flex-grow ml-2 mr-2;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  margin-left: var(--space-small);
+  margin-right: var(--space-small);
 }
 .option__body,
 .option__title {
-  @apply flex items-center justify-start leading-[1.2] text-sm;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  line-height: 1.2;
+  font-size: var(--font-size-small);
 }
 .option__body .icon {
-  @apply relative top-px mr-0.5 rtl:mr-0 rtl:ml-0.5;
+  position: relative;
+  top: 1px;
+  margin-right: var(--space-micro);
 }
 .option__title {
-  @apply text-slate-800 dark:text-slate-100 font-medium mb-0.5;
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-micro);
 }
 .option__body {
-  @apply text-xs text-slate-700 dark:text-slate-100 mt-1;
+  font-size: var(--font-size-mini);
+  color: var(--s-700);
 }
 
 .option__user-data .option__body {
   > .phone-icon-wrap,
   > .email-icon-wrap {
-    @apply w-auto flex items-center;
+    width: auto;
   }
 }
 
 .merge-contact--icon {
-  @apply -mb-0.5 mr-0.5;
+  margin-bottom: var(--space-minus-micro);
+  margin-right: var(--space-micro);
 }
 </style>

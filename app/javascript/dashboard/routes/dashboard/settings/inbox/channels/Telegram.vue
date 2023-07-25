@@ -1,11 +1,11 @@
 <template>
-  <div class="wizard-body w-[75%] flex-shrink-0 flex-grow-0 max-w-[75%]">
+  <div class="wizard-body small-9 columns">
     <page-header
       :header-title="$t('INBOX_MGMT.ADD.TELEGRAM_CHANNEL.TITLE')"
       :header-content="$t('INBOX_MGMT.ADD.TELEGRAM_CHANNEL.DESC')"
     />
-    <form class="mx-0 flex flex-wrap" @submit.prevent="createChannel()">
-      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <form class="row" @submit.prevent="createChannel()">
+      <div class="medium-8 columns">
         <label :class="{ error: $v.botToken.$error }">
           {{ $t('INBOX_MGMT.ADD.TELEGRAM_CHANNEL.BOT_TOKEN.LABEL') }}
           <input
@@ -22,7 +22,7 @@
         </p>
       </div>
 
-      <div class="w-full">
+      <div class="medium-12 columns">
         <woot-submit-button
           :loading="uiFlags.isCreating"
           :button-text="$t('INBOX_MGMT.ADD.TELEGRAM_CHANNEL.SUBMIT_BUTTON')"

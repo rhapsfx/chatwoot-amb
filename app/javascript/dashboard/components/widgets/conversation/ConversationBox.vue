@@ -13,7 +13,7 @@
     <woot-tabs
       v-if="dashboardApps.length && currentChat.id"
       :index="activeIndex"
-      class="dashboard-app--tabs bg-white dark:bg-slate-900 -mt-px"
+      class="dashboard-app--tabs"
       @change="onDashboardAppTabChange"
     >
       <woot-tabs-item
@@ -34,10 +34,7 @@
         @contact-panel-toggle="onToggleContactPanel"
       />
       <empty-state v-else :is-on-expanded-layout="isOnExpandedLayout" />
-      <div
-        v-show="showContactPanel"
-        class="conversation-sidebar-wrap basis-full sm:basis-[17.5rem] md:basis-[18.75rem] lg:basis-[19.375rem] xl:basis-[20.625rem] 2xl:basis-[25rem] rtl:border-r border-slate-50 dark:border-slate-700 h-auto overflow-auto z-10 flex-shrink-0 flex-grow-0"
-      >
+      <div v-show="showContactPanel" class="conversation-sidebar-wrap">
         <contact-panel
           v-if="showContactPanel"
           :conversation-id="currentChat.id"
@@ -144,8 +141,12 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+@import '~dashboard/assets/scss/woot';
 .conversation-details-wrap {
-  @apply flex flex-col min-w-0 w-full;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
 
   &.with-border-right {
     @apply border-r border-slate-50 dark:border-slate-700;
@@ -153,18 +154,40 @@ export default {
 }
 
 .dashboard-app--tabs {
-  ::v-deep {
-    .tabs-title {
-      a {
-        @apply pb-2 pt-1;
-      }
-    }
-  }
+  background: var(--white);
+  margin-top: -1px;
+  min-height: var(--dashboard-app-tabs-height);
 }
 
 .conversation-sidebar-wrap {
+  @apply border-r border-slate-50 dark:border-slate-700;
+  background: white;
+  flex-basis: 100%;
+
+  @include breakpoint(medium up) {
+    flex-basis: 17.5rem;
+  }
+
+  @include breakpoint(large up) {
+    flex-basis: 18.75rem;
+  }
+
+  @include breakpoint(xlarge up) {
+    flex-basis: 19.375rem;
+  }
+
+  @include breakpoint(xxlarge up) {
+    flex-basis: 20.625rem;
+  }
+
+  @include breakpoint(xxxlarge up) {
+    flex-basis: 25rem;
+  }
+
   &::v-deep .contact--panel {
-    @apply w-full h-full max-w-full;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
   }
 }
 </style>

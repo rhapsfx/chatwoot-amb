@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 overflow-auto p-4">
+  <div class="row content-box full-height">
     <woot-button
       color-scheme="success"
       class-names="button--fixed-top"
@@ -8,8 +8,8 @@
     >
       {{ $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.HEADER_BTN_TXT') }}
     </woot-button>
-    <div class="flex flex-row gap-4">
-      <div class="w-[60%]">
+    <div class="row">
+      <div class="small-8 columns with-right-space ">
         <p
           v-if="!uiFlags.isFetching && !records.length"
           class="no-items-error-message"
@@ -44,7 +44,7 @@
         </table>
       </div>
 
-      <div class="w-[34%]">
+      <div class="small-4 columns">
         <span
           v-dompurify-html="
             useInstallationName(

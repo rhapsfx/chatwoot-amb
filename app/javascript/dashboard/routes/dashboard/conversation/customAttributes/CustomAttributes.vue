@@ -97,13 +97,13 @@ export default {
 <style scoped lang="scss">
 .custom-attributes--panel {
   .conversation--attribute {
-    @apply border-slate-50 dark:border-slate-700 border-b border-solid;
+    border-bottom: 1px solid var(--color-border-light);
   }
 
   &.odd {
     .conversation--attribute {
       &:nth-child(2n + 1) {
-        @apply bg-slate-25 dark:bg-slate-800;
+        background: var(--s-25);
       }
     }
   }
@@ -111,7 +111,7 @@ export default {
   &.even {
     .conversation--attribute {
       &:nth-child(2n) {
-        @apply bg-slate-25 dark:bg-slate-800;
+        background: var(--s-25);
       }
     }
   }

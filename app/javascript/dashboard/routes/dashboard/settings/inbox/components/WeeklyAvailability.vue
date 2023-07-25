@@ -1,5 +1,5 @@
 <template>
-  <div class="my-2 mx-8">
+  <div class="settings--content">
     <settings-section
       :title="$t('INBOX_MGMT.BUSINESS_HOURS.TITLE')"
       :sub-title="$t('INBOX_MGMT.BUSINESS_HOURS.SUBTITLE')"
@@ -14,18 +14,15 @@
           {{ $t('INBOX_MGMT.BUSINESS_HOURS.TOGGLE_AVAILABILITY') }}
         </label>
         <p>{{ $t('INBOX_MGMT.BUSINESS_HOURS.TOGGLE_HELP') }}</p>
-        <div v-if="isBusinessHoursEnabled" class="mb-6">
+        <div v-if="isBusinessHoursEnabled" class="business-hours-wrap">
           <label class="unavailable-input-wrap">
             {{ $t('INBOX_MGMT.BUSINESS_HOURS.UNAVAILABLE_MESSAGE_LABEL') }}
-            <label
-              v-if="isRichEditorEnabled"
-              class="py-0 px-4 border border-solid border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 rounded-md mx-0 mt-0 mb-4"
-            >
+            <label v-if="isRichEditorEnabled" class="richtext">
               <woot-message-editor
                 v-model="unavailableMessage"
                 :enable-variables="true"
                 :is-format-mode="true"
-                class="message-editor"
+                class="input"
                 :min-height="4"
               />
             </label>
@@ -193,22 +190,30 @@ export default {
 </script>
 <style lang="scss" scoped>
 .timezone-input-wrap {
-  @apply max-w-[37.5rem];
+  max-width: 37.5rem;
 
   &::v-deep .multiselect {
-    @apply mt-2;
+    margin-top: var(--space-small);
   }
-}
-
-::v-deep.message-editor {
-  @apply border-0;
 }
 
 .unavailable-input-wrap {
-  @apply max-w-[37.5rem];
+  max-width: 37.5rem;
 
   textarea {
-    @apply min-h-[4rem] mt-2;
+    min-height: var(--space-jumbo);
+    margin-top: var(--space-small);
   }
+}
+
+.business-hours-wrap {
+  margin-bottom: var(--space-medium);
+}
+
+.richtext {
+  padding: 0 var(--space-normal);
+  border-radius: var(--border-radius-normal);
+  border: 1px solid var(--color-border);
+  margin: 0 0 var(--space-normal);
 }
 </style>

@@ -194,23 +194,33 @@ export default {
 }
 
 .bulk-action__container {
-  @apply p-4 relative border-b border-solid border-slate-100 dark:border-slate-600/70;
+  border-bottom: 1px solid var(--s-100);
+  padding: var(--space-normal);
+  position: relative;
 }
 
 .bulk-action__panel {
-  @apply cursor-pointer;
+  cursor: pointer;
 
   span {
-    @apply text-xs my-0 mx-1;
+    font-size: var(--font-size-mini);
+    margin: 0 var(--space-smaller);
   }
 
   input[type='checkbox'] {
-    @apply cursor-pointer m-0;
+    cursor: pointer;
+    margin: var(--space-zero);
   }
 }
 
 .bulk-action__alert {
-  @apply bg-yellow-50 text-yellow-700 rounded text-xs mt-2 py-1 px-2 border border-solid border-yellow-300 dark:border-yellow-300/10 dark:bg-yellow-200/20 dark:text-yellow-400;
+  background-color: var(--y-50);
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--y-300);
+  color: var(--y-700);
+  font-size: var(--font-size-mini);
+  margin-top: var(--space-small);
+  padding: var(--space-smaller) var(--space-small);
 }
 
 .popover-animation-enter-active,
@@ -219,23 +229,23 @@ export default {
 }
 
 .popover-animation-enter {
+  opacity: 0;
   transform: scale(0.95);
-  @apply opacity-0;
 }
 
 .popover-animation-enter-to {
+  opacity: 1;
   transform: scale(1);
-  @apply opacity-100;
 }
 
 .popover-animation-leave {
+  opacity: 1;
   transform: scale(1);
-  @apply opacity-100;
 }
 
 .popover-animation-leave-to {
+  opacity: 0;
   transform: scale(0.95);
-  @apply opacity-0;
 }
 
 .label-actions-box {

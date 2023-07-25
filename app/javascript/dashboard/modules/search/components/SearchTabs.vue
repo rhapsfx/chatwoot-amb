@@ -45,6 +45,7 @@ export default {
 </script>
 <style lang="scss" scoped>
 .tab-container {
-  @apply mt-1 border-b border-solid border-slate-100 dark:border-slate-800/50;
+  margin-top: var(--space-smaller);
+  border-bottom: 1px solid var(--s-100);
 }
 </style>

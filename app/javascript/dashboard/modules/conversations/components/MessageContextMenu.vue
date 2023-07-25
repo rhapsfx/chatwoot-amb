@@ -234,29 +234,34 @@ export default {
 </script>
 <style lang="scss" scoped>
 .menu-container {
-  @apply p-1 bg-white dark:bg-slate-900 shadow-xl rounded-md;
+  padding: var(--space-smaller);
+  background-color: var(--white);
+  box-shadow: var(--shadow-context-menu);
+  border-radius: var(--border-radius-normal);
 
   hr:first-child {
-    @apply hidden;
+    display: none;
   }
 
   hr {
-    @apply m-1 border-b border-solid border-slate-50 dark:border-slate-800/50;
+    border-bottom: 1px solid var(--color-border-light);
+    margin: var(--space-smaller);
   }
 }
 
 .context-menu--delete-modal {
   ::v-deep {
     .modal-container {
-      @apply max-w-[30rem];
+      max-width: 30rem;
 
       h2 {
-        @apply font-medium text-base;
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-default);
       }
     }
 
     .modal-footer {
-      @apply pt-4 pb-8 px-8;
+      padding: var(--space-normal) var(--space-large) var(--space-large);
     }
   }
 }

@@ -1,6 +1,6 @@
 <template>
-  <div class="wizard-body w-[75%] flex-shrink-0 flex-grow-0 max-w-[75%]">
-    <div class="w-full">
+  <div class="wizard-body columns content-box small-9">
+    <div class="medium-12 columns">
       <h3 class="block-title text-black-900 dark:text-slate-200">
         {{
           $t(
@@ -9,19 +9,17 @@
         }}
       </h3>
     </div>
-    <div
-      class="my-4 mx-0 border-b border-solid border-slate-25 dark:border-slate-800"
-    >
-      <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
-        <div class="mb-4">
+    <div class="portal-form">
+      <div class="medium-8 columns">
+        <div class="form-item">
           <label>
             {{ $t('HELP_CENTER.PORTAL.ADD.LOGO.LABEL') }}
           </label>
-          <div class="flex items-center flex-row">
+          <div class="logo-container">
             <thumbnail :username="name" size="56px" variant="square" />
             <woot-button
               v-if="false"
-              class="ml-3"
+              class="upload-button"
               variant="smooth"
               color-scheme="secondary"
               icon="upload"
@@ -30,13 +28,11 @@
               {{ $t('HELP_CENTER.PORTAL.ADD.LOGO.UPLOAD_BUTTON') }}
             </woot-button>
           </div>
-          <p
-            class="mt-1 mb-0 text-xs text-slate-600 dark:text-slate-400 not-italic"
-          >
+          <p class="logo-help--text">
             {{ $t('HELP_CENTER.PORTAL.ADD.LOGO.HELP_TEXT') }}
           </p>
         </div>
-        <div class="mb-4">
+        <div class="form-item">
           <woot-input
             v-model.trim="name"
             :class="{ error: $v.name.$error }"
@@ -48,7 +44,7 @@
             @input="onNameChange"
           />
         </div>
-        <div class="mb-4">
+        <div class="form-item">
           <woot-input
             v-model.trim="slug"
             :class="{ error: $v.slug.$error }"
@@ -59,7 +55,7 @@
             @blur="$v.slug.$touch"
           />
         </div>
-        <div class="mb-4">
+        <div class="form-item">
           <woot-input
             v-model.trim="domain"
             :class="{ error: $v.domain.$error }"
@@ -189,15 +185,40 @@ export default {
 </script>
 <style lang="scss" scoped>
 .wizard-body {
-  @apply pt-3 border border-solid border-transparent dark:border-transparent;
+  padding-top: var(--space-slab);
+  border: 1px solid transparent;
 }
 
+.portal-form {
+  margin: var(--space-normal) 0;
+  border-bottom: 1px solid var(--s-25);
+
+  .form-item {
+    margin-bottom: var(--space-normal);
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      flex-direction: row;
+      .upload-button {
+        margin-left: var(--space-slab);
+      }
+    }
+    .logo-help--text {
+      margin-top: var(--space-smaller);
+      margin-bottom: 0;
+      font-size: var(--font-size-mini);
+      color: var(--s-600);
+      font-style: normal;
+    }
+  }
+}
 ::v-deep {
   input {
-    @apply mb-1;
+    margin-bottom: var(--space-smaller);
   }
   .help-text {
-    @apply mb-0;
+    margin-bottom: 0;
   }
 }
 </style>

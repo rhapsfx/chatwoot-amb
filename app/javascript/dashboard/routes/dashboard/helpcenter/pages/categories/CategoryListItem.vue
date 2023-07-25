@@ -64,10 +64,7 @@
         </tr>
       </tbody>
     </table>
-    <p
-      v-if="categories.length === 0"
-      class="flex justify-center text-slate-500 dark:text-slate-300 text-base mt-8"
-    >
+    <p v-if="categories.length === 0" class="empty-text">
       {{ $t('HELP_CENTER.PORTAL.EDIT.CATEGORIES.TABLE.EMPTY_TEXT') }}
     </p>
   </div>
@@ -96,17 +93,31 @@ export default {
 <style lang="scss" scoped>
 table {
   thead tr th {
-    @apply text-sm font-medium normal-case text-slate-800 dark:text-slate-100 pl-0 rtl:pl-2.5 rtl:pr-0 pt-0;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    text-transform: none;
+    color: var(--s-600);
+    padding-left: 0;
+    padding-top: 0;
   }
 
   tbody tr {
-    @apply border-b-0;
+    border-bottom: 0;
     td {
-      @apply text-sm pl-0 rtl:pl-2.5 rtl:pr-0 text-slate-700 dark:text-slate-100;
+      font-size: var(--font-size-small);
+      padding-left: 0;
     }
   }
 }
 .horizontal-line {
-  @apply border-b border-solid border-slate-75 dark:border-slate-700;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.empty-text {
+  display: flex;
+  justify-content: center;
+  color: var(--s-500);
+  font-size: var(--font-size-default);
+  margin-top: var(--space-large);
 }
 </style>

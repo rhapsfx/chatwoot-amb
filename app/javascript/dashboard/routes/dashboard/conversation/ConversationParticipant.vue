@@ -1,13 +1,13 @@
 <template>
-  <div class="relative bg-white dark:bg-slate-900">
-    <div class="flex justify-between">
-      <div class="flex justify-between w-full mb-1">
+  <div class="watchers-wrap">
+    <div class="watchers--collapsed">
+      <div class="content-wrap">
         <div>
-          <p v-if="watchersList.length" class="total-watchers m-0 text-sm">
+          <p v-if="watchersList.length" class="total-watchers message-text">
             <spinner v-if="watchersUiFlas.isFetching" size="tiny" />
             {{ totalWatchersText }}
           </p>
-          <p v-else class="text-muted m-0 text-sm">
+          <p v-else class="text-muted message-text">
             {{ $t('CONVERSATION_PARTICIPANTS.NO_PARTICIPANTS_TEXT') }}
           </p>
         </div>
@@ -22,16 +22,13 @@
         />
       </div>
     </div>
-    <div class="flex justify-between items-center">
+    <div class="actions">
       <thumbnail-group
         :more-thumbnails-text="moreThumbnailsText"
         :show-more-thumbnails-count="showMoreThumbs"
         :users-list="thumbnailList"
       />
-      <p
-        v-if="isUserWatching"
-        class="text-slate-300 dark:text-slate-300 m-0 text-sm"
-      >
+      <p v-if="isUserWatching" class="text-muted message-text">
         {{ $t('CONVERSATION_PARTICIPANTS.YOU_ARE_WATCHING') }}
       </p>
       <woot-button
@@ -53,10 +50,8 @@
       :class="{ 'dropdown-pane--open': showDropDown }"
       class="dropdown-pane"
     >
-      <div class="flex justify-between items-center mb-1">
-        <h4
-          class="text-sm m-0 overflow-hidden whitespace-nowrap text-ellipsis text-slate-800 dark:text-slate-100"
-        >
+      <div class="dropdown__header">
+        <h4 class="text-block-title text-truncate">
           {{ $t('CONVERSATION_PARTICIPANTS.ADD_PARTICIPANTS') }}
         </h4>
         <woot-button
@@ -230,7 +225,46 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+.watchers-wrap {
+  position: relative;
+}
+
+.content-wrap {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: var(--space-smaller);
+}
+
+.watchers--collapsed {
+  display: flex;
+  justify-content: space-between;
+}
+
 .dropdown-pane {
-  @apply box-border top-8 w-full;
+  box-sizing: border-box;
+  top: var(--space-large);
+  width: 100%;
+}
+.dropdown__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-smaller);
+
+  .text-block-title {
+    margin: 0;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.message-text {
+  margin: 0;
+  font-size: var(--font-size-small);
 }
 </style>

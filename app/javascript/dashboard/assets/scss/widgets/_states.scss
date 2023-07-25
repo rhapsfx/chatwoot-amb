@@ -1,1 +1,27 @@
-// To be removed
+
+// EMPTY STATES
+.empty-state {
+  padding: $space-jumbo $space-smaller;
+
+  .title,
+  .message {
+    display: block;
+    text-align: center;
+    width: 100%;
+  }
+
+  .title {
+    font-size: $font-size-giga;
+    font-weight: $font-weight-feather;
+  }
+
+  .message {
+    color: $color-gray;
+    margin: $space-normal auto;
+    width: 90%;
+  }
+
+  .button {
+    margin-top: $space-medium;
+  }
+}

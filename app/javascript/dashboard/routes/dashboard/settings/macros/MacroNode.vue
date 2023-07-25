@@ -106,17 +106,29 @@ export default {
 
 <style scoped lang="scss">
 .macros__node-drag-handle {
-  @apply cursor-move -left-8 absolute;
+  position: absolute;
+  left: var(--space-minus-large);
+  cursor: move;
 }
 .macro__node-action-container {
-  @apply w-full min-w-0 basis-full items-center flex relative;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-basis: 100%;
+  min-width: 0;
+  width: 100%;
 
   .macro__node-action-item {
-    @apply flex-grow bg-white dark:bg-slate-700 p-2 mr-2 rounded-md shadow-sm;
+    flex-grow: 1;
+    background-color: var(--white);
+    padding: var(--space-small);
+    margin-right: var(--space-small);
+    border-radius: var(--border-radius-medium);
+    box-shadow: var(--shadow);
 
     &.has-error {
       animation: shake 0.3s ease-in-out 0s 2;
-      @apply bg-red-50 dark:bg-red-100;
+      background-color: var(--r-50);
     }
   }
 }

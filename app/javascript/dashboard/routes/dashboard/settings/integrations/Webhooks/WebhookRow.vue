@@ -1,17 +1,15 @@
 <template>
   <tr>
     <td>
-      <div class="text-slate-700 dark:text-slate-100 font-medium break-words">
-        {{ webhook.url }}
-      </div>
-      <span class="text-slate-500 dark:text-slate-400 text-xs">
-        <span class="font-medium">
+      <div class="webhook--link">{{ webhook.url }}</div>
+      <span class="webhook--subscribed-events">
+        <span class="webhook--subscribed-label">
           {{ $t('INTEGRATION_SETTINGS.WEBHOOK.SUBSCRIBED_EVENTS') }}:
         </span>
         <show-more :text="subscribedEvents" :limit="60" />
       </span>
     </td>
-    <td class="max-w-[6.25rem] min-w-[auto] flex gap-3">
+    <td class="button-wrapper">
       <woot-button
         v-tooltip.top="$t('INTEGRATION_SETTINGS.WEBHOOK.EDIT.BUTTON_TEXT')"
         variant="smooth"
@@ -56,3 +54,28 @@ export default {
   },
 };
 </script>
+<style scoped lang="scss">
+.webhook--link {
+  color: var(--s-700);
+  font-weight: var(--font-weight-medium);
+  word-break: break-word;
+}
+
+.webhook--subscribed-events {
+  color: var(--s-500);
+  font-size: var(--font-size-mini);
+}
+
+.webhook--subscribed-label {
+  font-weight: var(--font-weight-medium);
+}
+
+.button-wrapper {
+  max-width: var(--space-mega);
+  min-width: auto;
+
+  button:nth-child(2) {
+    margin-left: var(--space-normal);
+  }
+}
+</style>

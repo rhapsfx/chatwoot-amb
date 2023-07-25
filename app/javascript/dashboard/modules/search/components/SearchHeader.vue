@@ -71,31 +71,39 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import 'app/javascript/dashboard/assets/scss/_mixins.scss';
 .input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--space-small) var(--space-normal);
+  border: 1px solid var(--s-100);
+  border-radius: var(--border-radius-small);
   transition: border-bottom 0.2s ease-in-out;
-  @apply relative flex items-center py-2 px-4 rounded-sm border border-solid border-slate-100 dark:border-slate-800;
 
   input[type='search'] {
-    @apply w-full m-0 shadow-none border-transparent active:border-transparent active:shadow-none hover:border-transparent hover:shadow-none focus:border-transparent focus:shadow-none;
+    @include ghost-input;
+    width: 100%;
+    margin: 0;
   }
 
   &.is-focused {
-    @apply border-woot-100 dark:border-woot-600;
+    border-color: var(--w-100);
 
     .icon {
       color: var(--w-400);
-      @apply text-woot-400 dark:text-woot-500;
     }
   }
 }
 .icon-container {
-  @apply flex items-center;
+  display: flex;
+  align-items: center;
   .icon {
-    @apply text-slate-400;
+    color: var(--s-400);
   }
 }
 
 .helper-label {
-  @apply m-0;
+  margin: 0;
 }
 </style>

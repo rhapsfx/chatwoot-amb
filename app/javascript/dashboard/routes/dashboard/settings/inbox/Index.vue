@@ -1,8 +1,8 @@
 <template>
-  <div class="flex-1 overflow-auto p-4">
+  <div class="column content-box">
     <!-- List Canned Response -->
-    <div class="flex flex-row gap-4">
-      <div class="w-[60%]">
+    <div class="row">
+      <div class="small-8 columns with-right-space">
         <p v-if="!inboxesList.length" class="no-items-error-message">
           {{ $t('INBOX_MGMT.LIST.404') }}
           <router-link
@@ -98,7 +98,7 @@
         </table>
       </div>
 
-      <div class="w-[34%]">
+      <div class="small-4 columns">
         <span
           v-dompurify-html="
             useInstallationName(

@@ -1,14 +1,12 @@
 <template>
   <div>
-    <div
-      class="bg-white dark:bg-slate-900 rounded-md relative flex mb-3 p-4 border border-solid border-slate-100 dark:border-slate-600"
-    >
+    <div class="portal">
       <thumbnail :username="portal.name" variant="square" />
-      <div class="ml-2 rtl:ml-0 rtl:mr-2 flex-grow">
-        <header class="flex items-start justify-between mb-8">
+      <div class="container">
+        <header>
           <div>
-            <div class="flex items-center">
-              <h2 class="mb-0 text-lg text-slate-800 dark:text-slate-100">
+            <div class="title-status--wrap">
+              <h2 class="portal-title block-title">
                 {{ portal.name }}
               </h2>
               <woot-label
@@ -16,10 +14,10 @@
                 :color-scheme="labelColor"
                 size="small"
                 variant="smooth"
-                class="my-0 mx-2"
+                class="status"
               />
             </div>
-            <p class="text-sm mb-0 text-slate-700 dark:text-slate-200">
+            <p class="portal-count">
               {{ articleCount }}
               {{
                 $t(
@@ -28,11 +26,12 @@
               }}
             </p>
           </div>
-          <div class="flex flex-row gap-1">
+          <div>
             <woot-button
               variant="smooth"
               size="small"
               color-scheme="primary"
+              class="header-action-buttons"
               @click="addLocale"
             >
               {{
@@ -43,6 +42,7 @@
               variant="hollow"
               size="small"
               color-scheme="secondary"
+              class="header-action-buttons"
               @click="openSite"
             >
               {{
@@ -58,6 +58,7 @@
               variant="hollow"
               size="small"
               icon="settings"
+              class="header-action-buttons"
               color-scheme="secondary"
               @click="openSettings"
             />
@@ -69,98 +70,93 @@
               color-scheme="alert"
               size="small"
               icon="delete"
+              class="header-action-buttons"
               @click="onClickOpenDeleteModal(portal)"
             />
           </div>
         </header>
-        <div class="mb-12">
-          <h2
-            class="text-slate-800 dark:text-slate-100 font-medium mb-2 text-base"
-          >
+        <div class="portal-locales">
+          <h2 class="locale-title sub-block-title">
             {{
               $t(
                 'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.TITLE'
               )
             }}
           </h2>
-          <div
-            class="flex justify-between mr-[6.25rem] rtl:mr-0 rtl:ml-[6.25rem] max-w-[80vw]"
-          >
-            <div class="flex flex-col">
-              <div class="flex items-start flex-col mb-4">
+          <div class="configuration-items--wrap">
+            <div class="configuration-items">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.NAME'
                   )
                 }}</label>
-                <span class="text-sm text-slate-600 dark:text-slate-300">
+                <span class="text-block-title">
                   {{ portal.name }}
                 </span>
               </div>
-              <div class="flex items-start flex-col mb-4">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.DOMAIN'
                   )
                 }}</label>
-                <span class="text-sm text-slate-600 dark:text-slate-300">
+                <span class="text-block-title">
                   {{ portal.custom_domain }}
                 </span>
               </div>
             </div>
-            <div class="flex flex-col">
-              <div class="flex items-start flex-col mb-4">
+            <div class="configuration-items">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.SLUG'
                   )
                 }}</label>
-                <span class="text-sm text-slate-600 dark:text-slate-300">
+                <span class="text-block-title">
                   {{ portal.slug }}
                 </span>
               </div>
-              <div class="flex items-start flex-col mb-4">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.TITLE'
                   )
                 }}</label>
-                <span class="text-sm text-slate-600 dark:text-slate-300">
+                <span class="text-block-title">
                   {{ portal.page_title }}
                 </span>
               </div>
             </div>
-            <div class="flex flex-col">
-              <div class="flex items-start flex-col mb-4">
+            <div class="configuration-items">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.THEME'
                   )
                 }}</label>
-                <div class="flex items-center">
+                <div class="content-theme-wrap">
                   <div
-                    class="w-4 h-4 rounded-md mr-1 rtl:mr-0 rtl:ml-1 border border-solid border-slate-25 dark:border-slate-800"
+                    class="theme-color"
                     :style="{ background: portal.color }"
                   />
                 </div>
               </div>
-              <div class="flex items-start flex-col mb-4">
+              <div class="configuration-item">
                 <label>{{
                   $t(
                     'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.PORTAL_CONFIG.ITEMS.SUB_TEXT'
                   )
                 }}</label>
-                <span class="text-sm text-slate-600 dark:text-slate-300">
+                <span class="text-block-title">
                   {{ portal.header_text }}
                 </span>
               </div>
             </div>
           </div>
         </div>
-        <div class="mb-12">
-          <h2
-            class="text-slate-800 dark:text-slate-100 font-medium mb-2 text-base"
-          >
+        <div class="portal-locales">
+          <h2 class="locale-title sub-block-title">
             {{
               $t(
                 'HELP_CENTER.PORTAL.PORTAL_SETTINGS.LIST_ITEM.AVAILABLE_LOCALES.TITLE'
@@ -369,3 +365,94 @@ export default {
   },
 };
 </script>
+
+<style lang="scss" scoped>
+.portal {
+  background-color: var(--white);
+  padding: var(--space-normal);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--border-radius-medium);
+  position: relative;
+  display: flex;
+  margin-bottom: var(--space-slab);
+
+  .container {
+    margin-left: var(--space-small);
+    flex-grow: 1;
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: var(--space-large);
+      .title-status--wrap {
+        display: flex;
+        align-items: center;
+        .status {
+          margin: 0 var(--space-small);
+        }
+      }
+      .portal-title {
+        margin-bottom: 0;
+      }
+      .portal-count {
+        font-size: var(--font-size-small);
+        margin-bottom: 0;
+        color: var(--s-700);
+      }
+      .header-action-buttons {
+        margin-left: var(--space-smaller);
+      }
+    }
+    .portal-locales {
+      margin-bottom: var(--space-large);
+      .locale-title {
+        color: var(--s-800);
+        font-weight: var(--font-weight-medium);
+        margin-bottom: var(--space-small);
+      }
+    }
+
+    .portal--heading {
+      margin-bottom: var(--space-normal);
+    }
+  }
+  .portal-settings--icon {
+    padding: var(--space-smaller);
+    margin-left: var(--space-small);
+
+    &:hover {
+      cursor: pointer;
+      background: var(--s-50);
+      border-radius: var(--border-radius-normal);
+    }
+  }
+  .configuration-items--wrap {
+    display: flex;
+    justify-content: space-between;
+    margin-right: var(--space-mega);
+    max-width: 80vw;
+    .configuration-items {
+      display: flex;
+      flex-direction: column;
+    }
+    .configuration-item {
+      display: flex;
+      align-items: flex-start;
+      flex-direction: column;
+      margin-bottom: var(--space-normal);
+      .content-theme-wrap {
+        display: flex;
+        align-items: center;
+      }
+      .theme-color {
+        width: var(--space-normal);
+        height: var(--space-normal);
+        border-radius: var(--border-radius-normal);
+        margin-right: var(--space-smaller);
+        border: 1px solid var(--color-border-light);
+      }
+    }
+  }
+}
+</style>

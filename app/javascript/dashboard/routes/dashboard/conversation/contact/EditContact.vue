@@ -1,6 +1,6 @@
 <template>
   <woot-modal :show.sync="show" :on-close="onCancel" modal-type="right-aligned">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header
         :header-title="
           `${$t('EDIT_CONTACT.TITLE')} - ${contact.name || contact.email}`

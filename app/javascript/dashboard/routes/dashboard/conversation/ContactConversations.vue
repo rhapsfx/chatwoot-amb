@@ -71,13 +71,14 @@ export default {
 
 <style lang="scss" scoped>
 .no-label-message {
-  @apply text-slate-500 dark:text-slate-400 mb-4;
+  margin-bottom: var(--space-normal);
+  color: var(--b-500);
 }
 
 ::v-deep .conversation {
-  @apply pr-0;
+  padding-right: 0;
   .conversation--details {
-    @apply pl-2;
+    padding-left: var(--space-small);
   }
 }
 </style>

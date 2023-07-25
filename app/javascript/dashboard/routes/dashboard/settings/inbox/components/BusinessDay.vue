@@ -203,69 +203,97 @@ export default {
 </script>
 <style lang="scss" scoped>
 .day-wrap::v-deep .multiselect {
-  @apply m-0 w-[7.5rem];
+  margin: 0;
+  width: 7.5rem;
 
   > .multiselect__tags {
-    @apply pl-3;
+    padding-left: var(--space-slab);
 
     .multiselect__single {
-      @apply text-sm leading-6 py-2 px-0;
+      font-size: var(--font-size-small);
+      line-height: var(--space-medium);
+      padding: var(--space-small) 0;
     }
   }
 }
 .day-wrap {
-  @apply flex items-center justify-between py-2 px-0 min-h-[3rem] box-content border-b border-solid border-slate-50 dark:border-slate-600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-small) 0;
+  min-height: var(--space-larger);
+  box-sizing: content-box;
+  border-bottom: 1px solid var(--color-border-light);
 }
-
 .enable-checkbox {
-  @apply m-0;
+  margin: 0;
 }
 
 .hours-select-wrap {
-  @apply flex flex-col flex-shrink-0 flex-grow relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  flex-grow: 1;
+  position: relative;
 }
 
 .hours-range,
 .day-unavailable {
-  @apply flex items-center flex-shrink-0 flex-grow;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  flex-grow: 1;
 }
 
 .day-unavailable {
-  @apply text-sm text-slate-500 dark:text-slate-300;
+  font-size: var(--font-size-small);
+  color: var(--s-500);
 }
 
 .checkbox-wrap {
-  @apply flex items-center;
+  display: flex;
+  align-items: center;
 }
 
 .separator-icon,
 .day {
-  @apply flex items-center py-0 px-3;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-slab);
+  height: 100%;
 }
 
 .day {
-  @apply text-sm font-medium w-[8.125rem];
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  width: 8.125rem;
 }
 
 .label {
-  @apply bg-woot-50 dark:bg-woot-600 text-woot-700 dark:text-woot-100 text-xs;
+  font-size: var(--font-size-mini);
+  color: var(--w-700);
+  background: var(--w-50);
 }
 
 .date-error {
-  @apply pt-1;
+  padding-top: var(--space-smaller);
 }
 
 .error {
-  @apply text-xs text-red-300 dark:text-red-500;
+  font-size: var(--font-size-mini);
+  color: var(--r-300);
 }
 
 .open-all-day {
-  @apply mr-6;
+  margin-right: var(--space-medium);
   span {
-    @apply text-sm font-medium ml-1;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    margin-left: var(--space-smaller);
   }
   input {
-    @apply text-sm font-medium;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
   }
 }
 </style>

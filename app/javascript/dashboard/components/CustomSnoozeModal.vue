@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col">
+  <div class="column">
     <woot-modal-header :header-title="$t('CONVERSATION.CUSTOM_SNOOZE.TITLE')" />
-    <form class="modal-content" @submit.prevent="chooseTime">
+    <form class="row modal-content" @submit.prevent="chooseTime">
       <date-picker
         v-model="snoozeTime"
         type="datetime"
@@ -11,7 +11,7 @@
         :disabled-time="disabledTime"
         :popup-style="{ width: '100%' }"
       />
-      <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
+      <div class="modal-footer justify-content-end w-full">
         <woot-button variant="clear" @click.prevent="onClose">
           {{ this.$t('CONVERSATION.CUSTOM_SNOOZE.CANCEL') }}
         </woot-button>
@@ -64,8 +64,12 @@ export default {
   },
 };
 </script>
+
 <style lang="scss" scoped>
+.modal-footer {
+  padding: var(--space-two);
+}
 .modal-content {
-  @apply pt-2 px-5 pb-6;
+  padding: var(--space-small) var(--space-two) var(--space-zero);
 }
 </style>

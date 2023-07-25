@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-300 border-slate-50 dark:border-slate-800/50 border-l rtl:border-l-0 rtl:border-r contact--panel overflow-y-auto"
+    class="medium-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-300 contact--panel"
   >
     <contact-info
       :contact="contact"
@@ -21,7 +21,7 @@
         <div
           v-for="element in conversationSidebarItems"
           :key="element.name"
-          class="bg-white dark:bg-gray-800"
+          class="list-group-item"
         >
           <div
             v-if="element.name === 'conversation_actions'"
@@ -257,19 +257,72 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '~dashboard/assets/scss/variables';
+
+.contact--panel {
+  border-left: 1px solid var(--color-border);
+  font-size: $font-size-small;
+  overflow-y: auto;
+  overflow: auto;
+  position: relative;
+
+  i {
+    margin-right: $space-smaller;
+  }
+}
+
+.list-group {
+  .list-group-item {
+    background-color: var(--white);
+  }
+}
+
 ::v-deep {
   .contact--profile {
-    @apply pb-3 border-b border-solid border-slate-75 dark:border-slate-700;
+    padding-bottom: var(--space-slab);
+    border-bottom: 1px solid var(--color-border);
   }
   .conversation--actions .multiselect-wrap--small {
     .multiselect {
-      @apply box-border pl-6;
+      padding-left: var(--space-medium);
+      box-sizing: border-box;
     }
     .multiselect__element {
       span {
-        @apply w-full;
+        width: 100%;
       }
     }
   }
+}
+
+.conversation--labels {
+  padding: $space-medium;
+
+  .icon {
+    margin-right: $space-micro;
+    font-size: $font-size-micro;
+    color: #fff;
+  }
+
+  .label {
+    color: #fff;
+    padding: 0.125rem;
+  }
+}
+
+.contact--mute {
+  color: $alert-color;
+  display: block;
+  text-align: left;
+}
+
+.contact--actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.contact-info {
+  margin-top: var(--space-two);
 }
 </style>

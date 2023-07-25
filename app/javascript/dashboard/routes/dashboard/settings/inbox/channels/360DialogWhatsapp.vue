@@ -1,6 +1,6 @@
 <template>
-  <form class="mx-0 flex flex-wrap" @submit.prevent="createChannel()">
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+  <form class="row" @submit.prevent="createChannel()">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.inboxName.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.INBOX_NAME.LABEL') }}
         <input
@@ -15,7 +15,7 @@
       </label>
     </div>
 
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.phoneNumber.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.PHONE_NUMBER.LABEL') }}
         <input
@@ -30,7 +30,7 @@
       </label>
     </div>
 
-    <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
+    <div class="medium-8 columns">
       <label :class="{ error: $v.apiKey.$error }">
         <span>
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.LABEL') }}
@@ -47,7 +47,7 @@
       </label>
     </div>
 
-    <div class="w-full">
+    <div class="medium-12 columns">
       <woot-submit-button
         :loading="uiFlags.isCreating"
         :button-text="$t('INBOX_MGMT.ADD.WHATSAPP.SUBMIT_BUTTON')"

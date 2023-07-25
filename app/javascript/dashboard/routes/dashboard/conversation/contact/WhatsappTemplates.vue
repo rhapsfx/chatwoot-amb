@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-0 flex flex-wrap">
+  <div class="row">
     <templates-picker
       v-if="!selectedWaTemplate"
       :inbox-id="inboxId"

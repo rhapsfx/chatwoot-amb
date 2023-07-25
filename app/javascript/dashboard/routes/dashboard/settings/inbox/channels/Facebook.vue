@@ -1,6 +1,6 @@
 <template>
-  <div class="wizard-body w-[75%] flex-shrink-0 flex-grow-0 max-w-[75%]">
-    <div v-if="!hasLoginStarted" class="login-init h-full">
+  <div class="wizard-body columns content-box small-9">
+    <div v-if="!hasLoginStarted" class="login-init full-height">
       <a href="#" @click="startLogin()">
         <img
           src="~dashboard/assets/images/channels/facebook_login.png"
@@ -18,12 +18,8 @@
     </div>
     <div v-else>
       <loading-state v-if="showLoader" :message="emptyStateMessage" />
-      <form
-        v-if="!showLoader"
-        class="mx-0 flex flex-wrap"
-        @submit.prevent="createChannel()"
-      >
-        <div class="w-full">
+      <form v-if="!showLoader" class="row" @submit.prevent="createChannel()">
+        <div class="medium-12 columns">
           <page-header
             :header-title="$t('INBOX_MGMT.ADD.DETAILS.TITLE')"
             :header-content="
@@ -34,8 +30,8 @@
             "
           />
         </div>
-        <div class="w-[60%]">
-          <div class="w-full">
+        <div class="medium-7 columns">
+          <div class="medium-12 columns">
             <div class="input-wrap" :class="{ error: $v.selectedPage.$error }">
               {{ $t('INBOX_MGMT.ADD.FB.CHOOSE_PAGE') }}
               <multiselect
@@ -56,7 +52,7 @@
               </span>
             </div>
           </div>
-          <div class="w-full">
+          <div class="medium-12 columns">
             <label :class="{ error: $v.pageName.$error }">
               {{ $t('INBOX_MGMT.ADD.FB.INBOX_NAME') }}
               <input
@@ -70,7 +66,7 @@
               </span>
             </label>
           </div>
-          <div class="w-full text-right">
+          <div class="medium-12 columns text-right">
             <input type="submit" value="Create Inbox" class="button" />
           </div>
         </div>

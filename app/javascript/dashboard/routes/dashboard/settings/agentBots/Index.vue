@@ -1,7 +1,7 @@
 <template>
-  <div class="flex-1 overflow-auto p-4">
-    <div class="flex flex-row gap-4">
-      <div class="w-[60%]">
+  <div class="column content-box">
+    <div class="row">
+      <div class="small-8 columns with-right-space">
         <woot-loading-state
           v-if="uiFlags.isFetching"
           :message="$t('AGENT_BOTS.LIST.LOADING')"
@@ -23,7 +23,7 @@
         </p>
       </div>
 
-      <div class="w-[34%]">
+      <div class="small-4 columns content-box">
         <p v-html="$t('AGENT_BOTS.SIDEBAR_TXT')" />
       </div>
     </div>

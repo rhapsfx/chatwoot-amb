@@ -1,11 +1,8 @@
 <template>
-  <div
-    v-on-clickaway="closePortalPopover"
-    class="absolute overflow-y-scroll max-h-[96vh] p-4 bg-white dark:bg-slate-800 rounded-md shadow-lg max-w-[30rem] z-[1000]"
-  >
+  <div v-on-clickaway="closePortalPopover" class="portal-popover__container">
     <header>
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg text-slate-800 dark:text-slate-100">
+      <div class="actions">
+        <h2 class="block-title text-black-900 dark:text-slate-200">
           {{ $t('HELP_CENTER.PORTAL.POPOVER.TITLE') }}
         </h2>
         <div>
@@ -27,7 +24,7 @@
           />
         </div>
       </div>
-      <p class="text-xs text-slate-600 dark:text-slate-300 mt-2">
+      <p class="subtitle">
         {{ $t('HELP_CENTER.PORTAL.POPOVER.SUBTITLE') }}
       </p>
     </header>
@@ -85,3 +82,46 @@ export default {
   },
 };
 </script>
+
+<style lang="scss" scoped>
+.portal-popover__container {
+  position: absolute;
+  overflow-y: scroll;
+  max-height: 96vh;
+  padding: var(--space-normal);
+  background-color: var(--white);
+  border-radius: var(--border-radius-normal);
+  box-shadow: var(--shadow-large);
+  max-width: 30rem;
+  z-index: var(--z-index-high);
+
+  header {
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-normal);
+
+      .new-popover-link {
+        display: flex;
+        align-items: center;
+        padding: var(--space-smaller) var(--space-small);
+        background-color: var(--s-25);
+        font-size: var(--font-size-mini);
+        color: var(--s-500);
+        margin-left: var(--space-small);
+        border-radius: var(--border-radius-normal);
+        span {
+          margin-left: var(--space-small);
+        }
+      }
+
+      .subtitle {
+        font-size: var(--font-size-mini);
+        color: var(--s-600);
+        margin-top: var(--space-small);
+      }
+    }
+  }
+}
+</style>

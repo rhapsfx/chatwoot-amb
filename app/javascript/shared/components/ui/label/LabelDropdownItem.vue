@@ -47,38 +47,54 @@ export default {
 
 <style lang="scss" scoped>
 .item-wrap {
-  @apply flex;
+  display: flex;
 
   ::v-deep .button__content {
-    @apply w-full;
+    width: 100%;
   }
 
   .button-wrap {
-    @apply flex justify-between w-full;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
 
     &.active {
-      @apply flex font-semibold text-woot-700 dark:text-woot-600;
+      display: flex;
+      font-weight: var(--font-weight-bold);
+      color: var(--w-700);
     }
 
     .name-label-wrap {
-      @apply flex min-w-0 w-full;
+      display: flex;
+      min-width: 0;
+      width: 100%;
 
       .label-color--display {
-        @apply mr-2 rtl:mr-0 rtl:ml-2;
+        margin-right: var(--space-small);
       }
 
       .label-text {
-        @apply overflow-hidden text-ellipsis whitespace-nowrap leading-[1.1] pr-2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1.1;
+        padding-right: var(--space-small);
       }
 
       .icon {
-        @apply text-sm;
+        font-size: var(--font-size-small);
       }
     }
   }
 
   .label-color--display {
-    @apply rounded-md h-3 mr-1 rtl:mr-0 rtl:ml-1 mt-0.5 min-w-[0.75rem] w-3 border border-solid border-slate-50 dark:border-slate-600;
+    border-radius: var(--border-radius-normal);
+    height: var(--space-slab);
+    margin-right: var(--space-smaller);
+    margin-top: var(--space-micro);
+    min-width: var(--space-slab);
+    width: var(--space-slab);
+    border: 1px solid var(--color-border-light);
   }
 }
 </style>

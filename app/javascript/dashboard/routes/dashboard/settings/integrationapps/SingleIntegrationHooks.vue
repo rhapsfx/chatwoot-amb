@@ -1,25 +1,20 @@
 <template>
-  <div class="flex-shrink flex-grow overflow-auto p-4">
-    <div class="flex flex-col">
-      <div
-        class="bg-white dark:bg-slate-800 border border-solid border-slate-75 dark:border-slate-700/50 rounded-sm mb-4 p-4"
-      >
-        <div class="flex">
-          <div class="flex h-[6.25rem] w-[6.25rem]">
-            <img
-              :src="'/dashboard/images/integrations/' + integration.logo"
-              class="max-w-full p-6"
-            />
+  <div class="column content-box">
+    <div class="small-12 columns integrations-wrap">
+      <div class="small-12 columns integration">
+        <div class="row">
+          <div class="integration--image">
+            <img :src="'/dashboard/images/integrations/' + integration.logo" />
           </div>
-          <div class="flex flex-col justify-center m-0 mx-4 flex-1">
-            <h3 class="text-xl text-slate-800 dark:text-slate-100">
+          <div class="integration--type column">
+            <h3 class="integration--title">
               {{ integration.name }}
             </h3>
             <p>
               {{ integration.description }}
             </p>
           </div>
-          <div class="flex justify-center items-center mb-0 w-[15%]">
+          <div class="small-2 column button-wrap">
             <div v-if="hasConnectedHooks">
               <div @click="$emit('delete', integration.hooks[0])">
                 <woot-button class="nice alert">

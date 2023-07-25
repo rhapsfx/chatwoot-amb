@@ -1,18 +1,16 @@
 <template>
-  <div>
+  <div class="column">
     <woot-modal-header :header-title="filterModalHeaderTitle">
-      <p class="text-slate-600 dark:text-slate-200">
-        {{ filterModalSubTitle }}
-      </p>
+      <p>{{ filterModalSubTitle }}</p>
     </woot-modal-header>
-    <div class="p-8">
-      <div v-if="isSegmentsView">
+    <div class="column modal-content">
+      <div v-if="isSegmentsView" class="columns">
         <label class="input-label" :class="{ error: !activeSegmentNewName }">
           {{ $t('CONTACTS_FILTER.SEGMENT_LABEL') }}
           <input
             v-model="activeSegmentNewName"
             type="text"
-            class="folder-input border-slate-75 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            class="name-input"
           />
           <span v-if="!activeSegmentNewName" class="message">
             {{ $t('CONTACTS_FILTER.EMPTY_VALUE_ERROR') }}
@@ -22,9 +20,7 @@
           {{ $t('CONTACTS_FILTER.SEGMENT_QUERY_LABEL') }}
         </label>
       </div>
-      <div
-        class="p-4 rounded-lg bg-slate-25 dark:bg-slate-700 border border-solid border-slate-50 dark:border-slate-700 mb-4"
-      >
+      <div class="medium-12 columns filters-wrap">
         <filter-input-box
           v-for="(filter, i) in appliedFilters"
           :key="i"
@@ -45,7 +41,7 @@
           @resetFilter="resetFilter(i, appliedFilters[i])"
           @removeFilter="removeFilter(i)"
         />
-        <div class="mt-4">
+        <div class="filter-actions">
           <woot-button
             icon="add"
             color-scheme="success"
@@ -67,8 +63,8 @@
           </woot-button>
         </div>
       </div>
-      <div class="w-full">
-        <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
+      <div class="medium-12 columns">
+        <div class="modal-footer justify-content-end w-full">
           <woot-button class="button clear" @click.prevent="onClose">
             {{ $t('CONTACTS_FILTER.CANCEL_BUTTON_LABEL') }}
           </woot-button>
@@ -353,8 +349,17 @@ export default {
   },
 };
 </script>
+
 <style lang="scss" scoped>
-.folder-input {
-  @apply w-[50%];
+.filters-wrap {
+  padding: var(--space-normal);
+  border-radius: var(--border-radius-large);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-light);
+  margin-bottom: var(--space-normal);
+}
+
+.filter-actions {
+  margin-top: var(--space-normal);
 }
 </style>

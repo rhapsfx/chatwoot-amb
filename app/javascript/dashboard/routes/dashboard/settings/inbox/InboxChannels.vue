@@ -1,9 +1,7 @@
 <template>
-  <div
-    class="flex flex-row overflow-auto p-4 h-full bg-slate-25 dark:bg-slate-800"
-  >
+  <div class="row content-box full-height">
     <woot-wizard
-      class="hide-for-small-only w-[25%]"
+      class="hide-for-small-only medium-3 columns"
       :global-config="globalConfig"
       :items="items"
     />

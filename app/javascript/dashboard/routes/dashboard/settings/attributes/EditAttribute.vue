@@ -1,8 +1,8 @@
 <template>
-  <div class="h-auto overflow-auto flex flex-col">
+  <div class="column content-box">
     <woot-modal-header :header-title="pageTitle" />
-    <form class="flex flex-col w-full" @submit.prevent="editAttributes">
-      <div class="w-full">
+    <form class="row" @submit.prevent="editAttributes">
+      <div class="medium-12 columns">
         <woot-input
           v-model.trim="displayName"
           :label="$t('ATTRIBUTES_MGMT.ADD.FORM.NAME.LABEL')"
@@ -71,7 +71,7 @@
           </label>
         </div>
       </div>
-      <div class="flex flex-row justify-end gap-2 py-2 px-0 w-full">
+      <div class="modal-footer">
         <woot-button :is-loading="isUpdating" :disabled="isButtonDisabled">
           {{ $t('ATTRIBUTES_MGMT.EDIT.UPDATE_BUTTON_TEXT') }}
         </woot-button>

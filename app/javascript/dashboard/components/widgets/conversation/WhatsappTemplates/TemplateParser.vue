@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full">
+  <div class="medium-12 columns">
     <textarea
       v-model="processedString"
       rows="4"
@@ -119,40 +119,55 @@ export default {
 
 <style scoped lang="scss">
 .template__variables-container {
-  @apply p-2.5;
+  padding: var(--space-one);
 }
 
 .variables-label {
-  @apply text-sm font-semibold mb-2.5;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-one);
 }
 
 .template__variable-item {
-  @apply items-center flex mb-2.5;
+  align-items: center;
+  display: flex;
+  margin-bottom: var(--space-one);
 
   .label {
-    @apply text-xs;
+    font-size: var(--font-size-mini);
   }
 
   .variable-input {
-    @apply flex-1 text-sm ml-2.5;
+    flex: 1;
+    font-size: var(--font-size-small);
+    margin-left: var(--space-one);
   }
 
   .variable-label {
-    @apply bg-slate-75 dark:bg-slate-700 text-slate-700 dark:text-slate-100 inline-block rounded-md text-xs py-2.5 px-6;
+    background-color: var(--s-75);
+    border-radius: var(--border-radius-normal);
+    display: inline-block;
+    font-size: var(--font-size-mini);
+    padding: var(--space-one) var(--space-medium);
   }
 }
 
 footer {
-  @apply flex justify-end;
+  display: flex;
+  justify-content: flex-end;
 
   button {
-    @apply ml-2.5;
+    margin-left: var(--space-one);
   }
 }
 .error {
-  @apply bg-red-100 dark:bg-red-100 rounded-md text-red-800 dark:text-red-800 p-2.5 text-center;
+  background-color: var(--r-100);
+  border-radius: var(--border-radius-normal);
+  color: var(--r-800);
+  padding: var(--space-one);
+  text-align: center;
 }
 .template-input {
-  @apply bg-slate-25 dark:bg-slate-900 text-slate-700 dark:text-slate-100;
+  background-color: var(--s-25);
 }
 </style>

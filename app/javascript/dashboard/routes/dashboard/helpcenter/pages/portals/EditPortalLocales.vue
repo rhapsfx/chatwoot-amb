@@ -145,12 +145,17 @@ export default {
 
 <style lang="scss" scoped>
 .portal-locales {
-  @apply w-full bg-white dark:bg-slate-900 h-full py-0 pr-0 pl-4;
+  padding: var(--space-small) var(--space-normal);
+  width: 100%;
+  background: var(--white);
+  height: 100%;
+  padding: 0 0 0 var(--space-normal);
   .button-container {
-    @apply flex justify-end;
+    display: flex;
+    justify-content: flex-end;
   }
   .locale-container {
-    @apply mt-4;
+    margin-top: var(--space-normal);
   }
 }
 </style>

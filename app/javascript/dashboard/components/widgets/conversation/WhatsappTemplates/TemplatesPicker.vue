@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full">
+  <div class="medium-12 columns">
     <div class="templates__list-search">
       <fluent-icon icon="search" class="search-icon" size="16" />
       <input
@@ -96,35 +96,61 @@ export default {
 
 <style scoped lang="scss">
 .flex-between {
-  @apply flex justify-between mb-2.5;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-one);
 }
 
 .templates__list-search {
-  @apply items-center flex bg-slate-25 dark:bg-slate-900 mb-2.5 py-0 px-2.5 rounded-md border border-solid border-slate-100 dark:border-slate-700;
+  align-items: center;
+  background-color: var(--s-25);
+  border-radius: var(--border-radius-medium);
+  border: 1px solid var(--s-100);
+  display: flex;
+  margin-bottom: var(--space-one);
+  padding: 0 var(--space-one);
 
   .search-icon {
-    @apply text-slate-400 dark:text-slate-300;
+    color: var(--s-400);
   }
 
   .templates__search-input {
-    @apply bg-transparent border-0 text-xs h-auto m-0;
+    background-color: transparent;
+    border: var(--space-large);
+    font-size: var(--font-size-mini);
+    height: unset;
+    margin: var(--space-zero);
   }
 }
 .template__list-container {
-  @apply bg-slate-25 dark:bg-slate-900 rounded-md max-h-[18.75rem] overflow-y-auto p-2.5;
+  background-color: var(--s-25);
+  border-radius: var(--border-radius-medium);
+  max-height: 18.75rem;
+  overflow-y: auto;
+  padding: var(--space-one);
 
   .template__list-item {
-    @apply rounded-lg cursor-pointer block p-2.5 text-left w-full hover:bg-woot-50 dark:hover:bg-slate-600;
+    border-radius: var(--border-radius-medium);
+    cursor: pointer;
+    display: block;
+    padding: var(--space-one);
+    text-align: left;
+    width: 100%;
+
+    &:hover {
+      background-color: var(--w-50);
+    }
 
     .label-title {
-      @apply text-sm;
+      font-size: var(--font-size-small);
     }
 
     .label-category {
-      @apply mt-5;
+      margin-top: var(--space-two);
 
       span {
-        @apply text-sm font-semibold;
+        font-size: var(--font-size-small);
+        font-weight: var(--font-weight-bold);
       }
     }
 
@@ -135,10 +161,13 @@ export default {
 }
 
 .strong {
-  @apply text-xs font-semibold;
+  font-size: var(--font-size-mini);
+  font-weight: var(--font-weight-bold);
 }
 
 hr {
-  @apply border-b border-solid border-slate-100 dark:border-slate-700 my-2.5 mx-auto max-w-[95%];
+  border-bottom: 1px solid var(--s-100);
+  margin: var(--space-one) auto;
+  max-width: 95%;
 }
 </style>

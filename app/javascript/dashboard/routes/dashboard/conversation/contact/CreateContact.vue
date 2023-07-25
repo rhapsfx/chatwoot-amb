@@ -1,6 +1,6 @@
 <template>
   <woot-modal :show.sync="show" :on-close="onCancel" modal-type="right-aligned">
-    <div class="h-auto overflow-auto flex flex-col">
+    <div class="column content-box">
       <woot-modal-header
         :header-title="$t('CREATE_CONTACT.TITLE')"
         :header-content="$t('CREATE_CONTACT.DESC')"

@@ -9,7 +9,7 @@
       @close-key-shortcut-modal="closeKeyShortcutModal"
       @show-add-label-popup="showAddLabelPopup"
     />
-    <section class="app-content flex-1 px-0">
+    <section class="app-content columns">
       <router-view />
       <command-bar />
       <account-selector

@@ -1,14 +1,12 @@
 <template>
-  <div class="flex flex-col w-full max-h-[12.5rem]">
-    <div class="flex items-center justify-center mb-1">
-      <h4
-        class="text-sm text-slate-800 dark:text-slate-100 m-0 overflow-hidden whitespace-nowrap text-ellipsis flex-grow"
-      >
+  <div class="dropdown-search-wrap">
+    <div class="dropdown-title-container">
+      <h4 class="text-block-title">
         {{ $t('CONTACT_PANEL.LABELS.LABEL_SELECT.TITLE') }}
       </h4>
       <hotkey>L</hotkey>
     </div>
-    <div class="mb-2 flex-shrink-0 flex-grow-0 flex-auto max-h-8">
+    <div class="search-wrap">
       <input
         ref="searchbar"
         v-model="search"
@@ -18,10 +16,8 @@
         :placeholder="$t('CONTACT_PANEL.LABELS.LABEL_SELECT.PLACEHOLDER')"
       />
     </div>
-    <div
-      class="flex justify-start items-start flex-grow flex-shrink flex-auto overflow-auto"
-    >
-      <div class="w-full">
+    <div class="list-wrap">
+      <div class="list">
         <woot-dropdown-menu>
           <label-dropdown-item
             v-for="label in filteredActiveLabels"
@@ -32,16 +28,10 @@
             @click="onAddRemove(label)"
           />
         </woot-dropdown-menu>
-        <div
-          v-if="noResult"
-          class="flex justify-center py-4 px-2.5 font-medium text-xs text-slate-700 dark:text-slate-200"
-        >
+        <div v-if="noResult" class="no-result">
           {{ $t('CONTACT_PANEL.LABELS.LABEL_SELECT.NO_RESULT') }}
         </div>
-        <div
-          v-if="allowCreation && shouldShowCreate"
-          class="flex pt-1 border-t border-solid border-slate-100 dark:border-slate-900"
-        >
+        <div v-if="allowCreation && shouldShowCreate" class="new-label">
           <woot-button
             size="small"
             variant="clear"
@@ -181,19 +171,88 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.hotkey {
-  @apply flex-shrink-0;
+.dropdown-title-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-smaller);
+
+  .text-block-title {
+    flex-grow: 1;
+    margin: 0;
+  }
+
+  .hotkey {
+    flex-shrink: 0;
+  }
 }
 
-.search-input {
-  @apply m-0 w-full border border-solid border-transparent h-8 text-sm text-slate-700 dark:text-slate-100 rounded-md focus:border-woot-500 bg-slate-50 dark:bg-slate-900;
-}
+.dropdown-search-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 12.5rem;
 
-.button-new-label {
-  @apply whitespace-nowrap text-ellipsis overflow-hidden items-center;
+  .search-wrap {
+    margin-bottom: var(--space-small);
+    flex: 0 0 auto;
+    max-height: var(--space-large);
 
-  .icon {
-    @apply min-w-0;
+    .search-input {
+      margin: 0;
+      width: 100%;
+      border: 1px solid transparent;
+      height: var(--space-large);
+      font-size: var(--font-size-small);
+      padding: var(--space-small);
+      background-color: var(--color-background);
+    }
+
+    input:focus {
+      outline: 1px solid var(--color-border-dark);
+    }
+  }
+
+  .list-wrap {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex: 1 1 auto;
+    overflow: auto;
+
+    .list {
+      width: 100%;
+    }
+
+    .no-result {
+      display: flex;
+      justify-content: center;
+      color: var(--s-700);
+      padding: var(--space-normal) var(--space-one);
+      font-weight: var(--font-weight-medium);
+      font-size: var(--font-size-mini);
+    }
+
+    .new-label {
+      display: flex;
+      padding-top: var(--space-smaller);
+      border-top: 1px solid var(--s-100);
+
+      .button-new-label {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        align-items: center;
+
+        .icon {
+          min-width: 0;
+        }
+      }
+
+      .search-term {
+        color: var(--s-700);
+      }
+    }
   }
 }
 </style>

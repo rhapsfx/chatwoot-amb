@@ -32,16 +32,20 @@ export default {
 </script>
 <style lang="scss" scoped>
 .search-input-box {
-  @apply p-2;
+  padding: var(--space-small);
 }
 .search--icon {
-  @apply flex-shrink-0 text-slate-500 dark:text-slate-300;
+  flex-shrink: 0;
+  color: var(--s-500);
 }
 .search-placeholder {
-  @apply text-slate-500 dark:text-slate-300;
+  color: var(--s-500);
 }
 
 .search-input {
-  @apply flex justify-center items-center gap-1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-smaller);
 }
 </style>

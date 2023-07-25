@@ -79,26 +79,41 @@ export default {
 
 <style scoped lang="scss">
 .mention--box {
-  @apply bg-white dark:bg-slate-700 rounded-md overflow-auto absolute w-full z-[100] pt-2 px-2 pb-0 shadow-md left-0 bottom-full max-h-[9.75rem] border-t border-solid border-slate-75 dark:border-slate-800;
+  background: var(--white);
+  border-radius: var(--border-radius-normal);
+  border-top: 1px solid var(--color-border);
+  box-shadow: var(--shadow-medium);
+  left: 0;
+  bottom: 100%;
+  max-height: 9.75rem;
+  overflow: auto;
+  padding: var(--space-small) var(--space-small) 0;
+  position: absolute;
+  width: 100%;
+  z-index: 100;
 
   .dropdown-menu__item:last-child {
-    @apply pb-1;
+    padding-bottom: var(--space-smaller);
   }
 
   .active {
-    @apply text-white dark:text-white;
+    color: var(--white);
 
     &:hover {
-      @apply bg-woot-700 dark:bg-woot-700;
+      color: var(--w-700);
     }
   }
 
   .button {
-    @apply transition-none h-8 leading-[1.4];
+    transition: none;
+    height: var(--space-large);
+    line-height: 1.4;
   }
 }
 
 .canned-item__button::v-deep .button__content {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

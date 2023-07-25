@@ -1,7 +1,7 @@
 <template>
   <transition name="popover-animation">
     <div class="article-settings--container">
-      <h3 class="text-base text-slate-800 dark:text-slate-100">
+      <h3 class="block-title text-black-900 dark:text-slate-200">
         {{ $t('HELP_CENTER.ARTICLE_SETTINGS.TITLE') }}
       </h3>
       <div class="form-wrap">
@@ -225,36 +225,48 @@ export default {
 
 <style lang="scss" scoped>
 .article-settings--container {
-  @apply flex-[0.3] min-w-[15rem] max-w-[22.5rem] py-2 pl-4 rtl:pl-0 rtl:pr-4 ml-4 rtl:ml-0 rtl:mr-4 overflow-y-auto border-l rtl:border-r rtl:border-l-0 border-solid border-slate-50 dark:border-slate-700;
+  flex: 0.3;
+  min-width: var(--space-giga);
+  max-width: 22.5rem;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border-light);
+  margin-left: var(--space-normal);
+  padding-left: var(--space-normal);
+  padding-top: var(--space-small);
+  padding-bottom: var(--space-small);
 
   .form-wrap {
-    @apply mt-4 mb-6;
+    margin-top: var(--space-normal);
+    margin-bottom: var(--space-medium);
 
     textarea {
-      @apply text-sm;
+      font-size: var(--font-size-small);
     }
   }
 
   .action-buttons {
-    @apply flex flex-col;
+    display: flex;
+    flex-direction: column;
   }
 }
 ::v-deep {
   .multiselect {
-    @apply mb-0;
+    margin-bottom: 0;
   }
   .multiselect__content-wrapper {
-    @apply hidden;
+    display: none;
   }
   .multiselect--active .multiselect__tags {
+    border-radius: var(--border-radius-normal);
     padding-right: var(--space-small) !important;
-    @apply rounded-md;
   }
   .multiselect__placeholder {
-    @apply text-slate-300 dark:text-slate-200 pt-2 mb-0;
+    color: var(--s-300);
+    padding-top: var(--space-small);
+    margin-bottom: 0;
   }
   .multiselect__select {
-    @apply hidden;
+    display: none;
   }
 }
 </style>

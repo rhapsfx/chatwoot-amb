@@ -1,18 +1,16 @@
 <template>
-  <div class="flex-grow flex-shrink min-w-0 p-6 overflow-auto">
+  <div class="columns profile--settings">
     <form v-if="!uiFlags.isFetchingItem" @submit.prevent="updateAccount">
       <div
-        class="flex flex-row p-4 border-b border-slate-25 dark:border-slate-700"
+        class="small-12 row profile--settings--row border-b border-slate-25 dark:border-slate-700"
       >
-        <div
-          class="flex-grow-0 flex-shrink-0 flex-[25%] min-w-0 py-4 pr-6 pl-0"
-        >
+        <div class="columns small-3">
           <h4 class="block-title text-black-900 dark:text-slate-200">
             {{ $t('GENERAL_SETTINGS.FORM.GENERAL_SECTION.TITLE') }}
           </h4>
           <p>{{ $t('GENERAL_SETTINGS.FORM.GENERAL_SECTION.NOTE') }}</p>
         </div>
-        <div class="p-4 flex-grow-0 flex-shrink-0 flex-[50%]">
+        <div class="columns small-9 medium-5">
           <label :class="{ error: $v.name.$error }">
             {{ $t('GENERAL_SETTINGS.FORM.NAME.LABEL') }}
             <input
@@ -87,11 +85,9 @@
       </div>
 
       <div
-        class="p-4 border-slate-25 dark:border-slate-700 text-black-900 dark:text-slate-300 row"
+        class="profile--settings--row border-slate-25 dark:border-slate-700 text-black-900 dark:text-slate-300 row"
       >
-        <div
-          class="flex-grow-0 flex-shrink-0 flex-[25%] min-w-0 py-4 pr-6 pl-0"
-        >
+        <div class="columns small-3">
           <h4 class="block-title text-black-900 dark:text-slate-200">
             {{ $t('GENERAL_SETTINGS.FORM.ACCOUNT_ID.TITLE') }}
           </h4>
@@ -99,11 +95,11 @@
             {{ $t('GENERAL_SETTINGS.FORM.ACCOUNT_ID.NOTE') }}
           </p>
         </div>
-        <div class="p-4 flex-grow-0 flex-shrink-0 flex-[50%]">
+        <div class="columns small-9 medium-5">
           <woot-code :script="getAccountId" />
         </div>
       </div>
-      <div class="text-sm text-center p-4">
+      <div class="current-version">
         <div>{{ `v${globalConfig.appVersion}` }}</div>
         <div v-if="hasAnUpdateAvailable && globalConfig.displayManifest">
           {{
@@ -285,3 +281,29 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+@import '~dashboard/assets/scss/variables.scss';
+@import '~dashboard/assets/scss/mixins.scss';
+
+.profile--settings {
+  padding: 24px;
+  overflow: auto;
+}
+
+.profile--settings--row {
+  padding: $space-normal;
+  .small-3 {
+    padding: $space-normal $space-medium $space-normal 0;
+  }
+  .small-9 {
+    padding: $space-normal;
+  }
+}
+
+.current-version {
+  font-size: var(--font-size-small);
+  text-align: center;
+  padding: var(--space-normal);
+}
+</style>

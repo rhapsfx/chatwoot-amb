@@ -1,5 +1,5 @@
 <template>
-  <div class="m-0 flex flex-col justify-between h-full flex-grow min-w-0">
+  <div class="view-box fill-height">
     <banner
       v-if="!currentChat.can_reply"
       color-scheme="alert"
@@ -16,19 +16,19 @@
       @close="removeTweetSelection"
     />
 
-    <div class="flex justify-end">
+    <div class="sidebar-toggle__wrap">
       <woot-button
         variant="smooth"
         size="tiny"
         color-scheme="secondary"
-        class="rounded-bl-calc rtl:rotate-180 rounded-tl-calc fixed top-[6.25rem] z-10 bg-white dark:bg-slate-700 border-slate-50 dark:border-slate-600 border-solid border border-r-0 box-border"
+        class="sidebar-toggle--button"
         :icon="isRightOrLeftIcon"
         @click="onToggleContactPanel"
       />
     </div>
     <ul class="conversation-panel">
       <transition name="slide-up">
-        <li class="min-h-[4rem]">
+        <li class="spinner--container">
           <span v-if="shouldShowSpinner" class="spinner message" />
         </li>
       </transition>
@@ -44,7 +44,7 @@
         :is-web-widget-inbox="isAWebWidgetInbox"
       />
       <li v-show="unreadMessageCount != 0" class="unread--toast">
-        <span>
+        <span class="text-uppercase">
           {{ unreadMessageCount }}
           {{
             unreadMessageCount > 1
@@ -540,41 +540,68 @@ export default {
 };
 </script>
 
-<style scoped>
-@tailwind components;
-@layer components {
-  .rounded-bl-calc {
-    border-bottom-left-radius: calc(1.5rem + 1px);
-  }
-
-  .rounded-tl-calc {
-    border-top-left-radius: calc(1.5rem + 1px);
-  }
-}
-</style>
-
 <style scoped lang="scss">
+.spinner--container {
+  min-height: var(--space-jumbo);
+}
+
+.view-box.fill-height {
+  height: auto;
+  flex-grow: 1;
+  min-width: 0;
+}
+
 .modal-mask {
   &::v-deep {
     .ProseMirror-woot-style {
-      @apply max-h-[25rem];
+      max-height: 25rem;
     }
 
     .reply-box {
-      @apply border border-solid border-slate-75 dark:border-slate-600 max-w-[75rem] w-[70%];
+      border: 1px solid var(--color-border);
+      max-width: 75rem;
+      width: 70%;
     }
 
     .reply-box .reply-box__top {
-      @apply relative min-h-[27.5rem];
+      position: relative;
+      min-height: 27.5rem;
     }
 
     .reply-box__top .input {
-      @apply min-h-[27.5rem];
+      min-height: 27.5rem;
     }
 
     .emoji-dialog {
-      @apply absolute left-auto bottom-1;
+      position: fixed;
+      left: unset;
+      position: absolute;
+      bottom: var(--space-smaller);
     }
+  }
+}
+.sidebar-toggle__wrap {
+  display: flex;
+  justify-content: flex-end;
+
+  .sidebar-toggle--button {
+    position: fixed;
+
+    top: var(--space-mega);
+    z-index: var(--z-index-low);
+
+    background: var(--white);
+
+    padding: inherit 0;
+    border-top-left-radius: calc(
+      var(--space-medium) + 1px
+    ); /* 100px of height + 10px of border */
+    border-bottom-left-radius: calc(
+      var(--space-medium) + 1px
+    ); /* 100px of height + 10px of border */
+    border: 1px solid var(--color-border-light);
+    border-right: 0;
+    box-sizing: border-box;
   }
 }
 </style>
