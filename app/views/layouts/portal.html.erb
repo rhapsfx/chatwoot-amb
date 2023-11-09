@@ -28,7 +28,7 @@ By default, it renders:
     <% end %>
   </head>
   <body>
-    <div class="antialiased <%= @theme %>">
+    <div id="portal" class="antialiased <%= @theme == 'system' ? @system_theme : @theme %>">
       <main class="main-content min-h-screen flex flex-col bg-white dark:bg-slate-900" role="main">
         <% if !@is_plain_layout_enabled %>
           <%= render "public/api/v1/portals/header", portal: @portal %>
@@ -42,7 +42,44 @@ By default, it renders:
   </body>
   <style>
   :root {
-    color-scheme: '<%= @theme %>';
+    color-scheme: <% if @theme == 'system' %>light dark<% else %><%= @theme %><% end %>;
+    
+    --dynamic-portal-bg: <%= generate_portal_bg(@portal.color, 'light') %>;
+    --dynamic-portal-bg-gradient: <%= generate_gradient_to_bottom('light') %>;
+    --dynamic-hover-bg-color: <%= generate_portal_hover_color(@portal.color , 'light') %>;
+
+    .dark {
+      --dynamic-portal-bg: <%= generate_portal_bg(@portal.color, 'dark') %>;
+      --dynamic-portal-bg-gradient: <%= generate_gradient_to_bottom('dark') %>;
+      --dynamic-hover-bg-color: <%= generate_portal_hover_color(@portal.color , 'dark') %>;
+    }
+  }
+  
+  /* Portal background */
+  #portal-bg {
+    background: var(--dynamic-portal-bg);
+  }
+  /* Portal background gradient */
+  #portal-bg-gradient {
+    background-image: var(--dynamic-portal-bg-gradient);
+  }
+  /* Category block item hover color */
+  #category-item:hover {
+    background-color: var(--dynamic-hover-bg-color);
+  }
+
+  /* Header section */
+  #header-action-button:hover,
+  #toggle-appearance:hover,
+  #toggle-theme-button:hover {
+    color: var(--dynamic-hover-color);
+    stroke: var(--dynamic-hover-color);
+  }
+  #category-block:hover {
+    border-color: var(--dynamic-hover-color);
+  }
+  #category-block:hover #category-name  {
+    color: var(--dynamic-hover-color);
   }
   </style>
   <script>
