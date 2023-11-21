@@ -44,17 +44,13 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
 
   def message_content
     private_indicator = message.private? ? 'private: ' : ''
-    sanitized_content = ActionView::Base.full_sanitizer.sanitize(format_message_content)
+    sanitized_content = ActionView::Base.full_sanitizer.sanitize(message_text)
 
     if conversation.identifier.present?
       "#{private_indicator}#{sanitized_content}"
     else
       "#{formatted_inbox_name}#{formatted_conversation_link}#{email_subject_line}\n#{sanitized_content}"
     end
-  end
-
-  def format_message_content
-    message.message_type == 'activity' ? "_#{message_text}_" : message_text
   end
 
   def message_text
@@ -83,7 +79,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
   end
 
   def avatar_url(sender)
-    sender_type = sender_type(sender).downcase
+    sender_type = sender.instance_of?(Contact) ? 'contact' : 'user'
     blob_key = sender&.avatar&.attached? ? sender.avatar.blob.key : nil
     generate_url(sender_type, blob_key)
   end
@@ -141,15 +137,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
   end
 
   def sender_type(sender)
-    if sender.instance_of?(Contact)
-      'Contact'
-    elsif message.message_type == 'template' && sender.nil?
-      'Bot'
-    elsif message.message_type == 'activity' && sender.nil?
-      'System'
-    else
-      'Agent'
-    end
+    sender.instance_of?(Contact) ? 'Contact' : 'Agent'
   end
 
   def update_reference_id
