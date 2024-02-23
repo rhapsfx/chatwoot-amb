@@ -35,6 +35,14 @@
         "NAME": "Resolution Count",
         "DESC": "( Total )"
       },
+      "BOT_RESOLUTION_COUNT": {
+        "NAME": "Bot Resolution Count",
+        "DESC": "( Total )"
+      },
+      "BOT_HANDOFF_COUNT": {
+        "NAME": "Bot Handoff Count",
+        "DESC": "( Total )"
+      },
       "REPLY_TIME": {
         "NAME": "Customer waiting time",
         "TOOLTIP_TEXT": "Waiting time is %{metricValue} (based on %{conversationCount} conversations)"
@@ -404,6 +412,9 @@
       }
     }
   },
+  "BOT_REPORTS": {
+    "HEADER": "Bot Reports"
+  },
   "OVERVIEW_REPORTS": {
     "HEADER": "Overview",
     "LIVE": "Live",
@@ -412,7 +423,8 @@
       "LOADING_MESSAGE": "Loading conversation metrics...",
       "OPEN": "Open",
       "UNATTENDED": "Unattended",
-      "UNASSIGNED": "Unassigned"
+      "UNASSIGNED": "Unassigned",
+      "PENDING": "Pending"
     },
     "CONVERSATION_HEATMAP": {
       "HEADER": "Conversation Traffic",
