@@ -15,18 +15,18 @@
     <reporting-metric-card
       :label="$t('BOT_REPORTS.METRIC.RESOLUTION_RATE.LABEL')"
       :info-text="$t('BOT_REPORTS.METRIC.RESOLUTION_RATE.TOOLTIP')"
-      :value="resolutionRate"
+      :value="formatToPercent(resolutionRate)"
     />
     <reporting-metric-card
       :label="$t('BOT_REPORTS.METRIC.HANDOFF_RATE.LABEL')"
       :info-text="$t('BOT_REPORTS.METRIC.HANDOFF_RATE.TOOLTIP')"
-      :value="handoffRate"
+      :value="formatToPercent(handoffRate)"
     />
   </div>
 </template>
 <script>
-import { mapGetters } from 'vuex';
 import ReportingMetricCard from './ReportingMetricCard.vue';
+import ReportsAPI from 'dashboard/api/reports';
 
 export default {
   components: {
@@ -46,10 +46,29 @@ export default {
       handoffRate: '0',
     };
   },
-  computed: {
-    ...mapGetters({
-      metrics: 'reports/getBotMetrics',
-    }),
+  watch: {
+    filters: {
+      deep: true,
+      handler() {
+        this.fetchMetrics();
+      },
+    },
+  },
+  methods: {
+    formatToPercent(value) {
+      return value ? `${value}%` : '--';
+    },
+    fetchMetrics() {
+      if (!this.filters.to || !this.filters.from) {
+        return;
+      }
+      ReportsAPI.getBotMetrics(this.filters).then(response => {
+        this.conversationCount = response.data.conversation_count;
+        this.messageCount = response.data.message_count;
+        this.resolutionRate = response.data.resolution_rate;
+        this.handoffRate = response.data.handoff_rate;
+      });
+    },
   },
 };
 </script>

@@ -1,6 +1,7 @@
 class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
   include Api::V2::Accounts::ReportsHelper
   include Api::V2::Accounts::HeatmapHelper
+  include DateRangeHelper
 
   before_action :check_authorization
 
@@ -46,6 +47,21 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     return head :unprocessable_entity if params[:type].blank?
 
     render json: conversation_metrics
+  end
+
+  def bot_metrics
+    metrics_range = parse_date_time(params[:since])...parse_date_time(params[:until])
+    bot_activated_inbox_id = Current.account.inboxes.filter(&:active_bot?).map(&:id)
+    bot_conversations = Current.account.conversations.where(inbox_id: bot_activated_inbox_id).where(created_at: metrics_range)
+    bot_messages = Current.account.messages.outgoing.where(conversation_id: bot_conversations.ids).where(created_at: metrics_range)
+    bot_resolutions_count = ReportingEvent.where(name: 'conversation_bot_resolved', account_id: Current.account.id, created_at: metrics_range,
+                                                 conversation_id: bot_conversations.ids).distinct.count
+    bot_handoffs_count = ReportingEvent.where(name: 'conversation_bot_handoff', account_id: Current.account.id, created_at: metrics_range,
+                                              conversation_id: bot_conversations.ids).distinct.count
+    bot_resolution_rate = bot_resolutions_count.to_f / bot_conversations.count * 100
+    bot_handoff_rate = bot_handoffs_count.to_f / bot_conversations.count * 100
+    render json: { conversation_count: bot_conversations.count, message_count: bot_messages.count, resolution_rate: bot_resolution_rate.to_i,
+                   handoff_rate: bot_handoff_rate.to_i }
   end
 
   private
