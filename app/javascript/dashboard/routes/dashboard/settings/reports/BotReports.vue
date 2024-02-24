@@ -6,11 +6,14 @@
       :show-business-hours-switch="false"
       @filter-change="onFilterChange"
     />
+
+    <bot-metrics :filters="requestPayload" />
     <report-container :group-by="groupBy" :report-keys="reportKeys" />
   </div>
 </template>
 <script>
 import { mapGetters } from 'vuex';
+import BotMetrics from './components/BotMetrics.vue';
 import ReportFilterSelector from './components/FilterSelector.vue';
 import { GROUP_BY_FILTER } from './constants';
 import reportMixin from 'dashboard/mixins/reportMixin';
@@ -20,6 +23,7 @@ import { REPORTS_EVENTS } from '../../../../helper/AnalyticsHelper/events';
 export default {
   name: 'BotReports',
   components: {
+    BotMetrics,
     ReportFilterSelector,
     ReportContainer,
   },
@@ -41,6 +45,12 @@ export default {
       accountSummary: 'getAccountSummary',
       accountReport: 'getAccountReports',
     }),
+    requestPayload() {
+      return {
+        from: this.from,
+        to: this.to,
+      };
+    },
   },
   methods: {
     fetchAllData() {
