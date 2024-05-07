@@ -67,7 +67,7 @@
       "url": "heroku/ruby"
     },
     {
-      "url": "FFmpeg/FFmpeg"
+      "url": "heroku/heroku-buildpack-activestorage-preview"
     }
   ],
   "environments": {
