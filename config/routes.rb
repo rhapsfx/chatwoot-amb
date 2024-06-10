@@ -452,6 +452,7 @@ Rails.application.routes.draw do
   get 'google/callback', to: 'google/callbacks#show'
 
   get 'demo/rag', to: 'demo/rag#index'
+  get 'demo/daily_meeting_url', to: 'demo/rag#daily_meeting_url'
 
   # ----------------------------------------------------------------------
   # Routes for external service verifications
