@@ -50,6 +50,8 @@ class Demo::RagController < ApplicationController
       'exp' => Time.now.to_i + (60 * 5), # 1 hour
       'enable_chat' => false,
       'enable_emoji_reactions' => false,
+      'enable_recording' => 'cloud', # Record to a S3 bucket managed by Daily.co, it can be replaced by our own bucket
+      'enable_transcription_storage' => true, # startTranscription will only save recording if this is enabled
       'eject_at_room_exp' => false,
       'enable_prejoin_ui' => false,
       'start_video_off' => true # Important for the bot to be able to join headlessly
