@@ -968,13 +968,15 @@ export default {
                   content.replies || // Quick reply structure (legacy format)
                   content.list_picker || // List picker structure (nested)
                   content.time_picker || // Time picker structure (nested)
+                  content.event || // Time picker structure (with event object)
                   content.form || // Form structure
                   content.apple_pay || // Apple Pay structure
                   (content.sections && content.images) || // List picker structure (direct)
                   (content.timeslots && content.eventTitle) || // Time picker structure (direct)
                   (contentAttrs?.sections && contentAttrs?.images) || // List picker in content_attributes
-                  (contentAttrs?.timeslots && contentAttrs?.eventTitle))))
-          ) // Time picker in content_attributes
+                  (contentAttrs?.timeslots && contentAttrs?.eventTitle) || // Time picker in content_attributes
+                  contentAttrs?.event)))
+          ) // Time picker with event in content_attributes
         );
 
         // eslint-disable-next-line no-console
@@ -1267,82 +1269,72 @@ export default {
           } else if (
             content.time_picker ||
             content.timePicker ||
+            content.event || // Time picker with event object
             (content.timeslots && content.eventTitle) ||
-            (contentAttrs?.timeslots && contentAttrs?.eventTitle)
+            (contentAttrs?.timeslots && contentAttrs?.eventTitle) ||
+            contentAttrs?.event // Time picker with event in content_attributes
           ) {
-            // Time picker structure - normalize field names
-            // Handle both nested (content.time_picker) and direct (content.timeslots) structures
-            const timePickerData =
-              content.time_picker ||
-              content.timePicker ||
-              contentAttrs ||
-              content;
-            messageData = {
-              type: 'time_picker',
-              content_type: 'apple_time_picker',
-              content_attributes: {
-                eventTitle:
-                  timePickerData.eventTitle || timePickerData.event_title || '',
-                eventDescription:
-                  timePickerData.eventDescription ||
-                  timePickerData.event_description ||
-                  '',
-                timeslots: timePickerData.timeslots || [],
-                timezoneOffset:
-                  timePickerData.timezoneOffset ||
-                  timePickerData.timezone_offset ||
-                  0,
-                images: timePickerData.images || [],
-                receivedTitle:
-                  timePickerData.receivedTitle ||
-                  timePickerData.received_title ||
-                  'Please pick a time',
-                receivedSubtitle:
-                  timePickerData.receivedSubtitle ||
-                  timePickerData.received_subtitle ||
-                  '',
-                receivedImageIdentifier:
-                  timePickerData.receivedImageIdentifier ||
-                  timePickerData.received_image_identifier ||
-                  '',
-                receivedStyle:
-                  timePickerData.receivedStyle ||
-                  timePickerData.received_style ||
-                  'large',
-                replyTitle:
-                  timePickerData.replyTitle ||
-                  timePickerData.reply_title ||
-                  'Thank you!',
-                replySubtitle:
-                  timePickerData.replySubtitle ||
-                  timePickerData.reply_subtitle ||
-                  '',
-                replyImageIdentifier:
-                  timePickerData.replyImageIdentifier ||
-                  timePickerData.reply_image_identifier ||
-                  '',
-                replyStyle:
-                  timePickerData.replyStyle ||
-                  timePickerData.reply_style ||
-                  'large',
-                replyImageTitle:
-                  timePickerData.replyImageTitle ||
-                  timePickerData.reply_image_title ||
-                  '',
-                replyImageSubtitle:
-                  timePickerData.replyImageSubtitle ||
-                  timePickerData.reply_image_subtitle ||
-                  '',
-                replySecondarySubtitle:
-                  timePickerData.replySecondarySubtitle ||
-                  timePickerData.reply_secondary_subtitle ||
-                  '',
-                replyTertiarySubtitle:
-                  timePickerData.replyTertiarySubtitle ||
-                  timePickerData.reply_tertiary_subtitle ||
-                  '',
-              },
+            // For time picker templates, render via API to get dynamic timeslots
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0);
+
+            const parameters = {
+              available_slots: [
+                new Date(tomorrow.getTime()).toISOString(),
+                new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+                new Date(tomorrow.getTime() + 4 * 60 * 60 * 1000).toISOString(),
+              ],
             };
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters,
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: renderedData.content_attributes,
+              };
+            } else {
+              // Fallback to stored content if rendering fails
+              const timePickerData =
+                content.time_picker ||
+                content.timePicker ||
+                contentAttrs ||
+                content;
+
+              // Convert camelCase to snake_case for backend validation
+              const normalizeKeys = obj => {
+                if (!obj || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(normalizeKeys);
+
+                const normalized = {};
+                Object.keys(obj).forEach(key => {
+                  const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+                  normalized[snakeKey] = normalizeKeys(obj[key]);
+                });
+                return normalized;
+              };
+
+              const normalizedAttrs = normalizeKeys(timePickerData);
+              delete normalizedAttrs.images;
+
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: normalizedAttrs,
+              };
+            }
           } else if (content.form) {
             // Form structure
             messageData = {

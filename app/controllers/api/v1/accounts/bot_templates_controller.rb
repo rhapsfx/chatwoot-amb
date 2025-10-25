@@ -2,7 +2,9 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
   # This controller provides bot-friendly API endpoints for template search, rendering, and sending
   # Supports authentication via API access tokens (user or agent bot tokens)
 
-  before_action :validate_bot_access, only: [:search, :render, :send_message]
+  skip_before_action :authenticate_user!, only: [:search, :render_template, :send_message]
+  before_action :authenticate_access_token!, only: [:search, :render_template, :send_message]
+  before_action :validate_bot_access, only: [:search, :render_template, :send_message]
 
   # GET /api/v1/accounts/:account_id/bot_templates/search
   # Search templates by category, channel, tags, use_cases
@@ -47,7 +49,7 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
   # POST /api/v1/accounts/:account_id/bot_templates/render
   # Render a template with parameters for a specific channel
   # Body: { template_id, parameters, channel_type, conversation_id (optional) }
-  def render
+  def render_template
     template = MessageTemplate.find_by(id: params[:template_id], account: Current.account)
     return render json: { error: 'Template not found' }, status: :not_found unless template
 
@@ -86,14 +88,16 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
     Rails.logger.error e.backtrace.join("\n")
 
     # Log failed attempt
-    log_template_usage(
-      template: template,
-      parameters: params[:parameters] || {},
-      channel_type: params[:channel_type],
-      conversation_id: params[:conversation_id],
-      success: false,
-      error: e.message
-    ) if template
+    if template
+      log_template_usage(
+        template: template,
+        parameters: params[:parameters] || {},
+        channel_type: params[:channel_type],
+        conversation_id: params[:conversation_id],
+        success: false,
+        error: e.message
+      )
+    end
 
     render json: { error: 'Template rendering failed', details: e.message }, status: :internal_server_error
   end
@@ -148,26 +152,27 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
   def validate_bot_access
     # This endpoint is accessible by both users and bots via API tokens
     # Authentication is already handled by Api::BaseController
-    # Just ensure we have a valid current user or bot
-    return if Current.user.present?
+    # @resource is set by devise_token_auth
+    return if @resource.present?
 
     render json: { error: 'Authentication required' }, status: :unauthorized
   end
 
   def determine_sender
     # If authenticated as a bot, use the bot as sender
-    # Otherwise use the current user
-    if @resource.is_a?(AgentBot)
-      @resource
-    elsif Current.user.present?
-      Current.account_user
-    else
-      # Fallback: find or create a default bot for this account
-      AgentBot.where(account: Current.account, name: 'Template Bot').first_or_create!(
-        description: 'Automated template message bot',
-        bot_type: 'webhook'
-      )
+    return @resource if @resource.is_a?(AgentBot)
+
+    # If authenticated as a user, try to get their account user
+    if @resource.is_a?(User)
+      account_user = Current.account.account_users.find_by(user_id: @resource.id)
+      return account_user if account_user
     end
+
+    # Fallback: find or create a default bot for this account
+    AgentBot.where(account: Current.account, name: 'Template Bot').first_or_create!(
+      description: 'Automated template message bot',
+      bot_type: 'webhook'
+    )
   end
 
   def log_template_usage(template:, parameters:, channel_type:, conversation_id:, success:, error: nil)

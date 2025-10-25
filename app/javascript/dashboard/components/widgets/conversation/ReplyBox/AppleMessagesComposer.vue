@@ -22,7 +22,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['send', 'cancel', 'save-as-template']);
+const emit = defineEmits(['send', 'sendAppleMessage', 'cancel', 'saveAsTemplate']);
 
 console.log('[AMB] AppleMessagesComposer loading...');
 
@@ -842,7 +842,7 @@ const handleEnhancedTimePickerSaveAndSend = enhancedData => {
 
 const handleEnhancedTimePickerSaveAsTemplate = templateData => {
   showEnhancedTimePicker.value = false;
-  emit('save-as-template', templateData);
+  emit('saveAsTemplate', templateData);
 };
 
 const handleEnhancedTimePickerPreview = enhancedData => {
@@ -1079,7 +1079,7 @@ const handleFormCreated = formData => {
 
 const handleFormSaveAsTemplate = templateData => {
   showFormBuilder.value = false;
-  emit('save-as-template', templateData);
+  emit('saveAsTemplate', templateData);
 };
 
 const closeFormBuilder = () => {
@@ -1200,9 +1200,24 @@ const handleTemplateSelect = async item => {
       const inboxChannelType = props.conversation?.inbox?.channel_type || 'Channel::AppleMessagesForBusiness';
       console.log('[AMB Templates] Channel type:', inboxChannelType);
 
+      // Generate sample parameters for time picker templates
+      let parameters = {};
+      if (template.category === 'scheduling' || template.name.includes('time_picker')) {
+        // Generate 3 sample time slots starting from tomorrow at 9 AM
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+
+        parameters.available_slots = [
+          new Date(tomorrow.getTime()).toISOString(),
+          new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(), // +2 hours
+          new Date(tomorrow.getTime() + 4 * 60 * 60 * 1000).toISOString()  // +4 hours
+        ];
+      }
+
       const response = await store.dispatch('messageTemplates/render', {
         templateId: template.id,
-        parameters: {}, // TODO: Add parameter collection UI if template has parameters
+        parameters: parameters,
         channelType: inboxChannelType
       });
 
@@ -1213,15 +1228,16 @@ const handleTemplateSelect = async item => {
 
       // Send the rendered message
       if (renderedData && renderedData.content_type && renderedData.content_attributes) {
-        console.log('[AMB Templates] Emitting send event with:', {
-          content_type: renderedData.content_type,
-          content: renderedData.content
-        });
-        emit('send', {
+        const messageData = {
           content_type: renderedData.content_type,
           content_attributes: renderedData.content_attributes,
           content: renderedData.content
-        });
+        };
+
+        console.log('[AMB Templates] Emitting sendAppleMessage event with:', messageData);
+
+        emit('send', messageData);
+        emit('sendAppleMessage', messageData);
       } else {
         console.error('[AMB Templates] Invalid response format:', renderedData);
         alert('Error: Invalid template response format');

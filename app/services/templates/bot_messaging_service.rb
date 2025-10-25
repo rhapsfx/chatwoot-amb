@@ -62,9 +62,15 @@ class Templates::BotMessagingService
       sender_id: @sender.id
     }
 
-    # Add content_type and content_attributes if present
-    message_params[:content_type] = rendered[:contentType] if rendered[:contentType].present?
-    message_params[:content_attributes] = rendered[:contentAttributes] if rendered[:contentAttributes].present?
+    # Add content_type and content_attributes if present (check both camelCase and snake_case)
+    if rendered[:content_type].present? || rendered[:contentType].present?
+      message_params[:content_type] =
+        rendered[:content_type] || rendered[:contentType]
+    end
+    if rendered[:content_attributes].present? || rendered[:contentAttributes].present?
+      message_params[:content_attributes] =
+        rendered[:content_attributes] || rendered[:contentAttributes]
+    end
 
     # Add additional metadata
     message_params[:additional_attributes] = {
