@@ -6,34 +6,54 @@ The Bot Templates API provides a standardized way for bots (Dialogflow, Rasa, cu
 
 **Base URL**: `https://your-chatwoot-instance.com/api/v1`
 
+**⚠️ Important Notes:**
+- Use `X-Api-Access-Token` header for authentication (not `Authorization: Bearer`)
+- Alternative: Pass token as query parameter `?api_access_token=YOUR_TOKEN`
+- Get your token from Profile → Settings → Access Token
+- For production bots, create a dedicated Agent Bot token in Settings → Agent Bots
+
 ## Authentication
 
 All Bot Templates API endpoints require authentication via API access tokens.
 
 ### Authentication Methods
 
-#### 1. User API Token
-Use your personal access token from Chatwoot profile settings.
+**IMPORTANT:** Use the `X-Api-Access-Token` header for authentication. Standard proxy configurations may strip custom headers, so this format is recommended.
+
+#### 1. User API Token (Recommended for Testing)
+Use your personal access token from Chatwoot profile settings (Profile → Settings → Access Token).
 
 ```bash
-curl -H "Authorization: Bearer YOUR_USER_API_TOKEN" \
+curl -H "X-Api-Access-Token: YOUR_USER_API_TOKEN" \
      https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/search
 ```
 
-#### 2. Agent Bot Token
-Use an agent bot's access token (recommended for automated systems).
+#### 2. Query Parameter (Alternative)
+You can also pass the token as a query parameter:
 
 ```bash
-curl -H "Authorization: Bearer YOUR_BOT_API_TOKEN" \
+curl "https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/search?api_access_token=YOUR_TOKEN"
+```
+
+#### 3. Agent Bot Token (Recommended for Production)
+Use an agent bot's access token for automated systems.
+
+```bash
+curl -H "X-Api-Access-Token: YOUR_BOT_API_TOKEN" \
      https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/search
 ```
 
 ### Creating a Bot Token
 
-1. Navigate to Settings > Agent Bots
+**For User Token:**
+1. Navigate to Profile → Settings
+2. Copy your Access Token
+
+**For Agent Bot Token:**
+1. Navigate to Settings → Agent Bots
 2. Create a new Agent Bot or select an existing one
 3. Copy the API access token
-4. Use this token in the `Authorization` header
+4. Use this token in the `X-Api-Access-Token` header
 
 ## Rate Limiting
 
@@ -83,7 +103,7 @@ Search for templates by category, channel compatibility, tags, or use cases.
 ```bash
 curl -X GET \
   "https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/search?category=scheduling&channel=apple_messages_for_business&tags=appointment" \
-  -H "Authorization: Bearer YOUR_API_TOKEN"
+  -H "X-Api-Access-Token: YOUR_API_TOKEN"
 ```
 
 **Response** (200 OK):
@@ -167,7 +187,7 @@ Render a template with specific parameters for a target channel. This validates 
 ```bash
 curl -X POST \
   https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/render \
-  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "X-Api-Access-Token: YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "template_id": 123,
@@ -289,7 +309,7 @@ Render and send a template message directly to a conversation.
 ```bash
 curl -X POST \
   https://your-chatwoot-instance.com/api/v1/accounts/1/bot_templates/send_message \
-  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "X-Api-Access-Token: YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "conversation_id": 456,
@@ -493,7 +513,7 @@ class ChatwootBotTemplates
     @api_token = api_token
     @account_id = account_id
     @headers = {
-      'Authorization' => "Bearer #{@api_token}",
+      'X-Api-Access-Token' => @api_token,
       'Content-Type' => 'application/json'
     }
   end
@@ -568,7 +588,7 @@ class ChatwootBotTemplates:
         self.api_token = api_token
         self.account_id = account_id
         self.headers = {
-            'Authorization': f'Bearer {api_token}',
+            'X-Api-Access-Token': api_token,
             'Content-Type': 'application/json'
         }
 
@@ -664,7 +684,7 @@ class ChatwootBotTemplates {
     this.baseURL = 'https://your-chatwoot-instance.com/api/v1';
     this.accountId = accountId;
     this.headers = {
-      'Authorization': `Bearer ${apiToken}`,
+      'X-Api-Access-Token': apiToken,
       'Content-Type': 'application/json'
     };
   }

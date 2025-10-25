@@ -3,12 +3,20 @@ module AccessTokenAuthHelper
     'api/v1/accounts/conversations' => %w[toggle_status toggle_priority create update custom_attributes],
     'api/v1/accounts/conversations/messages' => ['create'],
     'api/v1/accounts/conversations/assignments' => ['create'],
-    'api/v1/accounts/bot_templates' => %w[search render send_message],
+    'api/v1/accounts/bot_templates' => %w[search render_template send_message],
     'api/v1/accounts/templates' => %w[index show]
   }.freeze
 
   def ensure_access_token
-    token = request.headers[:api_access_token] || request.headers[:HTTP_API_ACCESS_TOKEN]
+    # Try multiple header formats (some may be stripped by proxies)
+    token = request.headers['X-Api-Access-Token'] ||
+            request.headers['HTTP_X_API_ACCESS_TOKEN'] ||
+            request.headers[:api_access_token] ||
+            request.headers[:HTTP_API_ACCESS_TOKEN] ||
+            params[:api_access_token]
+
+    Rails.logger.info "[AccessToken] Token found: #{token.present?}"
+
     @access_token = AccessToken.find_by(token: token) if token.present?
   end
 

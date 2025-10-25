@@ -78,8 +78,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   def adapt_time_picker(block)
     properties = block[:properties]
 
-    # CRITICAL: Use camelCase for imageIdentifier (frontend sends camelCase)
-    # Check both camelCase and snake_case for compatibility
+    # CRITICAL: Use snake_case string keys (Chatwoot validation expects this)
     event_image_id = properties['imageIdentifier'] || properties['image_identifier']
     received_image_id = properties['receivedImageIdentifier'] || properties['received_image_identifier']
     reply_image_id = properties['replyImageIdentifier'] || properties['reply_image_identifier']
@@ -87,25 +86,27 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     # If reply image not specified, reuse received image (Apple MSP best practice)
     reply_image_id = received_image_id if reply_image_id.blank?
 
+    # Get slots from parameters (for dynamic bot usage) or properties (for static templates)
+    slots = @parameters['available_slots'] || @parameters[:available_slots] || properties['slots']
+
     {
       content_type: 'apple_time_picker',
       content: properties['title'] || 'Select a time',
       content_attributes: {
-        event: {
-          title: properties['title'],
-          description: properties['description'],
-          identifier: properties['identifier'] || SecureRandom.uuid,
-          timeslots: format_timeslots(properties['slots']),
-          timezoneOffset: properties['timezoneOffset'] || properties['timezone_offset'],
-          imageIdentifier: event_image_id
+        'event' => {
+          'title' => properties['title'],
+          'description' => properties['description'],
+          'identifier' => properties['identifier'] || SecureRandom.uuid,
+          'timeslots' => format_timeslots(slots),
+          'timezone_offset' => properties['timezoneOffset'] || properties['timezone_offset'],
+          'image_identifier' => event_image_id
         }.compact,
-        received_title: properties['receivedTitle'] || properties['received_title'] || properties['title'],
-        reply_title: properties['replyTitle'] || properties['reply_title'] || 'Selected: ${event.title}',
-        receivedImageIdentifier: received_image_id,
-        replyImageIdentifier: reply_image_id,
-        received_style: properties['receivedStyle'] || properties['received_style'] || 'large',
-        reply_style: properties['replyStyle'] || properties['reply_style'] || 'large',
-        images: properties['images'] || []
+        'received_title' => properties['receivedTitle'] || properties['received_title'] || properties['title'],
+        'reply_title' => properties['replyTitle'] || properties['reply_title'] || 'Selected: ${event.title}',
+        'received_image_identifier' => received_image_id,
+        'reply_image_identifier' => reply_image_id,
+        'received_style' => properties['receivedStyle'] || properties['received_style'] || 'large',
+        'reply_style' => properties['replyStyle'] || properties['reply_style'] || 'large'
       }.compact
     }
   end
@@ -114,18 +115,18 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     return [] unless slots.is_a?(Array)
 
     slots.map.with_index do |slot_time, index|
-      # Handle both string timestamps and hash objects
+      # Handle both string timestamps and hash objects (use snake_case string keys)
       if slot_time.is_a?(Hash)
         {
-          identifier: slot_time['identifier'] || "slot_#{index}",
-          startTime: format_time(slot_time['startTime']),
-          duration: slot_time['duration'] || 3600
+          'identifier' => slot_time['identifier'] || "slot_#{index}",
+          'start_time' => format_time(slot_time['startTime'] || slot_time['start_time']),
+          'duration' => slot_time['duration'] || 3600
         }
       else
         {
-          identifier: "slot_#{index}",
-          startTime: format_time(slot_time),
-          duration: @template.parameters.dig('appointment_duration', 'default') || 3600
+          'identifier' => "slot_#{index}",
+          'start_time' => format_time(slot_time),
+          'duration' => @template.parameters.dig('appointment_duration', 'default') || 3600
         }
       end
     end
@@ -154,22 +155,30 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   def adapt_list_picker(block)
     properties = block[:properties]
 
-    # CRITICAL: Check both camelCase and snake_case for imageIdentifier
+    # CRITICAL: Use snake_case for all keys (Chatwoot validation expects snake_case)
     received_image_id = properties['receivedImageIdentifier'] || properties['received_image_identifier']
     reply_image_id = properties['replyImageIdentifier'] || properties['reply_image_identifier']
+
+    # Filter images to only include data and identifier (remove size, preview, originalName)
+    images = (properties['images'] || []).map do |img|
+      {
+        'identifier' => img['identifier'],
+        'data' => img['data']
+      }.compact
+    end
 
     {
       content_type: 'apple_list_picker',
       content: properties['title'] || 'Select an option',
       content_attributes: {
-        sections: format_list_picker_sections(properties['sections']),
-        received_title: properties['receivedTitle'] || properties['received_title'] || properties['title'],
-        reply_title: properties['replyTitle'] || properties['reply_title'] || 'Selected: ${item.title}',
-        receivedImageIdentifier: received_image_id,
-        replyImageIdentifier: reply_image_id,
-        received_style: properties['receivedStyle'] || properties['received_style'] || 'small',
-        reply_style: properties['replyStyle'] || properties['reply_style'] || 'icon',
-        images: properties['images'] || []
+        'sections' => format_list_picker_sections(properties['sections']),
+        'received_title' => properties['receivedTitle'] || properties['received_title'] || properties['title'],
+        'reply_title' => properties['replyTitle'] || properties['reply_title'] || 'Selected: ${item.title}',
+        'received_image_identifier' => received_image_id,
+        'reply_image_identifier' => reply_image_id,
+        'received_style' => properties['receivedStyle'] || properties['received_style'] || 'small',
+        'reply_style' => properties['replyStyle'] || properties['reply_style'] || 'icon',
+        'images' => images
       }.compact
     }
   end
@@ -191,17 +200,20 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     return [] unless items.is_a?(Array)
 
     items.map.with_index do |item, item_index|
-      # CRITICAL: Check both camelCase and snake_case for imageIdentifier
-      # Frontend sends camelCase, but accept both for compatibility
+      # CRITICAL: Use snake_case for image_identifier (Chatwoot validation)
       image_id = item['imageIdentifier'] || item['image_identifier']
+
+      # Normalize style to valid values: icon, small, large (default to icon)
+      style = item['style']
+      style = 'icon' unless %w[icon small large].include?(style)
 
       {
         'identifier' => item['identifier'] || SecureRandom.uuid,
         'title' => item['title'] || "Item #{item_index + 1}",
         'subtitle' => item['subtitle'],
-        'imageIdentifier' => image_id, # Always output as camelCase for Apple MSP
+        'image_identifier' => image_id,
         'order' => item['order'] || item_index,
-        'style' => item['style'] || 'icon'
+        'style' => style
       }.compact
     end
   end
@@ -275,13 +287,20 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   def adapt_quick_reply(block)
     properties = block[:properties]
 
+    # Format items to match Chatwoot's expected format
+    items = (properties['items'] || properties[:items] || []).map do |item|
+      {
+        'identifier' => item['identifier'] || item[:identifier] || SecureRandom.uuid,
+        'title' => item['title'] || item[:title]
+      }.compact
+    end
+
     {
       content_type: 'apple_quick_reply',
-      content: properties['summaryText'] || 'Quick Reply',
+      content: properties['summaryText'] || properties[:summaryText] || properties['summary_text'] || 'Quick Reply',
       content_attributes: {
-        summaryText: properties['summaryText'],
-        items: properties['items'] || [],
-        images: properties['images'] || []
+        'summary_text' => properties['summaryText'] || properties[:summaryText] || properties['summary_text'],
+        'items' => items
       }.compact
     }
   end

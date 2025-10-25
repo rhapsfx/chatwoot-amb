@@ -88,7 +88,7 @@ Rails.application.routes.draw do
           resources :bot_templates, only: [] do
             collection do
               get :search
-              post :render
+              post 'render', to: 'bot_templates#render_template'
               post :send_message
             end
           end
