@@ -168,7 +168,12 @@ const variant = computed(() => {
   if (props.contentAttributes?.isUnsupported)
     return MESSAGE_VARIANTS.UNSUPPORTED;
 
-  const isBot = !props.sender || props.sender.type === SENDER_TYPES.AGENT_BOT;
+  // Check sender type with fallback to senderType prop
+  const senderType = props.sender?.type ?? props.senderType;
+  const isBot =
+    !props.sender ||
+    senderType === SENDER_TYPES.AGENT_BOT ||
+    senderType === SENDER_TYPES.CAPTAIN_ASSISTANT;
   if (isBot && props.messageType === MESSAGE_TYPES.OUTGOING) {
     return MESSAGE_VARIANTS.BOT;
   }
@@ -459,10 +464,17 @@ const avatarInfo = computed(() => {
   const { sender } = props;
   const { name, type, avatarUrl, thumbnail } = sender || {};
 
+  // Use sender type with fallback to senderType prop
+  const senderType = type ?? props.senderType;
+
   // If sender type is agent bot, use avatarUrl
-  if ([SENDER_TYPES.AGENT_BOT, SENDER_TYPES.CAPTAIN_ASSISTANT].includes(type)) {
+  if (
+    [SENDER_TYPES.AGENT_BOT, SENDER_TYPES.CAPTAIN_ASSISTANT].includes(
+      senderType
+    )
+  ) {
     return {
-      name: name ?? '',
+      name: name ?? t('CONVERSATION.BOT'),
       src: avatarUrl ?? '',
     };
   }

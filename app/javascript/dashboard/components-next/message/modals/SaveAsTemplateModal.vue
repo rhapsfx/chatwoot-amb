@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 
@@ -31,7 +30,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'saveAndSend']);
 
-const { t } = useI18n();
 const store = useStore();
 
 // Form state
@@ -40,7 +38,6 @@ const shortCode = ref('');
 const category = ref('general');
 const description = ref('');
 const tags = ref('');
-const isValidatingShortCode = ref(false);
 const shortCodeError = ref('');
 
 // Category options - must match MessageTemplate::CATEGORIES
@@ -145,17 +142,16 @@ const generateShortCode = () => {
   const prefix = props.messageType.substring(0, 3);
   const timestamp = Date.now().toString().slice(-6);
 
-  let baseShortCode = `${prefix}_${timestamp}`;
+  const baseShortCode = `${prefix}_${timestamp}`;
+  const existingShortCodes = existingCannedResponses.value.map(
+    response => response.short_code
+  );
 
   // Ensure uniqueness
   let counter = 1;
   let candidateShortCode = baseShortCode;
 
-  while (
-    existingCannedResponses.value.some(
-      response => response.short_code === candidateShortCode
-    )
-  ) {
+  while (existingShortCodes.includes(candidateShortCode)) {
     candidateShortCode = `${baseShortCode}_${counter}`;
     counter += 1;
   }
@@ -269,6 +265,10 @@ const validateShortCode = () => {
   return true;
 };
 
+const handleClose = () => {
+  emit('close');
+};
+
 const handleSave = async () => {
   if (!isFormValid.value) {
     useAlert('Please fill in all required fields');
@@ -288,12 +288,6 @@ const handleSave = async () => {
         .filter(tag => tag.length > 0),
     };
 
-    // Debug: Log payload before sending
-    console.log(
-      '📦 Saving template with payload:',
-      JSON.stringify(payload, null, 2)
-    );
-
     const template = await store.dispatch(
       'messageTemplates/createFromAppleMessage',
       payload
@@ -303,10 +297,6 @@ const handleSave = async () => {
     emit('save', template);
     handleClose();
   } catch (error) {
-    console.error('Failed to save template:', error);
-    console.error('Error response:', error.response);
-    console.error('Error response data:', error.response?.data);
-
     const errorMessage =
       error.response?.data?.details ||
       error.response?.data?.error ||
@@ -336,12 +326,6 @@ const handleSaveAndSend = async () => {
         .filter(tag => tag.length > 0),
     };
 
-    // Debug: Log payload before sending
-    console.log(
-      '📦 Saving template with payload:',
-      JSON.stringify(payload, null, 2)
-    );
-
     const template = await store.dispatch(
       'messageTemplates/createFromAppleMessage',
       payload
@@ -351,10 +335,6 @@ const handleSaveAndSend = async () => {
     emit('saveAndSend', { template, messageData: props.messageData });
     handleClose();
   } catch (error) {
-    console.error('Failed to save template:', error);
-    console.error('Error response:', error.response);
-    console.error('Error response data:', error.response?.data);
-
     const errorMessage =
       error.response?.data?.details ||
       error.response?.data?.error ||
@@ -363,10 +343,6 @@ const handleSaveAndSend = async () => {
 
     useAlert(errorMessage, 'error');
   }
-};
-
-const handleClose = () => {
-  emit('close');
 };
 
 // Watch props.show to initialize form
@@ -390,14 +366,14 @@ onMounted(async () => {
   try {
     await store.dispatch('getCannedResponse');
   } catch (error) {
-    console.error('Failed to load canned responses:', error);
+    // Silent fail - canned responses will be empty
   }
 });
 </script>
 
 <template>
   <div
-    v-if="show"
+    v-show="show"
     class="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-80 flex items-center justify-center p-4"
   >
     <div
