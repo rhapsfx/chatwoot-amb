@@ -20,12 +20,6 @@ const timeslots = computed(() => {
     duration: slot.duration,
   }));
 });
-const timezoneOffset = computed(
-  () =>
-    contentAttributes.value?.event?.timezoneOffset ||
-    contentAttributes.value?.timezone_offset ||
-    0
-);
 
 const formatDateTime = dateTimeString => {
   const date = new Date(dateTimeString);
@@ -56,9 +50,9 @@ const formatDuration = durationValue => {
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 };
 
-const handleTimeSlotClick = slot => {
+const handleTimeSlotClick = () => {
   // In a real implementation, this would send the selection back to the server
-  console.log('Time slot selected:', slot);
+  // User interaction handled by parent component
 };
 </script>
 
@@ -113,14 +107,15 @@ const handleTimeSlotClick = slot => {
 
       <!-- Empty State -->
       <div v-if="timeslots.length === 0" class="text-center py-6">
-        <div class="text-n-slate-11 text-sm">No available time slots</div>
+        <div class="text-n-slate-11 text-sm">{{ event.title || '' }}</div>
       </div>
 
       <!-- Footer Note -->
       <div
+        v-if="timeslots.length > 0"
         class="mt-4 text-xs text-n-slate-11 text-center bg-n-alpha-1 rounded p-2"
       >
-        Select a time slot to schedule
+        {{ event.description || '' }}
       </div>
     </div>
   </BaseBubble>

@@ -57,10 +57,7 @@ const v$ = useVuelidate(
       ),
     },
     botUrl: {
-      required: helpers.withMessage(
-        () => t('AGENT_BOTS.FORM.ERRORS.URL'),
-        required
-      ),
+      // Webhook URL is optional, but if provided, it must be valid
       url: helpers.withMessage(
         () => t('AGENT_BOTS.FORM.ERRORS.VALID_URL'),
         url
