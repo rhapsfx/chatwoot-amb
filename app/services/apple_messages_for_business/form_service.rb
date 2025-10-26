@@ -246,36 +246,38 @@ class AppleMessagesForBusiness::FormService
 
   def build_received_message
     received_msg = @form_config['received_message'] || {}
-    # Handle both camelCase and snake_case for imageIdentifier
-    received_image_id = received_msg['image_identifier'] || received_msg['imageIdentifier']
 
-    {
-      title: received_msg['title'] || @form_config['title'] || 'Please fill out this form',
-      subtitle: received_msg['subtitle'],
-      imageIdentifier: received_image_id,
-      style: received_msg['style'] || 'large'
+    msg_data = {
+      'title' => received_msg['title'] || @form_config['title'] || 'Please fill out this form',
+      'subtitle' => received_msg['subtitle'],
+      'image_identifier' => received_msg['image_identifier'],
+      'style' => received_msg['style'] || 'large'
     }
+
+    # Transform to Apple format (camelCase) with received_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(msg_data, context: :received_message)
   end
 
   def build_reply_message
     reply_msg = @form_config['reply_message'] || {}
-    # Handle both camelCase and snake_case for imageIdentifier
-    reply_image_id = reply_msg['image_identifier'] || reply_msg['imageIdentifier']
 
     # If reply image is not specified, reuse the received image identifier
     # This follows Apple MSP best practice: reply message should show the same image as received message
+    reply_image_id = reply_msg['image_identifier']
     if reply_image_id.blank?
       received_msg = @form_config['received_message'] || {}
-      received_image_id = received_msg['image_identifier'] || received_msg['imageIdentifier']
-      reply_image_id = received_image_id
+      reply_image_id = received_msg['image_identifier']
     end
 
-    {
-      title: reply_msg['title'] || 'Thank you for your submission!',
-      subtitle: reply_msg['subtitle'],
-      imageIdentifier: reply_image_id,
-      style: reply_msg['style'] || 'large'
+    msg_data = {
+      'title' => reply_msg['title'] || 'Thank you for your submission!',
+      'subtitle' => reply_msg['subtitle'],
+      'image_identifier' => reply_image_id,
+      'style' => reply_msg['style'] || 'large'
     }
+
+    # Transform to Apple format (camelCase) with reply_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(msg_data, context: :reply_message)
   end
 
   def build_images_array

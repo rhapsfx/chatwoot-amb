@@ -347,7 +347,9 @@ watch(selectedChannel, () => {
               </div>
               <div class="flex gap-2 flex-wrap mt-3">
                 <button
-                  v-for="(item, i) in block.properties.items || block.properties.replies || []"
+                  v-for="(item, i) in block.properties.items ||
+                  block.properties.replies ||
+                  []"
                   :key="i"
                   disabled
                   class="px-4 py-2 bg-n-blue-2 border border-n-blue-7 text-n-blue-11 rounded-full text-sm font-medium hover:bg-n-blue-3 transition-colors cursor-pointer"
@@ -399,7 +401,9 @@ watch(selectedChannel, () => {
               </div>
               <div class="space-y-2">
                 <template
-                  v-for="(section, sectionIdx) in (block.properties.sections || []).slice(0, 2)"
+                  v-for="(section, sectionIdx) in (
+                    block.properties.sections || []
+                  ).slice(0, 2)"
                   :key="sectionIdx"
                 >
                   <div
@@ -418,8 +422,18 @@ watch(selectedChannel, () => {
                       class="w-10 h-10 bg-n-slate-3 rounded flex items-center justify-center overflow-hidden flex-shrink-0"
                     >
                       <img
-                        v-if="getImageData(item.imageIdentifier || item.image_identifier, block.properties)"
-                        :src="getImageData(item.imageIdentifier || item.image_identifier, block.properties)"
+                        v-if="
+                          getImageData(
+                            item.imageIdentifier || item.image_identifier,
+                            block.properties
+                          )
+                        "
+                        :src="
+                          getImageData(
+                            item.imageIdentifier || item.image_identifier,
+                            block.properties
+                          )
+                        "
                         alt=""
                         class="w-full h-full object-cover"
                       />
@@ -429,10 +443,7 @@ watch(selectedChannel, () => {
                       <div class="text-sm font-medium text-n-slate-12">
                         {{ item.title }}
                       </div>
-                      <div
-                        v-if="item.subtitle"
-                        class="text-xs text-n-slate-10"
-                      >
+                      <div v-if="item.subtitle" class="text-xs text-n-slate-10">
                         {{ item.subtitle }}
                       </div>
                     </div>

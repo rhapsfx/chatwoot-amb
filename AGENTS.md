@@ -80,124 +80,240 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Apple Messages for Business (AMB) - Critical Implementation Notes
 
+### 🚨 MANDATORY: CaseTransformer for All AMB Features
+
+**Status**: ✅ **Case normalization complete** (Phases 1-3 deployed Oct 2025)
+
+**Critical Rule**: ALL Apple Messages for Business code MUST use `CaseTransformer` for case conversions.
+
+#### System Architecture
+
+**Data Flow**:
+```
+Frontend (camelCase)
+  → API Controller (auto-normalizes to snake_case via before_action)
+  → Database (snake_case storage)
+  → Services (snake_case internally)
+  → CaseTransformer (converts to camelCase for Apple MSP)
+  → Apple MSP API (camelCase)
+```
+
+**Key Principles**:
+1. **Internal storage**: Always snake_case (Rails convention)
+2. **Frontend**: Naturally sends camelCase (JavaScript convention)
+3. **API boundary**: Automatic normalization (camelCase → snake_case)
+4. **Apple MSP boundary**: CaseTransformer (snake_case → camelCase)
+5. **NEVER use dual-checks**: `field['snake_case'] || field['camelCase']` ❌
+
+#### Using CaseTransformer
+
+**Module**: `AppleMessagesForBusiness::CaseTransformer`
+**Location**: `app/services/apple_messages_for_business/case_transformer.rb`
+
+**Basic Usage**:
+```ruby
+# Convert internal snake_case → Apple MSP camelCase
+apple_format = AppleMessagesForBusiness::CaseTransformer.to_apple_format(internal_data)
+
+# Convert Apple/frontend camelCase → internal snake_case
+internal_format = AppleMessagesForBusiness::CaseTransformer.from_apple_format(apple_data)
+
+# Normalize mixed-case data → snake_case
+normalized = AppleMessagesForBusiness::CaseTransformer.normalize_content_attributes(mixed_data)
+```
+
+**Context-Aware Transformations**:
+```ruby
+# For received_message (strips received_ prefix)
+AppleMessagesForBusiness::CaseTransformer.to_apple_format(
+  { 'received_title' => 'Hello', 'received_image_identifier' => 'img1' },
+  context: :received_message
+)
+# Returns: { 'title' => 'Hello', 'imageIdentifier' => 'img1' }
+
+# For reply_message (strips reply_ prefix)
+AppleMessagesForBusiness::CaseTransformer.to_apple_format(
+  { 'reply_title' => 'Thanks', 'reply_image_identifier' => 'img2' },
+  context: :reply_message
+)
+# Returns: { 'title' => 'Thanks', 'imageIdentifier' => 'img2' }
+```
+
+#### Adding New AMB Features
+
+**When adding new Apple Messages features, ALWAYS**:
+
+1. **Store data in snake_case**:
+   ```ruby
+   content_attributes: {
+     'image_identifier' => 'img_123',
+     'timezone_offset' => 28800,
+     'multiple_selection' => true
+   }
+   ```
+
+2. **Use CaseTransformer in services**:
+   ```ruby
+   def build_my_feature_data
+     data = {
+       'my_field_name' => value,
+       'another_field' => value2
+     }
+
+     # Transform to Apple format
+     AppleMessagesForBusiness::CaseTransformer.to_apple_format(data)
+   end
+   ```
+
+3. **Add new fields to CaseTransformer mappings** if needed:
+   ```ruby
+   # In case_transformer.rb
+   TO_APPLE_MAPPINGS = {
+     'my_new_field' => 'myNewField',
+     # ... existing mappings
+   }.freeze
+   ```
+
+4. **API controller auto-normalizes** (no code changes needed):
+   - Frontend sends: `{ imageIdentifier: 'img1', timezoneOffset: 3600 }`
+   - API receives and auto-converts to: `{ image_identifier: 'img1', timezone_offset: 3600 }`
+   - Database stores snake_case
+
+#### Common Field Mappings
+
+**Most frequently used**:
+- `image_identifier` ↔ `imageIdentifier`
+- `multiple_selection` ↔ `multipleSelection`
+- `timezone_offset` ↔ `timezoneOffset`
+- `start_time` ↔ `startTime`
+- `received_image_identifier` ↔ `receivedImageIdentifier` (in received_message context → `imageIdentifier`)
+- `reply_image_identifier` ↔ `replyImageIdentifier` (in reply_message context → `imageIdentifier`)
+
+**See full mappings**: `app/services/apple_messages_for_business/case_transformer.rb`
+
+#### Migration Status
+
+✅ **Phase 1** (Oct 2025): CaseTransformer module + API normalization
+✅ **Phase 2** (Oct 2025): Database migration (265 records normalized to 100%)
+✅ **Phase 3** (Oct 2025): Service layer cleanup (all dual-checks removed)
+
+**Current Services Using CaseTransformer**:
+- ✅ SendListPickerService
+- ✅ SendTimePickerService
+- ✅ FormService
+- ✅ SendRichLinkService (already clean)
+- ✅ API Controller (messages_controller.rb)
+
+#### Testing CaseTransformer
+
+**Manual test script**: `test_case_transformer.rb` (project root)
+
+```bash
+# Run all transformation tests
+ruby test_case_transformer.rb
+```
+
+**RSpec tests**: `spec/services/apple_messages_for_business/case_transformer_spec.rb`
+
+#### Documentation
+
+**Technical Specs**:
+- `docs/apple-messages/case-normalization-specification.md` - Complete technical specification
+- `docs/apple-messages/PHASE_1_COMPLETE.md` - Phase 1 implementation details
+- `docs/apple-messages/MIGRATION_IMPLEMENTATION_COMPLETE.md` - Phase 2 migration guide
+- `docs/apple-messages/MIGRATION_GUIDE.md` - Step-by-step migration procedures
+
+**Scripts**:
+- `docs/apple-messages/scripts/dry_run_normalization.rb` - Analyze normalization status
+- `docs/apple-messages/scripts/verify_normalization.rb` - Verify database normalization
+- `docs/apple-messages/scripts/rollback_normalization.rb` - Emergency rollback (if needed)
+
+---
+
 ### List Picker with Images
 
-**Key Discovery**: The frontend sends `imageIdentifier` in **camelCase**, not `image_identifier` (snake_case).
+**Current Implementation**: Uses CaseTransformer for all case conversions.
 
 **Service Architecture**:
 - Parent: `AppleMessagesForBusiness::SendMessageService` (base class)
 - Child: `AppleMessagesForBusiness::SendListPickerService` (overrides `build_list_picker_data`)
 
-**Critical Implementation Details**:
+**Implementation Pattern**:
+```ruby
+def build_list_picker_data
+  sections = content_attributes['sections'] || []
 
-1. **Child Class Override MUST Check Both Cases**:
-   ```ruby
-   # CORRECT - Check both camelCase and snake_case
-   if item['image_identifier'].present?
-     transformed_item['imageIdentifier'] = item['image_identifier']
-   elsif item['imageIdentifier'].present?
-     transformed_item['imageIdentifier'] = item['imageIdentifier']
-   end
-   ```
+  transformed_sections = sections.map do |section|
+    # Use CaseTransformer to convert snake_case → camelCase
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(section)
+  end
 
-2. **Why This Matters**:
-   - Vue/JavaScript frontend naturally uses camelCase: `imageIdentifier`
-   - Rails typically uses snake_case: `image_identifier`
-   - The `content_attributes` hash preserves the original casing from JSON
-   - Apple MSP API expects camelCase: `imageIdentifier`
+  { sections: transformed_sections }
+end
+```
 
-3. **The Bug That Was Fixed**:
-   - Original code only checked `item['image_identifier']` (snake_case)
-   - Frontend was sending `item['imageIdentifier']` (camelCase)
-   - Result: `imageIdentifier` was silently dropped from the payload
-   - Apple received list picker items without image references
+**Image Storage Flow**:
+- Images are base64-encoded on frontend
+- Sent to backend in `content_attributes['images']`
+- Stored in ActiveStorage via `AppleListPickerImage` model
+- Retrieved and re-encoded when sending to Apple MSP
+- Items reference images via `image_identifier` (snake_case internally)
 
-4. **Image Storage Flow**:
-   - Images are base64-encoded on frontend
-   - Sent to backend in `content_attributes['images']`
-   - Stored in ActiveStorage via `AppleListPickerImage` model
-   - Retrieved and re-encoded when sending to Apple MSP
-   - Items reference images via `imageIdentifier` matching the image's `identifier`
-
-5. **Debugging Tips**:
-   - Check final payload with: `payload[:interactiveData][:data][:listPicker][:sections].first['items'].first.keys`
-   - Should include: `["identifier", "title", "subtitle", "order", "style", "imageIdentifier"]`
-   - If `imageIdentifier` is missing, check the casing in `content_attributes`
-
-6. **Related Files**:
-   - Service: `app/services/apple_messages_for_business/send_list_picker_service.rb`
-   - Model: `app/models/apple_list_picker_image.rb`
-   - Controller: `app/controllers/api/v1/accounts/inboxes/apple_list_picker_images_controller.rb`
+**Related Files**:
+- Service: `app/services/apple_messages_for_business/send_list_picker_service.rb`
+- Model: `app/models/apple_list_picker_image.rb`
+- Controller: `app/controllers/api/v1/accounts/inboxes/apple_list_picker_images_controller.rb`
 
 ### Time Picker with Images
 
-**Key Discovery**: The `replyMessage` should automatically reuse the same `imageIdentifier` as `receivedMessage` when not explicitly set.
+**Current Implementation**: Uses CaseTransformer for all case conversions.
 
-**Critical Implementation Details**:
+**Automatic Image Fallback**:
+```ruby
+# In SendTimePickerService#build_reply_message
+reply_image_id = content_attributes['reply_image_identifier']
 
-1. **Automatic Image Fallback**:
-   ```ruby
-   # In SendTimePickerService#build_reply_message
-   reply_image_id = content_attributes['reply_image_identifier'] || content_attributes['replyImageIdentifier']
+# If reply image is not specified, reuse the received image identifier
+if reply_image_id.blank?
+  reply_image_id = content_attributes['received_image_identifier']
+end
+```
 
-   # If reply image is not specified, reuse the received image identifier
-   if reply_image_id.blank?
-     received_image_id = content_attributes['received_image_identifier'] || content_attributes['receivedImageIdentifier']
-     reply_image_id = received_image_id
-   end
-   ```
+**Why This Matters**:
+- Apple MSP best practice: reply message should display the same image as received message
+- Frontend may not always explicitly set `reply_image_identifier`
+- Automatic fallback ensures visual consistency in the time picker flow
 
-2. **Why This Matters**:
-   - Apple MSP best practice: reply message should display the same image as received message
-   - Frontend may not always explicitly set `replyImageIdentifier`
-   - Automatic fallback ensures visual consistency in the time picker flow
-   - User sees the same image when selecting a time slot as when viewing the picker
-
-3. **The Fix**:
-   - `SendTimePickerService#build_reply_message` now checks if `reply_image_identifier` is blank
-   - If blank/nil/empty, it automatically uses `received_image_identifier`
-   - Supports both camelCase and snake_case for frontend compatibility
-   - Ensures Apple receives consistent image identifiers in both received and reply messages
-
-4. **Related Files**:
-   - Service: `app/services/apple_messages_for_business/send_time_picker_service.rb`
-   - Frontend Modal: `app/javascript/dashboard/components-next/message/modals/EnhancedTimePickerModal.vue`
-   - Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
+**Related Files**:
+- Service: `app/services/apple_messages_for_business/send_time_picker_service.rb`
+- Frontend Modal: `app/javascript/dashboard/components-next/message/modals/EnhancedTimePickerModal.vue`
+- Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
 
 ### Apple Messages Forms with Images
 
-**Key Implementation**: Forms now support `receivedMessage` and `replyMessage` with images, similar to Time Picker and List Picker.
+**Current Implementation**: Uses CaseTransformer for all case conversions.
 
-**Critical Implementation Details**:
+**Automatic Image Fallback**:
+```ruby
+# In FormService#build_reply_message
+reply_image_id = reply_msg['image_identifier']
 
-1. **Automatic Image Fallback**:
-   ```ruby
-   # In FormService#build_reply_message
-   reply_image_id = reply_msg['image_identifier'] || reply_msg['imageIdentifier']
+# If reply image is not specified, reuse the received image identifier
+if reply_image_id.blank?
+  received_msg = @form_config['received_message'] || {}
+  reply_image_id = received_msg['image_identifier']
+end
+```
 
-   # If reply image is not specified, reuse the received image identifier
-   if reply_image_id.blank?
-     received_msg = @form_config['received_message'] || {}
-     received_image_id = received_msg['image_identifier'] || received_msg['imageIdentifier']
-     reply_image_id = received_image_id
-   end
-   ```
+**Frontend Integration**:
+- AppleFormBuilder.vue has a "Messages" tab for configuring receivedMessage and replyMessage
+- Image selector with preview similar to Time Picker
+- Auto-sync: reply image automatically uses received image if not explicitly set
 
-2. **Frontend Integration**:
-   - AppleFormBuilder.vue has a new "Messages" tab for configuring receivedMessage and replyMessage
-   - Image selector with preview similar to Time Picker
-   - Auto-sync: reply image automatically uses received image if not explicitly set
-   - Upload button to add new images to the library
-
-3. **Service Updates**:
-   - `FormService#build_form_data` includes receivedMessage and replyMessage
-   - `FormService#build_images_array` collects and encodes images
-   - Supports both camelCase and snake_case for frontend compatibility
-
-4. **Related Files**:
-   - Service: `app/services/apple_messages_for_business/form_service.rb`
-   - Frontend Modal: `app/javascript/dashboard/components-next/message/modals/AppleFormBuilder.vue`
-   - Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
+**Related Files**:
+- Service: `app/services/apple_messages_for_business/form_service.rb`
+- Frontend Modal: `app/javascript/dashboard/components-next/message/modals/AppleFormBuilder.vue`
+- Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
 
 ## Database Access
 
@@ -214,6 +330,6 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Other Notes
 
-- Remember to implement camelCase format for any functions
+- **Apple Messages for Business**: ALWAYS use CaseTransformer for case conversions (see AMB section above)
 - Remember that any tailscale command requires privilege - ask user to execute them directly
-- Do not push changes to git until i noticed you
+- Do not push changes to git until user approves

@@ -49,9 +49,27 @@ module Templates
       # So we store a simple reference mapping here
       template.channel_mappings.create!(
         channel_type: 'apple_messages_for_business',
-        content_type: message_type,
+        content_type: content_type_for_channel,
         field_mappings: {}
       )
+    end
+
+    def content_type_for_channel
+      # Map message_type to Apple Messages content_type
+      case message_type.to_s
+      when 'time_picker'
+        'apple_time_picker'
+      when 'list_picker'
+        'apple_list_picker'
+      when 'quick_reply'
+        'apple_quick_reply'
+      when 'form'
+        'form'
+      when 'apple_pay'
+        'input_select'
+      else
+        message_type
+      end
     end
 
     def block_type_for_message

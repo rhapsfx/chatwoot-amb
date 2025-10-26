@@ -11,5 +11,12 @@ json.appleMspPayload message.apple_msp_payload if message.apple_msp_payload.pres
 json.created_at message.created_at.to_i
 json.private message.private
 json.source_id message.source_id
-json.sender message.sender.push_event_data if message.sender
+# Handle AgentBot sender correctly by passing inbox parameter
+if message.sender
+  if message.sender.is_a?(AgentBot)
+    json.sender message.sender.push_event_data(message.inbox)
+  else
+    json.sender message.sender.push_event_data
+  end
+end
 json.attachments message.attachments.map(&:push_event_data) if message.attachments.present?

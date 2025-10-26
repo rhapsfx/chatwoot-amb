@@ -135,17 +135,22 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   def build_time_picker_data
     event_data = content_attributes['event'] || {}
 
-    # Handle both camelCase and snake_case for imageIdentifier (frontend sends camelCase)
-    image_identifier = event_data['image_identifier'] || event_data['imageIdentifier']
+    Rails.logger.info "[AMB TimePicker] build_time_picker_data - Reading from database:"
+    Rails.logger.info "[AMB TimePicker] content_attributes['event']: #{content_attributes['event'].inspect}"
+    Rails.logger.info "[AMB TimePicker] event_data['timeslots']: #{event_data['timeslots'].inspect}"
 
-    {
-      identifier: event_data['identifier'] || SecureRandom.uuid,
-      title: event_data['title'] || 'Select a time',
-      imageIdentifier: image_identifier,
-      location: build_location_data(event_data['location']),
-      timeslots: build_timeslots(event_data['timeslots'] || default_timeslots),
-      timezoneOffset: event_data['timezone_offset']
+    # Build event with snake_case, then transform to Apple format
+    event = {
+      'identifier' => event_data['identifier'] || SecureRandom.uuid,
+      'title' => event_data['title'] || 'Select a time',
+      'image_identifier' => event_data['image_identifier'],
+      'location' => build_location_data(event_data['location']),
+      'timeslots' => build_timeslots(event_data['timeslots'] || default_timeslots),
+      'timezone_offset' => event_data['timezone_offset']
     }
+
+    # Transform to Apple format (camelCase)
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(event)
   end
 
   def build_location_data(location)
@@ -160,15 +165,26 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   end
 
   def build_timeslots(timeslots)
-    timeslots.map do |slot|
-      # Handle both camelCase (from frontend) and snake_case
-      start_time = slot['startTime'] || slot['start_time']
+    Rails.logger.info "[AMB TimePicker] build_timeslots called with #{timeslots&.length || 0} slots"
 
-      {
-        identifier: slot['identifier'] || SecureRandom.uuid,
-        startTime: format_iso8601_time(start_time),
-        duration: slot['duration']&.to_i || 3600 # Default 1 hour in seconds
+    timeslots.map.with_index do |slot, index|
+      Rails.logger.info "[AMB TimePicker] Slot #{index}: #{slot.inspect}"
+      Rails.logger.info "[AMB TimePicker] Slot #{index} keys: #{slot.keys.inspect}"
+      Rails.logger.info "[AMB TimePicker] Slot #{index} start_time (string key): #{slot['start_time'].inspect}"
+      Rails.logger.info "[AMB TimePicker] Slot #{index} start_time (symbol key): #{slot[:start_time].inspect}"
+
+      # Use snake_case internally, CaseTransformer will handle conversion
+      # Handle both string and symbol keys
+      start_time_value = slot['start_time'] || slot[:start_time]
+
+      result = {
+        'identifier' => slot['identifier'] || slot[:identifier] || SecureRandom.uuid,
+        'start_time' => format_iso8601_time(start_time_value),
+        'duration' => (slot['duration'] || slot[:duration])&.to_i || 3600 # Default 1 hour in seconds
       }
+
+      Rails.logger.info "[AMB TimePicker] Slot #{index} result: #{result.inspect}"
+      result
     end
   end
 
@@ -196,9 +212,6 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
 
   def build_images_array
     Rails.logger.info '[AMB TimePicker] build_images_array called'
-    Rails.logger.info "[AMB TimePicker] content_attributes keys: #{content_attributes.keys.inspect}"
-    Rails.logger.info "[AMB TimePicker] received_image_identifier: #{content_attributes['received_image_identifier'].inspect}"
-    Rails.logger.info "[AMB TimePicker] receivedImageIdentifier: #{content_attributes['receivedImageIdentifier'].inspect}"
 
     images_data = content_attributes['images'] || []
     all_images = []
@@ -216,11 +229,12 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
     end
 
     # Collect all image identifiers referenced in event, received_message, and reply_message
+    # All data is now normalized to snake_case
     image_identifiers = []
     event_data = content_attributes['event'] || {}
-    image_identifiers << (event_data['image_identifier'] || event_data['imageIdentifier'])
-    image_identifiers << (content_attributes['received_image_identifier'] || content_attributes['receivedImageIdentifier'])
-    image_identifiers << (content_attributes['reply_image_identifier'] || content_attributes['replyImageIdentifier'])
+    image_identifiers << event_data['image_identifier']
+    image_identifiers << content_attributes['received_image_identifier']
+    image_identifiers << content_attributes['reply_image_identifier']
     image_identifiers.compact!
     image_identifiers.uniq!
 
@@ -235,7 +249,6 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       Rails.logger.info "[AMB TimePicker] Fetching #{missing_identifiers.length} images from database: #{missing_identifiers.inspect}"
 
       # Performance Optimization: Batch fetch with single WHERE IN query (avoids N+1)
-      # This already uses optimal eager loading pattern
       fetched_images = AppleListPickerImage.where(
         inbox_id: message.inbox_id,
         identifier: missing_identifiers
@@ -258,34 +271,32 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   end
 
   def build_received_message
-    # Handle both camelCase and snake_case for imageIdentifier (frontend sends camelCase)
-    received_image_id = content_attributes['received_image_identifier'] || content_attributes['receivedImageIdentifier']
-
-    {
-      title: content_attributes['received_title'] || 'Select a time',
-      subtitle: content_attributes['received_subtitle'],
-      imageIdentifier: received_image_id,
-      style: content_attributes['received_style'] || 'large'
+    received_msg = {
+      'title' => content_attributes['received_title'] || 'Select a time',
+      'subtitle' => content_attributes['received_subtitle'],
+      'image_identifier' => content_attributes['received_image_identifier'],
+      'style' => content_attributes['received_style'] || 'large'
     }
+
+    # Transform to Apple format (camelCase) with received_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(received_msg, context: :received_message)
   end
 
   def build_reply_message
-    # Handle both camelCase and snake_case for imageIdentifier (frontend sends camelCase)
-    reply_image_id = content_attributes['reply_image_identifier'] || content_attributes['replyImageIdentifier']
-
     # If reply image is not specified, reuse the received image identifier
     # This follows Apple MSP best practice: reply message should show the same image as received message
-    if reply_image_id.blank?
-      received_image_id = content_attributes['received_image_identifier'] || content_attributes['receivedImageIdentifier']
-      reply_image_id = received_image_id
-    end
+    reply_image_id = content_attributes['reply_image_identifier']
+    reply_image_id = content_attributes['received_image_identifier'] if reply_image_id.blank?
 
-    {
-      title: content_attributes['reply_title'] || 'Selected: ${event.title}',
-      subtitle: content_attributes['reply_subtitle'],
-      imageIdentifier: reply_image_id,
-      style: content_attributes['reply_style'] || 'large'
+    reply_msg = {
+      'title' => content_attributes['reply_title'] || 'Selected: ${event.title}',
+      'subtitle' => content_attributes['reply_subtitle'],
+      'image_identifier' => reply_image_id,
+      'style' => content_attributes['reply_style'] || 'large'
     }
+
+    # Transform to Apple format (camelCase) with reply_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(reply_msg, context: :reply_message)
   end
 
   def default_timeslots
