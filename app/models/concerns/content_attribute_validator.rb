@@ -20,13 +20,17 @@ class ContentAttributeValidator < ActiveModel::Validator
   ALLOWED_APPLE_RICH_LINK_KEYS = [:url, :title, :description, :image_data, :image_mime_type, :video_url, :video_mime_type, :site_name].freeze
   ALLOWED_APPLE_PAY_KEYS = [:payment_request, :merchant_session, :endpoints].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
-  ALLOWED_APPLE_FORM_KEYS = [:title, :description, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message, :reply_message].freeze
+  ALLOWED_APPLE_FORM_KEYS = [:title, :description, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
+                             :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button].freeze
   ALLOWED_APPLE_CUSTOM_APP_KEYS = [:app_id, :app_name, :bid, :url, :use_live_layout].freeze
 
   # Apple MSP style values
   APPLE_STYLE_VALUES = %w[icon small large].freeze
 
   def validate(record)
+    Rails.logger.info "🔥🔥🔥 ContentAttributeValidator.validate CALLED for content_type: #{record.content_type}"
+    Rails.logger.info "🔥🔥🔥 ContentAttributeValidator - content_attributes keys: #{record.content_attributes&.keys&.inspect}"
+
     case record.content_type
     when 'input_select'
       validate_items!(record)
@@ -165,12 +169,16 @@ class ContentAttributeValidator < ActiveModel::Validator
       end
 
       timeslots = event['timeslots'] || []
+      Rails.logger.info "🔥 ContentAttributeValidator - Timeslots BEFORE processing: #{timeslots.inspect}"
+
       timeslots.each do |slot|
         next unless slot.is_a?(Hash)
 
         # Auto-generate identifier if not present (platform-generated, not agent-exposed)
         slot['identifier'] ||= SecureRandom.hex(1) # Use simple numeric-like identifier
       end
+
+      Rails.logger.info "🔥 ContentAttributeValidator - Timeslots AFTER processing: #{timeslots.inspect}"
 
       # Ensure timezone offset is properly named
       if content_attrs['timezone_offset'] && !event['timezoneOffset']
@@ -183,6 +191,8 @@ class ContentAttributeValidator < ActiveModel::Validator
       event['title'] = '' # Apple sample uses empty string for title
 
       content_attrs['event'] = event
+
+      Rails.logger.info "🔥 ContentAttributeValidator - Final event: #{content_attrs['event'].inspect}"
 
       # Add default received/reply message structure if not present
       content_attrs['received_title'] ||= event['title'] || record.content || 'Select a time'
