@@ -163,6 +163,8 @@ class Message < ApplicationRecord
     )
     data[:echo_id] = echo_id if echo_id.present?
     data[:attachments] = attachments.map(&:push_event_data) if attachments.present?
+    # Normalize sender_type to match frontend expectations
+    data[:sender_type] = normalize_sender_type(data[:sender_type])
     merge_sender_attributes(data)
   end
 
@@ -273,6 +275,23 @@ class Message < ApplicationRecord
   end
 
   private
+
+  def normalize_sender_type(sender_type)
+    # Normalize sender_type from database class names to frontend-expected values
+    case sender_type
+    when 'AgentBot'
+      'agent_bot'
+    when 'User', 'AccountUser'
+      'User' # Both User and AccountUser represent agents, frontend expects 'User'
+    when 'Contact'
+      'Contact'
+    when 'Captain::Assistant'
+      'captain_assistant'
+    else
+      # For any other types, convert to snake_case
+      sender_type&.underscore
+    end
+  end
 
   def prevent_message_flooding
     # Added this to cover the validation specs in messages

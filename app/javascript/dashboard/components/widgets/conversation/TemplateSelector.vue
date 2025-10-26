@@ -67,7 +67,12 @@ export default {
               template.supportedChannels ||
               template.supported_channels ||
               []
-            ).includes(this.channelType) && template.status === 'active'
+            ).includes(this.channelType) &&
+            template.status === 'active' &&
+            // Exclude bot_api_only templates from UI
+            !(template.useCases || template.use_cases || []).includes(
+              'bot_api_only'
+            )
         )
         .map(template => ({
           label: template.name,

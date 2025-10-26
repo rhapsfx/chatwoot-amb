@@ -8,11 +8,17 @@ const { contentAttributes } = useMessageContext();
 const event = computed(() => contentAttributes.value?.event || {});
 const timeslots = computed(() => {
   // Try event.timeslots first (current format), then fall back to top-level timeslots (legacy)
-  return (
+  const rawSlots =
     contentAttributes.value?.event?.timeslots ||
     contentAttributes.value?.timeslots ||
-    []
-  );
+    [];
+
+  // Normalize slots to handle both snake_case (database) and camelCase (Apple MSP) formats
+  return rawSlots.map(slot => ({
+    identifier: slot.identifier,
+    startTime: slot.startTime || slot.start_time,
+    duration: slot.duration,
+  }));
 });
 const timezoneOffset = computed(
   () =>

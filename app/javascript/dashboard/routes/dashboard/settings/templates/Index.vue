@@ -285,6 +285,55 @@ watch(
       </template>
     </BaseSettingsHeader>
 
+    <!-- Bot API Information Banner -->
+    <div class="mx-4 mt-4 p-4 bg-n-blue-1 border border-n-blue-7 rounded-lg">
+      <div class="flex items-start gap-3">
+        <i class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <h4 class="text-sm font-semibold text-n-slate-12 mb-2">
+            Bot Templates API
+          </h4>
+          <p class="text-sm text-n-slate-11 mb-3">
+            Templates marked with
+            <span
+              class="px-2 py-0.5 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
+              >🤖 Bot API</span>
+            are designed for programmatic use via webhooks, Dialogflow, Rasa, or
+            custom bots.
+          </p>
+          <div
+            class="bg-white dark:bg-n-slate-1 p-3 rounded border border-n-slate-6 text-xs font-mono overflow-x-auto"
+          >
+            <div class="text-n-slate-11 whitespace-pre-wrap break-all">
+              <span class="text-n-slate-10">curl</span> -X POST
+              https://your-chatwoot-domain.com/api/v1/accounts/1/bot_templates/send_message
+              \<br />
+              <span class="text-n-slate-10">-H</span>
+              "X-Api-Access-Token: YOUR_API_TOKEN" \<br />
+              <span class="text-n-slate-10">-H</span> "Content-Type:
+              application/json" \<br />
+              <span class="text-n-slate-10">-d</span> '{"conversation_id": 15,
+              "template_id": 4, "parameters": {}}'
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-n-slate-11">
+            <div class="mb-1">
+              <strong class="text-n-slate-12">Get your API token:</strong>
+              Profile → Settings → Access Token
+            </div>
+            <div>
+              <strong class="text-n-slate-12">Full documentation:</strong> See
+              <code
+                class="px-1 py-0.5 bg-n-slate-2 text-n-slate-12 rounded font-mono"
+                >docs/api/BOT_TEMPLATES_API.md</code
+              >
+              in the project root
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filters Section -->
     <div class="flex flex-col gap-4 p-4 bg-white border-b border-n-weak">
       <!-- Search Bar -->
@@ -475,18 +524,38 @@ watch(
             </div>
           </div>
 
-          <!-- Tags -->
-          <div v-if="template.tags && template.tags.length > 0" class="mb-3">
+          <!-- Tags and Use Cases -->
+          <div
+            v-if="
+              (template.tags && template.tags.length > 0) ||
+              (template.useCases && template.useCases.length > 0)
+            "
+            class="mb-3"
+          >
             <div class="flex flex-wrap gap-1">
+              <!-- Regular Tags -->
               <span
-                v-for="tag in template.tags.slice(0, 3)"
+                v-for="tag in (template.tags || []).slice(0, 3)"
                 :key="tag"
                 class="px-2 py-1 text-xs rounded bg-n-slate-2 text-n-slate-11"
               >
                 {{ tag }}
               </span>
+              <!-- Use Cases (Bot API) -->
               <span
-                v-if="template.tags.length > 3"
+                v-for="useCase in template.useCases || []"
+                :key="useCase"
+                class="px-2 py-1 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
+                :title="
+                  useCase === 'bot_api_only'
+                    ? 'Available via Bot API only'
+                    : useCase
+                "
+              >
+                {{ useCase === 'bot_api_only' ? '🤖 Bot API' : useCase }}
+              </span>
+              <span
+                v-if="template.tags && template.tags.length > 3"
                 class="px-2 py-1 text-xs rounded bg-n-slate-2 text-n-slate-11 font-medium"
               >
                 {{

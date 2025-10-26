@@ -288,6 +288,12 @@ const handleSave = async () => {
         .filter(tag => tag.length > 0),
     };
 
+    // Debug: Log payload before sending
+    console.log(
+      '📦 Saving template with payload:',
+      JSON.stringify(payload, null, 2)
+    );
+
     const template = await store.dispatch(
       'messageTemplates/createFromAppleMessage',
       payload
@@ -298,10 +304,16 @@ const handleSave = async () => {
     handleClose();
   } catch (error) {
     console.error('Failed to save template:', error);
-    useAlert(
-      error.response?.data?.details || 'Failed to save template',
-      'error'
-    );
+    console.error('Error response:', error.response);
+    console.error('Error response data:', error.response?.data);
+
+    const errorMessage =
+      error.response?.data?.details ||
+      error.response?.data?.error ||
+      error.message ||
+      'Failed to save template';
+
+    useAlert(errorMessage, 'error');
   }
 };
 
@@ -324,6 +336,12 @@ const handleSaveAndSend = async () => {
         .filter(tag => tag.length > 0),
     };
 
+    // Debug: Log payload before sending
+    console.log(
+      '📦 Saving template with payload:',
+      JSON.stringify(payload, null, 2)
+    );
+
     const template = await store.dispatch(
       'messageTemplates/createFromAppleMessage',
       payload
@@ -334,10 +352,16 @@ const handleSaveAndSend = async () => {
     handleClose();
   } catch (error) {
     console.error('Failed to save template:', error);
-    useAlert(
-      error.response?.data?.details || 'Failed to save template',
-      'error'
-    );
+    console.error('Error response:', error.response);
+    console.error('Error response data:', error.response?.data);
+
+    const errorMessage =
+      error.response?.data?.details ||
+      error.response?.data?.error ||
+      error.message ||
+      'Failed to save template';
+
+    useAlert(errorMessage, 'error');
   }
 };
 

@@ -72,6 +72,11 @@ class Templates::BotMessagingService
         rendered[:content_attributes] || rendered[:contentAttributes]
     end
 
+    Rails.logger.info "🟢 BotMessagingService - Creating message with content_attributes: #{message_params[:content_attributes].inspect}"
+    if message_params[:content_type] == 'apple_time_picker'
+      Rails.logger.info "🟢 BotMessagingService - Event timeslots: #{message_params.dig(:content_attributes, 'event', 'timeslots').inspect}"
+    end
+
     # Add additional metadata
     message_params[:additional_attributes] = {
       template_id: @template.id,

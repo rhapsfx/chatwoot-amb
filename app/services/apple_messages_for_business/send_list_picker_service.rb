@@ -163,96 +163,37 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
   # Override parent to properly transform section/item keys
   def build_list_picker_data
-    Rails.logger.info '[AMB ListPicker] 🚀 USING CHILD CLASS build_list_picker_data override'
+    Rails.logger.info '[AMB ListPicker] Building list picker data with CaseTransformer'
     sections = content_attributes['sections'] || []
 
-    Rails.logger.info "[AMB ListPicker] build_list_picker_data called with #{sections.length} sections"
-    Rails.logger.info "[AMB ListPicker] First section items: #{sections.first&.dig('items')&.inspect}"
+    Rails.logger.info "[AMB ListPicker] Processing #{sections.length} sections"
 
-    # Transform sections to camelCase for Apple MSP
+    # Use CaseTransformer to convert snake_case → camelCase for Apple MSP
+    # This handles all field transformations automatically and consistently
     transformed_sections = sections.map.with_index do |section, section_index|
-      transformed_section = {
-        'title' => section['title'],
-        'multipleSelection' => section['multipleSelection'] || section['multiple_selection'] || false,
-        'order' => section['order'] || section_index
-      }
+      # Set defaults for required fields
+      section_with_defaults = section.merge(
+        'order' => section['order'] || section_index,
+        'multiple_selection' => section['multiple_selection'] || false
+      )
 
-      # Transform items
+      # Transform items if present
       if section['items'].present?
-        Rails.logger.info "[AMB ListPicker] Section '#{section['title']}' has #{section['items'].length} items"
-        transformed_section['items'] = section['items'].map.with_index do |item, item_index|
-          Rails.logger.info "[AMB ListPicker] Item #{item_index}: #{item.inspect}"
-
-          transformed_item = {
+        section_with_defaults['items'] = section['items'].map.with_index do |item, item_index|
+          item.merge(
             'identifier' => item['identifier'] || SecureRandom.uuid,
-            'title' => item['title'],
-            'subtitle' => item['subtitle'],
             'order' => item['order'] || item_index,
             'style' => item['style'] || 'icon'
-          }
-
-          # CRITICAL: Transform image_identifier to imageIdentifier
-          if item['image_identifier'].present?
-            transformed_item['imageIdentifier'] = item['image_identifier']
-            Rails.logger.info "[AMB ListPicker] ✅ Item '#{item['title']}' has imageIdentifier: #{item['image_identifier']}"
-          elsif item['imageIdentifier'].present?
-            # Also check camelCase version
-            transformed_item['imageIdentifier'] = item['imageIdentifier']
-            Rails.logger.info "[AMB ListPicker] ✅ Item '#{item['title']}' has imageIdentifier (camelCase): #{item['imageIdentifier']}"
-          else
-            Rails.logger.info "[AMB ListPicker] ❌ Item '#{item['title']}' has NO image_identifier or imageIdentifier, keys: #{item.keys.inspect}"
-          end
-
-          Rails.logger.info "[AMB ListPicker] 🟢 Transformed item keys: #{transformed_item.keys.inspect}"
-          transformed_item
+          )
         end
-      else
-        Rails.logger.info "[AMB ListPicker] Section '#{section['title']}' has NO items"
       end
 
-      transformed_section
+      # Convert entire section (and nested items) to Apple format
+      AppleMessagesForBusiness::CaseTransformer.to_apple_format(section_with_defaults)
     end
 
-    result = {
-      sections: transformed_sections
-    }
-    Rails.logger.info "[AMB ListPicker] 🟢 CHILD CLASS FINAL RESULT first item keys: #{if result[:sections].first && result[:sections].first['items']&.first
-                                                                                        result[:sections].first['items'].first.keys.inspect
-                                                                                      end}"
-    result
-  end
-
-  def build_list_picker_sections
-    sections = content_attributes['sections'] || [default_section]
-
-    # Debug: log raw sections data
-    Rails.logger.info "[AMB ListPicker] Raw sections from content_attributes: #{sections.inspect}"
-
-    sections.map.with_index do |section, index|
-      {
-        title: section['title'] || "Section #{index + 1}",
-        multipleSelection: section['multipleSelection'] || section['multiple_selection'] || false,
-        order: section['order'] || index,
-        listPickerItem: build_list_picker_items(section['items'] || [])
-      }
-    end
-  end
-
-  def build_list_picker_items(items)
-    items.map.with_index do |item, index|
-      item_data = {
-        identifier: item['identifier'] || SecureRandom.uuid,
-        title: item['title'] || "Item #{index + 1}",
-        subtitle: item['subtitle'],
-        imageIdentifier: item['image_identifier'],
-        order: item['order'] || index
-      }
-      # Debug log
-      if item_data[:imageIdentifier].present?
-        Rails.logger.info "[AMB ListPicker] Item '#{item_data[:title]}' has imageIdentifier: #{item_data[:imageIdentifier]}"
-      end
-      item_data
-    end
+    Rails.logger.info "[AMB ListPicker] Transformed #{transformed_sections.length} sections to Apple format"
+    { sections: transformed_sections }
   end
 
   def build_images_array
@@ -271,21 +212,27 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
   end
 
   def build_received_message
-    {
-      title: content_attributes['received_title'] || 'Please select an option',
-      subtitle: content_attributes['received_subtitle'],
-      imageIdentifier: content_attributes['received_image_identifier'],
-      style: content_attributes['received_style'] || 'small'
+    received_msg = {
+      'title' => content_attributes['received_title'] || 'Please select an option',
+      'subtitle' => content_attributes['received_subtitle'],
+      'image_identifier' => content_attributes['received_image_identifier'],
+      'style' => content_attributes['received_style'] || 'small'
     }
+
+    # Transform to Apple format (camelCase) with received_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(received_msg, context: :received_message)
   end
 
   def build_reply_message
-    {
-      title: content_attributes['reply_title'] || 'Selected: ${item.title}',
-      subtitle: content_attributes['reply_subtitle'],
-      imageIdentifier: content_attributes['reply_image_identifier'],
-      style: content_attributes['reply_style'] || 'icon'
+    reply_msg = {
+      'title' => content_attributes['reply_title'] || 'Selected: ${item.title}',
+      'subtitle' => content_attributes['reply_subtitle'],
+      'image_identifier' => content_attributes['reply_image_identifier'],
+      'style' => content_attributes['reply_style'] || 'icon'
     }
+
+    # Transform to Apple format (camelCase) with reply_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(reply_msg, context: :reply_message)
   end
 
   def default_section

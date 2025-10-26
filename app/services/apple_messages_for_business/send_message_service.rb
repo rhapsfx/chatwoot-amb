@@ -251,10 +251,18 @@ class AppleMessagesForBusiness::SendMessageService
 
     # Fix timeslot format for Apple's requirements
     if event_data['timeslots'].present?
-      has_timezone_in_times = event_data['timeslots'].any? { |slot| slot['startTime']&.include?('+') || slot['startTime']&.include?('Z') }
+      # Handle both camelCase and snake_case for timezone detection
+      has_timezone_in_times = event_data['timeslots'].any? do |slot|
+        # Handle both symbol and string keys
+        time_value = slot[:startTime] || slot['startTime'] || slot[:start_time] || slot['start_time']
+        time_value&.include?('+') || time_value&.include?('Z')
+      end
 
       event_data['timeslots'] = event_data['timeslots'].map do |slot|
-        start_time = slot['startTime']
+        # Handle both symbol and string keys (CaseTransformer returns symbol keys)
+        start_time = slot[:startTime] || slot['startTime'] || slot[:start_time] || slot['start_time']
+        duration = slot[:duration] || slot['duration']
+        identifier = slot[:identifier] || slot['identifier']
 
         # Convert local time to GMT if it contains timezone info
         if start_time&.include?('+') || start_time&.include?('Z')
@@ -267,9 +275,9 @@ class AppleMessagesForBusiness::SendMessageService
         end
 
         {
-          'identifier' => slot['identifier'],  # Apple expects identifier first
+          'identifier' => identifier,  # Apple expects identifier first
           'startTime' => start_time,
-          'duration' => convert_duration_if_needed(slot['duration'])
+          'duration' => convert_duration_if_needed(duration)
         }
       end
 

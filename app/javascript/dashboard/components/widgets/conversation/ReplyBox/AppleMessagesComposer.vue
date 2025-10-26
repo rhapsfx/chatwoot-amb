@@ -412,6 +412,11 @@ const updateTimePickerData = () => {
     globalSelectedSlots: globalSelectedSlots.value.size,
     formattedSlots: slots,
     sampleSlot: slots[0],
+    assignedTimeslots: timePickerData.value.event.timeslots,
+    timeslotsLength: timePickerData.value.event.timeslots.length,
+    // Verify the first slot has startTime
+    firstSlotHasStartTime: slots[0]?.startTime !== undefined,
+    firstSlotStartTimeValue: slots[0]?.startTime,
   });
 };
 
@@ -929,9 +934,53 @@ const sendAppleMessage = () => {
       break;
     case 'time_picker':
       content_type = 'apple_time_picker';
+
+      // Debug: Log current state before sending
+      console.log('[AMB TimePicker] sendAppleMessage - Current state:', {
+        globalSelectedSlotsSize: globalSelectedSlots.value.size,
+        timePickerDataEventTimeslots: timePickerData.value.event.timeslots,
+        timeslotsLength: timePickerData.value.event.timeslots?.length || 0,
+        // Check if slots have startTime
+        firstSlot: timePickerData.value.event.timeslots?.[0],
+        firstSlotHasStartTime: timePickerData.value.event.timeslots?.[0]?.startTime !== undefined,
+        firstSlotHasStartTimeSnake: timePickerData.value.event.timeslots?.[0]?.start_time !== undefined,
+      });
+
+      // Validate that slots are selected
+      if (!timePickerData.value.event.timeslots || timePickerData.value.event.timeslots.length === 0) {
+        alert('Please select at least one time slot before sending. Click on the time slots in the calendar to select them.');
+        return;
+      }
+
+      // Transform timeslots to snake_case (similar to list picker transformation)
+      const transformedTimeslots = timePickerData.value.event.timeslots.map(slot => {
+        const startTime = slot.startTime || slot.start_time;
+
+        // Log warning if startTime is missing
+        if (!startTime) {
+          console.warn('[AMB TimePicker] Slot missing startTime:', slot);
+        }
+
+        return {
+          identifier: slot.identifier,
+          start_time: startTime,
+          duration: slot.duration
+        };
+      });
+
+      console.log('[AMB TimePicker] Transformation result:', {
+        originalSlots: timePickerData.value.event.timeslots,
+        transformedSlots: transformedTimeslots,
+        firstOriginal: timePickerData.value.event.timeslots?.[0],
+        firstTransformed: transformedTimeslots?.[0],
+      });
+
       // Map camelCase to snake_case for backend
       content_attributes = {
-        event: timePickerData.value.event,
+        event: {
+          ...timePickerData.value.event,
+          timeslots: transformedTimeslots  // Use transformed timeslots
+        },
         timezone_offset: timePickerData.value.timezone_offset,
         received_title: timePickerData.value.received_title,
         received_subtitle: timePickerData.value.received_subtitle,
@@ -1032,8 +1081,16 @@ const saveAsTemplate = () => {
       messageData = { ...quickReplyData.value };
       break;
     case 'time_picker':
+      // CRITICAL: Sync selected slots from inline picker to timePickerData BEFORE saving
+      updateTimePickerData();
       messageType = 'time_picker';
       messageData = { ...timePickerData.value };
+
+      console.log('[AMB Templates] Saving template with timeslots:', {
+        selectedSlotsCount: globalSelectedSlots.value.size,
+        timeslotsInData: messageData.event?.timeslots?.length || 0,
+        timeslots: messageData.event?.timeslots
+      });
       break;
     default:
       return;
@@ -2321,10 +2378,21 @@ const loadTimePickerTemplate = block => {
         <!-- Quick Settings -->
         <div class="flex items-center justify-between">
           <h4
-            class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11"
+            class="text-sm font-semibold"
+            :class="
+              selectedSlotsData.length > 0
+                ? 'text-n-green-11 dark:text-n-green-10'
+                : 'text-n-ruby-11 dark:text-n-ruby-10'
+            "
           >
             Schedule Appointment - {{ selectedSlotsData.length }} slot(s)
-            configured
+            selected
+            <span
+              v-if="selectedSlotsData.length === 0"
+              class="text-xs font-normal text-n-ruby-10 dark:text-n-ruby-9"
+            >
+              (click slots below to select)
+            </span>
           </h4>
           <div class="flex items-center space-x-4">
             <!-- Time Interval Selector -->
@@ -2462,12 +2530,17 @@ const loadTimePickerTemplate = block => {
             <button
               v-for="slot in availableSlots"
               :key="slot.id"
-              class="flex items-center justify-between p-2 rounded border transition-colors"
+              class="flex items-center justify-between p-2 rounded border transition-all duration-200 transform hover:scale-105"
               :class="[
                 slot.selected
-                  ? 'border-n-green-8 bg-n-green-2 text-n-green-11 dark:border-n-green-9 dark:bg-n-green-3 dark:text-n-green-10'
-                  : 'border-n-weak bg-white hover:border-n-strong hover:bg-n-alpha-1 text-n-slate-11 dark:border-n-slate-6 dark:bg-n-alpha-2 dark:hover:bg-n-alpha-3 dark:text-n-slate-10',
+                  ? 'border-n-green-8 bg-n-green-2 text-n-green-11 dark:border-n-green-9 dark:bg-n-green-3 dark:text-n-green-10 shadow-md scale-105'
+                  : 'border-n-weak bg-white hover:border-n-strong hover:bg-n-alpha-1 text-n-slate-11 dark:border-n-slate-6 dark:bg-n-alpha-2 dark:hover:bg-n-alpha-3 dark:text-n-slate-10 hover:shadow-sm',
               ]"
+              :title="
+                slot.selected
+                  ? 'Click to deselect this time slot'
+                  : 'Click to select this time slot'
+              "
               @click="toggleSlot(slot)"
             >
               <div class="text-xs">

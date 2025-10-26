@@ -1109,60 +1109,6 @@ export default {
             return;
           }
 
-          // Legacy block-based template (content.blocks array)
-          const blocks = fullTemplate.content?.blocks || [];
-          const hasMultipleBlocks = blocks.length > 1;
-
-          // Debug logging
-          // eslint-disable-next-line no-console
-          console.log('📦 Template content:', fullTemplate.content);
-          // eslint-disable-next-line no-console
-          console.log('📦 Blocks detected:', blocks);
-          // eslint-disable-next-line no-console
-          console.log('📦 Has multiple blocks:', hasMultipleBlocks);
-
-          if (hasMultipleBlocks) {
-            // Combined template - send text blocks first, then interactive block
-            /* eslint-disable no-await-in-loop */
-            for (let i = 0; i < blocks.length; i += 1) {
-              const block = blocks[i];
-              // eslint-disable-next-line no-console
-              console.log(`📦 Processing block ${i}:`, block);
-
-              if (block.type === 'text') {
-                // Send text block as a regular message
-                const textPayload = {
-                  conversationId: this.currentChat.id,
-                  message: block.content || '',
-                  private: false,
-                };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending text block:', textPayload);
-                await this.sendMessage(textPayload);
-
-                // Small delay between messages
-                await new Promise(resolve => {
-                  setTimeout(resolve, 500);
-                });
-              } else if (
-                block.type === 'quick_reply' ||
-                block.type === 'interactive'
-              ) {
-                // Send interactive block
-                const messageData = {
-                  type: block.type,
-                  content_type: `apple_${block.type}`,
-                  content_attributes: block.content_attributes || block,
-                };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending interactive block:', messageData);
-                await this.sendAppleMessage(messageData);
-              }
-            }
-            /* eslint-enable no-await-in-loop */
-            return;
-          }
-
           // Single interactive message - detect the message type and wrap the content appropriately
           let messageData;
           if (
@@ -1274,18 +1220,44 @@ export default {
             (contentAttrs?.timeslots && contentAttrs?.eventTitle) ||
             contentAttrs?.event // Time picker with event in content_attributes
           ) {
-            // For time picker templates, render via API to get dynamic timeslots
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(9, 0, 0, 0);
+            // ALWAYS use render API for time pickers to ensure proper formatting
+            // The adapter's format_timeslots method handles identifier → start_time conversion
+            // and ensures the payload matches Apple MSP requirements
 
-            const parameters = {
-              available_slots: [
-                new Date(tomorrow.getTime()).toISOString(),
-                new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(),
-                new Date(tomorrow.getTime() + 4 * 60 * 60 * 1000).toISOString(),
-              ],
-            };
+            // Get parameters for rendering
+            let parameters = {};
+
+            // If template has saved timeslots in content_blocks, extract them as available_slots
+            const savedTimeslots =
+              content.event?.timeslots ||
+              content.timeslots ||
+              contentAttrs?.event?.timeslots ||
+              contentAttrs?.timeslots;
+
+            if (savedTimeslots && savedTimeslots.length > 0) {
+              // Convert saved timeslots to available_slots parameter format
+              parameters.available_slots = savedTimeslots;
+            } else {
+              // No saved timeslots - use default dynamic slots
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(9, 0, 0, 0);
+
+              parameters = {
+                available_slots: [
+                  new Date(tomorrow.getTime()).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 2 * 60 * 60 * 1000
+                  ).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 4 * 60 * 60 * 1000
+                  ).toISOString(),
+                ],
+              };
+            }
+
+            // eslint-disable-next-line no-console
+            console.log('⏰ Calling render API with parameters:', parameters);
 
             const rendered = await this.$store.dispatch(
               'messageTemplates/render',
@@ -1299,6 +1271,9 @@ export default {
             );
 
             const renderedData = rendered.data || rendered;
+            // eslint-disable-next-line no-console
+            console.log('⏰ Render API response:', renderedData);
+
             if (renderedData?.content_attributes) {
               messageData = {
                 type: 'time_picker',
@@ -1313,7 +1288,6 @@ export default {
                 contentAttrs ||
                 content;
 
-              // Convert camelCase to snake_case for backend validation
               const normalizeKeys = obj => {
                 if (!obj || typeof obj !== 'object') return obj;
                 if (Array.isArray(obj)) return obj.map(normalizeKeys);
