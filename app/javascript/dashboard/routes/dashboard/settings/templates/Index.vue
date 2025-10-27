@@ -335,7 +335,9 @@ watch(
     </div>
 
     <!-- Filters Section -->
-    <div class="flex flex-col gap-4 p-4 bg-white dark:bg-n-slate-2 border-b border-n-weak">
+    <div
+      class="flex flex-col gap-4 p-4 bg-white dark:bg-n-slate-2 border-b border-n-weak"
+    >
       <!-- Search Bar -->
       <div class="flex gap-3">
         <div class="flex-1">

@@ -417,6 +417,7 @@
     "WATCH_CONVERSATION": "Join conversation",
     "YOU_ARE_WATCHING": "You are participating",
     "APPLE_MESSAGES": {
+      "LOAD_TEMPLATE": "Load Template",
       "CANCEL": "Cancel",
       "SEND_MESSAGE": "Send Message"
     },
@@ -627,7 +628,7 @@
         "FIELD_QUANTITY": "Quantity",
         "FIELD_BILLING_NAME": "Full Name",
         "FIELD_BILLING_EMAIL": "Email",
-        "FIELD_TERMS": "Accept Terms & Conditions",
+        "FIELD_TERMS": "Accept Terms and Conditions",
         "PLACEHOLDER_BILLING_NAME": "Name on card",
         "PLACEHOLDER_BILLING_EMAIL": "billing@example.com",
         "DESC_TERMS": "I agree to the terms and conditions",

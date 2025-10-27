@@ -11,33 +11,19 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['send-apple-message']);
+const emit = defineEmits(['sendAppleMessage']);
 
 const showAppleComposer = ref(false);
 
 const currentChat = useMapGetter('getSelectedChat');
 
 const isAppleMessagesChannel = computed(() => {
-  console.log('[AMB] AppleMessagesButton - inbox prop:', props.inbox);
-  console.log(
-    '[AMB] AppleMessagesButton - channel_type:',
-    props.inbox?.channel_type
-  );
-  const result =
-    props.inbox?.channel_type === 'Channel::AppleMessagesForBusiness';
-  console.log('[AMB] AppleMessagesButton - isAppleMessagesChannel:', result);
-  return result;
+  return props.inbox?.channel_type === 'Channel::AppleMessagesForBusiness';
 });
 
 const handleSendAppleMessage = messageData => {
-  console.log(
-    '🔥 AppleMessagesButton: handleSendAppleMessage called with:',
-    messageData
-  );
-  emit('send-apple-message', messageData);
-  console.log('🔥 AppleMessagesButton: emitted send-apple-message event');
+  emit('sendAppleMessage', messageData);
   showAppleComposer.value = false;
-  console.log('🔥 AppleMessagesButton: closed modal');
 };
 
 const toggleAppleComposer = () => {
@@ -67,8 +53,12 @@ const toggleAppleComposer = () => {
       <div
         class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
       >
-        <div class="flex items-center justify-between p-4 border-b border-n-weak dark:border-n-slate-6">
-          <h3 class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11">
+        <div
+          class="flex items-center justify-between p-4 border-b border-n-weak dark:border-n-slate-6"
+        >
+          <h3
+            class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11"
+          >
             Apple Messages for Business
           </h3>
           <NextButton
@@ -83,15 +73,7 @@ const toggleAppleComposer = () => {
         <div class="p-4">
           <AppleMessagesComposer
             :conversation="currentChat"
-            @send="
-              data => {
-                console.log(
-                  '🔥 AppleMessagesButton: received send event from composer:',
-                  data
-                );
-                handleSendAppleMessage(data);
-              }
-            "
+            @send="handleSendAppleMessage"
             @cancel="showAppleComposer = false"
           />
         </div>

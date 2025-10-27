@@ -136,12 +136,11 @@ const saveTemplate = async () => {
 
   saving.value = true;
   try {
-    let response;
     if (isEditMode.value) {
-      response = await TemplatesAPI.update(templateId.value, template.value);
+      await TemplatesAPI.update(templateId.value, template.value);
       useAlert(t('TEMPLATES.API.UPDATE_SUCCESS'));
     } else {
-      response = await TemplatesAPI.create(template.value);
+      await TemplatesAPI.create(template.value);
       useAlert(t('TEMPLATES.API.CREATE_SUCCESS'));
     }
 
@@ -221,7 +220,7 @@ const resetTemplate = () => {
 // Watch for route changes
 watch(
   () => route.params.templateId,
-  (newId, oldId) => {
+  newId => {
     if (newId) {
       fetchTemplate();
     } else {
@@ -280,7 +279,9 @@ onMounted(() => {
     <!-- Main Content -->
     <div v-else class="flex flex-1 overflow-hidden">
       <!-- Tabs Sidebar -->
-      <div class="w-64 bg-white dark:bg-n-slate-2 border-r border-n-weak overflow-y-auto">
+      <div
+        class="w-64 bg-white dark:bg-n-slate-2 border-r border-n-weak overflow-y-auto"
+      >
         <nav class="p-4 space-y-1">
           <button
             v-for="tab in tabs"
