@@ -490,38 +490,44 @@ const loadTemplate = templateId => {
   switch (templateId) {
     case 'contact':
       formData.value = {
-        title: 'Contact Form',
-        description: "We'd love to hear from you",
+        title: t('APPLE_FORM.TEMPLATES.CONTACT.FORM_TITLE'),
+        description: t('APPLE_FORM.TEMPLATES.CONTACT.FORM_DESC'),
         pages: [
           {
             page_id: 'page_1',
-            title: 'Contact Information',
-            description: 'Please provide your contact details',
+            title: t('APPLE_FORM.TEMPLATES.CONTACT.PAGE_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.CONTACT.PAGE_DESC'),
             items: [
               {
                 item_id: 'full_name',
                 item_type: 'text',
-                title: 'Full Name',
+                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_FULL_NAME'),
                 required: true,
-                placeholder: 'Enter your full name',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_FULL_NAME'
+                ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
               },
               {
                 item_id: 'email',
                 item_type: 'email',
-                title: 'Email Address',
+                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_EMAIL'),
                 required: true,
-                placeholder: 'your.email@example.com',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_EMAIL'
+                ),
                 keyboard_type: 'emailAddress',
                 text_content_type: 'emailAddress',
               },
               {
                 item_id: 'phone',
                 item_type: 'phone',
-                title: 'Phone Number',
+                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_PHONE'),
                 required: false,
-                placeholder: '+1 (555) 123-4567',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_PHONE'
+                ),
                 keyboard_type: 'phonePad',
                 text_content_type: 'telephoneNumber',
               },
@@ -544,18 +550,18 @@ const loadTemplate = templateId => {
       break;
     case 'feedback':
       formData.value = {
-        title: 'Customer Feedback',
-        description: 'Help us improve our service',
+        title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FORM_TITLE'),
+        description: t('APPLE_FORM.TEMPLATES.FEEDBACK.FORM_DESC'),
         pages: [
           {
             page_id: 'page_1',
-            title: 'Feedback',
-            description: 'Please share your experience',
+            title: t('APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_DESC'),
             items: [
               {
                 item_id: 'rating',
                 item_type: 'stepper',
-                title: 'Rate your experience (1-5)',
+                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RATING'),
                 required: true,
                 min_value: 1,
                 max_value: 5,
@@ -563,16 +569,18 @@ const loadTemplate = templateId => {
               {
                 item_id: 'comments',
                 item_type: 'textArea',
-                title: 'Comments',
+                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_COMMENTS'),
                 required: false,
-                placeholder: 'Tell us more about your experience...',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.FEEDBACK.PLACEHOLDER_COMMENTS'
+                ),
               },
               {
                 item_id: 'recommend',
                 item_type: 'toggle',
-                title: 'Would you recommend us?',
+                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RECOMMEND'),
                 required: false,
-                description: 'Would you recommend our service to others?',
+                description: t('APPLE_FORM.TEMPLATES.FEEDBACK.DESC_RECOMMEND'),
               },
             ],
           },
@@ -593,46 +601,61 @@ const loadTemplate = templateId => {
       break;
     case 'appointment':
       formData.value = {
-        title: 'Book Appointment',
-        description: 'Schedule a meeting with us',
+        title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_TITLE'),
+        description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_DESC'),
         pages: [
           {
             page_id: 'page_1',
-            title: 'Your Information',
-            description: 'Please provide your details',
+            title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_DESC'),
             items: [
               {
                 item_id: 'name',
                 item_type: 'text',
-                title: 'Full Name',
+                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NAME'),
                 required: true,
-                placeholder: 'Enter your full name',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NAME'
+                ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
               },
               {
                 item_id: 'date',
                 item_type: 'dateTime',
-                title: 'Preferred Date & Time',
+                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_DATE'),
                 required: true,
               },
               {
                 item_id: 'service',
                 item_type: 'singleSelect',
-                title: 'Service Type',
+                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_SERVICE'),
                 required: true,
                 options: [
-                  { value: 'consultation', title: 'Consultation' },
-                  { value: 'meeting', title: 'Meeting' },
-                  { value: 'demo', title: 'Demo' },
+                  {
+                    value: 'consultation',
+                    title: t(
+                      'APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_CONSULTATION'
+                    ),
+                  },
+                  {
+                    value: 'meeting',
+                    title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_MEETING'),
+                  },
+                  {
+                    value: 'demo',
+                    title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_DEMO'),
+                  },
                 ],
               },
               {
                 item_id: 'notes',
                 item_type: 'textArea',
-                title: 'Additional Notes',
+                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NOTES'),
                 required: false,
-                placeholder: 'Any special requests or information...',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NOTES'
+                ),
               },
             ],
           },
@@ -653,56 +676,80 @@ const loadTemplate = templateId => {
       break;
     case 'survey':
       formData.value = {
-        title: 'Customer Survey',
-        description: 'Your feedback matters to us',
+        title: t('APPLE_FORM.TEMPLATES.SURVEY.FORM_TITLE'),
+        description: t('APPLE_FORM.TEMPLATES.SURVEY.FORM_DESC'),
         pages: [
           {
             page_id: 'page_1',
-            title: 'About You',
-            description: 'Basic information',
+            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE1_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE1_DESC'),
             items: [
               {
                 item_id: 'age_group',
                 item_type: 'singleSelect',
-                title: 'Age Group',
+                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_AGE_GROUP'),
                 required: false,
                 options: [
-                  { value: '18-24', title: '18-24' },
-                  { value: '25-34', title: '25-34' },
-                  { value: '35-44', title: '35-44' },
-                  { value: '45+', title: '45+' },
+                  {
+                    value: '18-24',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_18_24'),
+                  },
+                  {
+                    value: '25-34',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_25_34'),
+                  },
+                  {
+                    value: '35-44',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_35_44'),
+                  },
+                  {
+                    value: '45+',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_45_PLUS'),
+                  },
                 ],
               },
             ],
           },
           {
             page_id: 'page_2',
-            title: 'Your Preferences',
-            description: 'What do you prefer?',
+            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE2_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE2_DESC'),
             items: [
               {
                 item_id: 'preferences',
                 item_type: 'multiSelect',
-                title: 'Product Features (select all that apply)',
+                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_PREFERENCES'),
                 required: false,
                 options: [
-                  { value: 'quality', title: 'Quality' },
-                  { value: 'price', title: 'Price' },
-                  { value: 'support', title: 'Customer Support' },
-                  { value: 'features', title: 'Features' },
+                  {
+                    value: 'quality',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_QUALITY'),
+                  },
+                  {
+                    value: 'price',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_PRICE'),
+                  },
+                  {
+                    value: 'support',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_SUPPORT'),
+                  },
+                  {
+                    value: 'features',
+                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_FEATURES'),
+                  },
                 ],
               },
             ],
           },
           {
             page_id: 'page_3',
-            title: 'Satisfaction',
-            description: 'Rate your experience',
+            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE3_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE3_DESC'),
             items: [
               {
                 item_id: 'satisfaction',
                 item_type: 'stepper',
-                title: 'Overall Satisfaction (1-10)',
+                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_SATISFACTION'),
                 required: true,
                 min_value: 1,
                 max_value: 10,
@@ -726,29 +773,38 @@ const loadTemplate = templateId => {
       break;
     case 'order':
       formData.value = {
-        title: 'Place Order',
-        description: 'Complete your order',
+        title: t('APPLE_FORM.TEMPLATES.ORDER.FORM_TITLE'),
+        description: t('APPLE_FORM.TEMPLATES.ORDER.FORM_DESC'),
         pages: [
           {
             page_id: 'page_1',
-            title: 'Product Selection',
-            description: 'Choose your product',
+            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE1_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE1_DESC'),
             items: [
               {
                 item_id: 'product',
                 item_type: 'singleSelect',
-                title: 'Product',
+                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_PRODUCT'),
                 required: true,
                 options: [
-                  { value: 'basic', title: 'Basic Package' },
-                  { value: 'pro', title: 'Pro Package' },
-                  { value: 'enterprise', title: 'Enterprise Package' },
+                  {
+                    value: 'basic',
+                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_BASIC'),
+                  },
+                  {
+                    value: 'pro',
+                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_PRO'),
+                  },
+                  {
+                    value: 'enterprise',
+                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_ENTERPRISE'),
+                  },
                 ],
               },
               {
                 item_id: 'quantity',
                 item_type: 'stepper',
-                title: 'Quantity',
+                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_QUANTITY'),
                 required: true,
                 min_value: 1,
                 max_value: 100,
@@ -757,24 +813,28 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_2',
-            title: 'Billing Information',
-            description: 'Enter billing details',
+            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE2_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE2_DESC'),
             items: [
               {
                 item_id: 'billing_name',
                 item_type: 'text',
-                title: 'Full Name',
+                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_NAME'),
                 required: true,
-                placeholder: 'Name on card',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_NAME'
+                ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
               },
               {
                 item_id: 'billing_email',
                 item_type: 'email',
-                title: 'Email',
+                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_EMAIL'),
                 required: true,
-                placeholder: 'billing@example.com',
+                placeholder: t(
+                  'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_EMAIL'
+                ),
                 keyboard_type: 'emailAddress',
                 text_content_type: 'emailAddress',
               },
@@ -782,15 +842,15 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_3',
-            title: 'Confirmation',
-            description: 'Review and confirm',
+            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE3_TITLE'),
+            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE3_DESC'),
             items: [
               {
                 item_id: 'terms',
                 item_type: 'toggle',
-                title: 'Accept Terms & Conditions',
+                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_TERMS'),
                 required: true,
-                description: 'I agree to the terms and conditions',
+                description: t('APPLE_FORM.TEMPLATES.ORDER.DESC_TERMS'),
               },
             ],
           },
