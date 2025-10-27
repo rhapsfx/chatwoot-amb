@@ -932,7 +932,7 @@ const sendAppleMessage = () => {
       };
       content = quickReplyData.value.summary_text || 'Quick Reply Message';
       break;
-    case 'time_picker':
+    case 'time_picker': {
       content_type = 'apple_time_picker';
 
       // Debug: Log current state before sending
@@ -1023,6 +1023,7 @@ const sendAppleMessage = () => {
 
       content = timePickerData.value.event?.title || 'Time Picker Message';
       break;
+    }
     case 'forms':
       // Forms are created through the modal, this shouldn't be reached
       return;
@@ -1517,69 +1518,6 @@ const loadTimePickerTemplate = block => {
                   : tab.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
           }}
         </button>
-      </div>
-
-      <!-- Template Selector Button -->
-      <div class="relative pb-2">
-        <button
-          class="px-3 py-1 text-sm bg-n-woot-6 dark:bg-n-woot-7 text-white rounded-lg hover:bg-n-woot-7 dark:hover:bg-n-woot-8 transition-colors flex items-center gap-2"
-          @click="toggleTemplateSelector"
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-            />
-          </svg>
-          Load Template
-        </button>
-
-        <!-- Template Selector Dropdown -->
-        <div
-          v-if="showTemplateSelector"
-          class="absolute top-full right-0 mt-1 z-50 bg-n-solid-1 border border-n-weak dark:border-n-slate-6 rounded-lg shadow-xl w-80 max-h-96 overflow-y-auto"
-        >
-          <div
-            class="sticky top-0 bg-n-solid-1 dark:bg-n-slate-1 p-3 border-b border-n-weak dark:border-n-slate-6"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <h4
-                class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11"
-              >
-                Select Template
-              </h4>
-              <button
-                class="text-n-slate-11 dark:text-n-slate-10 hover:text-n-slate-12 dark:hover:text-n-slate-9"
-                @click="showTemplateSelector = false"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </button>
-            </div>
-            <input
-              v-model="templateSearchKey"
-              type="text"
-              class="w-full px-3 py-2 text-sm border border-n-weak dark:border-n-slate-6 rounded-lg bg-n-solid-1 dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9"
-              placeholder="Search templates..."
-            />
-          </div>
-          <TemplateSelector
-            :search-key="templateSearchKey"
-            @select="handleTemplateSelect"
-          />
-        </div>
       </div>
     </div>
 
