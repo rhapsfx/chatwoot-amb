@@ -32,14 +32,12 @@ class AppleMessagesForBusiness::CustomExtensionService
     required_fields = %w[app_id bid]
     missing_fields = required_fields.select { |field| @app_config[field].blank? }
 
-    if missing_fields.any?
-      raise ArgumentError, "Missing required app configuration: #{missing_fields.join(', ')}"
-    end
+    raise ArgumentError, "Missing required app configuration: #{missing_fields.join(', ')}" if missing_fields.any?
 
     # Validate BID format (should be Apple MSP bundle identifier format)
-    unless @app_config['bid'].match?(/^[\w.-]+:[\w.-]+:[\w.-]+$/)
-      raise ArgumentError, "Invalid BID format. Expected format: com.apple.messages.MSMessageExtensionBalloonPlugin:bundleId:extension"
-    end
+    return if @app_config['bid'].match?(/^[\w.-]+:[\w.-]+:[\w.-]+$/)
+
+    raise ArgumentError, 'Invalid BID format. Expected format: com.apple.messages.MSMessageExtensionBalloonPlugin:bundleId:extension'
   end
 
   def build_apple_msp_payload(message_id)
@@ -64,28 +62,18 @@ class AppleMessagesForBusiness::CustomExtensionService
     }
 
     # Add URL if provided (for web-based extensions)
-    if @app_config['url'].present?
-      base_data[:url] = @app_config['url']
-    end
+    base_data[:url] = @app_config['url'] if @app_config['url'].present?
 
     # Add custom app data if provided
-    if @app_config['app_data'].present?
-      base_data[:data].merge!(@app_config['app_data'])
-    end
+    base_data[:data].merge!(@app_config['app_data']) if @app_config['app_data'].present?
 
     # Add images if provided
-    if @app_config['images'].present?
-      base_data[:data][:images] = @app_config['images']
-    end
+    base_data[:data][:images] = @app_config['images'] if @app_config['images'].present?
 
     # Add received and reply message structures for interactive apps
-    if @app_config['received_message'].present?
-      base_data[:receivedMessage] = normalize_message_structure(@app_config['received_message'])
-    end
+    base_data[:receivedMessage] = normalize_message_structure(@app_config['received_message']) if @app_config['received_message'].present?
 
-    if @app_config['reply_message'].present?
-      base_data[:replyMessage] = normalize_message_structure(@app_config['reply_message'])
-    end
+    base_data[:replyMessage] = normalize_message_structure(@app_config['reply_message']) if @app_config['reply_message'].present?
 
     base_data
   end
@@ -115,6 +103,20 @@ class AppleMessagesForBusiness::CustomExtensionService
   end
 
   def send_to_apple_gateway(payload, message_id)
+    # PRE-SEND VALIDATION: Validate payload before sending to Apple MSP
+    begin
+      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, 'apple_custom_app')
+      validator.validate!
+    rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
+      Rails.logger.error "[AMB CustomExtension] Payload validation failed: #{e.message}"
+      Rails.logger.error "[AMB CustomExtension] Invalid payload: #{payload.to_json}"
+      return OpenStruct.new(
+        success?: false,
+        code: 400,
+        body: { error: 'Payload validation failed', details: e.message }.to_json
+      )
+    end
+
     headers = {
       'Content-Type' => 'application/json',
       'Authorization' => "Bearer #{@channel.generate_jwt_token}",

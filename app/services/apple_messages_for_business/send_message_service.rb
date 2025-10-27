@@ -758,6 +758,22 @@ class AppleMessagesForBusiness::SendMessageService
   end
 
   def send_to_apple_gateway(payload, message_id, request_idr: false)
+    # PRE-SEND VALIDATION: Validate payload before sending to Apple MSP
+    begin
+      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, @message.content_type)
+      validator.validate!
+    rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
+      Rails.logger.error "[AMB Send] Payload validation failed: #{e.message}"
+      # Log the invalid payload for debugging
+      Rails.logger.error "[AMB Send] Invalid payload: #{payload.to_json}"
+      # Return error response instead of sending to Apple
+      return OpenStruct.new(
+        success?: false,
+        code: 400,
+        body: { error: 'Payload validation failed', details: e.message }.to_json
+      )
+    end
+
     headers = {
       'Content-Type' => 'application/json',
       'Authorization' => "Bearer #{@channel.generate_jwt_token}",
