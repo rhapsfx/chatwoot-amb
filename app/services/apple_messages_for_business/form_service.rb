@@ -125,14 +125,10 @@ class AppleMessagesForBusiness::FormService
     }
 
     # Add receivedMessage if configured
-    if @form_config['received_message'].present?
-      form_data[:receivedMessage] = build_received_message
-    end
+    form_data[:receivedMessage] = build_received_message if @form_config['received_message'].present?
 
     # Add replyMessage if configured
-    if @form_config['reply_message'].present?
-      form_data[:replyMessage] = build_reply_message
-    end
+    form_data[:replyMessage] = build_reply_message if @form_config['reply_message'].present?
 
     # Add images if present
     images = build_images_array
@@ -294,6 +290,20 @@ class AppleMessagesForBusiness::FormService
   end
 
   def send_to_apple_gateway(payload, message_id)
+    # PRE-SEND VALIDATION: Validate payload before sending to Apple MSP
+    begin
+      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, 'apple_form')
+      validator.validate!
+    rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
+      Rails.logger.error "[AMB FormService] Payload validation failed: #{e.message}"
+      Rails.logger.error "[AMB FormService] Invalid payload: #{payload.to_json}"
+      return OpenStruct.new(
+        success?: false,
+        code: 400,
+        body: { error: 'Payload validation failed', details: e.message }.to_json
+      )
+    end
+
     headers = {
       'Content-Type' => 'application/json',
       'Authorization' => "Bearer #{@channel.generate_jwt_token}",
