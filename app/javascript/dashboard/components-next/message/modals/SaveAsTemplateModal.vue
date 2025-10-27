@@ -377,23 +377,23 @@ onMounted(async () => {
     class="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-80 flex items-center justify-center p-4"
   >
     <div
-      class="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-woot-500 dark:border-woot-400"
+      class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg max-w-2xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-woot-500 dark:border-woot-400"
     >
       <!-- Header -->
       <div
-        class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-600"
+        class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-n-slate-6"
       >
         <div>
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">
             Save as Template
           </h2>
-          <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          <p class="text-sm text-slate-600 dark:text-n-slate-11 mt-1">
             Save this {{ messageType.replace('_', ' ') }} configuration as a
             reusable template
           </p>
         </div>
         <button
-          class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+          class="text-slate-400 hover:text-slate-600 dark:hover:text-n-slate-10 transition-colors"
           @click="handleClose"
         >
           <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -563,10 +563,10 @@ onMounted(async () => {
 
       <!-- Footer Actions -->
       <div
-        class="flex items-center justify-end space-x-3 p-6 border-t border-slate-200 dark:border-slate-600"
+        class="flex items-center justify-end space-x-3 p-6 border-t border-slate-200 dark:border-n-slate-6"
       >
         <button
-          class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+          class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
           @click="handleClose"
         >
           Cancel

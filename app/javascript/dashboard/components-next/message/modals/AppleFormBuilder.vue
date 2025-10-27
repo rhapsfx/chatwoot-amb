@@ -1002,10 +1002,10 @@ watch(
       class="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-80 flex items-center justify-center p-4"
     >
       <div
-        class="bg-white dark:bg-slate-800 rounded-lg max-w-4xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800"
+        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg max-w-4xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800"
       >
         <div
-          class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-600"
+          class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-n-slate-6"
         >
           <div>
             <h2
@@ -1013,12 +1013,12 @@ watch(
             >
               {{ t('APPLE_FORM.MODAL_TITLE') }}
             </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+            <p class="text-sm text-slate-600 dark:text-n-slate-11 mt-1">
               {{ t('APPLE_FORM.MODAL_SUBTITLE') }}
             </p>
           </div>
           <button
-            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            class="text-slate-400 hover:text-slate-600 dark:hover:text-n-slate-10 transition-colors"
             @click="closeModal"
           >
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -1029,13 +1029,13 @@ watch(
           </button>
         </div>
 
-        <div class="flex border-b border-slate-200 dark:border-slate-600">
+        <div class="flex border-b border-slate-200 dark:border-n-slate-6">
           <button
             class="px-6 py-3 text-sm font-medium border-b-2 transition-colors"
             :class="[
               activeTab === 'templates'
                 ? 'border-woot-500 text-woot-600 dark:text-woot-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300',
+                : 'border-transparent text-slate-500 dark:text-n-slate-11 hover:text-slate-700 dark:hover:text-n-slate-10',
             ]"
             @click="activeTab = 'templates'"
           >
@@ -1046,7 +1046,7 @@ watch(
             :class="[
               activeTab === 'builder'
                 ? 'border-woot-500 text-woot-600 dark:text-woot-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300',
+                : 'border-transparent text-slate-500 dark:text-n-slate-11 hover:text-slate-700 dark:hover:text-n-slate-10',
             ]"
             @click="activeTab = 'builder'"
           >
@@ -1057,7 +1057,7 @@ watch(
             :class="[
               activeTab === 'preview'
                 ? 'border-woot-500 text-woot-600 dark:text-woot-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300',
+                : 'border-transparent text-slate-500 dark:text-n-slate-11 hover:text-slate-700 dark:hover:text-n-slate-10',
             ]"
             @click="activeTab = 'preview'"
           >
@@ -1076,7 +1076,7 @@ watch(
               <button
                 v-for="template in formTemplates"
                 :key="template.id"
-                class="text-left p-4 border-2 border-slate-200 dark:border-slate-600 rounded-lg hover:border-woot-500 dark:hover:border-woot-400 transition-colors"
+                class="text-left p-4 border-2 border-slate-200 dark:border-n-slate-6 rounded-lg hover:border-woot-500 dark:hover:border-woot-400 transition-colors"
                 @click="loadTemplate(template.id)"
               >
                 <div class="flex items-center space-x-3">
@@ -1085,7 +1085,7 @@ watch(
                     <h4 class="font-medium text-slate-900 dark:text-slate-100">
                       {{ template.name }}
                     </h4>
-                    <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    <p class="text-sm text-slate-600 dark:text-n-slate-11 mt-1">
                       {{ template.description }}
                     </p>
                   </div>
@@ -1096,7 +1096,7 @@ watch(
 
           <div v-else-if="activeTab === 'builder'" class="flex h-full">
             <div
-              class="w-1/2 p-6 border-r border-slate-200 dark:border-slate-600 overflow-y-auto"
+              class="w-1/2 p-6 border-r border-slate-200 dark:border-n-slate-6 overflow-y-auto"
             >
               <div class="mb-6">
                 <h3
@@ -1107,7 +1107,7 @@ watch(
                 <div class="space-y-3">
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.FORM_TITLE_LABEL') }}
                     </label>
@@ -1115,12 +1115,12 @@ watch(
                       v-model="formData.title"
                       type="text"
                       :placeholder="t('APPLE_FORM.FORM_TITLE_PLACEHOLDER')"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
                     </label>
@@ -1128,7 +1128,7 @@ watch(
                       v-model="formData.description"
                       rows="2"
                       :placeholder="t('APPLE_FORM.DESCRIPTION_PLACEHOLDER')"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
                 </div>
@@ -1145,7 +1145,7 @@ watch(
                 <!-- Received Message Subtitle -->
                 <div class="mb-3">
                   <label
-                    class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{
                       t(
@@ -1161,21 +1161,21 @@ watch(
                         'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER'
                       )
                     "
-                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <!-- Image Selection -->
                 <div class="mb-3">
                   <label
-                    class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
                   </label>
                   <div class="flex items-center space-x-2">
                     <select
                       v-model="formData.receivedMessage.imageIdentifier"
-                      class="flex-1 px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="flex-1 px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     >
                       <option value="">
                         {{ t('APPLE_FORM.MESSAGES_TAB.NO_IMAGE') }}
@@ -1206,7 +1206,7 @@ watch(
                           formData.receivedMessage.imageIdentifier
                         )
                       "
-                      class="h-16 rounded border border-slate-300 dark:border-slate-600"
+                      class="h-16 rounded border border-slate-300 dark:border-n-slate-6"
                       alt="Preview"
                     />
                   </div>
@@ -1215,13 +1215,13 @@ watch(
                 <!-- Style Selection -->
                 <div class="mb-3">
                   <label
-                    class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
                   </label>
                   <select
                     v-model="formData.receivedMessage.style"
-                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   >
                     <option
                       v-for="style in styleOptions"
@@ -1235,17 +1235,17 @@ watch(
 
                 <!-- Reply Message -->
                 <div
-                  class="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-600"
+                  class="space-y-3 pt-3 border-t border-slate-200 dark:border-n-slate-6"
                 >
                   <h4
-                    class="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                    class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
                   >
                     {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
                   </h4>
 
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
                     </label>
@@ -1255,13 +1255,13 @@ watch(
                       :placeholder="
                         t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
                       "
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
 
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
                     </label>
@@ -1271,7 +1271,7 @@ watch(
                       :placeholder="
                         t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
                       "
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
                 </div>
@@ -1300,7 +1300,7 @@ watch(
                     :class="[
                       index === currentPageIndex
                         ? 'border-woot-500 bg-woot-50 dark:bg-woot-900/20'
-                        : 'border-slate-200 dark:border-slate-600 hover:border-slate-300',
+                        : 'border-slate-200 dark:border-n-slate-6 hover:border-slate-300',
                     ]"
                     @click="currentPageIndex = index"
                   >
@@ -1310,7 +1310,7 @@ watch(
                         class="w-full text-sm font-medium text-slate-900 dark:text-slate-100 bg-transparent border-none p-0 focus:outline-none truncate"
                         @click.stop
                       />
-                      <p class="text-xs text-slate-600 dark:text-slate-400">
+                      <p class="text-xs text-slate-600 dark:text-n-slate-11">
                         {{ page.items ? page.items.length : 0 }}
                         {{ t('APPLE_FORM.FIELDS_COUNT') }}
                       </p>
@@ -1355,7 +1355,7 @@ watch(
                   <div
                     v-for="(field, index) in currentPage.items"
                     :key="field.item_id"
-                    class="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
+                    class="flex items-center justify-between p-2 bg-slate-50 dark:bg-n-slate-1 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-n-slate-3 transition-colors"
                     @click="editField(index)"
                   >
                     <div class="flex-1 min-w-0">
@@ -1365,7 +1365,7 @@ watch(
                         {{ field.title }}
                       </div>
                       <div
-                        class="text-xs text-slate-600 dark:text-slate-400 truncate"
+                        class="text-xs text-slate-600 dark:text-n-slate-11 truncate"
                       >
                         {{
                           fieldTypes.find(ft => ft.value === field.item_type)
@@ -1405,26 +1405,26 @@ watch(
                 <div class="space-y-3">
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.PAGE_TITLE_LABEL') }}
                     </label>
                     <input
                       v-model="currentPage.title"
                       type="text"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
                       {{ t('APPLE_FORM.PAGE_DESCRIPTION_LABEL') }}
                     </label>
                     <textarea
                       v-model="currentPage.description"
                       rows="2"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
                 </div>
@@ -1439,7 +1439,7 @@ watch(
               {{ t('APPLE_FORM.FORM_PREVIEW') }}
             </h3>
             <div v-if="formData.pages.length === 0" class="text-center py-12">
-              <p class="text-slate-600 dark:text-slate-400">
+              <p class="text-slate-600 dark:text-n-slate-11">
                 {{ t('APPLE_FORM.NO_PAGES_YET') }}
               </p>
             </div>
@@ -1447,7 +1447,7 @@ watch(
               <div
                 v-for="page in formData.pages"
                 :key="page.page_id"
-                class="border border-slate-200 dark:border-slate-600 rounded-lg p-6"
+                class="border border-slate-200 dark:border-n-slate-6 rounded-lg p-6"
               >
                 <div class="mb-4">
                   <h4
@@ -1457,7 +1457,7 @@ watch(
                   </h4>
                   <p
                     v-if="page.description"
-                    class="text-sm text-slate-600 dark:text-slate-400 mt-1"
+                    class="text-sm text-slate-600 dark:text-n-slate-11 mt-1"
                   >
                     {{ page.description }}
                   </p>
@@ -1473,7 +1473,7 @@ watch(
                     class="space-y-2"
                   >
                     <label
-                      class="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                      class="block text-sm font-medium text-slate-700 dark:text-n-slate-10"
                     >
                       {{ field.title }}
                       <span v-if="field.required" class="text-red-500">*</span>
@@ -1492,7 +1492,7 @@ watch(
                       "
                       :placeholder="field.placeholder"
                       disabled
-                      class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-slate-900 dark:text-slate-100"
                     />
 
                     <textarea
@@ -1500,7 +1500,7 @@ watch(
                       :placeholder="field.placeholder"
                       rows="3"
                       disabled
-                      class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-slate-900 dark:text-slate-100"
                     />
 
                     <select
@@ -1510,7 +1510,7 @@ watch(
                         )
                       "
                       disabled
-                      class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-slate-900 dark:text-slate-100"
                     >
                       <option value="">
                         {{ t('APPLE_FORM.SELECT_OPTION') }}
@@ -1534,7 +1534,7 @@ watch(
                         class="rounded border-slate-300 text-woot-600 focus:ring-woot-500"
                       />
                       <span
-                        class="ml-2 text-sm text-slate-600 dark:text-slate-400"
+                        class="ml-2 text-sm text-slate-600 dark:text-n-slate-11"
                       >
                         {{ field.description || t('APPLE_FORM.TOGGLE_OPTION') }}
                       </span>
@@ -1547,7 +1547,7 @@ watch(
                       <button
                         type="button"
                         disabled
-                        class="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700"
+                        class="px-3 py-1 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1"
                       >
                         -
                       </button>
@@ -1555,12 +1555,12 @@ watch(
                         type="number"
                         :value="field.min_value || 1"
                         disabled
-                        class="w-20 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 text-center"
+                        class="w-20 px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-center"
                       />
                       <button
                         type="button"
                         disabled
-                        class="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700"
+                        class="px-3 py-1 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1"
                       >
                         +
                       </button>
@@ -1570,12 +1570,12 @@ watch(
                       v-else-if="field.item_type === 'dateTime'"
                       type="datetime-local"
                       disabled
-                      class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-slate-900 dark:text-slate-100"
                     />
 
                     <div
                       v-else-if="field.item_type === 'richLink'"
-                      class="p-3 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700"
+                      class="p-3 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1"
                     >
                       <a
                         :href="field.url"
@@ -1590,7 +1590,7 @@ watch(
                 </div>
                 <div
                   v-else
-                  class="text-center py-8 text-slate-500 dark:text-slate-400"
+                  class="text-center py-8 text-slate-500 dark:text-n-slate-11"
                 >
                   {{ t('APPLE_FORM.NO_FIELDS_YET') }}
                 </div>
@@ -1600,9 +1600,9 @@ watch(
         </div>
 
         <div
-          class="flex items-center justify-between p-6 border-t border-slate-200 dark:border-slate-600"
+          class="flex items-center justify-between p-6 border-t border-slate-200 dark:border-n-slate-6"
         >
-          <div class="text-sm text-slate-600 dark:text-slate-400">
+          <div class="text-sm text-slate-600 dark:text-n-slate-11">
             {{
               t('APPLE_FORM.SUMMARY', {
                 pages: formData.pages.length,
@@ -1612,7 +1612,7 @@ watch(
           </div>
           <div class="flex space-x-3">
             <button
-              class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
               @click="closeModal"
             >
               {{ t('APPLE_FORM.CANCEL') }}
@@ -1640,7 +1640,7 @@ watch(
         class="fixed inset-0 z-60 overflow-y-auto bg-black bg-opacity-90 flex items-center justify-center p-4"
       >
         <div
-          class="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-full overflow-y-auto shadow-2xl border-4 border-green-500 dark:border-green-400"
+          class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg max-w-2xl w-full max-h-full overflow-y-auto shadow-2xl border-4 border-green-500 dark:border-green-400"
         >
           <div class="p-6">
             <h3
@@ -1655,7 +1655,7 @@ watch(
 
             <div class="mb-4">
               <label
-                class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+                class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-2"
               >
                 {{ t('APPLE_FORM.FIELD_TYPE') }}
               </label>
@@ -1667,7 +1667,7 @@ watch(
                   :class="[
                     newField.item_type === fieldType.value
                       ? 'border-woot-500 bg-woot-50 dark:bg-woot-900/20'
-                      : 'border-slate-200 dark:border-slate-600 hover:border-slate-300',
+                      : 'border-slate-200 dark:border-n-slate-6 hover:border-slate-300',
                   ]"
                   @click="newField.item_type = fieldType.value"
                 >
@@ -1679,7 +1679,7 @@ watch(
                       >
                         {{ fieldType.label }}
                       </div>
-                      <div class="text-xs text-slate-600 dark:text-slate-400">
+                      <div class="text-xs text-slate-600 dark:text-n-slate-11">
                         {{ fieldType.description }}
                       </div>
                     </div>
@@ -1691,7 +1691,7 @@ watch(
             <div class="space-y-4">
               <div>
                 <label
-                  class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                  class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
                   {{ t('APPLE_FORM.FIELD_TITLE') }}
                 </label>
@@ -1699,13 +1699,13 @@ watch(
                   v-model="newField.title"
                   type="text"
                   :placeholder="t('APPLE_FORM.FIELD_TITLE_PLACEHOLDER')"
-                  class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                  class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                 />
               </div>
 
               <div>
                 <label
-                  class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                  class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
                   {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
                 </label>
@@ -1713,7 +1713,7 @@ watch(
                   v-model="newField.description"
                   type="text"
                   :placeholder="t('APPLE_FORM.FIELD_DESCRIPTION_PLACEHOLDER')"
-                  class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                  class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                 />
               </div>
 
@@ -1723,7 +1723,7 @@ watch(
                   type="checkbox"
                   class="rounded border-slate-300 text-woot-600 focus:ring-woot-500"
                 />
-                <label class="text-sm text-slate-700 dark:text-slate-300">
+                <label class="text-sm text-slate-700 dark:text-n-slate-10">
                   {{ t('APPLE_FORM.REQUIRED_FIELD') }}
                 </label>
               </div>
@@ -1739,7 +1739,7 @@ watch(
               >
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{ t('APPLE_FORM.PLACEHOLDER') }}
                   </label>
@@ -1747,13 +1747,13 @@ watch(
                     v-model="newField.placeholder"
                     type="text"
                     :placeholder="t('APPLE_FORM.PLACEHOLDER_TEXT')"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{ t('APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT') }}
                   </label>
@@ -1763,13 +1763,13 @@ watch(
                     :placeholder="
                       t('APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT_PLACEHOLDER')
                     "
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Prefix Text
                   </label>
@@ -1777,13 +1777,13 @@ watch(
                     v-model="newField.prefix_text"
                     type="text"
                     placeholder="e.g., $ for currency fields"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Hint Text
                   </label>
@@ -1791,13 +1791,13 @@ watch(
                     v-model="newField.hint_text"
                     type="text"
                     placeholder="Additional context shown below the field"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Maximum Character Count
                   </label>
@@ -1805,19 +1805,19 @@ watch(
                     v-model.number="newField.maximum_character_count"
                     type="number"
                     placeholder="Default: 30 for singleline, 300 for multiline"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Input Type
                   </label>
                   <select
                     v-model="newField.input_type"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   >
                     <option value="singleline">Single Line</option>
                     <option value="multiline">Multi Line</option>
@@ -1826,13 +1826,13 @@ watch(
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Keyboard Type
                   </label>
                   <select
                     v-model="newField.keyboard_type"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   >
                     <option value="default">Default</option>
                     <option value="asciiCapable">ASCII Capable</option>
@@ -1852,13 +1852,13 @@ watch(
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Text Content Type
                   </label>
                   <select
                     v-model="newField.text_content_type"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   >
                     <option value="">None</option>
                     <option value="name">Name</option>
@@ -1899,7 +1899,7 @@ watch(
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Regex Pattern (JSON encoded)
                   </label>
@@ -1907,9 +1907,9 @@ watch(
                     v-model="newField.regex"
                     type="text"
                     placeholder="e.g., ^\\d*\\.?\\d?\\d?$ for decimals"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white font-mono text-sm"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white font-mono text-sm"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     JSON encode all regex strings. Used to limit input type.
                   </p>
                 </div>
@@ -1919,7 +1919,7 @@ watch(
               <div v-if="newField.item_type === 'dateTime'" class="space-y-4">
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Label Text
                   </label>
@@ -1927,13 +1927,13 @@ watch(
                     v-model="newField.label_text"
                     type="text"
                     placeholder="Text shown next to date field (default: 'Date')"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Hint Text
                   </label>
@@ -1941,13 +1941,13 @@ watch(
                     v-model="newField.hint_text"
                     type="text"
                     placeholder="Context text shown below the date field"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Date Format
                   </label>
@@ -1955,54 +1955,54 @@ watch(
                     v-model="newField.date_format"
                     type="text"
                     placeholder="MM/dd/yyyy"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     Default: MM/dd/yyyy
                   </p>
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Start Date
                   </label>
                   <input
                     v-model="newField.start_date"
                     type="date"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     Initial date displayed (defaults to current date)
                   </p>
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Minimum Date
                   </label>
                   <input
                     v-model="newField.minimum_date"
                     type="date"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Maximum Date
                   </label>
                   <input
                     v-model="newField.maximum_date"
                     type="date"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     Defaults to current date
                   </p>
                 </div>
@@ -2012,7 +2012,7 @@ watch(
               <div v-if="newField.item_type === 'picker'" class="space-y-4">
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Picker Title
                   </label>
@@ -2020,16 +2020,16 @@ watch(
                     v-model="newField.picker_title"
                     type="text"
                     placeholder="Text shown next to picker field"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     When empty, picker centers on page
                   </p>
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     Selected Item Index
                   </label>
@@ -2038,9 +2038,9 @@ watch(
                     type="number"
                     min="0"
                     placeholder="0"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-slate-500 dark:text-n-slate-11">
                     Zero-indexed default selected item (defaults to 0)
                   </p>
                 </div>
@@ -2063,14 +2063,14 @@ watch(
                     type="checkbox"
                     class="rounded border-slate-300 text-woot-600 focus:ring-woot-500"
                   />
-                  <label class="text-sm text-slate-700 dark:text-slate-300">
+                  <label class="text-sm text-slate-700 dark:text-n-slate-10">
                     Enable Multiple Selection
                   </label>
                 </div>
 
                 <div>
                   <label
-                    class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-2"
                   >
                     {{ t('APPLE_FORM.OPTIONS') }}
                   </label>
@@ -2085,13 +2085,13 @@ watch(
                           v-model="option.value"
                           type="text"
                           :placeholder="t('APPLE_FORM.OPTION_VALUE')"
-                          class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                          class="flex-1 px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                         />
                         <input
                           v-model="option.title"
                           type="text"
                           :placeholder="t('APPLE_FORM.OPTION_LABEL')"
-                          class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                          class="flex-1 px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                         />
                         <button
                           class="text-red-500 hover:text-red-700 transition-colors"
@@ -2112,13 +2112,13 @@ watch(
                       <!-- Image selector for option -->
                       <div class="ml-4 flex items-center space-x-2">
                         <label
-                          class="text-xs text-slate-600 dark:text-slate-400"
+                          class="text-xs text-slate-600 dark:text-n-slate-11"
                         >
                           Image:
                         </label>
                         <select
                           v-model="option.imageIdentifier"
-                          class="flex-1 px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+                          class="flex-1 px-2 py-1 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                         >
                           <option value="">No image</option>
                           <option
@@ -2134,7 +2134,7 @@ watch(
                             option.imageIdentifier &&
                             getImagePreviewUrl(option.imageIdentifier)
                           "
-                          class="w-8 h-8 rounded overflow-hidden border border-slate-300 dark:border-slate-600"
+                          class="w-8 h-8 rounded overflow-hidden border border-slate-300 dark:border-n-slate-6"
                         >
                           <img
                             :src="getImagePreviewUrl(option.imageIdentifier)"
@@ -2145,7 +2145,7 @@ watch(
                       </div>
                     </div>
                     <button
-                      class="w-full py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-md text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+                      class="w-full py-2 border-2 border-dashed border-slate-300 dark:border-n-slate-6 rounded-md text-slate-600 dark:text-n-slate-11 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
                       @click="addOption"
                     >
                       {{ t('APPLE_FORM.ADD_OPTION') }}
@@ -2157,7 +2157,7 @@ watch(
 
             <div class="flex justify-end space-x-3 mt-6">
               <button
-                class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
                 @click="showAddFieldModal = false"
               >
                 {{ t('APPLE_FORM.CANCEL') }}

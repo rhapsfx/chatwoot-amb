@@ -353,15 +353,15 @@ export default {
 }
 
 .modal-header {
-  @apply pb-6 border-b border-gray-200;
+  @apply pb-6 border-b border-gray-200 dark:border-n-slate-6;
 }
 
 .modal-title {
-  @apply text-2xl font-bold text-gray-900 mb-2;
+  @apply text-2xl font-bold text-gray-900 dark:text-n-slate-12 mb-2;
 }
 
 .modal-description {
-  @apply text-gray-600;
+  @apply text-gray-600 dark:text-n-slate-11;
 }
 
 .modal-content {
@@ -369,7 +369,7 @@ export default {
 }
 
 .section-title {
-  @apply text-lg font-semibold text-gray-900 mb-4;
+  @apply text-lg font-semibold text-gray-900 dark:text-n-slate-12 mb-4;
 }
 
 .provider-grid {
@@ -377,7 +377,7 @@ export default {
 }
 
 .provider-button {
-  @apply flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200 text-left;
+  @apply flex items-center p-4 border border-gray-200 dark:border-n-slate-6 rounded-lg hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-n-slate-3 transition-colors duration-200 text-left;
 }
 
 .provider-icon {
@@ -393,15 +393,15 @@ export default {
 }
 
 .provider-name {
-  @apply font-semibold text-gray-900 mb-1;
+  @apply font-semibold text-gray-900 dark:text-n-slate-12 mb-1;
 }
 
 .provider-description {
-  @apply text-sm text-gray-600;
+  @apply text-sm text-gray-600 dark:text-n-slate-11;
 }
 
 .selected-provider {
-  @apply bg-blue-50 border border-blue-200 rounded-lg p-4;
+  @apply bg-blue-50 dark:bg-n-slate-3 border border-blue-200 dark:border-blue-500 rounded-lg p-4;
 }
 
 .provider-header {
@@ -413,7 +413,7 @@ export default {
 }
 
 .change-provider {
-  @apply text-blue-600 hover:text-blue-700 text-sm;
+  @apply text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm;
 }
 
 .auth-form {
@@ -425,11 +425,11 @@ export default {
 }
 
 .form-label {
-  @apply block text-sm font-medium text-gray-700;
+  @apply block text-sm font-medium text-gray-700 dark:text-n-slate-10;
 }
 
 .form-input {
-  @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply w-full p-3 border border-gray-300 dark:border-n-slate-6 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-n-slate-1 text-gray-900 dark:text-n-slate-12;
 }
 
 .checkbox-label {
@@ -437,15 +437,15 @@ export default {
 }
 
 .checkbox {
-  @apply w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500;
+  @apply w-4 h-4 text-blue-600 border-gray-300 dark:border-n-slate-6 rounded focus:ring-blue-500;
 }
 
 .message-preview {
-  @apply bg-gray-50 border border-gray-200 rounded-lg p-4;
+  @apply bg-gray-50 dark:bg-n-slate-1 border border-gray-200 dark:border-n-slate-6 rounded-lg p-4;
 }
 
 .modal-footer {
-  @apply pt-6 border-t border-gray-200 flex justify-end space-x-4;
+  @apply pt-6 border-t border-gray-200 dark:border-n-slate-6 flex justify-end space-x-4;
 }
 
 .btn {
@@ -453,7 +453,7 @@ export default {
 }
 
 .btn-secondary {
-  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+  @apply bg-gray-100 dark:bg-n-slate-3 text-gray-700 dark:text-n-slate-11 hover:bg-gray-200 dark:hover:bg-n-slate-4;
 }
 
 .btn-primary {

@@ -2886,10 +2886,10 @@ const loadTimePickerTemplate = block => {
       @click.self="closeImagePicker"
     >
       <div
-        class="bg-white dark:bg-n-slate-1 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto m-4"
+        class="bg-n-solid-1 dark:bg-n-slate-1 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto m-4"
       >
         <div
-          class="sticky top-0 bg-white dark:bg-n-slate-1 border-b border-n-weak dark:border-n-alpha-6 p-4 flex justify-between items-center"
+          class="sticky top-0 bg-n-solid-1 dark:bg-n-slate-1 border-b border-n-weak dark:border-n-alpha-6 p-4 flex justify-between items-center"
         >
           <h3
             class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11"

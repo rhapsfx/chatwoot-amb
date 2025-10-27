@@ -65,10 +65,10 @@ const toggleAppleComposer = () => {
       @click.self="showAppleComposer = false"
     >
       <div
-        class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
       >
-        <div class="flex items-center justify-between p-4 border-b">
-          <h3 class="text-lg font-semibold text-n-slate-12">
+        <div class="flex items-center justify-between p-4 border-b border-n-weak dark:border-n-slate-6">
+          <h3 class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11">
             Apple Messages for Business
           </h3>
           <NextButton
