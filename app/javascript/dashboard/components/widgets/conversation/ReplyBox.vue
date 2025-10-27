@@ -2119,10 +2119,10 @@ export default {
   position: absolute;
   bottom: 100%;
   z-index: 100;
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  @apply bg-white dark:bg-n-slate-1;
+  @apply border border-n-slate-4 dark:border-n-slate-6;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  @apply shadow-lg dark:shadow-2xl;
   margin-bottom: 8px;
   max-height: 400px;
   overflow-y: auto;

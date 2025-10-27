@@ -335,7 +335,7 @@ watch(
     </div>
 
     <!-- Filters Section -->
-    <div class="flex flex-col gap-4 p-4 bg-white border-b border-n-weak">
+    <div class="flex flex-col gap-4 p-4 bg-white dark:bg-n-slate-2 border-b border-n-weak">
       <!-- Search Bar -->
       <div class="flex gap-3">
         <div class="flex-1">
@@ -343,7 +343,7 @@ watch(
             v-model="searchQuery"
             type="text"
             :placeholder="t('TEMPLATES.SEARCH_PLACEHOLDER')"
-            class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
           />
         </div>
         <Button
@@ -370,7 +370,7 @@ watch(
           </label>
           <select
             v-model="selectedCategory"
-            class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
           >
             <option
               v-for="category in categories"
@@ -388,7 +388,7 @@ watch(
           </label>
           <select
             v-model="selectedChannel"
-            class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
           >
             <option
               v-for="channel in availableChannels"
@@ -414,7 +414,7 @@ watch(
             :class="[
               selectedTags.includes(tag)
                 ? 'bg-n-blue-9 text-white border-n-blue-9'
-                : 'bg-white text-n-slate-11 border-n-slate-7 hover:border-n-blue-7',
+                : 'bg-white dark:bg-n-slate-1 text-n-slate-11 border-n-slate-7 dark:border-n-slate-6 hover:border-n-blue-7',
             ]"
             @click="toggleTag(tag)"
           >
@@ -464,7 +464,7 @@ watch(
         <div
           v-for="template in filteredTemplates"
           :key="template.id"
-          class="border border-n-slate-7 rounded-lg p-5 hover:shadow-lg hover:border-n-blue-7 transition-all bg-white"
+          class="border border-n-slate-7 dark:border-n-slate-6 rounded-lg p-5 hover:shadow-lg hover:border-n-blue-7 transition-all bg-white dark:bg-n-slate-2"
         >
           <!-- Header -->
           <div class="flex items-start justify-between mb-3">

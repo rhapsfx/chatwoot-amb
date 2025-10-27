@@ -280,7 +280,7 @@ const getBlockLabel = type => {
       <div
         v-for="(block, index) in blocks"
         :key="index"
-        class="border border-n-slate-7 rounded-lg bg-white transition-all"
+        class="border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-n-solid-1 dark:bg-n-slate-2 transition-all"
         :class="[
           draggingIndex === index ? 'opacity-50' : '',
           editingBlockIndex === index ? 'ring-2 ring-n-blue-7' : '',

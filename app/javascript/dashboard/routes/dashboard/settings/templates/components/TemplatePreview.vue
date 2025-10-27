@@ -199,7 +199,7 @@ watch(selectedChannel, () => {
             v-if="isAppleMessagesChannel(channel.value)"
             :src="AppleLogo"
             alt="Apple Messages"
-            class="w-5 h-5"
+            class="w-5 h-5 dark:brightness-0 dark:invert"
           />
           <i v-else class="text-xl" :class="[channel.icon]" />
           <span class="text-sm font-medium">{{ channel.label }}</span>
@@ -235,7 +235,7 @@ watch(selectedChannel, () => {
             :placeholder="
               param.example || param.default || `Enter ${param.name}`
             "
-            class="w-full px-3 py-2 text-sm border border-n-slate-7 bg-white rounded focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+            class="w-full px-3 py-2 text-sm border border-n-slate-7 dark:border-n-slate-6 bg-n-solid-1 dark:bg-n-slate-2 rounded focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
           <p v-if="param.description" class="text-xs text-n-slate-10 mt-1">
             {{ param.description }}
@@ -253,7 +253,7 @@ watch(selectedChannel, () => {
             v-if="isAppleMessagesChannel(selectedChannel)"
             :src="AppleLogo"
             alt="Apple Messages"
-            class="w-4 h-4"
+            class="w-4 h-4 dark:brightness-0 dark:invert"
           />
           <i
             v-else
@@ -267,7 +267,7 @@ watch(selectedChannel, () => {
       </div>
 
       <!-- Preview Content -->
-      <div class="bg-white p-6 min-h-96">
+      <div class="bg-n-solid-1 dark:bg-n-slate-2 p-6 min-h-96">
         <div v-if="loading" class="flex items-center justify-center h-64">
           <div class="text-n-slate-10">Loading preview...</div>
         </div>
@@ -302,7 +302,7 @@ watch(selectedChannel, () => {
                 v-if="isAppleMessagesChannel(selectedChannel)"
                 :src="AppleLogo"
                 alt="Apple Messages"
-                class="w-3.5 h-3.5"
+                class="w-3.5 h-3.5 dark:brightness-0 dark:invert"
               />
               <i
                 v-else

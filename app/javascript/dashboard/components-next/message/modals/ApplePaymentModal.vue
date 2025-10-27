@@ -608,15 +608,15 @@ export default {
 }
 
 .modal-header {
-  @apply pb-6 border-b border-gray-200;
+  @apply pb-6 border-b border-gray-200 dark:border-n-slate-6;
 }
 
 .modal-title {
-  @apply text-2xl font-bold text-gray-900 mb-2;
+  @apply text-2xl font-bold text-gray-900 dark:text-n-slate-12 mb-2;
 }
 
 .modal-description {
-  @apply text-gray-600;
+  @apply text-gray-600 dark:text-n-slate-11;
 }
 
 .modal-content {
@@ -636,7 +636,7 @@ export default {
 }
 
 .section-title {
-  @apply text-lg font-semibold text-gray-900 mb-4;
+  @apply text-lg font-semibold text-gray-900 dark:text-n-slate-12 mb-4;
 }
 
 .form-row {
@@ -656,15 +656,15 @@ export default {
 }
 
 .form-label {
-  @apply block text-sm font-medium text-gray-700;
+  @apply block text-sm font-medium text-gray-700 dark:text-n-slate-10;
 }
 
 .form-input {
-  @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply w-full p-3 border border-gray-300 dark:border-n-slate-6 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-n-slate-1 text-gray-900 dark:text-n-slate-12;
 }
 
 .form-select {
-  @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white;
+  @apply w-full p-3 border border-gray-300 dark:border-n-slate-6 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-n-slate-1 text-gray-900 dark:text-n-slate-12;
 }
 
 .input-group {
@@ -672,7 +672,7 @@ export default {
 }
 
 .input-prefix {
-  @apply px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 font-medium;
+  @apply px-3 py-3 bg-gray-50 dark:bg-n-slate-3 border border-r-0 border-gray-300 dark:border-n-slate-6 rounded-l-lg text-gray-500 dark:text-n-slate-11 font-medium;
 }
 
 .input-group .form-input {
@@ -684,23 +684,23 @@ export default {
 }
 
 .line-item {
-  @apply bg-gray-50 p-4 rounded-lg;
+  @apply bg-gray-50 dark:bg-n-slate-1 p-4 rounded-lg;
 }
 
 .shipping-method {
-  @apply bg-blue-50 p-4 rounded-lg;
+  @apply bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg;
 }
 
 .remove-item-btn {
-  @apply w-10 h-10 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors duration-200 flex items-center justify-center flex-shrink-0 mt-6;
+  @apply w-10 h-10 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors duration-200 flex items-center justify-center flex-shrink-0 mt-6;
 }
 
 .add-item-btn {
-  @apply w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-300 hover:text-blue-600 transition-colors duration-200 flex items-center justify-center;
+  @apply w-full p-3 border-2 border-dashed border-gray-300 dark:border-n-slate-6 rounded-lg text-gray-600 dark:text-n-slate-11 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 flex items-center justify-center;
 }
 
 .total-section {
-  @apply border-t border-gray-200 pt-4 mt-4;
+  @apply border-t border-gray-200 dark:border-n-slate-6 pt-4 mt-4;
 }
 
 .total-row {
@@ -708,11 +708,11 @@ export default {
 }
 
 .total-label {
-  @apply text-gray-900;
+  @apply text-gray-900 dark:text-n-slate-12;
 }
 
 .total-amount {
-  @apply text-green-600;
+  @apply text-green-600 dark:text-green-400;
 }
 
 .checkbox-group {
@@ -728,11 +728,11 @@ export default {
 }
 
 .checkbox {
-  @apply w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500;
+  @apply w-4 h-4 text-blue-600 border-gray-300 dark:border-n-slate-6 rounded focus:ring-blue-500;
 }
 
 .checkmark {
-  @apply text-sm text-gray-700;
+  @apply text-sm text-gray-700 dark:text-n-slate-11;
 }
 
 .shipping-methods {
@@ -744,11 +744,11 @@ export default {
 }
 
 .payment-preview {
-  @apply bg-gray-50 border border-gray-200 rounded-lg p-6;
+  @apply bg-gray-50 dark:bg-n-slate-1 border border-gray-200 dark:border-n-slate-6 rounded-lg p-6;
 }
 
 .modal-footer {
-  @apply pt-6 border-t border-gray-200 flex justify-end space-x-4;
+  @apply pt-6 border-t border-gray-200 dark:border-n-slate-6 flex justify-end space-x-4;
 }
 
 .btn {
@@ -756,7 +756,7 @@ export default {
 }
 
 .btn-secondary {
-  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+  @apply bg-gray-100 dark:bg-n-slate-3 text-gray-700 dark:text-n-slate-11 hover:bg-gray-200 dark:hover:bg-n-slate-4;
 }
 
 .btn-primary {

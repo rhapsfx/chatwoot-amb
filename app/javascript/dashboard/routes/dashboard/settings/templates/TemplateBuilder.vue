@@ -243,7 +243,7 @@ onMounted(() => {
   <div class="flex flex-col h-full bg-n-slate-1">
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-6 py-4 bg-white border-b border-n-weak"
+      class="flex items-center justify-between px-6 py-4 bg-white dark:bg-n-slate-2 border-b border-n-weak"
     >
       <div>
         <h1 class="text-2xl font-semibold text-n-slate-12">
@@ -280,7 +280,7 @@ onMounted(() => {
     <!-- Main Content -->
     <div v-else class="flex flex-1 overflow-hidden">
       <!-- Tabs Sidebar -->
-      <div class="w-64 bg-white border-r border-n-weak overflow-y-auto">
+      <div class="w-64 bg-white dark:bg-n-slate-2 border-r border-n-weak overflow-y-auto">
         <nav class="p-4 space-y-1">
           <button
             v-for="tab in tabs"
@@ -313,11 +313,11 @@ onMounted(() => {
               v-model="template.name"
               type="text"
               :placeholder="t('TEMPLATES.BUILDER.NAME.PLACEHOLDER')"
-              class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2"
+              class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
               :class="[
                 errors.name
                   ? 'border-n-red-7 focus:ring-n-red-7'
-                  : 'border-n-slate-7 focus:ring-n-blue-7',
+                  : 'border-n-slate-7 dark:border-n-slate-6 focus:ring-n-blue-7',
               ]"
             />
             <p v-if="errors.name" class="mt-1 text-sm text-n-red-11">
@@ -334,7 +334,7 @@ onMounted(() => {
               v-model="template.description"
               rows="3"
               :placeholder="t('TEMPLATES.BUILDER.DESCRIPTION.PLACEHOLDER')"
-              class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+              class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
             />
           </div>
 
@@ -347,11 +347,11 @@ onMounted(() => {
               </label>
               <select
                 v-model="template.category"
-                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
                 :class="[
                   errors.category
                     ? 'border-n-red-7 focus:ring-n-red-7'
-                    : 'border-n-slate-7 focus:ring-n-blue-7',
+                    : 'border-n-slate-7 dark:border-n-slate-6 focus:ring-n-blue-7',
                 ]"
               >
                 <option value="">
@@ -376,7 +376,7 @@ onMounted(() => {
               </label>
               <select
                 v-model="template.status"
-                class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+                class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
               >
                 <option
                   v-for="option in statusOptions"
@@ -444,7 +444,7 @@ onMounted(() => {
                 v-model="newTag"
                 type="text"
                 :placeholder="t('TEMPLATES.BUILDER.TAGS.PLACEHOLDER')"
-                class="flex-1 px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+                class="flex-1 px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
                 @keyup.enter="addTag"
               />
               <Button icon="i-lucide-plus" @click="addTag" />
@@ -453,7 +453,7 @@ onMounted(() => {
               <span
                 v-for="(tag, index) in template.tags"
                 :key="index"
-                class="inline-flex items-center gap-2 px-3 py-1 bg-n-slate-3 text-n-slate-12 rounded-full text-sm"
+                class="inline-flex items-center gap-2 px-3 py-1 bg-n-slate-3 dark:bg-n-slate-4 text-n-slate-12 dark:text-n-slate-11 rounded-full text-sm"
               >
                 {{ tag }}
                 <button class="hover:text-n-red-11" @click="removeTag(index)">
@@ -476,7 +476,7 @@ onMounted(() => {
                 v-model="newUseCase"
                 type="text"
                 :placeholder="t('TEMPLATES.BUILDER.USE_CASES.PLACEHOLDER')"
-                class="flex-1 px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+                class="flex-1 px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
                 @keyup.enter="addUseCase"
               />
               <Button icon="i-lucide-plus" @click="addUseCase" />
@@ -488,7 +488,7 @@ onMounted(() => {
               <span
                 v-for="(useCase, index) in template.useCases"
                 :key="index"
-                class="inline-flex items-center gap-2 px-3 py-1 bg-n-slate-3 text-n-slate-12 rounded-full text-sm"
+                class="inline-flex items-center gap-2 px-3 py-1 bg-n-slate-3 dark:bg-n-slate-4 text-n-slate-12 dark:text-n-slate-11 rounded-full text-sm"
               >
                 {{ useCase }}
                 <button
