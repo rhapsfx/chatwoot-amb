@@ -14,6 +14,7 @@
     "VERSION": "Version",
     "UPDATED": "Updated",
     "VERSION_LABEL": "Version {version}",
+    "TEMPLATE_ID_LABEL": "(ID: {id})",
     "UPDATED_LABEL": "Updated {date}",
     "TAGS_MORE": "+{count}",
     "CREATE_FIRST_TEMPLATE": "Create Your First Template",

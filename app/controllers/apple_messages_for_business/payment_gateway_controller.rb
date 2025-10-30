@@ -3,12 +3,27 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
   protect_from_forgery except: [:process_payment, :payment_method_update, :webhook]
 
   def process_payment
-    payment_token = params[:paymentToken]
-    payment_data = params[:paymentData]
+    # Extract payment data from the nested structure
+    payment_params = params[:payment] || {}
+    payment_token = payment_params[:paymentToken]
+    payment_data = payment_params[:paymentData]
 
     return render_error('Missing payment token') unless payment_token
+
+    # Check if test mode is enabled - if so, return success without processing payment
+    if test_mode_enabled?
+      Rails.logger.info '[Apple Pay] 🧪 Test mode enabled - simulating successful payment'
+      Rails.logger.info "[Apple Pay] 🧪 Request ID: #{params[:requestIdentifier]}"
+      Rails.logger.debug { "[Apple Pay] 🧪 Test payment token: #{payment_token.inspect}" }
+
+      # Return simple success response as per Apple Pay specification
+      return render json: { status: 'STATUS_SUCCESS' }, status: 200
+    end
+
+    # Production mode requires payment_data
     return render_error('Missing payment data') unless payment_data
 
+    # Production payment processing
     apple_pay_service = AppleMessagesForBusiness::ApplePayService.new(@channel)
 
     begin
@@ -42,9 +57,9 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
 
     begin
       result = apple_pay_service.handle_payment_method_update({
-        type: update_type,
-        **update_data.symbolize_keys
-      })
+                                                                type: update_type,
+                                                                **update_data.symbolize_keys
+                                                              })
 
       if result[:error]
         render json: { error: result[:error] }, status: :unprocessable_entity
@@ -134,7 +149,15 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
   private
 
   def find_channel
-    @channel = Channel::AppleMessagesForBusiness.find_by!(msp_id: params[:msp_id])
+    # Try finding by msp_id first (for old routes)
+    if params[:msp_id].present?
+      @channel = Channel::AppleMessagesForBusiness.find_by!(msp_id: params[:msp_id])
+    # Otherwise find by account_id (for new Apple Pay payment gateway route)
+    elsif params[:account_id].present?
+      @channel = Channel::AppleMessagesForBusiness.find_by!(account_id: params[:account_id])
+    else
+      render_error('Missing channel identifier')
+    end
   rescue ActiveRecord::RecordNotFound
     render_error('Channel not found')
   end
@@ -157,8 +180,15 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
 
   def extract_webhook_signature
     request.headers['Stripe-Signature'] ||
-    request.headers['X-Square-Signature'] ||
-    request.headers['Bt-Signature'] ||
-    request.headers['HTTP_X_HUB_SIGNATURE_256']
+      request.headers['X-Square-Signature'] ||
+      request.headers['Bt-Signature'] ||
+      request.headers['HTTP_X_HUB_SIGNATURE_256']
+  end
+
+  # Check if Apple Pay test mode is enabled
+  # Test mode allows payment testing without processing through real payment gateways
+  # Enable via: channel payment_settings OR environment variable
+  def test_mode_enabled?
+    @channel.payment_settings&.dig('test_mode') == true || ENV['APPLE_PAY_TEST_MODE'] == 'true'
   end
 end

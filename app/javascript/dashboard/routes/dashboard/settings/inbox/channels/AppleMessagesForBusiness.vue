@@ -191,7 +191,7 @@ export default {
       :header-content="$t('INBOX_MGMT.ADD.APPLE_MESSAGES_FOR_BUSINESS.DESC')"
     />
 
-    <div class="mb-6 p-4 bg-n-alpha-2 rounded-lg border border-n-weak">
+    <div class="mb-6 p-4 bg-n-solid-2 rounded-lg border border-n-weak">
       <h3 class="text-sm font-medium text-n-slate-12 mb-2">
         {{ $t('INBOX_MGMT.ADD.APPLE_MESSAGES_FOR_BUSINESS.SETUP_GUIDE.TITLE') }}
       </h3>
@@ -384,7 +384,7 @@ export default {
         </p>
 
         <!-- Google OAuth2 -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="google-oauth"
@@ -441,7 +441,7 @@ export default {
         </div>
 
         <!-- LinkedIn OAuth2 -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="linkedin-oauth"
@@ -498,7 +498,7 @@ export default {
         </div>
 
         <!-- Facebook OAuth2 -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="facebook-oauth"
@@ -566,7 +566,7 @@ export default {
           {{ $t('INBOX_MGMT.ADD.APPLE_MESSAGES_FOR_BUSINESS.APPLE_PAY.DESC') }}
         </p>
 
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-4">
             <input
               id="apple-pay-enabled"
@@ -730,7 +730,7 @@ export default {
           <div
             v-for="(app, index) in imessageApps"
             :key="app.id"
-            class="bg-n-alpha-2 dark:bg-n-alpha-3 p-4 rounded-lg border border-n-weak"
+            class="bg-n-solid-2 p-4 rounded-lg border border-n-weak"
           >
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-3">
@@ -893,7 +893,7 @@ export default {
         </p>
 
         <!-- Stripe -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="stripe-enabled"
@@ -950,7 +950,7 @@ export default {
         </div>
 
         <!-- Square -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="square-enabled"
@@ -1007,7 +1007,7 @@ export default {
         </div>
 
         <!-- Braintree -->
-        <div class="bg-n-alpha-2 rounded-lg p-4 mb-4">
+        <div class="bg-n-solid-2 rounded-lg p-4 mb-4">
           <div class="flex items-center mb-3">
             <input
               id="braintree-enabled"

@@ -68,6 +68,53 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     render json: { content: translated_content }
   end
 
+  def send_apple_pay
+    # Validate that this is an Apple Messages for Business conversation
+    unless @conversation.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
+      return render json: { error: 'Apple Pay is only available for Apple Messages for Business' }, status: :unprocessable_entity
+    end
+
+    # Get channel and destination_id
+    channel = @conversation.inbox.channel
+    contact_inbox = @conversation.contact_inbox
+    destination_id = contact_inbox.source_id
+
+    # Validate required parameters
+    validation_result = validate_apple_pay_params
+    return render json: validation_result, status: :unprocessable_entity if validation_result[:errors]
+
+    # Normalize payment data from camelCase to snake_case
+    payment_data = AppleMessagesForBusiness::CaseTransformer.from_apple_format(
+      apple_pay_params.to_unsafe_h
+    )
+
+    # Send Apple Pay request
+    service = AppleMessagesForBusiness::SendApplePayService.new(
+      channel: channel,
+      destination_id: destination_id,
+      payment_data: payment_data
+    )
+
+    result = service.perform
+
+    if result[:success]
+      render json: {
+        success: true,
+        message_id: result[:message_id],
+        message: 'Apple Pay request sent successfully'
+      }, status: :ok
+    else
+      render json: {
+        success: false,
+        error: result[:error] || 'Failed to send Apple Pay request'
+      }, status: :unprocessable_entity
+    end
+  rescue StandardError => e
+    Rails.logger.error "[MessagesController] Apple Pay send failed: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    render json: { error: "Failed to send Apple Pay request: #{e.message}" }, status: :internal_server_error
+  end
+
   private
 
   def message
@@ -139,7 +186,17 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                                 :reply_image_identifier,
                                 # Nested message structures (new form builder format)
                                 { :received_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
-                                { :reply_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] }
+                                { :reply_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
+                                # Apple Pay
+                                :merchant_name, :merchantName, :currency_code, :currencyCode, :country_code, :countryCode,
+                                :requires_shipping, :requiresShipping, :requires_billing, :requiresBilling,
+                                { :line_items => [:label, :amount, :type] },
+                                { :lineItems => [:label, :amount, :type] },
+                                { :total => [:label, :amount, :type] },
+                                { :shipping_methods => [:identifier, :label, :detail, :amount] },
+                                { :shippingMethods => [:identifier, :label, :detail, :amount] },
+                                :required_billing_fields, :requiredBillingFields,
+                                :required_shipping_fields, :requiredShippingFields
                               ])
 
     Rails.logger.info "🔥 MessagesController permitted params: #{permitted.inspect}"
@@ -156,7 +213,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   # Normalize Apple Messages content_attributes from camelCase to snake_case
   # This ensures consistent internal storage format regardless of frontend input
   def normalize_apple_messages_content_attributes
-    return unless params[:content_attributes].present?
+    return if params[:content_attributes].blank?
     return unless apple_messages_content_type?
 
     Rails.logger.info '[API] Normalizing Apple Messages content_attributes from camelCase to snake_case'
@@ -179,5 +236,69 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   def ensure_api_inbox
     # Only API inboxes can update messages
     render json: { error: 'Message status update is only allowed for API inboxes' }, status: :forbidden unless @conversation.inbox.api?
+  end
+
+  # Validate Apple Pay parameters
+  # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+  def validate_apple_pay_params
+    errors = []
+
+    # Required fields
+    errors << 'merchant_name is required' if params[:merchant_name].blank?
+    errors << 'currency_code is required' unless params[:currency_code].present? || params[:currencyCode].present?
+    errors << 'country_code is required' unless params[:country_code].present? || params[:countryCode].present?
+
+    # Line items validation
+    line_items = params[:line_items] || params[:lineItems] || []
+    if line_items.empty?
+      errors << 'At least one line item is required'
+    else
+      line_items.each_with_index do |item, index|
+        errors << "Line item #{index + 1}: label is required" if item[:label].blank?
+        errors << "Line item #{index + 1}: amount is required" if item[:amount].blank?
+      end
+    end
+
+    # Total validation
+    total = params[:total]
+    if total.blank?
+      errors << 'total is required'
+    else
+      errors << 'total.label is required' if total[:label].blank?
+      errors << 'total.amount is required' if total[:amount].blank?
+    end
+
+    return { errors: errors } if errors.any?
+
+    nil
+  end
+  # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+
+  # Strong parameters for Apple Pay request
+  def apple_pay_params
+    params.permit(
+      :merchant_name, :merchantName,
+      :merchant_identifier, :merchantIdentifier,
+      :currency_code, :currencyCode,
+      :country_code, :countryCode,
+      :received_title, :receivedTitle,
+      :received_subtitle, :receivedSubtitle,
+      :received_style, :receivedStyle,
+      :received_image_identifier, :receivedImageIdentifier,
+      line_items: [:label, :amount, :type],
+      lineItems: [:label, :amount, :type],
+      total: [:label, :amount, :type],
+      supported_networks: [],
+      supportedNetworks: [],
+      merchant_capabilities: [],
+      merchantCapabilities: [],
+      required_billing_contact_fields: [],
+      requiredBillingContactFields: [],
+      required_shipping_contact_fields: [],
+      requiredShippingContactFields: [],
+      shipping_methods: [:identifier, :label, :detail, :amount],
+      shippingMethods: [:identifier, :label, :detail, :amount],
+      images: [:identifier, :data, :description]
+    )
   end
 end

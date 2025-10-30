@@ -102,133 +102,170 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def validate_list_picker_data(data)
-    unless data[:listPicker].present?
+    # Handle both string and symbol keys
+    list_picker = data[:listPicker] || data['listPicker']
+
+    unless list_picker.present?
       @errors << 'List picker data missing listPicker field'
       return
     end
 
-    list_picker = data[:listPicker]
-
-    # Validate sections
-    unless list_picker[:sections].is_a?(Array) && list_picker[:sections].any?
+    # Validate sections - handle both string and symbol keys
+    sections = list_picker[:sections] || list_picker['sections']
+    unless sections.is_a?(Array) && sections.any?
       @errors << 'List picker must have at least one section'
       return
     end
 
     # Validate each section
-    list_picker[:sections].each_with_index do |section, index|
+    sections.each_with_index do |section, index|
       validate_list_picker_section(section, index)
     end
   end
 
   def validate_list_picker_section(section, index)
-    @errors << "Section #{index} missing items" unless section['items'].is_a?(Array) && section['items'].any?
+    # Handle both string and symbol keys
+    items = section[:items] || section['items']
+    @errors << "Section #{index} missing items" unless items.is_a?(Array) && items.any?
 
     # Validate each item
-    section['items']&.each_with_index do |item, item_index|
+    items&.each_with_index do |item, item_index|
       validate_list_picker_item(item, index, item_index)
     end
   end
 
   def validate_list_picker_item(item, section_index, item_index)
-    @errors << "Section #{section_index} item #{item_index} missing identifier" unless item['identifier'].present?
-    @errors << "Section #{section_index} item #{item_index} missing title" unless item['title'].present?
+    # Handle both string and symbol keys
+    identifier = item[:identifier] || item['identifier']
+    title = item[:title] || item['title']
+    style = item[:style] || item['style']
+
+    @errors << "Section #{section_index} item #{item_index} missing identifier" if identifier.blank?
+    @errors << "Section #{section_index} item #{item_index} missing title" if title.blank?
 
     # Validate style if present
-    return unless item['style'].present?
+    return unless style.present?
 
     valid_styles = %w[icon small large]
-    return if valid_styles.include?(item['style'])
+    return if valid_styles.include?(style)
 
-    @errors << "Section #{section_index} item #{item_index} has invalid style: #{item['style']}"
+    @errors << "Section #{section_index} item #{item_index} has invalid style: #{style}"
   end
 
   def validate_time_picker_data(data)
-    unless data[:event].present?
+    # Handle both string and symbol keys
+    event = data[:event] || data['event']
+
+    unless event.present?
       @errors << 'Time picker data missing event field'
       return
     end
 
-    event = data[:event]
-
-    # Validate timeslots
-    unless event['timeslots'].is_a?(Array) && event['timeslots'].any?
+    # Validate timeslots - handle both string and symbol keys
+    timeslots = event[:timeslots] || event['timeslots']
+    unless timeslots.is_a?(Array) && timeslots.any?
       @errors << 'Time picker event must have at least one timeslot'
       return
     end
 
     # Validate each timeslot
-    event['timeslots'].each_with_index do |slot, index|
+    timeslots.each_with_index do |slot, index|
       validate_timeslot(slot, index)
     end
   end
 
   def validate_timeslot(slot, index)
-    @errors << "Timeslot #{index} missing identifier" unless slot['identifier'].present?
-    @errors << "Timeslot #{index} missing startTime" unless slot['startTime'].present?
-    @errors << "Timeslot #{index} missing duration" unless slot['duration'].present?
+    # Handle both string and symbol keys
+    identifier = slot[:identifier] || slot['identifier']
+    start_time = slot[:startTime] || slot['startTime']
+    duration = slot[:duration] || slot['duration']
+
+    @errors << "Timeslot #{index} missing identifier" if identifier.blank?
+    @errors << "Timeslot #{index} missing startTime" if start_time.blank?
+    @errors << "Timeslot #{index} missing duration" if duration.blank?
   end
 
   def validate_quick_reply_data(data)
-    quick_reply = data[:'quick-reply']
+    # Handle both string and symbol keys
+    quick_reply = data[:'quick-reply'] || data['quick-reply']
 
     unless quick_reply.present?
       @errors << 'Quick reply data missing quick-reply field'
       return
     end
 
-    # Validate items
-    unless quick_reply[:items].is_a?(Array) && quick_reply[:items].any?
+    # Validate items - handle both string and symbol keys
+    items = quick_reply[:items] || quick_reply['items']
+    unless items.is_a?(Array) && items.any?
       @errors << 'Quick reply must have at least one item'
       return
     end
 
     # Apple MSP requires 2-5 items for quick reply
-    item_count = quick_reply[:items].length
+    item_count = items.length
     @errors << "Quick reply must have 2-5 items (has #{item_count})" unless item_count.between?(2, 5)
 
     # Validate each item
-    quick_reply[:items].each_with_index do |item, index|
-      @errors << "Quick reply item #{index} missing identifier" unless item['identifier'].present?
-      @errors << "Quick reply item #{index} missing title" unless item['title'].present?
+    items.each_with_index do |item, index|
+      identifier = item[:identifier] || item['identifier']
+      title = item[:title] || item['title']
+      @errors << "Quick reply item #{index} missing identifier" if identifier.blank?
+      @errors << "Quick reply item #{index} missing title" if title.blank?
     end
   end
 
   def validate_form_data(data)
-    unless data[:dynamic].present?
+    # Handle both string and symbol keys
+    dynamic = data[:dynamic] || data['dynamic']
+
+    unless dynamic.present?
       @errors << 'Form data missing dynamic field'
       return
     end
 
-    dynamic = data[:dynamic]
-
-    # Validate pages
-    unless dynamic[:pages].is_a?(Array) && dynamic[:pages].any?
+    # Validate pages - handle both string and symbol keys
+    pages = dynamic[:pages] || dynamic['pages']
+    unless pages.is_a?(Array) && pages.any?
       @errors << 'Form must have at least one page'
       return
     end
 
     # Validate each page
-    dynamic[:pages].each_with_index do |page, index|
+    pages.each_with_index do |page, index|
       validate_form_page(page, index)
     end
   end
 
   def validate_form_page(page, index)
-    @errors << "Form page #{index} missing pageIdentifier" unless page[:pageIdentifier].present?
-    @errors << "Form page #{index} missing type" unless page[:type].present?
-    @errors << "Form page #{index} missing title" unless page[:title].present?
+    # Handle both string and symbol keys
+    page_identifier = page[:pageIdentifier] || page['pageIdentifier']
+    page_type = page[:type] || page['type']
+    page_title = page[:title] || page['title']
+
+    @errors << "Form page #{index} missing pageIdentifier" if page_identifier.blank?
+    @errors << "Form page #{index} missing type" if page_type.blank?
+    @errors << "Form page #{index} missing title" if page_title.blank?
   end
 
   def validate_iso8601_dates
     # Validate ISO 8601 date formats in time picker timeslots
     return unless @message_type == 'apple_time_picker'
-    return unless @payload[:interactiveData]&.dig(:data, :event, 'timeslots')
 
-    timeslots = @payload[:interactiveData][:data][:event]['timeslots']
+    # Handle both string and symbol keys for nested access
+    interactive_data = @payload[:interactiveData] || @payload['interactiveData']
+    return unless interactive_data
+
+    data = interactive_data[:data] || interactive_data['data']
+    return unless data
+
+    event = data[:event] || data['event']
+    return unless event
+
+    timeslots = event[:timeslots] || event['timeslots']
+    return unless timeslots
 
     timeslots.each_with_index do |slot, index|
-      start_time = slot['startTime']
+      start_time = slot[:startTime] || slot['startTime']
       next unless start_time.present?
 
       @errors << "Timeslot #{index} has invalid ISO 8601 startTime: #{start_time}" unless valid_iso8601_datetime?(start_time)
@@ -236,15 +273,15 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def valid_iso8601_datetime?(datetime_string)
-    # Valid formats:
-    # - 2024-01-15T14:30:00+0000 (with timezone)
-    # - 2024-01-15T14:30:00Z (UTC)
-    # - 2024-01-15T14:30:00 (local time, less preferred)
+    # Valid formats (Apple accepts BOTH):
+    # - 2024-01-15T14:30+0000 (Apple's preferred format - NO seconds)
+    # - 2024-01-15T14:30:00+0000 (Standard ISO 8601 with seconds)
+    # - 2024-01-15T14:30Z or 2024-01-15T14:30:00Z (UTC notation)
 
     return false unless datetime_string.is_a?(String)
 
-    # Check basic ISO 8601 format
-    iso8601_regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{4}|Z)?$/
+    # Check ISO 8601 format - seconds are OPTIONAL
+    iso8601_regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{4}|Z)?$/
     return false unless datetime_string.match?(iso8601_regex)
 
     # Try to parse it
@@ -256,9 +293,15 @@ class AppleMessagesForBusiness::PayloadValidatorService
 
   def validate_base64_images
     # Validate base64 encoding for images in interactive messages
-    return unless @payload[:interactiveData]&.dig(:data, :images)
+    # Handle both string and symbol keys for nested access
+    interactive_data = @payload[:interactiveData] || @payload['interactiveData']
+    return unless interactive_data
 
-    images = @payload[:interactiveData][:data][:images]
+    data = interactive_data[:data] || interactive_data['data']
+    return unless data
+
+    images = data[:images] || data['images']
+    return unless images
 
     images.each_with_index do |image, index|
       validate_image(image, index)

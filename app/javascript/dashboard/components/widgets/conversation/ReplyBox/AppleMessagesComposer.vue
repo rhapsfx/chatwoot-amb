@@ -509,9 +509,9 @@ const listPickerData = ref({
       title: 'Options',
       multipleSelection: false,
       items: [
-        { title: 'Option 1', subtitle: 'Description 1' },
-        { title: 'Option 2', subtitle: 'Description 2' },
-        { title: 'Option 3', subtitle: 'Description 3' },
+        { identifier: 'option_1', title: 'Option 1', subtitle: 'Description 1' },
+        { identifier: 'option_2', title: 'Option 2', subtitle: 'Description 2' },
+        { identifier: 'option_3', title: 'Option 3', subtitle: 'Description 3' },
       ],
     },
   ],
@@ -712,6 +712,7 @@ const removeSection = sectionIndex => {
 
 const addListItem = sectionIndex => {
   const newItem = {
+    identifier: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     title: 'New Item',
     subtitle: '',
   };
@@ -1398,6 +1399,7 @@ const loadListPickerTemplate = block => {
     title: section.title || 'Section',
     multipleSelection: section.multipleSelection || section.multiple_selection || false,
     items: (section.items || []).map(item => ({
+      identifier: item.identifier || `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: item.title || '',
       subtitle: item.subtitle || '',
       image_identifier: item.imageIdentifier || item.image_identifier || '',
@@ -1476,6 +1478,73 @@ const loadTimePickerTemplate = block => {
   }
 
   console.log('[AMB Templates] Loaded time picker:', timePickerData.value);
+};
+
+// Payment template loading
+const loadPaymentTemplate = templateType => {
+  console.log('[AMB Payment] Loading payment template:', templateType);
+
+  const templates = {
+    simple: {
+      merchantName: 'Demo Store',
+      currencyCode: 'USD',
+      countryCode: 'US',
+      lineItems: [{ label: 'Product A', amount: '10.00', type: 'final' }],
+      total: { label: 'Total', amount: '10.00', type: 'final' },
+      requiresShipping: false,
+      requiresBilling: true,
+    },
+    shipping: {
+      merchantName: 'Demo Store',
+      currencyCode: 'USD',
+      countryCode: 'US',
+      lineItems: [
+        { label: 'Wireless Headphones', amount: '99.99', type: 'final' },
+        { label: 'Tax', amount: '8.00', type: 'final' },
+        { label: 'Shipping', amount: '5.00', type: 'final' },
+      ],
+      total: { label: 'Total', amount: '112.99', type: 'final' },
+      requiresShipping: true,
+      requiresBilling: true,
+    },
+    service: {
+      merchantName: 'Spa Services',
+      currencyCode: 'USD',
+      countryCode: 'US',
+      lineItems: [
+        { label: 'Massage Therapy (60 min)', amount: '80.00', type: 'final' },
+        { label: 'Service Fee', amount: '10.00', type: 'final' },
+      ],
+      total: { label: 'Total', amount: '90.00', type: 'final' },
+      requiresShipping: false,
+      requiresBilling: true,
+    },
+    euro: {
+      merchantName: 'European Shop',
+      currencyCode: 'EUR',
+      countryCode: 'DE',
+      lineItems: [{ label: 'Premium Product', amount: '149.99', type: 'final' }],
+      total: { label: 'Total', amount: '149.99', type: 'final' },
+      requiresShipping: false,
+      requiresBilling: true,
+    },
+  };
+
+  const template = templates[templateType];
+  if (!template) {
+    console.error('[AMB Payment] Unknown template type:', templateType);
+    return;
+  }
+
+  // Send the payment message immediately
+  const messageData = {
+    content_type: 'apple_pay',
+    content_attributes: template,
+    content: `${template.merchantName} - ${template.total.label}: ${template.currencyCode} ${template.total.amount}`,
+  };
+
+  console.log('[AMB Payment] Sending payment template:', messageData);
+  emit('send', messageData);
 };
 
 </script>
@@ -2738,6 +2807,159 @@ const loadTimePickerTemplate = block => {
 
     <!-- Apple Pay Tab -->
     <div v-if="activeTab === 'apple_pay'" class="space-y-6">
+      <!-- Payment Templates Selector -->
+      <div
+        class="bg-n-alpha-2 dark:bg-n-alpha-3 p-4 rounded-lg border border-n-weak dark:border-n-slate-6"
+      >
+        <h4
+          class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
+        >
+          Payment Templates
+        </h4>
+        <p class="text-xs text-n-slate-11 dark:text-n-slate-10 mb-4">
+          Select a template to quickly test Apple Pay functionality
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Template 1 - Simple Product -->
+          <button
+            class="text-left p-4 border border-n-weak dark:border-n-slate-6 rounded-lg hover:border-n-blue-8 dark:hover:border-n-blue-9 hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-all"
+            @click="loadPaymentTemplate('simple')"
+          >
+            <div class="flex items-start space-x-3">
+              <div
+                class="w-10 h-10 bg-n-blue-2 dark:bg-n-blue-3 rounded-lg flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-xl">📦</span>
+              </div>
+              <div class="flex-1">
+                <h5
+                  class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-1"
+                >
+                  Simple Product
+                </h5>
+                <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mb-2">
+                  Single item purchase - $10.00
+                </p>
+                <div class="flex items-center space-x-2 text-xs">
+                  <span
+                    class="px-2 py-0.5 bg-n-green-2 dark:bg-n-green-3 text-n-green-11 dark:text-n-green-10 rounded"
+                    >USD</span
+                  >
+                  <span
+                    class="px-2 py-0.5 bg-n-blue-2 dark:bg-n-blue-3 text-n-blue-11 dark:text-n-blue-10 rounded"
+                    >No Shipping</span
+                  >
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <!-- Template 2 - Product with Shipping -->
+          <button
+            class="text-left p-4 border border-n-weak dark:border-n-slate-6 rounded-lg hover:border-n-blue-8 dark:hover:border-n-blue-9 hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-all"
+            @click="loadPaymentTemplate('shipping')"
+          >
+            <div class="flex items-start space-x-3">
+              <div
+                class="w-10 h-10 bg-n-purple-2 dark:bg-n-purple-3 rounded-lg flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-xl">🎧</span>
+              </div>
+              <div class="flex-1">
+                <h5
+                  class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-1"
+                >
+                  Product with Shipping
+                </h5>
+                <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mb-2">
+                  Wireless Headphones with tax & shipping - $112.99
+                </p>
+                <div class="flex items-center space-x-2 text-xs">
+                  <span
+                    class="px-2 py-0.5 bg-n-green-2 dark:bg-n-green-3 text-n-green-11 dark:text-n-green-10 rounded"
+                    >USD</span
+                  >
+                  <span
+                    class="px-2 py-0.5 bg-n-purple-2 dark:bg-n-purple-3 text-n-purple-11 dark:text-n-purple-10 rounded"
+                    >Requires Shipping</span
+                  >
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <!-- Template 3 - Service Booking -->
+          <button
+            class="text-left p-4 border border-n-weak dark:border-n-slate-6 rounded-lg hover:border-n-blue-8 dark:hover:border-n-blue-9 hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-all"
+            @click="loadPaymentTemplate('service')"
+          >
+            <div class="flex items-start space-x-3">
+              <div
+                class="w-10 h-10 bg-n-pink-2 dark:bg-n-pink-3 rounded-lg flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-xl">💆</span>
+              </div>
+              <div class="flex-1">
+                <h5
+                  class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-1"
+                >
+                  Service Booking
+                </h5>
+                <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mb-2">
+                  Spa service with fee - $90.00
+                </p>
+                <div class="flex items-center space-x-2 text-xs">
+                  <span
+                    class="px-2 py-0.5 bg-n-green-2 dark:bg-n-green-3 text-n-green-11 dark:text-n-green-10 rounded"
+                    >USD</span
+                  >
+                  <span
+                    class="px-2 py-0.5 bg-n-orange-2 dark:bg-n-orange-3 text-n-orange-11 dark:text-n-orange-10 rounded"
+                    >Billing Required</span
+                  >
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <!-- Template 4 - Multi-Currency (EUR) -->
+          <button
+            class="text-left p-4 border border-n-weak dark:border-n-slate-6 rounded-lg hover:border-n-blue-8 dark:hover:border-n-blue-9 hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-all"
+            @click="loadPaymentTemplate('euro')"
+          >
+            <div class="flex items-start space-x-3">
+              <div
+                class="w-10 h-10 bg-n-amber-2 dark:bg-n-amber-3 rounded-lg flex items-center justify-center flex-shrink-0"
+              >
+                <span class="text-xl">💎</span>
+              </div>
+              <div class="flex-1">
+                <h5
+                  class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-1"
+                >
+                  Premium Product (EUR)
+                </h5>
+                <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mb-2">
+                  European Shop - €149.99
+                </p>
+                <div class="flex items-center space-x-2 text-xs">
+                  <span
+                    class="px-2 py-0.5 bg-n-amber-2 dark:bg-n-amber-3 text-n-amber-11 dark:text-n-amber-10 rounded"
+                    >EUR</span
+                  >
+                  <span
+                    class="px-2 py-0.5 bg-n-blue-2 dark:bg-n-blue-3 text-n-blue-11 dark:text-n-blue-10 rounded"
+                    >Germany</span
+                  >
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Coming Soon Message -->
       <div class="text-center py-12">
         <div
           class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -2763,8 +2985,7 @@ const loadTimePickerTemplate = block => {
           Apple Pay integration for Apple Messages for Business is coming soon.
         </p>
         <p class="text-xs text-n-slate-9 dark:text-n-slate-8">
-          This feature will enable secure payment processing within iMessage
-          conversations.
+          Click a template above to quickly send a test payment to your device.
         </p>
       </div>
     </div>

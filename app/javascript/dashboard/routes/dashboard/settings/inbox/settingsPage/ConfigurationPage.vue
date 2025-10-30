@@ -616,7 +616,7 @@ export default {
     >
       <div class="space-y-6">
         <!-- Google OAuth2 -->
-        <div class="bg-slate-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="google-oauth-enabled"
@@ -682,7 +682,7 @@ export default {
         </div>
 
         <!-- LinkedIn OAuth2 -->
-        <div class="bg-slate-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="linkedin-oauth-enabled"
@@ -750,7 +750,7 @@ export default {
         </div>
 
         <!-- Facebook OAuth2 -->
-        <div class="bg-slate-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="facebook-oauth-enabled"
@@ -825,7 +825,7 @@ export default {
       "
     >
       <div class="space-y-6">
-        <div class="bg-green-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="apple-pay-enabled"
@@ -1025,7 +1025,7 @@ export default {
     >
       <div class="space-y-6">
         <!-- Stripe -->
-        <div class="bg-purple-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="stripe-enabled"
@@ -1091,7 +1091,7 @@ export default {
         </div>
 
         <!-- Square -->
-        <div class="bg-blue-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="square-enabled"
@@ -1159,7 +1159,7 @@ export default {
         </div>
 
         <!-- Braintree -->
-        <div class="bg-yellow-50 p-4 rounded-lg">
+        <div class="bg-n-solid-2 p-4 rounded-lg">
           <div class="flex items-center space-x-3 mb-4">
             <input
               id="braintree-enabled"
@@ -1259,7 +1259,7 @@ export default {
           <div
             v-for="(app, index) in imessageApps"
             :key="app.id"
-            class="bg-slate-50 p-4 rounded-lg border"
+            class="bg-n-solid-2 p-4 rounded-lg border border-n-weak"
           >
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center space-x-3">

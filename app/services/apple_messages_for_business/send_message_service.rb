@@ -29,6 +29,8 @@ class AppleMessagesForBusiness::SendMessageService
       send_interactive_message
     when 'apple_rich_link'
       send_rich_link_message
+    when 'apple_pay'
+      send_apple_pay_message
     else
       send_text_message # fallback
     end
@@ -643,6 +645,33 @@ class AppleMessagesForBusiness::SendMessageService
     service.perform
   end
 
+  def send_apple_pay_message
+    # Delegate to the specialized SendApplePayService
+    # Extract payment data from message content_attributes
+    payment_data = content_attributes.slice(
+      'merchant_name',
+      'currency_code',
+      'country_code',
+      'line_items',
+      'total',
+      'shipping_methods',
+      'required_billing_fields',
+      'required_shipping_fields',
+      'received_title',
+      'received_subtitle',
+      'received_style',
+      'received_image_identifier'
+    )
+
+    service = AppleMessagesForBusiness::SendApplePayService.new(
+      channel: @channel,
+      destination_id: @destination_id,
+      payment_data: payment_data
+    )
+
+    service.perform
+  end
+
   def process_attachments
     # Performance Note: To avoid N+1 queries, ensure @message is loaded with:
     # .includes(attachments: { file_attachment: :blob })
@@ -760,7 +789,16 @@ class AppleMessagesForBusiness::SendMessageService
   def send_to_apple_gateway(payload, message_id, request_idr: false)
     # PRE-SEND VALIDATION: Validate payload before sending to Apple MSP
     begin
-      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, @message.content_type)
+      # Debug: Log the actual payload structure
+      Rails.logger.info "[AMB Send] Payload keys: #{payload.keys.inspect}"
+      Rails.logger.info "[AMB Send] interactiveData keys: #{payload[:interactiveData]&.keys&.inspect}"
+      Rails.logger.info "[AMB Send] data keys: #{payload[:interactiveData]&.dig(:data)&.keys&.inspect}"
+      Rails.logger.info "[AMB Send] event keys: #{payload[:interactiveData]&.dig(:data, :event)&.keys&.inspect}"
+      Rails.logger.info "[AMB Send] event content: #{payload[:interactiveData]&.dig(:data, :event)&.inspect}"
+
+      # Get content_type from message or default to 'apple_pay' for direct Apple Pay requests
+      content_type = @message&.content_type || 'apple_pay'
+      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, content_type)
       validator.validate!
     rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
       Rails.logger.error "[AMB Send] Payload validation failed: #{e.message}"

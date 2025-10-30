@@ -92,6 +92,14 @@ module AppleMessagesForBusiness
       'line_items' => 'lineItems',
       'total_label' => 'totalLabel',
       'total_type' => 'totalType',
+      'payment_request' => 'paymentRequest',
+      'merchant_session' => 'merchantSession',
+      'payment_gateway_url' => 'paymentGatewayUrl',
+      'apple_pay' => 'applePay',
+      'supported_networks' => 'supportedNetworks',
+      'merchant_capabilities' => 'merchantCapabilities',
+      'required_billing_contact_fields' => 'requiredBillingContactFields',
+      'required_shipping_contact_fields' => 'requiredShippingContactFields',
 
       # OAuth
       'response_type' => 'responseType',

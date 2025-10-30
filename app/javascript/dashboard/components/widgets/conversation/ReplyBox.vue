@@ -1320,7 +1320,7 @@ export default {
             // Apple Pay structure
             messageData = {
               type: 'apple_pay',
-              content_type: 'input_select',
+              content_type: 'apple_pay',
               content_attributes: content,
             };
           } else {
