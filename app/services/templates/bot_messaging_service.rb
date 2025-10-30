@@ -22,6 +22,12 @@ class Templates::BotMessagingService
 
     rendered = renderer.render_for_bot
 
+    # Show typing indicator for Apple Messages
+    if apple_messages_channel?
+      send_typing_indicator(:start)
+      sleep(1.5) # Wait 1.5 seconds with typing indicator visible
+    end
+
     # Create the message
     message = create_message(rendered)
 
@@ -99,5 +105,32 @@ class Templates::BotMessagingService
   rescue StandardError => e
     Rails.logger.error "[Templates::BotMessagingService] Failed to trigger events: #{e.message}"
     # Don't fail the message creation if event dispatch fails
+  end
+
+  def apple_messages_channel?
+    @conversation.inbox.channel.is_a?(Channel::AppleMessagesForBusiness)
+  end
+
+  def send_typing_indicator(action)
+    return unless apple_messages_channel?
+
+    # Get the Apple Messages source ID from contact's additional attributes
+    apple_source_urn = @conversation.contact&.additional_attributes&.dig('apple_messages_source_id')
+    return unless apple_source_urn # Need destination ID
+
+    # Extract the UUID from the URN format (urn:biz:UUID)
+    destination_id = apple_source_urn.sub(/^urn:biz:/, '')
+
+    service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
+      channel: @conversation.inbox.channel,
+      destination_id: destination_id,
+      action: action
+    )
+
+    result = service.perform
+    Rails.logger.info "[BotMessagingService] Typing indicator #{action}: #{result[:success] ? 'success' : result[:error]}"
+  rescue StandardError => e
+    Rails.logger.error "[BotMessagingService] Failed to send typing indicator: #{e.message}"
+    # Don't fail the message sending if typing indicator fails
   end
 end

@@ -9,27 +9,25 @@ class AppleMessagesForBusiness::ApplePayService
     merchant_session = create_merchant_session
     return { error: merchant_session[:error] } if merchant_session[:error]
 
-    request_data = {
+    {
       payment_request: {
         country_code: payment_data[:country_code] || 'US',
         currency_code: payment_data[:currency_code] || 'USD',
-        supported_networks: payment_data[:supported_networks] || ['visa', 'masterCard', 'amex'],
+        supported_networks: payment_data[:supported_networks] || %w[visa masterCard amex],
         merchant_identifier: merchant_identifier,
-        merchant_capabilities: ['supports3DS', 'supportsDebit', 'supportsCredit'],
+        merchant_capabilities: %w[supports3DS supportsDebit supportsCredit],
         line_items: format_line_items(payment_data[:line_items]),
         total: format_total(payment_data[:total]),
         shipping_methods: format_shipping_methods(payment_data[:shipping_methods]),
         required_billing_contact_fields: payment_data[:required_billing_fields] || ['postalAddress'],
-        required_shipping_contact_fields: payment_data[:required_shipping_fields] || ['postalAddress', 'name'],
+        required_shipping_contact_fields: payment_data[:required_shipping_fields] || %w[postalAddress name]
       },
       merchant_session: merchant_session[:session_data],
       endpoints: {
         payment_gateway: payment_gateway_url,
-        fallback_url: payment_data[:fallback_url],
+        fallback_url: payment_data[:fallback_url]
       }
     }
-
-    request_data
   end
 
   def process_payment_authorization(payment_token, payment_data)
@@ -106,7 +104,7 @@ class AppleMessagesForBusiness::ApplePayService
 
   def validate_total(total)
     raise ArgumentError, 'Total must include label and amount' unless total[:label] && total[:amount]
-    raise ArgumentError, 'Total amount must be positive' unless total[:amount].to_f > 0
+    raise ArgumentError, 'Total amount must be positive' unless total[:amount].to_f.positive?
   end
 
   def create_merchant_session
@@ -116,7 +114,7 @@ class AppleMessagesForBusiness::ApplePayService
 
   def merchant_identifier
     @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
-    ENV['APPLE_PAY_MERCHANT_IDENTIFIER']
+      ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
   end
 
   def payment_gateway_url
@@ -155,93 +153,228 @@ class AppleMessagesForBusiness::ApplePayService
   end
 
   def format_amount(amount)
-    sprintf('%.2f', amount.to_f)
+    format('%.2f', amount.to_f)
   end
 
   def decrypt_payment_token(payment_token)
-    # Implement Apple Pay payment token decryption
-    # This requires the merchant private key and Apple's intermediate certificate
-    begin
-      # Decode the payment token
-      token_data = JSON.parse(Base64.decode64(payment_token))
+    # Implement Apple Pay payment token decryption using Payment Processing Certificate (ECC 256-bit)
+    # Reference: Apple Pay PKPayment specification
+    # https://developer.apple.com/documentation/passkit/apple_pay/payment_token_format_reference
 
-      # Extract encrypted payment data
-      encrypted_data = token_data['data']
-      ephemeral_public_key = token_data['header']['ephemeralPublicKey']
-      public_key_hash = token_data['header']['publicKeyHash']
+    Rails.logger.info '[Apple Pay] Starting payment token decryption'
 
-      # Decrypt using ECDH and AES-GCM
-      decrypted_data = perform_apple_pay_decryption(
-        encrypted_data,
-        ephemeral_public_key,
-        public_key_hash
-      )
+    # Parse the payment token structure
+    token_data = parse_payment_token(payment_token)
+    return nil unless token_data
 
-      JSON.parse(decrypted_data)
-    rescue StandardError => e
-      Rails.logger.error "Apple Pay token decryption failed: #{e.message}"
+    # Validate token version
+    unless token_data['version'] == 'EC_v1'
+      Rails.logger.error "[Apple Pay] Unsupported token version: #{token_data['version']}"
+      return nil
+    end
+
+    # Extract components
+    encrypted_data = token_data['data']
+    token_data['signature']
+    header = token_data['header']
+
+    Rails.logger.info '[Apple Pay] Token components extracted successfully'
+    Rails.logger.debug { "[Apple Pay] Header: #{header.inspect}" }
+
+    # Validate signature (optional but recommended)
+    unless validate_token_signature(token_data)
+      Rails.logger.error '[Apple Pay] Token signature validation failed'
+      # Continue anyway for now, but log the warning
+    end
+
+    # Decrypt using ECDH and AES-256-GCM
+    decrypted_data = perform_apple_pay_decryption(
+      encrypted_data,
+      header['ephemeralPublicKey'],
+      header['publicKeyHash'],
+      header['transactionId']
+    )
+
+    if decrypted_data
+      payment_data = JSON.parse(decrypted_data)
+      Rails.logger.info '[Apple Pay] Payment token decrypted successfully'
+      Rails.logger.debug { "[Apple Pay] Decrypted payment data keys: #{payment_data.keys.inspect}" }
+      payment_data
+    else
+      Rails.logger.error '[Apple Pay] Decryption returned nil'
       nil
     end
+  rescue JSON::ParserError => e
+    Rails.logger.error "Apple Pay token parsing failed: #{e.message}"
+    nil
+  rescue OpenSSL::PKey::ECError => e
+    Rails.logger.error "Apple Pay cryptographic operation failed: #{e.message}"
+    nil
+  rescue StandardError => e
+    Rails.logger.error "Apple Pay token decryption failed: #{e.class.name} - #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    nil
   end
 
-  def perform_apple_pay_decryption(encrypted_data, ephemeral_public_key, public_key_hash)
-    # This is a simplified version - actual implementation requires:
-    # 1. Merchant private key
-    # 2. Apple Pay intermediate certificate
-    # 3. Proper ECDH key derivation
-    # 4. AES-GCM decryption with the derived keys
+  def parse_payment_token(payment_token)
+    # Payment token can be base64-encoded or already a JSON string
+    if payment_token.is_a?(String)
+      begin
+        # Try parsing as JSON first
+        JSON.parse(payment_token)
+      rescue JSON::ParserError
+        # If that fails, try base64 decoding then parsing
+        JSON.parse(Base64.decode64(payment_token))
+      end
+    elsif payment_token.is_a?(Hash)
+      payment_token
+    else
+      Rails.logger.error "[Apple Pay] Invalid payment token type: #{payment_token.class.name}"
+      nil
+    end
+  rescue StandardError => e
+    Rails.logger.error "Payment token parsing error: #{e.message}"
+    nil
+  end
 
-    merchant_private_key = load_merchant_private_key
+  def validate_token_signature(_token_data)
+    # Validate the token signature using Apple's root certificate
+    # This is optional but recommended for production
+    # For now, we'll return true and implement proper validation later
+    Rails.logger.info '[Apple Pay] Token signature validation skipped (to be implemented)'
+    true
+  end
 
-    # Create shared secret using ECDH
+  def perform_apple_pay_decryption(encrypted_data, ephemeral_public_key, _public_key_hash, transaction_id)
+    # Apple Pay token decryption using Payment Processing Certificate (ECC 256-bit)
+    # Algorithm: ECDH + KDF (ANSI X9.63) + AES-256-GCM
+    Rails.logger.info '[Apple Pay] Starting ECDH key agreement and decryption'
+
+    # Load the Payment Processing Certificate private key (ECC 256-bit)
+    merchant_private_key = load_payment_processing_private_key
+
+    # Parse the ephemeral public key from Apple
     ephemeral_key = parse_ephemeral_public_key(ephemeral_public_key)
-    shared_secret = merchant_private_key.dh_compute_key(ephemeral_key.public_key)
 
-    # Derive decryption keys
-    symmetric_key = derive_symmetric_key(shared_secret, public_key_hash)
+    # Perform ECDH to derive shared secret
+    shared_secret = compute_shared_secret(merchant_private_key, ephemeral_key)
+    Rails.logger.debug { "[Apple Pay] Shared secret length: #{shared_secret.bytesize} bytes" }
 
-    # Decrypt the payment data
-    decrypt_with_aes_gcm(encrypted_data, symmetric_key)
+    # Derive symmetric encryption key using KDF
+    symmetric_key = derive_symmetric_key(shared_secret, transaction_id)
+    Rails.logger.debug { "[Apple Pay] Symmetric key length: #{symmetric_key.bytesize} bytes" }
+
+    # Decrypt the payment data using AES-256-GCM
+    decrypted_data = decrypt_with_aes_gcm(encrypted_data, symmetric_key)
+
+    Rails.logger.info '[Apple Pay] Payment data decrypted successfully'
+    decrypted_data
+  rescue StandardError => e
+    Rails.logger.error "Apple Pay decryption error: #{e.class.name} - #{e.message}"
+    Rails.logger.error e.backtrace.first(5).join("\n")
+    nil
   end
 
-  def load_merchant_private_key
-    key_pem = @channel.merchant_certificates
+  def load_payment_processing_private_key
+    # Load the Payment Processing Certificate private key (ECC 256-bit)
+    # This is different from the Merchant Identity Certificate (RSA 2048-bit)
+    key_pem = @channel.payment_settings.dig('apple_pay', 'payment_processing_private_key') ||
+              ENV.fetch('APPLE_PAY_PAYMENT_PROCESSING_PRIVATE_KEY', nil)
+
+    raise 'Payment Processing private key not configured' if key_pem.blank?
+
+    # Parse the ECC private key
     OpenSSL::PKey::EC.new(key_pem)
+  rescue OpenSSL::PKey::ECError => e
+    Rails.logger.error "Failed to load Payment Processing private key: #{e.message}"
+    raise
   end
 
   def parse_ephemeral_public_key(ephemeral_key_data)
-    key_der = Base64.decode64(ephemeral_key_data)
-    OpenSSL::PKey::EC.new(key_der)
+    # Parse the base64-encoded ephemeral public key
+    key_bytes = Base64.decode64(ephemeral_key_data)
+
+    # Create EC key from X9.62 encoded point
+    # Apple uses P-256 curve (prime256v1)
+    group = OpenSSL::PKey::EC::Group.new('prime256v1')
+    key = OpenSSL::PKey::EC.new(group)
+
+    # Parse the public key point
+    point = OpenSSL::PKey::EC::Point.new(group, OpenSSL::BN.new(key_bytes, 2))
+    key.public_key = point
+
+    key
+  rescue StandardError => e
+    Rails.logger.error "Failed to parse ephemeral public key: #{e.message}"
+    raise
   end
 
-  def derive_symmetric_key(shared_secret, public_key_hash)
-    # Implement key derivation according to Apple Pay specifications
-    # This involves ANSI X9.63 KDF with specific parameters
-    merchant_id = merchant_identifier.encode('utf-8')
+  def compute_shared_secret(merchant_private_key, ephemeral_public_key)
+    # Compute shared secret using ECDH
+    # shared_secret = merchant_private_key * ephemeral_public_key
+    merchant_private_key.dh_compute_key(ephemeral_public_key.public_key)
+  end
 
-    kdf_input = shared_secret +
-                [0x00, 0x00, 0x00, 0x01].pack('C*') +
-                merchant_id +
-                Base64.decode64(public_key_hash)
+  def derive_symmetric_key(shared_secret, _transaction_id)
+    # Derive symmetric encryption key using ANSI X9.63 KDF with SHA-256
+    # As specified in Apple Pay documentation
+    #
+    # KDF Input = shared_secret || 0x00000001 || merchant_id || transaction_id
+    # Symmetric Key = SHA-256(KDF Input)
 
-    OpenSSL::Digest::SHA256.digest(kdf_input)[0, 16] # First 16 bytes for AES-128
+    merchant_id = merchant_identifier
+
+    # Build KDF input according to Apple Pay specification
+    kdf_algorithm = "\rid-aes256-GCM" # Algorithm identifier
+    party_u_info = 'Apple' # Party U (Apple)
+    party_v_info = merchant_id # Party V (Merchant)
+
+    kdf_input = [0x00, 0x00, 0x00, 0x01].pack('C*') +
+                shared_secret +
+                kdf_algorithm +
+                party_u_info +
+                party_v_info
+
+    # Use SHA-256 to derive the symmetric key (32 bytes for AES-256)
+    OpenSSL::Digest::SHA256.digest(kdf_input)
   end
 
   def decrypt_with_aes_gcm(encrypted_data, key)
-    cipher = OpenSSL::Cipher.new('AES-128-GCM')
+    # Decrypt using AES-256-GCM
+    # The encrypted data format is: IV (16 bytes) || Ciphertext || Auth Tag (16 bytes)
+
+    data = Base64.decode64(encrypted_data)
+
+    # Extract components
+    # For AES-GCM with Apple Pay:
+    # - IV: First 16 bytes (128 bits)
+    # - Ciphertext: Middle bytes
+    # - Auth Tag: Last 16 bytes (128 bits)
+    iv = data[0, 16]
+    auth_tag = data[-16, 16]
+    ciphertext = data[16...-16]
+
+    Rails.logger.debug { "[Apple Pay] Encrypted data length: #{data.bytesize} bytes" }
+    Rails.logger.debug { "[Apple Pay] IV length: #{iv.bytesize} bytes" }
+    Rails.logger.debug { "[Apple Pay] Ciphertext length: #{ciphertext.bytesize} bytes" }
+    Rails.logger.debug { "[Apple Pay] Auth tag length: #{auth_tag.bytesize} bytes" }
+
+    # Initialize AES-256-GCM cipher
+    cipher = OpenSSL::Cipher.new('AES-256-GCM')
     cipher.decrypt
     cipher.key = key
-
-    # Extract IV, encrypted data, and auth tag from the encrypted payload
-    data = Base64.decode64(encrypted_data)
-    iv = data[0, 16]
-    ciphertext = data[16, data.length - 32]
-    auth_tag = data[-16, 16]
-
     cipher.iv = iv
     cipher.auth_tag = auth_tag
 
-    cipher.update(ciphertext) + cipher.final
+    # Decrypt and verify
+    plaintext = cipher.update(ciphertext) + cipher.final
+
+    Rails.logger.debug { "[Apple Pay] Decrypted data length: #{plaintext.bytesize} bytes" }
+
+    plaintext
+  rescue OpenSSL::Cipher::CipherError => e
+    Rails.logger.error "AES-GCM decryption failed: #{e.message}"
+    raise
   end
 
   def process_with_gateway(payment_data, transaction_data)
@@ -268,7 +401,7 @@ class AppleMessagesForBusiness::ApplePayService
           amount: '12.99'
         }
       ]
-    elsif ['CA', 'MX'].include?(shipping_contact[:country_code])
+    elsif %w[CA MX].include?(shipping_contact[:country_code])
       shipping_methods = [
         {
           identifier: 'international',

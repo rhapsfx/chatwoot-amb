@@ -18,7 +18,13 @@ class ContentAttributeValidator < ActiveModel::Validator
   ALLOWED_APPLE_QUICK_REPLY_ITEM_KEYS = [:identifier, :title].freeze
   ALLOWED_APPLE_IMAGE_KEYS = [:identifier, :data, :description].freeze
   ALLOWED_APPLE_RICH_LINK_KEYS = [:url, :title, :description, :image_data, :image_mime_type, :video_url, :video_mime_type, :site_name].freeze
-  ALLOWED_APPLE_PAY_KEYS = [:payment_request, :merchant_session, :endpoints].freeze
+  ALLOWED_APPLE_PAY_KEYS = [:payment_request, :merchant_session, :endpoints,
+                            :merchant_name, :currency_code, :country_code,
+                            :line_items, :total, :shipping_methods,
+                            :required_billing_fields, :required_shipping_fields,
+                            :requires_shipping, :requires_billing,
+                            :received_title, :received_subtitle, :received_style,
+                            :received_image_identifier].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
   ALLOWED_APPLE_FORM_KEYS = [:title, :description, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
                              :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button].freeze
@@ -401,16 +407,36 @@ class ContentAttributeValidator < ActiveModel::Validator
     invalid_keys = content_attrs.keys.map(&:to_sym) - ALLOWED_APPLE_PAY_KEYS
     record.errors.add(:content_attributes, "contains invalid keys for apple_pay: #{invalid_keys}") if invalid_keys.present?
 
-    # Payment request is required
+    # Support two formats:
+    # 1. Nested format: { payment_request: { ... } }
+    # 2. Flat format: { merchant_name: ..., currency_code: ..., ... }
+
     payment_request = content_attrs['payment_request']
-    record.errors.add(:content_attributes, 'payment_request is required for apple_pay') if payment_request.blank?
 
-    # Validate payment request structure
-    return unless payment_request.present? && payment_request.is_a?(Hash)
+    if payment_request.present? && payment_request.is_a?(Hash)
+      # Nested format - validate payment_request structure
+      required_fields = %w[country_code currency_code supported_networks merchant_capabilities total]
+      required_fields.each do |field|
+        record.errors.add(:content_attributes, "payment_request missing required field: #{field}") if payment_request[field].blank?
+      end
+    else
+      # Flat format - validate flat keys
+      required_flat_fields = %w[merchant_name currency_code country_code line_items total]
+      required_flat_fields.each do |field|
+        record.errors.add(:content_attributes, "#{field} is required for apple_pay") if content_attrs[field].blank?
+      end
 
-    required_fields = %w[country_code currency_code supported_networks merchant_capabilities total]
-    required_fields.each do |field|
-      record.errors.add(:content_attributes, "payment_request missing required field: #{field}") if payment_request[field].blank?
+      # Validate line_items is an array
+      if content_attrs['line_items'].present? && !content_attrs['line_items'].is_a?(Array)
+        record.errors.add(:content_attributes, 'line_items must be an array')
+      end
+
+      # Validate total is a hash with label and amount
+      if content_attrs['total'].present? && !(content_attrs['total'].is_a?(Hash) &&
+               content_attrs['total']['label'].present? &&
+               content_attrs['total']['amount'].present?)
+        record.errors.add(:content_attributes, 'total must have label and amount')
+      end
     end
   end
 

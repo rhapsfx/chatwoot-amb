@@ -1219,6 +1219,6 @@ class RateLimitedClient {
 
 - [Bot Templates API Reference](../api/BOT_TEMPLATES_API.md)
 - [Template Schema Reference](../api/TEMPLATE_SCHEMA_REFERENCE.md)
-- [Unified Template System Architecture](../UNIFIED_TEMPLATE_SYSTEM_ARCHITECTURE.md)
+- [Unified Template System Architecture](./UNIFIED_TEMPLATE_SYSTEM_ARCHITECTURE.md)
 - [Dialogflow Documentation](https://cloud.google.com/dialogflow/docs)
 - [Rasa Documentation](https://rasa.com/docs/)

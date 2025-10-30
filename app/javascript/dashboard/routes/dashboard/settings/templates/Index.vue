@@ -606,6 +606,9 @@ watch(
               {{
                 t('TEMPLATES.VERSION_LABEL', { version: template.version || 1 })
               }}
+              <span class="text-n-slate-9 ml-1">{{
+                t('TEMPLATES.TEMPLATE_ID_LABEL', { id: template.id })
+              }}</span>
             </span>
             <span class="text-xs text-n-slate-10">
               {{

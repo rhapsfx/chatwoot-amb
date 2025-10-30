@@ -1069,4 +1069,4 @@ Previous version:
 
 - [Bot Templates API Reference](./BOT_TEMPLATES_API.md)
 - [Bot Integration Guide](../guides/BOT_INTEGRATION_GUIDE.md)
-- [Unified Template System Architecture](../UNIFIED_TEMPLATE_SYSTEM_ARCHITECTURE.md)
+- [Unified Template System Architecture](../guides/UNIFIED_TEMPLATE_SYSTEM_ARCHITECTURE.md)

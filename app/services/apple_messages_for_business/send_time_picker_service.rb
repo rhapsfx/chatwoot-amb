@@ -192,7 +192,8 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
     return nil unless time_input
 
     # Parse various time formats and convert to ISO-8601 format required by Apple
-    # Format: 2017-05-26T08:27+0000 (no seconds, no Z notation)
+    # Format: 2017-05-26T08:27+0000 (NO seconds, no Z notation)
+    # Apple's device expects this format without seconds
     time = case time_input
            when String
              Time.parse(time_input)

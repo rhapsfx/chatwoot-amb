@@ -32,6 +32,25 @@ Rails.application.routes.draw do
     resource :slack_uploads, only: [:show]
   end
 
+  # Apple Pay domain verification (both with and without .txt extension)
+  get '/.well-known/apple-developer-merchantid-domain-association', to: proc { |env|
+    file_path = Rails.root.join('public', '.well-known', 'apple-developer-merchantid-domain-association')
+    if File.exist?(file_path)
+      [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
+    else
+      [404, { 'Content-Type' => 'text/plain' }, ['Not Found']]
+    end
+  }
+
+  get '/.well-known/apple-developer-merchantid-domain-association.txt', to: proc { |env|
+    file_path = Rails.root.join('public', '.well-known', 'apple-developer-merchantid-domain-association')
+    if File.exist?(file_path)
+      [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
+    else
+      [404, { 'Content-Type' => 'text/plain' }, ['Not Found']]
+    end
+  }
+
   get '/api', to: 'api#index'
   namespace :api, defaults: { format: 'json' } do
     namespace :v1 do
@@ -144,6 +163,9 @@ Rails.application.routes.draw do
                   post :translate
                   post :retry
                 end
+                collection do
+                  post :send_apple_pay
+                end
               end
               resources :assignments, only: [:create]
               resources :labels, only: [:create, :index]
@@ -166,6 +188,7 @@ Rails.application.routes.draw do
             end
           end
 
+          # Apple Pay payment gateway (outside of accounts scope)
           resources :search, only: [:index] do
             collection do
               get :conversations
@@ -340,6 +363,9 @@ Rails.application.routes.draw do
               post :reorder, on: :collection
             end
           end
+
+          # Apple Pay payment gateway - specify absolute controller path
+          post 'apple_pay/payment_gateway', to: '/apple_messages_for_business/payment_gateway#process_payment'
 
           resources :upload, only: [:create]
         end
