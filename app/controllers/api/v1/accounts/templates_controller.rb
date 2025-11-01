@@ -1,9 +1,9 @@
 class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   # CRUD controller for managing message templates
-  # Requires administrator access for create/update/delete operations
+  # Uses MessageTemplatePolicy for authorization
 
-  before_action :check_admin_authorization?, except: [:index, :show, :render_template]
   before_action :fetch_template, only: [:show, :update, :destroy, :render_template]
+  before_action :check_authorization
 
   # GET /api/v1/accounts/:account_id/templates
   # List all templates for the account with optional filtering
@@ -14,15 +14,13 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
     templates = templates.where(category: params[:category]) if params[:category].present?
 
     # Filter by status - default to active templates only
-    if params[:status].present?
-      templates = templates.where(status: params[:status])
-    else
-      templates = templates.where.not(status: 'deprecated')
-    end
+    templates = if params[:status].present?
+                  templates.where(status: params[:status])
+                else
+                  templates.where.not(status: 'deprecated')
+                end
 
-    if params[:channel].present?
-      templates = templates.where('? = ANY(supported_channels)', params[:channel])
-    end
+    templates = templates.where('? = ANY(supported_channels)', params[:channel]) if params[:channel].present?
 
     if params[:search].present?
       search_term = "%#{params[:search]}%"
@@ -187,6 +185,11 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   end
 
   private
+
+  def check_authorization
+    # Authorize instance for show/update/destroy, class for index/create
+    authorize(@template || MessageTemplate)
+  end
 
   def fetch_template
     @template = Current.account.message_templates.find_by(id: params[:id])

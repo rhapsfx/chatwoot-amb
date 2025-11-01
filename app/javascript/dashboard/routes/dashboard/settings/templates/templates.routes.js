@@ -2,6 +2,7 @@ import { frontendURL } from '../../../../helper/URLHelper';
 import {
   ROLES,
   CONVERSATION_PERMISSIONS,
+  TEMPLATE_PERMISSIONS,
 } from 'dashboard/constants/permissions.js';
 import SettingsWrapper from '../SettingsWrapper.vue';
 import TemplateList from './Index.vue';
@@ -23,7 +24,11 @@ export default {
           path: 'list',
           name: 'templates_list',
           meta: {
-            permissions: [...ROLES, ...CONVERSATION_PERMISSIONS],
+            permissions: [
+              ...ROLES,
+              ...CONVERSATION_PERMISSIONS,
+              TEMPLATE_PERMISSIONS,
+            ],
           },
           component: TemplateList,
         },
@@ -31,7 +36,7 @@ export default {
           path: 'new',
           name: 'template_new',
           meta: {
-            permissions: [...ROLES, ...CONVERSATION_PERMISSIONS],
+            permissions: ['administrator', TEMPLATE_PERMISSIONS],
           },
           component: TemplateBuilder,
         },
@@ -39,7 +44,7 @@ export default {
           path: ':templateId/edit',
           name: 'template_edit',
           meta: {
-            permissions: [...ROLES, ...CONVERSATION_PERMISSIONS],
+            permissions: ['administrator', TEMPLATE_PERMISSIONS],
           },
           component: TemplateBuilder,
         },
