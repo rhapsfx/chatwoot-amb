@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import Avatar from 'next/avatar/Avatar.vue';
 import { useAdmin } from 'dashboard/composables/useAdmin';
+import { usePolicy } from 'dashboard/composables/usePolicy';
 import SettingsLayout from '../SettingsLayout.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import {
@@ -19,11 +20,17 @@ const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
 const { isAdmin } = useAdmin();
+const { checkPermissions } = usePolicy();
 
 const showDeletePopup = ref(false);
 const selectedInbox = ref({});
 
 const inboxes = useMapGetter('inboxes/getInboxes');
+
+// Check if user has inbox_manage permission
+const canManageInboxes = computed(() => {
+  return isAdmin.value || checkPermissions(['inbox_manage']);
+});
 
 const inboxesList = computed(() => {
   return inboxes.value?.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -159,7 +166,7 @@ const openDelete = inbox => {
                   }"
                 >
                   <Button
-                    v-if="isAdmin"
+                    v-if="canManageInboxes"
                     v-tooltip.top="$t('INBOX_MGMT.SETTINGS')"
                     icon="i-lucide-settings"
                     slate

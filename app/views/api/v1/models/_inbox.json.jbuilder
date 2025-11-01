@@ -134,9 +134,14 @@ end
 
 ### Apple Messages for Business Channel
 if resource.apple_messages_for_business?
+  # Allow users with inbox_manage permission to see business_id for start conversation links
+  if Current.account_user&.administrator? || Current.account_user&.custom_role&.permissions&.include?('inbox_manage')
+    json.business_id resource.channel.try(:business_id)
+  end
+
+  # Other sensitive fields only for administrators
   if Current.account_user&.administrator?
     json.msp_id resource.channel.try(:msp_id)
-    json.business_id resource.channel.try(:business_id)
     json.secret resource.channel.try(:secret)
     json.merchant_id resource.channel.try(:merchant_id)
     json.apple_pay_merchant_cert resource.channel.try(:apple_pay_merchant_cert)
