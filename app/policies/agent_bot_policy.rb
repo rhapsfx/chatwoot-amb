@@ -27,3 +27,5 @@ class AgentBotPolicy < ApplicationPolicy
     @account_user.administrator?
   end
 end
+
+AgentBotPolicy.prepend_mod_with('AgentBotPolicy')
