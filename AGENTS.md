@@ -328,6 +328,16 @@ end
 - **Logs**: Check `log/development.log` for Rails database activity
 - **Only ask user to run `psql`** if rails runner cannot accomplish the task
 
+## Deployment Scripts
+
+- **NEVER run deployment scripts through Claude Code** - SSH and rsync are blocked by sandbox
+- **ALWAYS ask user to run deployment scripts manually** in their terminal:
+  - `./script/deploy-backend-changes-safe.sh` - Deploy backend code to production
+  - `./script/deploy-assets-only.sh` - Build and deploy frontend assets
+  - `./script/enable_custom_roles_production.sh` - Enable feature flags on production
+- **Claude Code can**: Prepare code, create commits, push to git
+- **User must**: Run deployment and server management scripts directly
+
 ## Other Notes
 
 - **Apple Messages for Business**: ALWAYS use CaseTransformer for case conversions (see AMB section above)
