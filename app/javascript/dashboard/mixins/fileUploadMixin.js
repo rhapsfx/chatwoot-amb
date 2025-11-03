@@ -4,6 +4,7 @@ import { checkFileSizeLimit } from 'shared/helpers/FileHelper';
 import { getMaxUploadSizeByChannel } from '@chatwoot/utils';
 import { DirectUpload } from 'activestorage';
 import { MAXIMUM_FILE_UPLOAD_SIZE } from 'shared/constants/messages';
+import { INBOX_TYPES } from 'dashboard/helper/inbox';
 
 export default {
   computed: {
@@ -17,6 +18,14 @@ export default {
       // Use default file size limit for private notes
       if (this.isOnPrivateNote) {
         return MAXIMUM_FILE_UPLOAD_SIZE;
+      }
+
+      // Apple Messages for Business supports 100 MB file uploads
+      // Per Apple MSP REST API v4.1.5 specification
+      if (
+        this.inbox?.channel_type === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS
+      ) {
+        return 100; // 100 MB
       }
 
       return getMaxUploadSizeByChannel({
