@@ -1,0 +1,88 @@
+================================================================================
+Apple Messages Content Attributes Normalization - DRY RUN
+================================================================================
+
+Found 265 Apple Messages records
+
+Analyzing records...
+--------------------------------------------------------------------------------
+
+================================================================================
+DRY RUN RESULTS
+================================================================================
+
+Summary:
+  Total records:             265
+  Need normalization:        152 (57.4%)
+  Already normalized:        113 (42.6%)
+  Empty (skipped):           0
+  Errors:                    0
+
+Changes by content type:
+  apple_list_picker         92 records
+  apple_time_picker         57 records
+  apple_rich_link           3 records
+
+Most affected fields (top 10):
+  sections                            86 occurrences
+  event.timeslots                     61 occurrences
+  event.timezoneOffset                36 occurrences
+  event.timezone_offset               36 occurrences
+  interactive_response.session_identifier 2 occurrences
+  interactive_response.sessionIdentifier 2 occurrences
+  interactive_response.data.reply_message 2 occurrences
+  interactive_response.data.request_identifier 2 occurrences
+  interactive_response.data.received_message 2 occurrences
+  interactive_response.data.replyMessage 2 occurrences
+
+================================================================================
+SAMPLE CHANGES (first 5 records)
+================================================================================
+
+Sample 1: Message #389 (apple_list_picker)
+--------------------------------------------------------------------------------
+Changed fields: event.timeslots, event.timezoneOffset, event.timezone_offset
+
+Sample 2: Message #394 (apple_list_picker)
+--------------------------------------------------------------------------------
+Changed fields: event.timeslots, event.timezoneOffset, event.timezone_offset
+
+Sample 3: Message #397 (apple_list_picker)
+--------------------------------------------------------------------------------
+Changed fields: event.timeslots, event.timezoneOffset, event.timezone_offset
+
+Sample 4: Message #402 (apple_list_picker)
+--------------------------------------------------------------------------------
+Changed fields: event.timeslots, event.timezoneOffset, event.timezone_offset
+
+Sample 5: Message #403 (apple_list_picker)
+--------------------------------------------------------------------------------
+Changed fields: event.timeslots, event.timezoneOffset, event.timezone_offset
+
+================================================================================
+SAFETY CHECKS
+================================================================================
+
+✅ No data loss detected
+
+✅ Round-trip transformation validated
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+✅ Migration appears safe to proceed
+
+Next steps:
+  1. Review sample changes above
+  2. Create database backup:
+     pg_dump chatwoot_development > backup_before_normalization.sql
+  3. Run migration in staging first:
+     DRY_RUN=true rails db:migrate
+  4. Test application thoroughly in staging
+  5. Run migration in production:
+     rails db:migrate
+
+Rollback option available if needed:
+  rails runner docs/apple-messages/scripts/rollback_normalization.rb
+================================================================================

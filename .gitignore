@@ -110,3 +110,15 @@ deploy-assets-only.sh
 # Test and validation scripts
 test_*.rb
 validate_*.rb
+
+# Sensitive files - certificates and keys
+certs/**/*.key
+*.key
+*.pem
+
+# Database backups
+docs/backups/*.sql
+*.sql
+
+# Documentation PDFs (may contain sensitive info)
+docs/**/*.pdf
