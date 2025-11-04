@@ -181,7 +181,7 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
       if section['items'].present?
         section_with_defaults['items'] = section['items'].map.with_index do |item, item_index|
           item.merge(
-            'identifier' => item['identifier'] || SecureRandom.uuid,
+            'identifier' => item['identifier'].presence || SecureRandom.uuid,
             'order' => item['order'] || item_index,
             'style' => item['style'] || 'icon'
           )

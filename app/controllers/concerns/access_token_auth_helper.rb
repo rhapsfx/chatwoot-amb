@@ -16,8 +16,12 @@ module AccessTokenAuthHelper
             params[:api_access_token]
 
     Rails.logger.info "[AccessToken] Token found: #{token.present?}"
+    Rails.logger.info "[AccessToken] Token value (first 10 chars): #{token&.first(10)}"
 
     @access_token = AccessToken.find_by(token: token) if token.present?
+
+    Rails.logger.info "[AccessToken] AccessToken record found: #{@access_token.present?}"
+    Rails.logger.info "[AccessToken] Owner type: #{@access_token&.owner&.class&.name}"
   end
 
   def authenticate_access_token!

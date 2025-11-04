@@ -28,8 +28,21 @@ class Templates::BotMessagingService
       sleep(1.5) # Wait 1.5 seconds with typing indicator visible
     end
 
-    # Create the message
-    message = create_message(rendered)
+    # For Apple Messages text messages, use MessageProcessorService for automatic URL-to-Rich Link conversion
+    if apple_messages_channel? && should_use_message_processor?(rendered)
+      message_params = build_message_params(rendered)
+      processor = AppleMessagesForBusiness::MessageProcessorService.new(
+        @conversation,
+        message_params,
+        @sender
+      )
+      message = processor.process_and_send
+      # Handle multiple messages case (when URLs are split)
+      message = message.last if message.is_a?(Array)
+    else
+      # Create the message directly for complex content types
+      message = create_message(rendered)
+    end
 
     # Trigger conversation events
     trigger_events(message)
@@ -42,6 +55,42 @@ class Templates::BotMessagingService
   end
 
   private
+
+  def should_use_message_processor?(rendered)
+    # Use MessageProcessorService for text messages to enable URL-to-Rich Link conversion
+    # Skip for complex Apple Messages content types that are already properly formatted
+    content_type = rendered[:content_type] || rendered[:contentType] || 'text'
+
+    # List of Apple Messages content types that are already formatted and should skip URL processing
+    skip_processor_types = %w[
+      apple_list_picker
+      apple_time_picker
+      apple_quick_reply
+      apple_pay
+      apple_rich_link
+      apple_authentication
+      apple_form
+      apple_custom_app
+    ]
+
+    !skip_processor_types.include?(content_type)
+  end
+
+  def build_message_params(rendered)
+    {
+      content: rendered[:content],
+      content_type: rendered[:content_type] || rendered[:contentType] || 'text',
+      content_attributes: rendered[:content_attributes] || rendered[:contentAttributes] || {},
+      message_type: :outgoing,
+      sender_type: @sender.class.name,
+      sender_id: @sender.id,
+      additional_attributes: {
+        template_id: @template.id,
+        template_name: @template.name,
+        rendered_at: Time.current.iso8601
+      }
+    }
+  end
 
   def determine_channel_type
     # Convert inbox channel to standardized template channel type

@@ -93,32 +93,65 @@ class AppleMessagesForBusiness::MessageProcessorService
   def split_message_by_urls(text)
     return [{ type: 'text', content: text }] if text.blank?
 
-    url_regex = %r{https?://[^\s<>"{}|\\^`\[\]]+}i
+    # Enhanced regex to match:
+    # 1. URLs with protocol: http://example.com or https://example.com
+    # 2. URLs without protocol: www.example.com or example.com/path
+    url_with_protocol_regex = %r{https?://[^\s<>"{}|\\^`\[\]]+}i
+    url_without_protocol_regex = %r{(?:www\.)[a-zA-Z0-9][-a-zA-Z0-9.]*\.[a-zA-Z]{2,}(?:/[^\s<>"{}|\\^`\[\]]*)?}i
+
     parts = []
+    remaining_text = text.dup
+    position = 0
+
+    # First, find all URLs (with and without protocol)
+    urls_found = []
+
+    # Find URLs with protocol
+    remaining_text.scan(url_with_protocol_regex) do |match|
+      match_start = remaining_text.index(match, position)
+      urls_found << { url: match, position: match_start, has_protocol: true } if match_start
+    end
+
+    # Find URLs without protocol (www.)
+    remaining_text.scan(url_without_protocol_regex) do |match|
+      match_start = remaining_text.index(match, position)
+      # Only add if not already part of a URL with protocol
+      next if urls_found.any? { |u| match_start >= u[:position] && match_start < u[:position] + u[:url].length }
+
+      urls_found << { url: match, position: match_start, has_protocol: false } if match_start
+    end
+
+    # Sort URLs by position
+    urls_found.sort_by! { |u| u[:position] }
+
+    return [{ type: 'text', content: text }] if urls_found.empty?
+
+    # Split text by URLs
     last_index = 0
 
-    text.scan(url_regex) do |match|
-      match_start = text.index(match, last_index)
+    urls_found.each do |url_info|
+      url = url_info[:url]
+      match_start = url_info[:position]
 
       # Add text before URL if exists
       if match_start > last_index
-        before_text = text[last_index...match_start].strip
+        before_text = remaining_text[last_index...match_start].strip
         parts << { type: 'text', content: before_text } if before_text.present?
       end
 
-      # Add URL
-      parts << { type: 'url', content: match }
+      # Add URL (prepend https:// if missing protocol)
+      normalized_url = url_info[:has_protocol] ? url : "https://#{url}"
+      parts << { type: 'url', content: normalized_url, original: url }
 
-      last_index = match_start + match.length
+      last_index = match_start + url.length
     end
 
     # Add remaining text after last URL if exists
-    if last_index < text.length
-      after_text = text[last_index..-1].strip
+    if last_index < remaining_text.length
+      after_text = remaining_text[last_index..-1].strip
       parts << { type: 'text', content: after_text } if after_text.present?
     end
 
-    # If no URLs found, return original text
     parts.empty? ? [{ type: 'text', content: text }] : parts
   end
 

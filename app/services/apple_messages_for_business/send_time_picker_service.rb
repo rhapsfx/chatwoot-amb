@@ -135,13 +135,13 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   def build_time_picker_data
     event_data = content_attributes['event'] || {}
 
-    Rails.logger.info "[AMB TimePicker] build_time_picker_data - Reading from database:"
+    Rails.logger.info '[AMB TimePicker] build_time_picker_data - Reading from database:'
     Rails.logger.info "[AMB TimePicker] content_attributes['event']: #{content_attributes['event'].inspect}"
     Rails.logger.info "[AMB TimePicker] event_data['timeslots']: #{event_data['timeslots'].inspect}"
 
     # Build event with snake_case, then transform to Apple format
     event = {
-      'identifier' => event_data['identifier'] || SecureRandom.uuid,
+      'identifier' => event_data['identifier'].presence || SecureRandom.uuid,
       'title' => event_data['title'] || 'Select a time',
       'image_identifier' => event_data['image_identifier'],
       'location' => build_location_data(event_data['location']),
@@ -178,7 +178,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       start_time_value = slot['start_time'] || slot[:start_time]
 
       result = {
-        'identifier' => slot['identifier'] || slot[:identifier] || SecureRandom.uuid,
+        'identifier' => (slot['identifier'] || slot[:identifier]).presence || SecureRandom.uuid,
         'start_time' => format_iso8601_time(start_time_value),
         'duration' => (slot['duration'] || slot[:duration])&.to_i || 3600 # Default 1 hour in seconds
       }

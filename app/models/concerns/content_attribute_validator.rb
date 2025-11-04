@@ -17,7 +17,8 @@ class ContentAttributeValidator < ActiveModel::Validator
                                     :reply_secondary_subtitle, :reply_tertiary_subtitle].freeze
   ALLOWED_APPLE_QUICK_REPLY_ITEM_KEYS = [:identifier, :title].freeze
   ALLOWED_APPLE_IMAGE_KEYS = [:identifier, :data, :description].freeze
-  ALLOWED_APPLE_RICH_LINK_KEYS = [:url, :title, :description, :image_data, :image_mime_type, :video_url, :video_mime_type, :site_name].freeze
+  ALLOWED_APPLE_RICH_LINK_KEYS = [:url, :title, :description, :subtitle, :image_data, :image_url, :favicon_url, :image_mime_type, :video_url,
+                                  :video_mime_type, :site_name].freeze
   ALLOWED_APPLE_PAY_KEYS = [:payment_request, :merchant_session, :endpoints,
                             :merchant_name, :currency_code, :country_code,
                             :line_items, :total, :shipping_methods,
