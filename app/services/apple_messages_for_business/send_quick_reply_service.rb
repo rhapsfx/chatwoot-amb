@@ -25,7 +25,7 @@ class AppleMessagesForBusiness::SendQuickReplyService < AppleMessagesForBusiness
 
   def build_quick_reply_items
     items = content_attributes['items'] || []
-    
+
     # Ensure we have between 2-5 items as per Apple specification
     if items.empty?
       items = default_items
@@ -37,7 +37,7 @@ class AppleMessagesForBusiness::SendQuickReplyService < AppleMessagesForBusiness
 
     items.map do |item|
       {
-        identifier: item['identifier'] || SecureRandom.uuid,
+        identifier: item['identifier'].presence || SecureRandom.uuid,
         title: item['title'] || 'Option'
       }
     end
