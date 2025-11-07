@@ -4,26 +4,28 @@
 #
 # Table name: message_templates
 #
-#  id                 :bigint           not null, primary key
-#  category           :string
-#  description        :text
-#  metadata           :jsonb
-#  name               :string           not null
-#  parameters         :jsonb
-#  status             :string           default("active")
-#  supported_channels :text             default([]), is an Array
-#  tags               :text             default([]), is an Array
-#  use_cases          :text             default([]), is an Array
-#  version            :integer          default(1)
-#  created_at         :datetime         not null
-#  updated_at         :datetime         not null
-#  account_id         :bigint           not null
+#  id                  :bigint           not null, primary key
+#  attachment_metadata :jsonb
+#  category            :string
+#  description         :text
+#  metadata            :jsonb
+#  name                :string           not null
+#  parameters          :jsonb
+#  status              :string           default("active")
+#  supported_channels  :text             default([]), is an Array
+#  tags                :text             default([]), is an Array
+#  use_cases           :text             default([]), is an Array
+#  version             :integer          default(1)
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  account_id          :bigint           not null
 #
 # Indexes
 #
 #  index_message_templates_on_account_id               (account_id)
 #  index_message_templates_on_account_id_and_category  (account_id,category)
 #  index_message_templates_on_account_id_and_status    (account_id,status)
+#  index_message_templates_on_attachment_metadata      (attachment_metadata) USING gin
 #  index_message_templates_on_category                 (category)
 #  index_message_templates_on_metadata                 (metadata) USING gin
 #  index_message_templates_on_status                   (status)
@@ -36,6 +38,8 @@
 #
 
 class MessageTemplate < ApplicationRecord
+  include Rails.application.routes.url_helpers
+
   # Constants
   STATUSES = %w[active draft deprecated].freeze
   CATEGORIES = %w[
@@ -43,11 +47,31 @@ class MessageTemplate < ApplicationRecord
     feedback notification confirmation sales
   ].freeze
 
+  # Attachment constants
+  MAX_ATTACHMENTS = 5
+  MAX_ATTACHMENT_SIZE = 100.megabytes
+  ALLOWED_ATTACHMENT_TYPES = %w[
+    image/jpeg image/png image/gif image/webp image/heic
+    video/mp4 video/quicktime video/mpeg
+    audio/mpeg audio/mp4 audio/wav audio/aac
+    application/pdf
+    application/msword
+    application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    application/vnd.ms-excel
+    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    application/vnd.ms-powerpoint
+    application/vnd.openxmlformats-officedocument.presentationml.presentation
+    text/plain text/csv
+    application/zip application/x-7z-compressed application/vnd.rar
+    model/vnd.usdz+zip model/usd
+  ].freeze
+
   # Associations
   belongs_to :account
   has_many :content_blocks, class_name: 'TemplateContentBlock', dependent: :destroy
   has_many :channel_mappings, class_name: 'TemplateChannelMapping', dependent: :destroy
   has_many :usage_logs, class_name: 'TemplateUsageLog', dependent: :destroy
+  has_many_attached :attachments
 
   accepts_nested_attributes_for :content_blocks, allow_destroy: true
   accepts_nested_attributes_for :channel_mappings, allow_destroy: true
@@ -61,6 +85,9 @@ class MessageTemplate < ApplicationRecord
 
   validate :validate_parameters_format
   validate :validate_supported_channels_format
+  validate :validate_attachments_count
+  validate :validate_attachments_size
+  validate :validate_attachments_content_type
 
   # Scopes
   scope :active, -> { where(status: 'active') }
@@ -186,6 +213,7 @@ class MessageTemplate < ApplicationRecord
       version: version,
       metadata: metadata || {},
       content: build_content,  # Add assembled content
+      attachmentsSummary: attachments_summary(camel_case: true),  # Add attachments summary in camelCase
       createdAt: created_at,
       updatedAt: updated_at
     }
@@ -226,14 +254,127 @@ class MessageTemplate < ApplicationRecord
     if content_blocks.count == 1
       block = content_blocks.first
       # For quick_reply blocks, ensure the structure matches what the frontend expects
-      if block.block_type == 'quick_reply' && block.properties.present?
-        return block.properties
-      end
+      return block.properties if block.block_type == 'quick_reply' && block.properties.present?
       return block.properties if block.properties.present?
     end
 
     # For complex templates, return an array of blocks
-    content_blocks.order(:order_index).map { |block| block.properties }
+    content_blocks.order(:order_index).map(&:properties)
+  end
+
+  # Attachment Management Methods
+
+  # Returns summary of all attachments with metadata
+  def attachments_summary(camel_case: false)
+    return [] unless attachments.attached?
+
+    result = attachments.map do |attachment|
+      stored_metadata = find_attachment_metadata(attachment.id)
+
+      {
+        id: attachment.id,
+        filename: attachment.filename.to_s,
+        content_type: attachment.content_type,
+        byte_size: attachment.byte_size,
+        url: url_for(attachment),
+        created_at: attachment.created_at,
+        display_order: stored_metadata&.dig('display_order'),
+        description: stored_metadata&.dig('description'),
+        metadata: stored_metadata
+      }
+    end.sort_by { |a| a[:display_order] || Float::INFINITY }
+
+    return result unless camel_case
+
+    # Transform to camelCase for API responses
+    result.map do |attachment|
+      {
+        id: attachment[:id],
+        name: attachment[:filename],
+        contentType: attachment[:content_type],
+        size: attachment[:byte_size],
+        url: attachment[:url],
+        preview: attachment[:content_type]&.start_with?('image/') ? attachment[:url] : nil,
+        createdAt: attachment[:created_at],
+        displayOrder: attachment[:display_order],
+        description: attachment[:description],
+        metadata: attachment[:metadata]
+      }
+    end
+  end
+
+  # Attach multiple files and update metadata
+  def attach_files(files)
+    return false if files.blank?
+
+    ActiveRecord::Base.transaction do
+      Array(files).each_with_index do |file, index|
+        attachment = attachments.attach(file)
+        next unless attachment
+
+        # Get the newly attached file
+        new_attachment = attachments.last
+
+        # Update metadata for this attachment
+        update_attachment_metadata(
+          new_attachment.id,
+          display_order: (attachment_metadata['attachments']&.length || 0) + index,
+          attached_at: Time.current.iso8601
+        )
+      end
+
+      save!
+    end
+
+    true
+  rescue StandardError => e
+    Rails.logger.error "Failed to attach files to MessageTemplate #{id}: #{e.message}"
+    errors.add(:attachments, "Failed to attach files: #{e.message}")
+    false
+  end
+
+  # Remove a specific attachment by ID
+  def remove_attachment(attachment_id)
+    attachment = attachments.find_by(id: attachment_id)
+    return false unless attachment
+
+    ActiveRecord::Base.transaction do
+      # Remove from ActiveStorage
+      attachment.purge
+
+      # Remove from metadata
+      remove_attachment_metadata(attachment_id)
+
+      # Reindex remaining attachments
+      reindex_attachment_display_order
+
+      save!
+    end
+
+    true
+  rescue StandardError => e
+    Rails.logger.error "Failed to remove attachment #{attachment_id} from MessageTemplate #{id}: #{e.message}"
+    errors.add(:attachments, "Failed to remove attachment: #{e.message}")
+    false
+  end
+
+  # Reorder attachments by providing ordered array of attachment IDs
+  def reorder_attachments(ordered_ids)
+    return false if ordered_ids.blank?
+
+    ActiveRecord::Base.transaction do
+      ordered_ids.each_with_index do |attachment_id, index|
+        update_attachment_metadata(attachment_id, display_order: index)
+      end
+
+      save!
+    end
+
+    true
+  rescue StandardError => e
+    Rails.logger.error "Failed to reorder attachments for MessageTemplate #{id}: #{e.message}"
+    errors.add(:attachments, "Failed to reorder attachments: #{e.message}")
+    false
   end
 
   private
@@ -320,6 +461,90 @@ class MessageTemplate < ApplicationRecord
       end
     else
       true # Unknown type, allow it
+    end
+  end
+
+  # Attachment Validation Methods
+
+  def validate_attachments_count
+    return unless attachments.attached?
+
+    return unless attachments.count > MAX_ATTACHMENTS
+
+    errors.add(:attachments, "cannot exceed #{MAX_ATTACHMENTS} files")
+  end
+
+  def validate_attachments_size
+    return unless attachments.attached?
+
+    attachments.each do |attachment|
+      next unless attachment.byte_size > MAX_ATTACHMENT_SIZE
+
+      errors.add(
+        :attachments,
+        "file '#{attachment.filename}' exceeds maximum size of #{MAX_ATTACHMENT_SIZE / 1.megabyte}MB"
+      )
+    end
+  end
+
+  def validate_attachments_content_type
+    return unless attachments.attached?
+
+    attachments.each do |attachment|
+      next if ALLOWED_ATTACHMENT_TYPES.include?(attachment.content_type)
+
+      errors.add(
+        :attachments,
+        "file '#{attachment.filename}' has unsupported type '#{attachment.content_type}'"
+      )
+    end
+  end
+
+  # Attachment Metadata Management Methods
+
+  def initialize_attachment_metadata
+    self.attachment_metadata ||= { 'attachments' => [] }
+  end
+
+  def find_attachment_metadata(attachment_id)
+    initialize_attachment_metadata
+    attachment_metadata['attachments']&.find { |meta| meta['id'] == attachment_id.to_s }
+  end
+
+  def update_attachment_metadata(attachment_id, additional_metadata = {})
+    initialize_attachment_metadata
+
+    attachments_array = attachment_metadata['attachments'] || []
+    existing_index = attachments_array.index { |meta| meta['id'] == attachment_id.to_s }
+
+    metadata_entry = {
+      'id' => attachment_id.to_s,
+      'updated_at' => Time.current.iso8601
+    }.merge(additional_metadata.stringify_keys)
+
+    if existing_index
+      attachments_array[existing_index].merge!(metadata_entry)
+    else
+      attachments_array << metadata_entry
+    end
+
+    self.attachment_metadata = attachment_metadata.merge('attachments' => attachments_array)
+  end
+
+  def remove_attachment_metadata(attachment_id)
+    initialize_attachment_metadata
+
+    attachments_array = attachment_metadata['attachments'] || []
+    attachments_array.reject! { |meta| meta['id'] == attachment_id.to_s }
+
+    self.attachment_metadata = attachment_metadata.merge('attachments' => attachments_array)
+  end
+
+  def reindex_attachment_display_order
+    return unless attachments.attached?
+
+    attachments.each_with_index do |attachment, index|
+      update_attachment_metadata(attachment.id, display_order: index)
     end
   end
 end
