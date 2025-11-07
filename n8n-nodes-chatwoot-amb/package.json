@@ -1,0 +1,72 @@
+{
+  "name": "n8n-nodes-chatwoot-amb",
+  "version": "1.0.1",
+  "description": "n8n community nodes for Chatwoot Apple Messages for Business rich features",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "chatwoot",
+    "apple-messages-for-business",
+    "apple-messages",
+    "amb",
+    "chatbot"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/chatwoot/n8n-nodes-chatwoot-amb",
+  "author": {
+    "name": "Chatwoot",
+    "email": "hello@chatwoot.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chatwoot/n8n-nodes-chatwoot-amb.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials --ext .ts",
+    "lintfix": "eslint nodes credentials --ext .ts --fix",
+    "prepublishOnly": "npm run build && npm run lint",
+    "test": "jest"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/ChatwootBotApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/ChatwootAMBListPicker/ChatwootAMBListPicker.node.js",
+      "dist/nodes/ChatwootAMBTimePicker/ChatwootAMBTimePicker.node.js",
+      "dist/nodes/ChatwootAMBQuickReply/ChatwootAMBQuickReply.node.js",
+      "dist/nodes/ChatwootAMBForm/ChatwootAMBForm.node.js",
+      "dist/nodes/ChatwootAMBApplePay/ChatwootAMBApplePay.node.js",
+      "dist/nodes/ChatwootAMBRichLink/ChatwootAMBRichLink.node.js",
+      "dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.16.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.40.0",
+    "eslint-plugin-n8n-nodes-base": "^1.11.0",
+    "gulp": "^4.0.2",
+    "jest": "^29.5.0",
+    "n8n-workflow": "^1.0.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
