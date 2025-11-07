@@ -6,6 +6,7 @@ Successfully created a **complete migration toolkit** for converting the old Aco
 
 ## 📦 What Was Created
 
+### 1. Migration Scripts (4 scripts)
 ### 1. Migration Scripts (3 scripts)
 
 **✅ `script/migrate_apple_bot.rb`** - Extract & Transform
@@ -27,6 +28,13 @@ Successfully created a **complete migration toolkit** for converting the old Aco
 - Acoustic House specific filtering
 - Identifies guitar sales flows
 - Creates filtered migration files
+**✅ `script/migrate_bot_templates_to_message_templates.rb`** - Make Templates Accessible in UI ⭐ NEW
+- Migrates bot templates from `agent_bots.bot_config` to `message_templates` table
+- Makes templates accessible via `/` command in ReplyBox
+- Filters CORE templates (production-ready)
+- Stores original bot data in `metadata['apple_message_content']`
+- Supports `--dry-run` and `--force` modes
+
 - Detailed filter report
 
 ### 2. Documentation (6 documents)
@@ -243,6 +251,19 @@ ruby script/migrate_apple_bot.rb --business acoustic_house
 
 # Filtering
 ruby script/filter_core_templates.rb --dry-run
+
+# Make Templates Accessible in UI (/ command)
+rails runner script/migrate_bot_templates_to_message_templates.rb \
+  --bot-name "Acoustic House" \
+  --account-id 1 \
+  --filter-core \
+  --dry-run
+
+# Apply migration
+rails runner script/migrate_bot_templates_to_message_templates.rb \
+  --bot-name "Acoustic House" \
+  --account-id 1 \
+  --filter-core
 ruby script/filter_core_templates.rb --business acoustic_house
 
 # Import
@@ -256,6 +277,46 @@ rails runner script/import_migrated_bots.rb --account-id 1 --business acoustic_h
 ## 🎯 Success Criteria
 
 Migration is successful when:
+
+### Step 5: Make Templates Accessible in UI (NEW - Required for / command)
+
+**Problem**: Bot templates stored in `agent_bots.bot_config` are NOT accessible via the `/` command in ReplyBox.
+
+**Solution**: Migrate templates to `message_templates` table.
+
+```bash
+# DRY-RUN FIRST
+rails runner script/migrate_bot_templates_to_message_templates.rb \
+  --bot-name "Acoustic House" \
+  --account-id 1 \
+  --filter-core \
+  --dry-run
+
+# Apply migration (16 CORE templates)
+rails runner script/migrate_bot_templates_to_message_templates.rb \
+  --bot-name "Acoustic House" \
+  --account-id 1 \
+  --filter-core
+```
+
+**Result**: 16 templates now accessible via `/` command in ReplyBox:
+- 6 WISMO (order tracking) templates
+- 3 Guitar selection list pickers (EN, JP, BR)
+- 4 Navigation & form templates
+- 3 Other templates
+
+**Verify**:
+```ruby
+rails console
+>> MessageTemplate.where(
+     account_id: 1,
+     status: 'active',
+     supported_channels: ['apple_messages_for_business'],
+     use_cases: ['agent_ui']
+   ).where("tags @> ARRAY['acoustic-house']::text[]").count
+=> 16  # Templates accessible via / command
+```
+
 - [x] All JSON payloads scanned (624 files)
 - [x] Valid payloads extracted (575/588 = 97.7%)
 - [x] Images extracted (898/972 = 92.4%)
@@ -266,6 +327,10 @@ Migration is successful when:
 - [x] CaseTransformer compatible
 - [ ] Core templates imported to Chatwoot
 - [ ] Bot assigned to inbox
+
+**Issue**: Templates not showing in `/` command after bot import
+- **Solution**: Bot templates in `agent_bots.bot_config` are NOT accessible via `/` command. Run `migrate_bot_templates_to_message_templates.rb` to migrate them to `message_templates` table.
+
 - [ ] Test conversation successful
 
 ## 🔧 Troubleshooting

@@ -89,65 +89,72 @@ Once published to npm, install via n8n UI:
 **For macOS Container users:**
 
 ```bash
-# 1. Build the package
+# 1. Build the package (icons are automatically copied to each node directory)
 cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
 npm install
 npm run build
 
-# 2. Create custom nodes directory
-mkdir -p ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+# 2. Stop existing n8n (if running)
+container stop n8n 2>/dev/null || true
+container rm n8n 2>/dev/null || true
 
-# 3. Copy built files
-cp -r dist/* ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
-cp package.json ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
+# 3. Copy entire package to custom directory
+rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
 
-# 4. Fix package.json paths (remove dist/ prefix)
-# Edit ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/package.json
-# Change "dist/credentials/..." to "credentials/..."
-# Change "dist/nodes/..." to "nodes/..."
+# 4. Verify icons are in each node directory
+ls ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/ChatwootAMBListPicker/
+# Should show: amb.svg, chatwoot.svg, ChatwootAMBListPicker.node.js
 
-# 5. Copy icons to each node directory (for proper display)
-for dir in ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/nodes/*/; do
-  cp ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/icons/amb.svg "$dir"
-done
-
-# 6. Stop and restart n8n with custom extensions path
-container stop n8n
-container rm n8n
-
+# 5. Start n8n with custom nodes
 container run \
   --name n8n \
   --detach \
   --publish 5678:5678 \
   --volume ~/.n8n:/home/node/.n8n \
   --env N8N_SECURE_COOKIE=false \
-  --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
   --dns 8.8.8.8 \
   --dns 1.1.1.1 \
   n8nio/n8n
 
-# 7. Verify installation
+# 6. Verify installation
+sleep 10
 container logs n8n | tail -20
 ```
+
+**Important Notes:**
+- The `npm run build` command now automatically copies icons to each node directory (via gulpfile.js)
+- Icons must be in the same directory as each node file for n8n to display them correctly
+- DNS configuration (`--dns 8.8.8.8 --dns 1.1.1.1`) ensures n8n can reach external APIs
+- We no longer need `N8N_CUSTOM_EXTENSIONS` env var - n8n automatically loads from `~/.n8n/custom/node_modules/`
 
 **For Docker Desktop users:**
 
 ```bash
-# 1. Build the package
+# 1. Build the package (icons are automatically copied to each node directory)
 cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
 npm install
 npm run build
 
-# 2. Install in n8n
-mkdir -p ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
-cp -r dist/* ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
-cp package.json ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
+# 2. Copy entire package to custom directory
+mkdir -p ~/.n8n/custom/node_modules
+rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
 
-# 3. Fix paths and copy icons (same as above)
-# ... (same steps 4-5 from macOS Container)
+# 3. Restart Docker container
+docker stop n8n 2>/dev/null || true
+docker rm n8n 2>/dev/null || true
 
-# 4. Restart Docker container
-docker restart n8n
+docker run -d \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  --dns 8.8.8.8 \
+  --dns 1.1.1.1 \
+  n8nio/n8n
+
+# 4. Verify installation
+docker logs n8n | tail -20
 ```
 
 **For npm/npx users:**
@@ -167,6 +174,163 @@ npm install /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
 # Set custom extensions path
 export N8N_CUSTOM_EXTENSIONS="$HOME/.n8n/custom"
 n8n start
+```
+
+#### Option 3: Build from Source (For Developers)
+
+If you want to modify or contribute to the custom nodes:
+
+**1. Clone and Setup:**
+```bash
+# Clone or navigate to the package directory
+cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
+
+# Install dependencies
+npm install
+
+# Verify package structure
+ls -la nodes/
+# Should show all node directories (ChatwootAMBListPicker, ChatwootAMBTimePicker, etc.)
+```
+
+**2. Build Process:**
+```bash
+# Compile TypeScript and copy icons
+npm run build
+
+# This will:
+# - Compile all .ts files to .js
+# - Generate .d.ts type definitions
+# - Copy icons to dist/ directory
+# - Output to dist/ directory
+```
+
+**3. Check Build Output:**
+```bash
+# Verify build completed
+ls -la dist/nodes/ChatwootAMBListPicker/
+
+# Should show:
+# - ChatwootAMBListPicker.node.js
+# - ChatwootAMBListPicker.node.d.ts
+# - amb.svg (icon)
+# - chatwoot.svg (icon)
+```
+
+**4. Code Quality Checks:**
+```bash
+# Run linter
+npm run lint
+
+# Fix linting errors automatically
+npm run lintfix
+
+# Run tests (if available)
+npm test
+```
+
+**5. Link for Development:**
+```bash
+# In package directory
+npm link
+
+# In n8n custom directory
+cd ~/.n8n/custom
+npm link n8n-nodes-chatwoot-amb
+
+# Restart n8n to load changes
+```
+
+**Development Workflow:**
+1. Make changes to `.ts` files in `nodes/` directory
+2. Run `npm run build` to compile
+3. Restart n8n to test changes
+4. Iterate until satisfied
+5. Run `npm run lint` before committing
+
+### Testing Custom Nodes
+
+After installation (via any method), thoroughly test the custom nodes:
+
+**Manual Testing Checklist:**
+
+1. **Verify Node Appears:**
+   - [ ] Open http://localhost:5678
+   - [ ] Create new workflow
+   - [ ] Click "+ Add node"
+   - [ ] Search for "Chatwoot AMB"
+   - [ ] All 6-7 nodes should appear
+
+2. **Check Icons:**
+   - [ ] Icons display correctly (not showing "?" icon)
+   - [ ] Icons are visible in node list
+   - [ ] Icons appear in workflow canvas
+
+3. **Test Node Configuration:**
+   - [ ] Open a node (e.g., List Picker)
+   - [ ] All parameters render correctly
+   - [ ] Dropdowns work
+   - [ ] Text fields accept input
+   - [ ] Validation works
+
+4. **Test with Real Chatwoot:**
+   - [ ] Add Chatwoot credentials
+   - [ ] Test connection works
+   - [ ] Template ID selection works (if applicable)
+   - [ ] Execute node with test data
+   - [ ] Response returns expected structure
+   - [ ] Error handling works (try invalid data)
+
+5. **Test Each Node Type:**
+   - [ ] List Picker - sections and items render
+   - [ ] Time Picker - time slots are formatted correctly
+   - [ ] Quick Reply - buttons display properly
+   - [ ] Form - fields and pages work
+   - [ ] Apple Pay - payment request structured correctly
+   - [ ] Rich Link - preview data is complete
+   - [ ] Template Message - template rendering works
+
+**Automated Testing (via n8n):**
+
+Create a test workflow with all nodes:
+1. Add all Chatwoot AMB nodes to a workflow
+2. Connect them in sequence
+3. Configure each with test data
+4. Execute workflow
+5. Verify all nodes complete successfully
+
+**Troubleshooting Test Failures:**
+
+**Node doesn't appear:**
+```bash
+# Check n8n logs
+container logs n8n | grep -i "chatwoot\|custom\|community"
+
+# Verify files exist in container
+container exec n8n ls -la /home/node/.n8n/custom/node_modules/
+
+# Check package.json n8n section
+cat ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/package.json | grep -A 20 '"n8n"'
+```
+
+**Icons missing:**
+```bash
+# Verify icons in dist after build
+ls ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/dist/nodes/*/
+
+# Each directory should contain .svg files
+# If missing, run: npm run build
+
+# Check gulpfile.js has icon copy task
+cat ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/gulpfile.js | grep -i icon
+```
+
+**Execution fails:**
+```bash
+# Check n8n execution logs in UI
+# Enable "Continue on Fail" to see detailed error messages
+# Verify Chatwoot API credentials are correct
+# Check network connectivity (DNS configuration)
 ```
 
 ### Available Custom Nodes
@@ -227,42 +391,85 @@ After installing custom nodes:
 1. **Verify files exist inside container:**
    ```bash
    # macOS Container
-   container exec n8n ls -la /home/node/.n8n/custom/node_modules/
+   container exec n8n ls -la /home/node/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
 
    # Docker
-   docker exec n8n ls -la /home/node/.n8n/custom/node_modules/
+   docker exec n8n ls -la /home/node/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
    ```
 
-2. **Check N8N_CUSTOM_EXTENSIONS is set:**
+2. **Check node files and icons:**
    ```bash
-   # macOS Container
-   container exec n8n printenv | grep N8N_CUSTOM
-
-   # Docker
-   docker exec n8n printenv | grep N8N_CUSTOM
+   # Verify icons are in each node directory
+   container exec n8n ls /home/node/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/ChatwootAMBListPicker/
+   # Should show: amb.svg, chatwoot.svg, ChatwootAMBListPicker.node.js
    ```
 
-   Should show: `N8N_CUSTOM_EXTENSIONS=/home/node/.n8n/custom`
-
-3. **Verify package.json paths are correct:**
-   ```bash
-   cat ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/package.json | grep -A 10 '"n8n"'
-   ```
-
-   Paths should be `credentials/...` and `nodes/...` (NOT `dist/credentials/...`)
-
-4. **Rebuild if needed:**
+3. **Rebuild if needed:**
    ```bash
    cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
    npm run build
-   cp -r dist/* ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
-   # Restart n8n
+
+   # Copy fresh build
+   container stop n8n && container rm n8n
+   rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+   cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
+
+   # Restart n8n (use container run command from installation section)
    ```
 
-**Icons showing as "?" (blue question marks):**
-- Icons are copied to wrong location
-- Follow the icon fix in "Verifying Installation" section above
-- Hard refresh browser after restart (Cmd+Shift+R or Ctrl+Shift+R)
+**Icons showing as "?" or not loading (404 errors):**
+
+This usually happens when icons aren't in the node directories. Our updated build process fixes this automatically.
+
+1. **Verify gulpfile.js has icon copying code:**
+   ```bash
+   cat ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/gulpfile.js
+   # Should show buildIconsMain() and buildIconsNodes() functions
+   ```
+
+2. **Rebuild with icon copying:**
+   ```bash
+   cd ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
+   npm run build
+
+   # Verify icons were copied to node directories
+   ls dist/nodes/ChatwootAMBListPicker/
+   # Should show: amb.svg, chatwoot.svg, *.node.js
+   ```
+
+3. **Update n8n and hard refresh browser:**
+   ```bash
+   # Stop n8n
+   container stop n8n && container rm n8n
+
+   # Update custom directory
+   rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+   cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
+
+   # Start n8n
+   container run \
+     --name n8n \
+     --detach \
+     --publish 5678:5678 \
+     --volume ~/.n8n:/home/node/.n8n \
+     --env N8N_SECURE_COOKIE=false \
+     --dns 8.8.8.8 \
+     --dns 1.1.1.1 \
+     n8nio/n8n
+
+   # Hard refresh browser: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+   ```
+
+4. **Check browser console:**
+   - Open DevTools (F12)
+   - Look for 404 errors loading `amb.svg`
+   - If present, icons aren't in the correct location
+
+**Technical Background:**
+- n8n loads icons using `icon: 'file:amb.svg'` syntax
+- This requires the icon file to be in the **same directory** as the node's `.js` file
+- Our gulpfile.js automatically copies icons to all 7 node directories during build
+- If you see 404 errors for icons, the build step didn't complete or files weren't copied
 
 **Note:** The rest of this guide covers using HTTP Request nodes, which is still valid but requires more manual configuration.
 
@@ -272,7 +479,7 @@ After installing custom nodes:
 
 ### Installation Options
 
-**IMPORTANT:** If you plan to use custom Chatwoot AMB nodes (recommended), you need to set the `N8N_CUSTOM_EXTENSIONS` environment variable during n8n startup. See the examples below.
+**Note:** This section covers basic n8n installation. For custom Chatwoot AMB nodes, see the [Custom n8n Nodes](#custom-n8n-nodes-recommended) section above for installation instructions.
 
 #### Option 1: Using macOS Container (Recommended for macOS)
 
@@ -303,22 +510,7 @@ macOS Container provides native container support on macOS without requiring Doc
 
 3. **Run n8n:**
 
-   **With custom Chatwoot AMB nodes (recommended):**
-
-   ```bash
-   container run \
-     --name n8n \
-     --detach \
-     --publish 5678:5678 \
-     --volume ~/.n8n:/home/node/.n8n \
-     --env N8N_SECURE_COOKIE=false \
-     --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
-     --dns 8.8.8.8 \
-     --dns 1.1.1.1 \
-     n8nio/n8n
-   ```
-
-   **Without custom nodes (using HTTP Request nodes only):**
+   **Simplified command (recommended):**
 
    ```bash
    container run \
@@ -332,9 +524,10 @@ macOS Container provides native container support on macOS without requiring Doc
      n8nio/n8n
    ```
 
-   **Note**:
-   - We set `N8N_SECURE_COOKIE=false` for local development. For production deployments, use HTTPS/TLS instead.
-   - `--dns 8.8.8.8 --dns 1.1.1.1` configures public DNS servers (Google and Cloudflare) to ensure n8n can connect to external APIs like Google Gemini, OpenAI, etc.
+   **Note:**
+   - `N8N_SECURE_COOKIE=false` allows local development access via HTTP
+   - `--dns 8.8.8.8 --dns 1.1.1.1` configures public DNS (Google & Cloudflare) for external API access
+   - Custom nodes in `~/.n8n/custom/node_modules/` are automatically loaded by n8n
 
 4. **Manage n8n Container:**
    ```bash
@@ -354,7 +547,7 @@ macOS Container provides native container support on macOS without requiring Doc
    container rm n8n
    ```
 
-   **Note:** If you need to restart with different environment variables (e.g., adding `N8N_CUSTOM_EXTENSIONS`), you must stop, remove, and re-run the container with the new parameters.
+   **To update custom nodes:** Stop, remove, and re-run container with updated `~/.n8n/custom/` directory.
 
 **Access n8n:** Open `http://localhost:5678` in your browser.
 
@@ -1647,9 +1840,8 @@ const state = $node["Webhook"].context.get('conversationState');
 #### 6. n8n Cannot Connect to External APIs (DNS Issues)
 
 **Symptoms:**
-- n8n cannot connect to Google Gemini, OpenAI, or other external APIs
-- Error messages like "ENOTFOUND" or "getaddrinfo failed"
-- "Cannot resolve hostname" errors
+- n8n cannot connect to Google Gemini, OpenAI, Chatwoot (Tailscale), or other external APIs
+- Error messages like "ENOTFOUND", "getaddrinfo failed", or "Cannot resolve hostname"
 
 **Solutions:**
 
@@ -1669,7 +1861,6 @@ const state = $node["Webhook"].context.get('conversationState');
      --publish 5678:5678 \
      --volume ~/.n8n:/home/node/.n8n \
      --env N8N_SECURE_COOKIE=false \
-     --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
      --dns 8.8.8.8 \
      --dns 1.1.1.1 \
      n8nio/n8n
@@ -1677,7 +1868,8 @@ const state = $node["Webhook"].context.get('conversationState');
 
 3. **Verify DNS is working:**
    ```bash
-   container exec n8n nslookup google.com
+   container exec n8n wget -q -O - https://www.google.com 2>&1 | head -1
+   # Should show HTML content, not "getaddrinfo failed"
    ```
 
 **For Docker Desktop users:**
@@ -1686,7 +1878,7 @@ const state = $node["Webhook"].context.get('conversationState');
 docker stop n8n
 docker rm n8n
 
-docker run -it --rm \
+docker run -d \
   --name n8n \
   -p 5678:5678 \
   -v ~/.n8n:/home/node/.n8n \
@@ -1696,9 +1888,17 @@ docker run -it --rm \
 ```
 
 **Why this happens:**
-- Containers use the host's DNS by default, which may not resolve external domains
+- Containers may not inherit proper DNS configuration from the host
 - The `--dns` flags configure public DNS servers (Google: 8.8.8.8, Cloudflare: 1.1.1.1)
 - This ensures n8n can reach external APIs regardless of your network configuration
+
+**Accessing Chatwoot via Tailscale:**
+If your Chatwoot instance is on Tailscale (e.g., `https://liquid-m3-pro.tail367da4.ts.net`), the DNS configuration allows n8n to resolve Tailscale hostnames:
+
+```javascript
+// In n8n HTTP Request node
+URL: https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/1/bot_templates/send_message
+```
 
 #### 7. Duplicate Messages from Quick Reply/Interactive Responses
 
@@ -1782,6 +1982,256 @@ curl -X POST https://chatwoot.com/api/v1/accounts/1/bot_templates/render \
     "parameters": { ... }
   }'
 ```
+
+---
+
+## Production Deployment
+
+Once you've tested your n8n bot workflows locally, you'll need to deploy to production.
+
+### Production Architecture
+
+**Recommended Setup**: n8n runs in its own Docker environment at `/opt/n8n/`, separate from Chatwoot.
+
+```
+┌──────────────────────────────────┐
+│    Nginx Proxy Manager (SSL)    │
+│  https://msp.rhaps.net           │
+│  https://n8n.msp.rhaps.net       │
+└──────────┬───────────────┬───────┘
+           │               │
+    ┌──────▼──────┐  ┌────▼─────┐
+    │  Chatwoot   │  │   n8n    │
+    │  /opt/      │◄─┤  /opt/   │
+    │  chatwoot   │  │  n8n/    │
+    └─────────────┘  └──────────┘
+         Docker Network Bridge
+```
+
+**For complete production setup instructions**, see:
+- **[n8n Production Setup Guide](N8N_PRODUCTION_SETUP.md)** - Complete guide to set up n8n in production
+
+### Quick Reference: Deploy Custom Nodes and Backend
+
+**Prerequisites for n8n node deployment**:
+
+If you want to deploy custom n8n nodes, ensure they are built locally first:
+```bash
+# Build custom nodes (icons are automatically copied during build)
+cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
+npm install
+npm run build
+
+# Verify build output
+ls -la dist/nodes/ChatwootAMBListPicker/
+# Should show: ChatwootAMBListPicker.node.js, amb.svg, chatwoot.svg
+
+# Install to local n8n
+rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
+cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
+```
+
+**Deploy using**:
+```bash
+./script/deploy-backend-changes-safe.sh
+```
+
+This script:
+- ✅ Syncs all backend code (models, controllers, services, migrations)
+- ✅ Includes bot-related files automatically
+- ✅ **Syncs n8n custom AMB nodes** from `~/.n8n/` to `/opt/n8n/data/`
+- ✅ **Restarts n8n container** at `/opt/n8n/` to load new nodes
+- ✅ Runs database migrations
+- ✅ Restarts Chatwoot web and worker services
+- ✅ Preserves sensitive configuration (Apple Pay, certs, .env)
+
+**n8n Custom Nodes Deployment**:
+- Custom nodes are synced to `/opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/`
+- n8n automatically loads custom nodes from this directory (via Docker volume mount)
+- The n8n container is restarted via `docker compose restart` in `/opt/n8n/`
+- If n8n is not set up at `/opt/n8n/`, deployment is skipped (see [setup guide](N8N_PRODUCTION_SETUP.md))
+
+**Verify deployment**:
+```bash
+# Check bot services deployed
+ssh root@msp.rhaps.net "docker exec chatwoot-web ls -la app/services/templates/bot_messaging_service.rb"
+
+# Check bot API endpoints
+ssh root@msp.rhaps.net "docker exec chatwoot-web ls -la app/controllers/api/v1/accounts/bot_templates_controller.rb"
+
+# Test bot API
+curl https://msp.rhaps.net/api/v1/accounts/1/bot_templates/search \
+  -H "api_access_token: YOUR_BOT_TOKEN"
+
+# Verify n8n custom nodes deployed (if applicable)
+ssh root@msp.rhaps.net "ls -la /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/"
+
+# Check n8n container is running
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose ps"
+
+# Check n8n logs for custom node loading
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs | tail -20"
+```
+
+### Frontend Changes (Bot UI Components)
+
+If you've only changed bot-related UI components (rare for n8n integration):
+```bash
+./script/deploy-assets-only.sh
+```
+
+### n8n Configuration Updates
+
+**Production n8n webhook URL**:
+
+n8n and Chatwoot communicate via Docker networking using **internal hostnames**.
+
+**Update bot's outgoing URL** (in Chatwoot):
+```bash
+# Via API
+curl -X PATCH https://msp.rhaps.net/api/v1/accounts/1/agent_bots/AGENT_BOT_ID \
+  -H "api_access_token: YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "outgoing_url": "http://n8n:5678/webhook/chatwoot"
+  }'
+
+# Or via Rails console
+ssh root@msp.rhaps.net "docker exec -it chatwoot-web rails console"
+# Then run:
+# bot = AgentBot.find(YOUR_BOT_ID)
+# bot.outgoing_url = "http://n8n:5678/webhook/chatwoot"
+# bot.save!
+```
+
+**Important Notes**:
+- ✅ Use internal hostname: `http://n8n:5678/webhook/chatwoot` (not https://n8n.msp.rhaps.net)
+- ✅ Containers communicate directly via Docker network (faster, no SSL overhead)
+- ✅ External SSL is handled by Nginx Proxy Manager for browser access only
+- ✅ Both containers must be on `chatwoot_default` network ([setup guide](N8N_PRODUCTION_SETUP.md))
+
+**Users access n8n UI via**:
+- Public URL: `https://n8n.msp.rhaps.net` (via Nginx Proxy Manager with SSL)
+
+### Post-Deployment Testing
+
+1. **Test bot webhook**:
+   - Send test message in production Apple Messages channel
+   - Check n8n execution logs
+   - Verify webhook payload received
+
+2. **Test template sending**:
+   - Trigger n8n workflow that sends a template
+   - Verify template displays correctly in Apple Messages
+   - Check for any API errors in logs
+
+3. **Monitor logs**:
+   ```bash
+   # Follow Chatwoot logs
+   ssh root@msp.rhaps.net "cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web -f | grep -E 'BotMessaging|AgentBot'"
+
+   # Check for errors
+   ssh root@msp.rhaps.net "cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web --tail=100 | grep -i error"
+   ```
+
+### Complete Deployment Workflow Reference
+
+For comprehensive deployment procedures, troubleshooting, and maintenance commands, see:
+- **[Deployment Summary](/docs/deployment/DEPLOYMENT_SUMMARY.md)** - Complete production deployment guide
+- **Production URL**: https://msp.rhaps.net
+- **Server IP**: 82.64.228.224
+
+### Troubleshooting n8n Node Deployment
+
+**Custom nodes not appearing in n8n UI**:
+
+1. **Verify nodes were synced to server**:
+   ```bash
+   ssh root@msp.rhaps.net "ls -la /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/"
+   ```
+   Should show directories for all 6 node types with `.node.js` files and `.svg` icons.
+
+2. **Check n8n container is running**:
+   ```bash
+   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose ps"
+   ```
+   If not running, start it:
+   ```bash
+   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose up -d"
+   ```
+
+3. **Check n8n logs for errors**:
+   ```bash
+   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs | grep -i 'custom\|community\|chatwoot'"
+   ```
+   Look for loading messages or errors.
+
+4. **Manually restart n8n**:
+   ```bash
+   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose restart"
+   ```
+   Wait 10-15 seconds, then check the UI.
+
+5. **Clear browser cache**:
+   - Hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+   - Or clear browser cache and reload
+
+**Icons showing as "?" in n8n UI**:
+
+This means icon files weren't synced or aren't in the correct location.
+
+```bash
+# Verify icons exist in each node directory
+ssh root@msp.rhaps.net "ls /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/*/amb.svg"
+
+# If missing, rebuild locally and redeploy
+cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
+npm run build  # Icons are copied during build
+cd /Users/rhaps/LocalGit/chatwoot
+./script/deploy-backend-changes-safe.sh
+```
+
+**n8n container not found during deployment**:
+
+The deployment script looks for n8n at `/opt/n8n/docker-compose.yml`.
+
+If you have a different setup:
+
+```bash
+# Check where n8n is running
+ssh root@msp.rhaps.net "docker ps | grep n8n"
+
+# Manually copy nodes to your n8n location
+ssh root@msp.rhaps.net "docker exec n8n ls -la /home/node/.n8n/custom/node_modules/"
+
+# Restart your n8n setup
+ssh root@msp.rhaps.net "docker restart YOUR_N8N_CONTAINER_NAME"
+```
+
+**Custom nodes show old version after deployment**:
+
+n8n may cache node definitions. Force a clean restart:
+
+```bash
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose down && docker compose up -d"
+```
+
+Then clear browser cache and reload the n8n UI.
+
+**Network connectivity issues**:
+
+If Chatwoot can't reach n8n:
+
+```bash
+# Test connectivity from Chatwoot container
+ssh root@msp.rhaps.net "docker exec chatwoot-web ping -c 3 n8n"
+ssh root@msp.rhaps.net "docker exec chatwoot-web curl -I http://n8n:5678"
+
+# Verify both on same network
+ssh root@msp.rhaps.net "docker network inspect chatwoot_default | grep -E 'n8n|chatwoot-web'"
+```
+
+If n8n is not on the network, see [N8N_PRODUCTION_SETUP.md](N8N_PRODUCTION_SETUP.md#step-4-connect-n8n-to-chatwoot-network).
 
 ---
 
