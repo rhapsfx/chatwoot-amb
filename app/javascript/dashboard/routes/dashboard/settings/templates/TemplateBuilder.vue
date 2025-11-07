@@ -8,6 +8,7 @@ import TemplatesAPI from 'dashboard/api/templates';
 import ParameterEditor from './components/ParameterEditor.vue';
 import ContentBlockList from './components/ContentBlockList.vue';
 import TemplatePreview from './components/TemplatePreview.vue';
+import AttachmentManager from './components/AttachmentManager.vue';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -30,6 +31,7 @@ const template = ref({
   parameters: {},
   contentBlocks: [],
   version: 1,
+  attachments: [],
 });
 
 const errors = ref({});
@@ -84,6 +86,13 @@ const tabs = computed(() => [
     icon: 'i-lucide-blocks',
   },
   {
+    id: 'attachments',
+    label: t('TEMPLATES.BUILDER.ATTACHMENTS.TITLE'),
+    icon: 'i-lucide-paperclip',
+    visible: () =>
+      template.value.supportedChannels.includes('apple_messages_for_business'),
+  },
+  {
     id: 'preview',
     label: t('TEMPLATES.BUILDER.PREVIEW.TITLE'),
     icon: 'i-lucide-eye',
@@ -121,7 +130,20 @@ const validateTemplate = () => {
     errors.value.channels = t('TEMPLATES.BUILDER.VALIDATION.CHANNEL_REQUIRED');
   }
 
-  if (template.value.contentBlocks.length === 0) {
+  // Content blocks are optional for Apple Messages if template will have attachments
+  // Or if it's a new template (user can add attachments after saving)
+  const isAppleMessages = template.value.supportedChannels.includes(
+    'apple_messages_for_business'
+  );
+  const hasAttachments = template.value.attachments?.length > 0;
+  const isNewTemplate = !isEditMode.value;
+
+  // Allow saving without content blocks if:
+  // - It's Apple Messages AND (has attachments OR is a new template being created)
+  const canSkipContentBlocks =
+    isAppleMessages && (hasAttachments || isNewTemplate);
+
+  if (template.value.contentBlocks.length === 0 && !canSkipContentBlocks) {
     errors.value.content = t('TEMPLATES.BUILDER.VALIDATION.CONTENT_REQUIRED');
   }
 
@@ -139,12 +161,18 @@ const saveTemplate = async () => {
     if (isEditMode.value) {
       await TemplatesAPI.update(templateId.value, template.value);
       useAlert(t('TEMPLATES.API.UPDATE_SUCCESS'));
+      // Stay on edit page after update so user can continue editing
     } else {
-      await TemplatesAPI.create(template.value);
+      const response = await TemplatesAPI.create(template.value);
       useAlert(t('TEMPLATES.API.CREATE_SUCCESS'));
-    }
 
-    router.push({ name: 'templates_list' });
+      // Redirect to edit mode for the newly created template
+      // This allows user to add attachments without closing the form
+      router.push({
+        name: 'template_edit',
+        params: { templateId: response.data.id },
+      });
+    }
   } catch (error) {
     const message = isEditMode.value
       ? t('TEMPLATES.API.UPDATE_ERROR')
@@ -200,6 +228,10 @@ const updateContentBlocks = blocks => {
   template.value.contentBlocks = blocks;
 };
 
+const updateAttachments = attachments => {
+  template.value.attachments = attachments;
+};
+
 const resetTemplate = () => {
   template.value = {
     name: '',
@@ -212,6 +244,7 @@ const resetTemplate = () => {
     parameters: {},
     contentBlocks: [],
     version: 1,
+    attachments: [],
   };
   errors.value = {};
   activeTab.value = 'basic';
@@ -284,7 +317,7 @@ onMounted(() => {
       >
         <nav class="p-4 space-y-1">
           <button
-            v-for="tab in tabs"
+            v-for="tab in tabs.filter(t => !t.visible || t.visible())"
             :key="tab.id"
             class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors"
             :class="[
@@ -430,6 +463,26 @@ onMounted(() => {
             <p v-if="errors.channels" class="mt-2 text-sm text-n-red-11">
               {{ errors.channels }}
             </p>
+
+            <!-- Info box for Apple Messages attachment-only templates -->
+            <div
+              v-if="
+                template.supportedChannels.includes(
+                  'apple_messages_for_business'
+                )
+              "
+              class="mt-4 p-4 bg-n-blue-1 border border-n-blue-7 rounded-lg flex gap-3"
+            >
+              <i
+                class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5"
+              />
+              <div class="text-sm text-n-blue-11">
+                <p class="font-medium mb-1">
+                  {{ t('TEMPLATES.BUILDER.ATTACHMENTS.TITLE') }}
+                </p>
+                <p>{{ t('TEMPLATES.BUILDER.ATTACHMENTS.INFO_HINT') }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Tags -->
@@ -518,6 +571,25 @@ onMounted(() => {
             :parameters="template.parameters"
             @update:blocks="updateContentBlocks"
           />
+        </div>
+
+        <!-- Attachments Tab -->
+        <div v-show="activeTab === 'attachments'" class="max-w-4xl mx-auto">
+          <AttachmentManager
+            v-if="templateId"
+            :template-id="templateId"
+            channel-type="apple_messages_for_business"
+            @attachments-updated="updateAttachments"
+          />
+          <div
+            v-else
+            class="p-8 bg-n-blue-1 border border-n-blue-7 rounded-lg text-center"
+          >
+            <i class="i-lucide-info text-n-blue-9 text-3xl mb-3" />
+            <p class="text-sm text-n-slate-11">
+              {{ t('TEMPLATES.BUILDER.ATTACHMENTS.SAVE_FIRST') }}
+            </p>
+          </div>
         </div>
 
         <!-- Preview Tab -->

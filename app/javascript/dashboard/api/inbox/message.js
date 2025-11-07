@@ -13,6 +13,7 @@ export const buildCreatePayload = ({
   bccEmails = '',
   toEmails = '',
   templateParams,
+  templateId,
 }) => {
   let payload;
   if (files && files.length !== 0) {
@@ -50,6 +51,9 @@ export const buildCreatePayload = ({
     if (contentType) {
       payload.append('content_type', contentType);
     }
+    if (templateId) {
+      payload.append('template_id', templateId);
+    }
   } else {
     payload = {
       content: message,
@@ -61,6 +65,7 @@ export const buildCreatePayload = ({
       bcc_emails: bccEmails,
       to_emails: toEmails,
       template_params: templateParams,
+      template_id: templateId,
     };
   }
   return payload;
@@ -88,6 +93,7 @@ class MessageApi extends ApiClient {
       bccEmails = '',
       toEmails = '',
       templateParams,
+      template_id: templateId,
     } = params;
 
     console.log(
@@ -98,11 +104,13 @@ class MessageApi extends ApiClient {
       '🔥 MessageApi extracted contentAttributes:',
       contentAttributes
     );
+    console.log('🔥 MessageApi extracted template_id:', templateId);
 
     // Use content_attributes if contentAttributes is not provided (for Vuex compatibility)
     const finalContentAttributes = contentAttributes || content_attributes;
     const finalContentType = content_type;
     const finalEchoId = echoId || params.echo_id;
+    const finalTemplateId = templateId || params.template_id;
 
     console.log(
       '🔥 MessageApi finalContentAttributes:',
@@ -112,6 +120,7 @@ class MessageApi extends ApiClient {
       '🔥 MessageApi finalContentAttributes images:',
       finalContentAttributes?.images?.length || 'NO IMAGES'
     );
+    console.log('🔥 MessageApi finalTemplateId:', finalTemplateId);
 
     const payload = buildCreatePayload({
       message,
@@ -124,6 +133,7 @@ class MessageApi extends ApiClient {
       bccEmails,
       toEmails,
       templateParams,
+      templateId: finalTemplateId,
     });
 
     console.log('🔥 MessageApi final payload:', payload);
@@ -135,6 +145,7 @@ class MessageApi extends ApiClient {
       '🔥 MessageApi payload images:',
       payload.content_attributes?.images?.length || 'NO IMAGES'
     );
+    console.log('🔥 MessageApi payload template_id:', payload.template_id);
 
     return axios({
       method: 'post',

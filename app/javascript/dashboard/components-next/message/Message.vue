@@ -340,10 +340,21 @@ const componentToRender = computed(() => {
     return InstagramStoryBubble;
   }
 
+  // Check if this is a template message with attachments
+  // Templates often have generic "Message" content, so we should show attachments directly
+  const isTemplateWithAttachments =
+    props.messageType === MESSAGE_TYPES.TEMPLATE &&
+    Array.isArray(props.attachments) &&
+    props.attachments.length > 0 &&
+    (!props.content || props.content === 'Message');
+
   if (Array.isArray(props.attachments) && props.attachments.length === 1) {
     const fileType = props.attachments[0].fileType;
 
-    if (!props.content) {
+    // Show attachment bubble if:
+    // 1. No content at all, OR
+    // 2. This is a template with generic "Message" content
+    if (!props.content || isTemplateWithAttachments) {
       if (fileType === ATTACHMENT_TYPES.IMAGE) return ImageBubble;
       if (fileType === ATTACHMENT_TYPES.FILE) return FileBubble;
       if (fileType === ATTACHMENT_TYPES.AUDIO) return AudioBubble;
@@ -355,6 +366,8 @@ const componentToRender = computed(() => {
     if (fileType === ATTACHMENT_TYPES.CONTACT) return ContactBubble;
   }
 
+  // If template has multiple attachments with generic content, show in TextBubble
+  // but the AttachmentChips component will display them properly
   return TextBubble;
 });
 
