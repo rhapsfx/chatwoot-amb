@@ -14,7 +14,7 @@ class AppleMessagesForBusiness::FormBuilderService
       title: title,
       description: description,
       pages: @pages,
-      version: '1.0',
+      version: '1.2',
       use_live_layout: true,
       submit_button: { title: 'Submit', style: 'primary' },
       cancel_button: { title: 'Cancel', style: 'secondary' }
@@ -364,20 +364,20 @@ class AppleMessagesForBusiness::FormBuilderService
       @parent_builder = parent_builder
     end
 
-    def add_text_field(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'text', title: title, required: required, **options)
+    def add_text_field(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'text', title: title, required: required, **)
     end
 
-    def add_text_area(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'textArea', title: title, required: required, **options)
+    def add_text_area(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'textArea', title: title, required: required, **)
     end
 
-    def add_email_field(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'email', title: title, required: required, **options)
+    def add_email_field(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'email', title: title, required: required, **)
     end
 
-    def add_phone_field(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'phone', title: title, required: required, **options)
+    def add_phone_field(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'phone', title: title, required: required, **)
     end
 
     def add_select_field(item_id:, title:, options:, required: false, **other_options)
@@ -388,24 +388,24 @@ class AppleMessagesForBusiness::FormBuilderService
       add_item(item_id: item_id, item_type: 'multiSelect', title: title, required: required, options: options, **other_options)
     end
 
-    def add_datetime_field(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'dateTime', title: title, required: required, **options)
+    def add_datetime_field(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'dateTime', title: title, required: required, **)
     end
 
-    def add_toggle_field(item_id:, title:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'toggle', title: title, required: required, **options)
+    def add_toggle_field(item_id:, title:, required: false, **)
+      add_item(item_id: item_id, item_type: 'toggle', title: title, required: required, **)
     end
 
-    def add_stepper_field(item_id:, title:, min_value:, max_value:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'stepper', title: title, required: required, min_value: min_value, max_value: max_value, **options)
+    def add_stepper_field(item_id:, title:, min_value:, max_value:, required: false, **)
+      add_item(item_id: item_id, item_type: 'stepper', title: title, required: required, min_value: min_value, max_value: max_value, **)
     end
 
-    def add_rich_link(item_id:, title:, url:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'richLink', title: title, required: required, url: url, **options)
+    def add_rich_link(item_id:, title:, url:, required: false, **)
+      add_item(item_id: item_id, item_type: 'richLink', title: title, required: required, url: url, **)
     end
 
-    def add_button(item_id:, title:, action:, required: false, **options)
-      add_item(item_id: item_id, item_type: 'button', title: title, required: required, action: action, **options)
+    def add_button(item_id:, title:, action:, required: false, **)
+      add_item(item_id: item_id, item_type: 'button', title: title, required: required, action: action, **)
     end
 
     private

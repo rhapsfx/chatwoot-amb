@@ -326,7 +326,7 @@ ssh root@msp.rhaps.net "cd /opt/chatwoot && docker compose -f docker-compose.pro
 - `app/services/apple_messages_for_business/case_transformer.rb` - Source code with inline docs
 
 **Maintenance**:
-- `docs/apple-messages/scripts/verify_normalization.rb` - Verify database normalization status
+- `docs/apple-messages/script/verify_normalization.rb` - Verify database normalization status
 - `test_case_transformer.rb` - Manual transformation tests
 
 ---

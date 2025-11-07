@@ -21,7 +21,7 @@ docs/apple-messages/
 │   ├── APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md
 │   ├── APPLE_MESSAGES_OAUTH2_APPLEPAY_CONFIGURATION_GUIDE.md
 │   └── CHATWOOT_MESSAGING_CHANNEL_GUIDE.md
-├── scripts/                           # Scripts and utilities
+├── script/                           # Scripts and utilities
 │   ├── test/                          # Test scripts
 │   │   ├── test_apple_integration.sh
 │   │   ├── test_apple_message_delivery.rb
@@ -52,7 +52,7 @@ docs/apple-messages/
 
 1. **Configuration**: Start with the configuration guide in `guides/APPLE_MESSAGES_OAUTH2_APPLEPAY_CONFIGURATION_GUIDE.md`
 2. **Implementation**: Follow the main implementation plan in `implementation/APPLE_MESSAGES_FOR_BUSINESS_INTEGRATION_PLAN.md`
-3. **Testing**: Use the test scripts in `scripts/apple-messages/test/` to validate your implementation
+3. **Testing**: Use the test scripts in `script/apple-messages/test/` to validate your implementation
 4. **Troubleshooting**: Refer to `guides/APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md` for common issues
 
 ## Key Implementation Files
@@ -72,12 +72,12 @@ docs/apple-messages/
 
 Run the main integration test:
 ```bash
-./docs/apple-messages/scripts/test/test_apple_integration.sh
+./docs/apple-messages/script/test/test_apple_integration.sh
 ```
 
 Check Apple Messages configuration:
 ```bash
-ruby docs/apple-messages/scripts/utilities/check_apple_config.rb
+ruby docs/apple-messages/script/utilities/check_apple_config.rb
 ```
 
 ## Data Files

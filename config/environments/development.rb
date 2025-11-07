@@ -55,7 +55,8 @@ Rails.application.configure do
   config.active_record.migration_error = :page_load
 
   # Highlight code that triggered database queries in logs.
-  config.active_record.verbose_query_logs = true
+  # Disabled for less noise - re-enable when debugging SQL issues
+  config.active_record.verbose_query_logs = false
 
   # Debug mode disables concatenation and preprocessing of assets.
   # This option may cause significant delays in view rendering with a large
@@ -87,17 +88,19 @@ Rails.application.configure do
   end
 
   # customize using the environment variables
-  config.log_level = ENV.fetch('LOG_LEVEL', 'debug').to_sym
+  # Use :info for less verbose logs, :debug for full troubleshooting
+  config.log_level = ENV.fetch('LOG_LEVEL', 'info').to_sym
 
   # Use a different logger for distributed setups.
   # require 'syslog/logger'
   config.logger = ActiveSupport::Logger.new(Rails.root.join('log', "#{Rails.env}.log"), 1, ENV.fetch('LOG_SIZE', '1024').to_i.megabytes)
 
   # Bullet configuration to fix the N+1 queries
+  # Logs to bullet.log instead of cluttering development.log
   config.after_initialize do
     Bullet.enable = true
     Bullet.bullet_logger = true
-    Bullet.rails_logger = true
+    Bullet.rails_logger = false  # Reduced noise - check log/bullet.log for N+1 queries
   end
 end
 

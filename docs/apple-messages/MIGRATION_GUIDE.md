@@ -30,10 +30,10 @@ rails db:migrate
 
 ```bash
 # 1. Analyze current state
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb
+rails runner docs/apple-messages/script/dry_run_normalization.rb
 
 # 2. Review sample changes
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true
+rails runner docs/apple-messages/script/dry_run_normalization.rb VERBOSE=true
 
 # 3. Create backup
 pg_dump chatwoot_production > backup_$(date +%Y%m%d).sql
@@ -42,7 +42,7 @@ pg_dump chatwoot_production > backup_$(date +%Y%m%d).sql
 rails db:migrate
 
 # 5. Verify results
-rails runner docs/apple-messages/scripts/verify_normalization.rb
+rails runner docs/apple-messages/script/verify_normalization.rb
 ```
 
 ---
@@ -67,7 +67,7 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb
 
 - [ ] **Run dry-run analysis**
   ```bash
-  rails runner docs/apple-messages/scripts/dry_run_normalization.rb > dry_run_results.txt
+  rails runner docs/apple-messages/script/dry_run_normalization.rb > dry_run_results.txt
 
   # Review results
   cat dry_run_results.txt
@@ -112,7 +112,7 @@ DRY_RUN=true VERBOSE=true rails db:migrate
 ```
 
 ### 2. Dry-Run Analysis Script
-**Location**: `docs/apple-messages/scripts/dry_run_normalization.rb`
+**Location**: `docs/apple-messages/script/dry_run_normalization.rb`
 
 **What it does**:
 - Analyzes all Apple Messages records
@@ -124,13 +124,13 @@ DRY_RUN=true VERBOSE=true rails db:migrate
 **Usage**:
 ```bash
 # Basic analysis
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb
+rails runner docs/apple-messages/script/dry_run_normalization.rb
 
 # Verbose mode (detailed output)
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true
+rails runner docs/apple-messages/script/dry_run_normalization.rb VERBOSE=true
 
 # Save results to file
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb > analysis.txt
+rails runner docs/apple-messages/script/dry_run_normalization.rb > analysis.txt
 ```
 
 **Expected Output**:
@@ -192,7 +192,7 @@ Next steps:
 ```
 
 ### 3. Rollback Script
-**Location**: `docs/apple-messages/scripts/rollback_normalization.rb`
+**Location**: `docs/apple-messages/script/rollback_normalization.rb`
 
 **What it does**:
 - Reverses normalization (snake_case → camelCase)
@@ -202,16 +202,16 @@ Next steps:
 **Usage**:
 ```bash
 # Dry-run (see what would change)
-rails runner docs/apple-messages/scripts/rollback_normalization.rb DRY_RUN=true
+rails runner docs/apple-messages/script/rollback_normalization.rb DRY_RUN=true
 
 # LIVE rollback (requires confirmation)
-rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLBACK=yes
+rails runner docs/apple-messages/script/rollback_normalization.rb CONFIRM_ROLLBACK=yes
 ```
 
 **⚠️ WARNING**: Only use if you need to fully revert the migration. Services expect snake_case internally after Phase 1.
 
 ### 4. Verification Script
-**Location**: `docs/apple-messages/scripts/verify_normalization.rb`
+**Location**: `docs/apple-messages/script/verify_normalization.rb`
 
 **What it does**:
 - Checks normalization status
@@ -222,13 +222,13 @@ rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLB
 **Usage**:
 ```bash
 # Basic verification
-rails runner docs/apple-messages/scripts/verify_normalization.rb
+rails runner docs/apple-messages/script/verify_normalization.rb
 
 # Detailed analysis (includes integrity checks)
-rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
+rails runner docs/apple-messages/script/verify_normalization.rb DETAILED=true
 
 # Save results
-rails runner docs/apple-messages/scripts/verify_normalization.rb > verification.txt
+rails runner docs/apple-messages/script/verify_normalization.rb > verification.txt
 ```
 
 **Expected Output**:
@@ -280,7 +280,7 @@ Services can now safely remove defensive dual-checks.
 
 ```bash
 # Run dry-run analysis
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true > staging_analysis.txt
+rails runner docs/apple-messages/script/dry_run_normalization.rb VERBOSE=true > staging_analysis.txt
 
 # Review results
 less staging_analysis.txt
@@ -343,7 +343,7 @@ MIGRATION COMPLETE - Changes applied to database
 
 ```bash
 # Verify normalization
-rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true > staging_verification.txt
+rails runner docs/apple-messages/script/verify_normalization.rb DETAILED=true > staging_verification.txt
 
 # Review results
 less staging_verification.txt
@@ -403,7 +403,7 @@ ls -lh backup_production_*.sql
 
 ```bash
 # Quick sanity check
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb > production_analysis.txt
+rails runner docs/apple-messages/script/dry_run_normalization.rb > production_analysis.txt
 
 # Review - should match staging results (similar counts)
 cat production_analysis.txt
@@ -426,7 +426,7 @@ tail -f log/production.log | grep -i "normalization"
 
 ```bash
 # Verify normalization
-rails runner docs/apple-messages/scripts/verify_normalization.rb > production_verification.txt
+rails runner docs/apple-messages/script/verify_normalization.rb > production_verification.txt
 
 # Should show 100% normalized
 cat production_verification.txt | grep "Overall Health" -A 5
@@ -481,7 +481,7 @@ grep -c "\[API\] Normalizing" log/production.log
 **Daily checks**:
 ```bash
 # Verify no mixed-case records appearing
-rails runner docs/apple-messages/scripts/verify_normalization.rb | grep "Overall Health" -A 5
+rails runner docs/apple-messages/script/verify_normalization.rb | grep "Overall Health" -A 5
 
 # Should remain 100% normalized
 ```
@@ -504,7 +504,7 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb | grep "Overall
 **Solution**:
 ```bash
 # Identify problematic messages
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true | grep "WARNING: Key count"
+rails runner docs/apple-messages/script/dry_run_normalization.rb VERBOSE=true | grep "WARNING: Key count"
 
 # Investigate specific message
 rails runner "msg = Message.find(ID); puts msg.content_attributes.inspect"
@@ -554,7 +554,7 @@ VERBOSE=true rails db:migrate:redo VERSION=20251026114341
 **Solution**:
 ```bash
 # Identify problematic records
-rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true | grep "Message #"
+rails runner docs/apple-messages/script/verify_normalization.rb DETAILED=true | grep "Message #"
 
 # Manually fix specific records
 rails runner "
@@ -578,11 +578,11 @@ rails db:migrate:redo VERSION=20251026114341
 pg_restore -d chatwoot_production backup_production_YYYYMMDD_HHMMSS.sql
 
 # 2. Or use rollback script
-rails runner docs/apple-messages/scripts/rollback_normalization.rb DRY_RUN=true
-rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLBACK=yes
+rails runner docs/apple-messages/script/rollback_normalization.rb DRY_RUN=true
+rails runner docs/apple-messages/script/rollback_normalization.rb CONFIRM_ROLLBACK=yes
 
 # 3. Verify
-rails runner docs/apple-messages/scripts/verify_normalization.rb
+rails runner docs/apple-messages/script/verify_normalization.rb
 ```
 
 ---
@@ -666,7 +666,7 @@ Once migration is complete and verified:
 **Issues or Questions?**
 - Review specification: `docs/apple-messages/case-normalization-specification.md`
 - Check Phase 1 status: `docs/apple-messages/PHASE_1_COMPLETE.md`
-- Run verification: `rails runner docs/apple-messages/scripts/verify_normalization.rb`
+- Run verification: `rails runner docs/apple-messages/script/verify_normalization.rb`
 
 **Emergency Rollback**:
 ```bash

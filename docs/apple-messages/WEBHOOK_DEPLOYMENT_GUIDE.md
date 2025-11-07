@@ -99,7 +99,7 @@ Send a test message from your Apple device to verify:
 - `app/controllers/webhooks/apple_messages_for_business_controller.rb` - Changed channel lookup logic
 - `app/models/channel/apple_messages_for_business.rb` - Updated webhook URL generation
 - `config/initializers/apple_messages_for_business.rb` - Updated auto-configuration
-- `docs/apple-messages/scripts/utilities/*.rb` - Updated utility scripts
+- `docs/apple-messages/script/utilities/*.rb` - Updated utility scripts
 
 ## Rollback Plan
 

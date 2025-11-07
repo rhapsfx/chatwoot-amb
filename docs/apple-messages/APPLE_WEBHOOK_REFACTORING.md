@@ -70,8 +70,8 @@ new_webhook_url = "#{base_url}/webhooks/apple_messages_for_business"
 ### 5. Utility Scripts
 
 Updated the following scripts to use the permanent webhook URL:
-- `docs/apple-messages/scripts/utilities/update_apple_webhook_url.rb`
-- `docs/apple-messages/scripts/utilities/check_apple_config.rb`
+- `docs/apple-messages/script/utilities/update_apple_webhook_url.rb`
+- `docs/apple-messages/script/utilities/check_apple_config.rb`
 
 ## How It Works
 
@@ -126,12 +126,12 @@ To verify the changes:
 
 2. **Check channel configuration**:
    ```bash
-   rails runner docs/apple-messages/scripts/utilities/check_apple_config.rb
+   rails runner docs/apple-messages/script/utilities/check_apple_config.rb
    ```
 
 3. **Update webhook URL** (if needed):
    ```bash
-   rails runner docs/apple-messages/scripts/utilities/update_apple_webhook_url.rb
+   rails runner docs/apple-messages/script/utilities/update_apple_webhook_url.rb
    ```
 
 4. **Monitor webhook requests**:
@@ -162,4 +162,4 @@ The old routes with MSP ID have been removed. All channels must use the new perm
 - Controller: `app/controllers/webhooks/apple_messages_for_business_controller.rb`
 - Model: `app/models/channel/apple_messages_for_business.rb`
 - Initializer: `config/initializers/apple_messages_for_business.rb`
-- Utility scripts: `docs/apple-messages/scripts/utilities/`
+- Utility scripts: `docs/apple-messages/script/utilities/`

@@ -30,7 +30,7 @@ rails db:migrate
 ```
 
 ### 2. **Dry-Run Analysis Script** ✅
-**File**: `docs/apple-messages/scripts/dry_run_normalization.rb`
+**File**: `docs/apple-messages/script/dry_run_normalization.rb`
 
 **Features**:
 - Analyzes all Apple Messages records without making changes
@@ -43,10 +43,10 @@ rails db:migrate
 **Usage**:
 ```bash
 # Basic analysis
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb
+rails runner docs/apple-messages/script/dry_run_normalization.rb
 
 # Verbose (detailed samples)
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true
+rails runner docs/apple-messages/script/dry_run_normalization.rb VERBOSE=true
 ```
 
 **Output Includes**:
@@ -59,7 +59,7 @@ rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true
 - Recommendations
 
 ### 3. **Rollback Script** ✅
-**File**: `docs/apple-messages/scripts/rollback_normalization.rb`
+**File**: `docs/apple-messages/script/rollback_normalization.rb`
 
 **Features**:
 - Reverses normalization (snake_case → camelCase)
@@ -71,16 +71,16 @@ rails runner docs/apple-messages/scripts/dry_run_normalization.rb VERBOSE=true
 **Usage**:
 ```bash
 # Test rollback (dry-run)
-rails runner docs/apple-messages/scripts/rollback_normalization.rb DRY_RUN=true
+rails runner docs/apple-messages/script/rollback_normalization.rb DRY_RUN=true
 
 # Execute rollback (with confirmation)
-rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLBACK=yes
+rails runner docs/apple-messages/script/rollback_normalization.rb CONFIRM_ROLLBACK=yes
 ```
 
 **Note**: Only use if critical issues require full revert. Services expect snake_case after Phase 1.
 
 ### 4. **Verification Script** ✅
-**File**: `docs/apple-messages/scripts/verify_normalization.rb`
+**File**: `docs/apple-messages/script/verify_normalization.rb`
 
 **Features**:
 - Checks normalization status of all records
@@ -93,10 +93,10 @@ rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLB
 **Usage**:
 ```bash
 # Basic verification
-rails runner docs/apple-messages/scripts/verify_normalization.rb
+rails runner docs/apple-messages/script/verify_normalization.rb
 
 # Detailed (includes integrity checks)
-rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
+rails runner docs/apple-messages/script/verify_normalization.rb DETAILED=true
 ```
 
 **Output Includes**:
@@ -128,9 +128,9 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
 1. `db/migrate/20251026114341_normalize_apple_messages_content_attributes.rb` (180 lines)
 
 ### Scripts (3)
-2. `docs/apple-messages/scripts/dry_run_normalization.rb` (280 lines)
-3. `docs/apple-messages/scripts/rollback_normalization.rb` (140 lines)
-4. `docs/apple-messages/scripts/verify_normalization.rb` (320 lines)
+2. `docs/apple-messages/script/dry_run_normalization.rb` (280 lines)
+3. `docs/apple-messages/script/rollback_normalization.rb` (140 lines)
+4. `docs/apple-messages/script/verify_normalization.rb` (320 lines)
 
 ### Documentation (1)
 5. `docs/apple-messages/MIGRATION_GUIDE.md` (800 lines)
@@ -167,7 +167,7 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
 
 ```bash
 # 1. Analyze what will change
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb > analysis.txt
+rails runner docs/apple-messages/script/dry_run_normalization.rb > analysis.txt
 cat analysis.txt
 
 # 2. Create backup
@@ -177,7 +177,7 @@ pg_dump chatwoot_staging > backup_staging_$(date +%Y%m%d).sql
 rails db:migrate
 
 # 4. Verify success
-rails runner docs/apple-messages/scripts/verify_normalization.rb
+rails runner docs/apple-messages/script/verify_normalization.rb
 # Should show: ✅ EXCELLENT: All records are properly normalized
 ```
 
@@ -188,13 +188,13 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb
 pg_dump chatwoot_production > backup_production_$(date +%Y%m%d).sql
 
 # 2. Quick sanity check
-rails runner docs/apple-messages/scripts/dry_run_normalization.rb > prod_analysis.txt
+rails runner docs/apple-messages/script/dry_run_normalization.rb > prod_analysis.txt
 
 # 3. Run migration
 rails db:migrate
 
 # 4. Verify immediately
-rails runner docs/apple-messages/scripts/verify_normalization.rb > prod_verification.txt
+rails runner docs/apple-messages/script/verify_normalization.rb > prod_verification.txt
 cat prod_verification.txt | grep "Overall Health" -A 5
 
 # 5. Smoke test
@@ -401,7 +401,7 @@ rails runner "puts Message.last(5).map(&:content_attributes).map(&:keys).flatten
 ### First 24 Hours
 ```bash
 # Run verification every 2-4 hours
-rails runner docs/apple-messages/scripts/verify_normalization.rb | grep "Overall Health" -A 5
+rails runner docs/apple-messages/script/verify_normalization.rb | grep "Overall Health" -A 5
 
 # Should consistently show 100% normalized
 ```
@@ -409,7 +409,7 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb | grep "Overall
 ### First Week
 ```bash
 # Daily verification
-rails runner docs/apple-messages/scripts/verify_normalization.rb > daily_check_$(date +%Y%m%d).txt
+rails runner docs/apple-messages/script/verify_normalization.rb > daily_check_$(date +%Y%m%d).txt
 
 # Track metrics:
 # - Message creation success rate
@@ -457,7 +457,7 @@ After successful migration:
 
 ### Issue: Records not 100% normalized
 ```bash
-rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
+rails runner docs/apple-messages/script/verify_normalization.rb DETAILED=true
 # Review issues section, manually fix or re-run migration
 ```
 
@@ -467,7 +467,7 @@ rails runner docs/apple-messages/scripts/verify_normalization.rb DETAILED=true
 pg_restore -d chatwoot_production backup.sql
 
 # Option 2: Use rollback script
-rails runner docs/apple-messages/scripts/rollback_normalization.rb CONFIRM_ROLLBACK=yes
+rails runner docs/apple-messages/script/rollback_normalization.rb CONFIRM_ROLLBACK=yes
 ```
 
 ### Issue: Migration errors
@@ -491,9 +491,9 @@ VERBOSE=true rails db:migrate:redo VERSION=20251026114341
 - **Phase 1 Complete**: `docs/apple-messages/PHASE_1_COMPLETE.md`
 
 **Scripts**:
-- Dry-run: `docs/apple-messages/scripts/dry_run_normalization.rb`
-- Rollback: `docs/apple-messages/scripts/rollback_normalization.rb`
-- Verify: `docs/apple-messages/scripts/verify_normalization.rb`
+- Dry-run: `docs/apple-messages/script/dry_run_normalization.rb`
+- Rollback: `docs/apple-messages/script/rollback_normalization.rb`
+- Verify: `docs/apple-messages/script/verify_normalization.rb`
 
 ---
 

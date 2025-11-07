@@ -108,7 +108,7 @@ cp package.json ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
 
 # 5. Copy icons to each node directory (for proper display)
 for dir in ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/nodes/*/; do
-  cp ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/icons/chatwoot.svg "$dir"
+  cp ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/icons/amb.svg "$dir"
 done
 
 # 6. Stop and restart n8n with custom extensions path
@@ -122,6 +122,8 @@ container run \
   --volume ~/.n8n:/home/node/.n8n \
   --env N8N_SECURE_COOKIE=false \
   --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
+  --dns 8.8.8.8 \
+  --dns 1.1.1.1 \
   n8nio/n8n
 
 # 7. Verify installation
@@ -209,7 +211,7 @@ After installing custom nodes:
    ```bash
    # Copy icons to each node directory
    for dir in ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/nodes/*/; do
-     cp ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/icons/chatwoot.svg "$dir"
+     cp ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/icons/amb.svg "$dir"
    done
 
    # Restart n8n
@@ -311,6 +313,8 @@ macOS Container provides native container support on macOS without requiring Doc
      --volume ~/.n8n:/home/node/.n8n \
      --env N8N_SECURE_COOKIE=false \
      --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
+     --dns 8.8.8.8 \
+     --dns 1.1.1.1 \
      n8nio/n8n
    ```
 
@@ -323,10 +327,14 @@ macOS Container provides native container support on macOS without requiring Doc
      --publish 5678:5678 \
      --volume ~/.n8n:/home/node/.n8n \
      --env N8N_SECURE_COOKIE=false \
+     --dns 8.8.8.8 \
+     --dns 1.1.1.1 \
      n8nio/n8n
    ```
 
-   **Note**: We set `N8N_SECURE_COOKIE=false` for local development. For production deployments, use HTTPS/TLS instead.
+   **Note**:
+   - We set `N8N_SECURE_COOKIE=false` for local development. For production deployments, use HTTPS/TLS instead.
+   - `--dns 8.8.8.8 --dns 1.1.1.1` configures public DNS servers (Google and Cloudflare) to ensure n8n can connect to external APIs like Google Gemini, OpenAI, etc.
 
 4. **Manage n8n Container:**
    ```bash
@@ -360,13 +368,17 @@ macOS Container provides native container support on macOS without requiring Doc
 # Pull n8n Docker image
 docker pull n8nio/n8n
 
-# Run n8n with persistent data
+# Run n8n with persistent data and DNS configuration
 docker run -it --rm \
   --name n8n \
   -p 5678:5678 \
   -v ~/.n8n:/home/node/.n8n \
+  --dns 8.8.8.8 \
+  --dns 1.1.1.1 \
   n8nio/n8n
 ```
+
+**Note**: DNS configuration (`--dns`) ensures n8n can connect to external APIs like Google Gemini, OpenAI, etc.
 
 #### Option 3: Using npm
 
@@ -1631,6 +1643,96 @@ const state = $node["Webhook"].context.get('conversationState');
 - Check `content_attributes` structure matches Apple MSP specs
 - Ensure images are properly base64 encoded
 - Check CaseTransformer is handling snake_case → camelCase conversion
+
+#### 6. n8n Cannot Connect to External APIs (DNS Issues)
+
+**Symptoms:**
+- n8n cannot connect to Google Gemini, OpenAI, or other external APIs
+- Error messages like "ENOTFOUND" or "getaddrinfo failed"
+- "Cannot resolve hostname" errors
+
+**Solutions:**
+
+**For macOS Container users:**
+
+1. **Stop and remove existing n8n container:**
+   ```bash
+   container stop n8n
+   container rm n8n
+   ```
+
+2. **Restart with DNS configuration:**
+   ```bash
+   container run \
+     --name n8n \
+     --detach \
+     --publish 5678:5678 \
+     --volume ~/.n8n:/home/node/.n8n \
+     --env N8N_SECURE_COOKIE=false \
+     --env N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/custom" \
+     --dns 8.8.8.8 \
+     --dns 1.1.1.1 \
+     n8nio/n8n
+   ```
+
+3. **Verify DNS is working:**
+   ```bash
+   container exec n8n nslookup google.com
+   ```
+
+**For Docker Desktop users:**
+
+```bash
+docker stop n8n
+docker rm n8n
+
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  --dns 8.8.8.8 \
+  --dns 1.1.1.1 \
+  n8nio/n8n
+```
+
+**Why this happens:**
+- Containers use the host's DNS by default, which may not resolve external domains
+- The `--dns` flags configure public DNS servers (Google: 8.8.8.8, Cloudflare: 1.1.1.1)
+- This ensures n8n can reach external APIs regardless of your network configuration
+
+#### 7. Duplicate Messages from Quick Reply/Interactive Responses
+
+**Symptoms:**
+- Bot sends the same response message twice
+- Happens specifically after customer taps quick reply buttons, time pickers, or forms
+
+**Cause:**
+- Chatwoot sends both `message_created` AND `message_updated` webhooks for interactive messages
+- n8n processes both events, triggering duplicate responses
+
+**Solution:**
+
+Add this check at the beginning of your "Extract Message Context" function:
+
+```javascript
+// Extract data from the correct location (nested in 'body')
+const messageData = $json.body || $json;
+const event = messageData.event;
+
+// Skip message_updated events to avoid duplicate processing
+if (event === 'message_updated') {
+  return {
+    json: {
+      messageCategory: 'skip',
+      reason: 'Message updated event - already processed on message_created'
+    }
+  };
+}
+
+// Continue with rest of your logic...
+```
+
+This ensures only `message_created` events are processed, eliminating duplicates.
 
 ### Debugging Tips
 
