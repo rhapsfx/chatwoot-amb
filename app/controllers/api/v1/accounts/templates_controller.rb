@@ -2,7 +2,7 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   # CRUD controller for managing message templates
   # Uses MessageTemplatePolicy for authorization
 
-  before_action :fetch_template, only: [:show, :update, :destroy, :render_template]
+  before_action :fetch_template, only: [:show, :update, :destroy, :render_template, :attach_files, :remove_attachment, :reorder_attachments]
   before_action :check_authorization
 
   # GET /api/v1/accounts/:account_id/templates
@@ -184,6 +184,105 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
     render json: { error: 'Failed to create template from Apple message', details: e.message }, status: :internal_server_error
   end
 
+  # POST /api/v1/accounts/:account_id/templates/:id/attach_files
+  # Attach files to a template
+  def attach_files
+    if params[:attachments].blank?
+      render json: { error: 'No attachments provided' }, status: :bad_request
+      return
+    end
+
+    begin
+      attached_count = 0
+      attachment_errors = []
+
+      params[:attachments].each_with_index do |file, index|
+        @template.attachments.attach(file)
+        attached_count += 1
+
+        # Update metadata with attachment ID
+        attachment = @template.attachments.last
+        @template.attachment_metadata ||= {}
+        @template.attachment_metadata['display_order'] ||= []
+        @template.attachment_metadata['display_order'] << attachment.id unless @template.attachment_metadata['display_order'].include?(attachment.id)
+      rescue StandardError => e
+        attachment_errors << "File #{index + 1}: #{e.message}"
+      end
+
+      @template.save! if @template.changed?
+
+      render json: {
+        message: "#{attached_count} file(s) attached successfully",
+        attachments: @template.attachments_summary,
+        errors: attachment_errors.presence
+      }, status: :ok
+    rescue StandardError => e
+      Rails.logger.error "[Templates] Attach files failed: #{e.message}"
+      render json: { error: 'Failed to attach files', details: e.message }, status: :internal_server_error
+    end
+  end
+
+  # DELETE /api/v1/accounts/:account_id/templates/:id/attachments/:attachment_id
+  # Remove a specific attachment from a template
+  def remove_attachment
+    attachment = @template.attachments.find(params[:attachment_id])
+    attachment_id = attachment.id
+
+    attachment.purge
+
+    # Remove from metadata
+    if @template.attachment_metadata.present?
+      @template.attachment_metadata['display_order']&.delete(attachment_id)
+      @template.attachment_metadata['descriptions']&.delete(attachment_id.to_s)
+      @template.save!
+    end
+
+    render json: {
+      message: 'Attachment removed successfully',
+      attachments: @template.attachments_summary
+    }, status: :ok
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Attachment not found' }, status: :not_found
+  rescue StandardError => e
+    Rails.logger.error "[Templates] Remove attachment failed: #{e.message}"
+    render json: { error: 'Failed to remove attachment', details: e.message }, status: :internal_server_error
+  end
+
+  # PUT /api/v1/accounts/:account_id/templates/:id/reorder_attachments
+  # Reorder attachments for display
+  def reorder_attachments
+    if params[:attachment_ids].blank?
+      render json: { error: 'No attachment IDs provided' }, status: :bad_request
+      return
+    end
+
+    attachment_ids = params[:attachment_ids].map(&:to_i)
+
+    # Validate that all provided IDs belong to this template
+    current_attachment_ids = @template.attachments.pluck(:id)
+    invalid_ids = attachment_ids - current_attachment_ids
+
+    if invalid_ids.any?
+      render json: {
+        error: 'Invalid attachment IDs',
+        details: "IDs #{invalid_ids.join(', ')} do not belong to this template"
+      }, status: :bad_request
+      return
+    end
+
+    @template.attachment_metadata ||= {}
+    @template.attachment_metadata['display_order'] = attachment_ids
+    @template.save!
+
+    render json: {
+      message: 'Attachments reordered successfully',
+      attachments: @template.attachments_summary
+    }, status: :ok
+  rescue StandardError => e
+    Rails.logger.error "[Templates] Reorder attachments failed: #{e.message}"
+    render json: { error: 'Failed to reorder attachments', details: e.message }, status: :internal_server_error
+  end
+
   private
 
   def check_authorization
@@ -216,14 +315,23 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
       key.to_s.underscore.to_sym
     end
 
+    # Remove read-only fields that come from detailed_json response
+    # These are computed values and not actual database columns
+    normalized_params.delete(:content)
+    normalized_params.delete(:attachments_summary)
+    normalized_params.delete(:attachments)
+    normalized_params.delete(:created_at)
+    normalized_params.delete(:updated_at)
+    normalized_params.delete(:id)
+
     ActionController::Parameters.new(normalized_params).permit(
       :name,
       :category,
       :description,
       :status,
       :version,
-      :content,
       :metadata,
+      :attachment_metadata,
       parameters: {},
       supported_channels: [],
       tags: [],
