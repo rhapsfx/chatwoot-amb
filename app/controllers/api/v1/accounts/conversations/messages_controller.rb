@@ -134,7 +134,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     Rails.logger.info "🔥 MessagesController content_attributes: #{params[:content_attributes]}"
     Rails.logger.info "🔥 MessagesController images in content_attributes: #{params.dig(:content_attributes, :images)}"
 
-    permitted = params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at,
+    permitted = params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at, :template_id,
                               :attachments => [],
                               :content_attributes => [
                                 # Common type field for all Apple Messages

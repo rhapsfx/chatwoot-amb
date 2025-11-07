@@ -35,7 +35,7 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
     paginated_templates = templates.offset((page - 1) * per_page).limit(per_page)
 
     render json: {
-      templates: paginated_templates.map(&:bot_summary),
+      templates: paginated_templates.map { |t| t.bot_summary.merge(attachments_summary: t.attachments_summary) },
       total: templates.count,
       page: page,
       perPage: per_page,
@@ -80,7 +80,8 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
       success: true
     )
 
-    render json: result
+    # Include attachment metadata in response
+    render json: result.merge(attachments: result[:attachments] || [])
   rescue Templates::BotRendererService::ParameterValidationError => e
     render json: { error: 'Parameter validation failed', details: e.message }, status: :bad_request
   rescue StandardError => e
@@ -137,7 +138,8 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
     render json: {
       message: message.push_event_data,
       templateApplied: true,
-      templateId: template.id
+      templateId: template.id,
+      attachmentsSent: message.attachments.count
     }
   rescue Templates::BotMessagingService::SendError => e
     render json: { error: 'Failed to send template message', details: e.message }, status: :unprocessable_entity
