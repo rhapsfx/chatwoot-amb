@@ -28,7 +28,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
 
   # Main entry point: adapt template to Apple Messages format
   def adapt
-    Rails.logger.info "[TemplateAdapter] ========== ADAPT METHOD CALLED =========="
+    Rails.logger.info '[TemplateAdapter] ========== ADAPT METHOD CALLED =========='
     Rails.logger.info "[TemplateAdapter] Template: #{template.name if template.present?}"
     Rails.logger.info "[TemplateAdapter] Parameters: #{parameters.keys.inspect}"
 
@@ -46,7 +46,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   private
 
   def adapt_with_mapping(mapping)
-    Rails.logger.info "[TemplateAdapter] adapt_with_mapping called"
+    Rails.logger.info '[TemplateAdapter] adapt_with_mapping called'
     Rails.logger.info "[TemplateAdapter] Mapping content_type: #{mapping.content_type.inspect}"
     Rails.logger.info "[TemplateAdapter] Mapping field_mappings: #{mapping.field_mappings.inspect}"
 
@@ -61,7 +61,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   end
 
   def adapt_with_defaults
-    Rails.logger.info "[TemplateAdapter] adapt_with_defaults called"
+    Rails.logger.info '[TemplateAdapter] adapt_with_defaults called'
     Rails.logger.info "[TemplateAdapter] Content blocks count: #{@content_blocks&.length || 0}"
 
     # Default adaptation logic for Apple Messages
@@ -76,7 +76,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
 
     case block_type
     when 'time_picker'
-      Rails.logger.info "[TemplateAdapter] Routing to adapt_time_picker"
+      Rails.logger.info '[TemplateAdapter] Routing to adapt_time_picker'
       adapt_time_picker(primary_block)
     when 'list_picker'
       adapt_list_picker(primary_block)
@@ -93,13 +93,13 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     when 'auth_request', 'oauth'
       adapt_oauth(primary_block)
     else
-      Rails.logger.info "[TemplateAdapter] No matching block type, using generic content"
+      Rails.logger.info '[TemplateAdapter] No matching block type, using generic content'
       adapt_generic_content
     end
   end
 
   def adapt_time_picker(block)
-    Rails.logger.info "[TemplateAdapter] adapt_time_picker called"
+    Rails.logger.info '[TemplateAdapter] adapt_time_picker called'
     properties = block[:properties]
 
     # CRITICAL: Use snake_case string keys (Chatwoot validation expects this)
@@ -152,34 +152,34 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     result = slots.map.with_index do |slot_time, index|
       # Handle both string timestamps and hash objects (use snake_case string keys)
       formatted_slot = if slot_time.is_a?(Hash)
-        identifier = slot_time['identifier'] || "slot_#{index}"
-        start_time_value = slot_time['startTime'] || slot_time['start_time']
+                         identifier = slot_time['identifier'] || "slot_#{index}"
+                         start_time_value = slot_time['startTime'] || slot_time['start_time']
 
-        Rails.logger.info "[TemplateAdapter] Slot #{index}: identifier=#{identifier}, startTime=#{start_time_value.inspect}"
+                         Rails.logger.info "[TemplateAdapter] Slot #{index}: identifier=#{identifier}, startTime=#{start_time_value.inspect}"
 
-        # Fallback: Try to parse start_time from identifier if missing
-        # Format: "YYYY-MM-DD_HH" or similar date-based identifiers
-        if start_time_value.nil? && identifier.present?
-          Rails.logger.info "[TemplateAdapter] startTime is nil, attempting to parse from identifier: #{identifier}"
-          start_time_value = parse_time_from_identifier(identifier)
-          Rails.logger.info "[TemplateAdapter] Parsed time from identifier: #{start_time_value.inspect}"
-        end
+                         # Fallback: Try to parse start_time from identifier if missing
+                         # Format: "YYYY-MM-DD_HH" or similar date-based identifiers
+                         if start_time_value.nil? && identifier.present?
+                           Rails.logger.info "[TemplateAdapter] startTime is nil, attempting to parse from identifier: #{identifier}"
+                           start_time_value = parse_time_from_identifier(identifier)
+                           Rails.logger.info "[TemplateAdapter] Parsed time from identifier: #{start_time_value.inspect}"
+                         end
 
-        formatted_time = format_time(start_time_value)
-        Rails.logger.info "[TemplateAdapter] Formatted time: #{formatted_time.inspect}"
+                         formatted_time = format_time(start_time_value)
+                         Rails.logger.info "[TemplateAdapter] Formatted time: #{formatted_time.inspect}"
 
-        {
-          'identifier' => identifier,
-          'start_time' => formatted_time,
-          'duration' => slot_time['duration'] || 3600
-        }
-      else
-        {
-          'identifier' => "slot_#{index}",
-          'start_time' => format_time(slot_time),
-          'duration' => @template.parameters.dig('appointment_duration', 'default') || 3600
-        }
-      end
+                         {
+                           'identifier' => identifier,
+                           'start_time' => formatted_time,
+                           'duration' => slot_time['duration'] || 3600
+                         }
+                       else
+                         {
+                           'identifier' => "slot_#{index}",
+                           'start_time' => format_time(slot_time),
+                           'duration' => @template.parameters.dig('appointment_duration', 'default') || 3600
+                         }
+                       end
 
       Rails.logger.info "[TemplateAdapter] Formatted slot #{index}: #{formatted_slot.inspect}"
       formatted_slot
@@ -199,7 +199,10 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
 
     # Pattern 1: YYYY-MM-DD_HH format
     if identifier =~ /(\d{4})-(\d{2})-(\d{2})_(\d+)/
-      year, month, day, hour = $1.to_i, $2.to_i, $3.to_i, $4.to_i
+      year = ::Regexp.last_match(1).to_i
+      month = ::Regexp.last_match(2).to_i
+      day = ::Regexp.last_match(3).to_i
+      hour = ::Regexp.last_match(4).to_i
       begin
         Time.utc(year, month, day, hour, 0, 0)
       rescue ArgumentError
@@ -208,14 +211,14 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     # Pattern 2: ISO8601-like in identifier (e.g., "slot_2025-10-30T14:00")
     elsif identifier =~ /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/
       begin
-        Time.parse($1)
+        Time.parse(::Regexp.last_match(1))
       rescue ArgumentError
         nil
       end
     # Pattern 3: Just a date (e.g., "2025-10-30")
     elsif identifier =~ /^(\d{4}-\d{2}-\d{2})$/
       begin
-        Time.parse($1)
+        Time.parse(::Regexp.last_match(1))
       rescue ArgumentError
         nil
       end
@@ -380,7 +383,9 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
     properties = block[:properties]
 
     # Format items to match Chatwoot's expected format
-    items = (properties['items'] || properties[:items] || []).map do |item|
+    # Support both 'items' (Apple format) and 'replies' (Chatwoot format)
+    source_items = properties['items'] || properties[:items] || properties['replies'] || properties[:replies] || []
+    items = source_items.map do |item|
       {
         'identifier' => item['identifier'] || item[:identifier] || SecureRandom.uuid,
         'title' => item['title'] || item[:title]
@@ -389,9 +394,9 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
 
     {
       content_type: 'apple_quick_reply',
-      content: properties['summaryText'] || properties[:summaryText] || properties['summary_text'] || 'Quick Reply',
+      content: properties['text'] || properties['summaryText'] || properties[:summaryText] || properties['summary_text'] || 'Quick Reply',
       content_attributes: {
-        'summary_text' => properties['summaryText'] || properties[:summaryText] || properties['summary_text'],
+        'summary_text' => properties['text'] || properties['summaryText'] || properties[:summaryText] || properties['summary_text'],
         'items' => items
       }.compact
     }
@@ -504,7 +509,7 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
   end
 
   def map_attributes(field_mappings)
-    Rails.logger.info "[TemplateAdapter] map_attributes called"
+    Rails.logger.info '[TemplateAdapter] map_attributes called'
     Rails.logger.info "[TemplateAdapter] Field mappings: #{field_mappings.inspect}"
 
     # Apply custom field mappings from template

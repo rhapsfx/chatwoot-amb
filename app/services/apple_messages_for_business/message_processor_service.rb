@@ -73,9 +73,18 @@ class AppleMessagesForBusiness::MessageProcessorService
       message_params[:content] = @message_params[:content_attributes]['title']
     end
 
+    # Clean placeholder content if template has attachments
+    if @message_params[:template_id].present?
+      template = MessageTemplate.find_by(id: @message_params[:template_id])
+      message_params[:content] = clean_placeholder_content(message_params[:content]) if template&.attachments&.attached?
+    end
+
     # Create the message using MessageBuilder (this validates and saves to DB)
     # The message will be automatically sent via SendReplyJob after_create_commit callback
     message = Messages::MessageBuilder.new(@user, @conversation, message_params).perform
+
+    # If template_id is present, attach template files to the message
+    attach_template_files(message, @message_params[:template_id]) if @message_params[:template_id].present?
 
     Rails.logger.info '[AMB MessageProcessor] Message created and will be sent automatically via SendReplyJob'
 
@@ -208,7 +217,20 @@ class AppleMessagesForBusiness::MessageProcessorService
   end
 
   def send_regular_message
-    Messages::MessageBuilder.new(@user, @conversation, @message_params).perform
+    message_params = @message_params.dup
+
+    # Clean placeholder content if template has attachments
+    if @message_params[:template_id].present?
+      template = MessageTemplate.find_by(id: @message_params[:template_id])
+      message_params[:content] = clean_placeholder_content(message_params[:content]) if template&.attachments&.attached?
+    end
+
+    message = Messages::MessageBuilder.new(@user, @conversation, message_params).perform
+
+    # If template_id is present, attach template files to the message
+    attach_template_files(message, @message_params[:template_id]) if @message_params[:template_id].present?
+
+    message
   end
 
   def customer_opted_out?
@@ -218,5 +240,76 @@ class AppleMessagesForBusiness::MessageProcessorService
 
     # Check if this customer has opted out (blocked) via AMB close event
     contact.additional_attributes&.dig('apple_messages_blocked') == true
+  end
+
+  # Clean placeholder content for messages with template attachments
+  # This removes generic "Message" text that would appear as a separate bubble
+  def clean_placeholder_content(content)
+    return content if content.blank?
+
+    stripped = content.strip
+
+    # Remove generic "Message" text (case-insensitive)
+    # Keep empty string - SendMessageService will add the replacement character (￼)
+    return '' if /^Message$/i.match?(stripped)
+
+    # Remove "Message " prefix but keep the replacement character
+    # This handles: "Message ￼" -> "￼"
+    return stripped.gsub(/^Message\s+/i, '')
+  end
+
+  # Attach template files to the message
+  # This is called when a message is created from a template with attachments
+  def attach_template_files(message, template_id)
+    template = MessageTemplate.find_by(id: template_id)
+    return unless template&.attachments&.attached?
+
+    Rails.logger.info "[AMB MessageProcessor] Attaching #{template.attachments.count} template files to message #{message.id}"
+
+    # Get ordered attachment IDs from metadata
+    display_order = template.attachment_metadata.dig('display_order') || []
+
+    # Sort attachments by display order
+    ordered_attachments = if display_order.present?
+                            display_order.filter_map { |id| template.attachments.find { |a| a.id == id } }
+                          else
+                            template.attachments.to_a
+                          end
+
+    # Attach each file to the message
+    ordered_attachments.each do |attachment|
+      # Download the blob content
+      file_content = attachment.download
+
+      # Create a new Attachment record for the message
+      message.attachments.create!(
+        file_type: determine_file_type(attachment.content_type),
+        account_id: message.account_id,
+        file: {
+          io: StringIO.new(file_content),
+          filename: attachment.filename.to_s,
+          content_type: attachment.content_type
+        }
+      )
+
+      Rails.logger.info "[AMB MessageProcessor] Attached file '#{attachment.filename}' to message #{message.id}"
+    rescue StandardError => e
+      Rails.logger.error "[AMB MessageProcessor] Failed to attach file #{attachment.filename}: #{e.message}"
+      # Continue with other attachments even if one fails
+    end
+  end
+
+  # Determine attachment file type from content type
+  def determine_file_type(content_type)
+    case content_type
+    when %r{^image/}
+      :image
+    when %r{^video/}
+      :video
+    when %r{^audio/}
+      :audio
+    else
+      :file
+    end
   end
 end
