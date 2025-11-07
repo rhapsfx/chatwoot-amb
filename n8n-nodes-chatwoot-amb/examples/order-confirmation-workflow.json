@@ -1,0 +1,191 @@
+{
+  "name": "Order Confirmation with Attachments",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-placed",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - Order Placed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "order-placed-trigger"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract order data and format for template\nconst order = $json;\n\nreturn {\n  conversation_id: order.chatwoot_conversation_id,\n  customer_name: order.customer.name,\n  order_id: order.id,\n  order_total: order.total,\n  order_date: new Date(order.created_at).toLocaleDateString(),\n  shipping_address: order.shipping.address,\n  estimated_delivery: order.shipping.estimated_delivery\n};"
+      },
+      "id": "function-1",
+      "name": "Format Order Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "accountId": 1,
+        "conversationId": "={{$json.conversation_id}}",
+        "templateSelection": "search",
+        "templateName": "Order Confirmation",
+        "parameters": {
+          "parameter": [
+            {
+              "key": "customer_name",
+              "value": "={{$json.customer_name}}"
+            },
+            {
+              "key": "order_id",
+              "value": "={{$json.order_id}}"
+            },
+            {
+              "key": "order_total",
+              "value": "={{$json.order_total}}"
+            },
+            {
+              "key": "order_date",
+              "value": "={{$json.order_date}}"
+            },
+            {
+              "key": "shipping_address",
+              "value": "={{$json.shipping_address}}"
+            },
+            {
+              "key": "estimated_delivery",
+              "value": "={{$json.estimated_delivery}}"
+            }
+          ]
+        },
+        "additionalOptions": {
+          "returnTemplateInfo": true,
+          "validateTemplate": true
+        }
+      },
+      "id": "template-message-1",
+      "name": "Send Order Confirmation",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.error}}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "Check for Errors",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log success\nconsole.log('Order confirmation sent successfully');\nconsole.log('Template ID:', $json.metadata.template_id);\nconsole.log('Attachments sent:', $json.metadata.attachments_sent);\n\nreturn $json;"
+      },
+      "id": "function-2",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log error and send fallback message\nconsole.error('Template message failed:', $json.error);\n\n// Return data for fallback text message\nreturn {\n  conversation_id: $json.conversation_id,\n  fallback_message: 'Your order has been confirmed! Order details will be sent shortly.'\n};"
+      },
+      "id": "function-3",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Webhook - Order Placed": {
+      "main": [
+        [
+          {
+            "node": "Format Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Order Data": {
+      "main": [
+        [
+          {
+            "node": "Send Order Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Order Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Check for Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Errors": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "instanceId": "order-confirmation-example"
+  },
+  "tags": [
+    {
+      "name": "chatwoot"
+    },
+    {
+      "name": "template"
+    },
+    {
+      "name": "order"
+    },
+    {
+      "name": "e-commerce"
+    }
+  ]
+}
