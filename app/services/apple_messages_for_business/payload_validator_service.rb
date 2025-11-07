@@ -223,8 +223,15 @@ class AppleMessagesForBusiness::PayloadValidatorService
       return
     end
 
+    # Pages are inside dynamic.data for messageForms template
+    dynamic_data = dynamic[:data] || dynamic['data']
+    unless dynamic_data.present?
+      @errors << 'Form data missing dynamic.data field'
+      return
+    end
+
     # Validate pages - handle both string and symbol keys
-    pages = dynamic[:pages] || dynamic['pages']
+    pages = dynamic_data[:pages] || dynamic_data['pages']
     unless pages.is_a?(Array) && pages.any?
       @errors << 'Form must have at least one page'
       return

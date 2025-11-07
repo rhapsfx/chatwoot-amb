@@ -41,6 +41,9 @@ class Templates::BotRendererService
     validate_parameters!
     validate_channel_compatibility!
 
+    # Check if template has apple_message_content in metadata (migrated bot templates)
+    return render_from_metadata if template.metadata.present? && template.metadata['apple_message_content'].present?
+
     processed_content = process_template_variables
     channel_content = adapt_for_channel(processed_content)
 
@@ -50,11 +53,336 @@ class Templates::BotRendererService
       content_type: channel_content[:content_type],
       content: channel_content[:content],
       content_attributes: channel_content[:content_attributes],
+      attachments: load_template_attachments,
       webhook_data: generate_webhook_data
     }
   end
 
   private
+
+  # Render template directly from metadata (for migrated bot templates)
+  def render_from_metadata
+    apple_content = template.metadata['apple_message_content']
+
+    # Get content attributes
+    content_attrs = apple_content['content_attributes'] || {}
+
+    # Detect actual content type from structure
+    actual_content_type = detect_content_type_from_attributes(content_attrs)
+
+    # Transform old bot format to Chatwoot format
+    transformed_attrs = transform_bot_format_to_chatwoot(content_attrs, actual_content_type)
+
+    # Load images from ActiveStorage if template references them
+    transformed_attrs = load_images_from_storage(transformed_attrs) if actual_content_type == 'apple_list_picker'
+
+    # Merge parameters if provided, but filter out keys that would be invalid at root level
+    if parameters.present?
+      # Filter parameters to only allow valid keys for this content type
+      filtered_params = filter_parameters_for_content_type(parameters, actual_content_type)
+      # Remove blank/empty values to prevent overriding template defaults
+      filtered_params = filtered_params.reject { |_k, v| v.blank? }
+      transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+    end
+
+    {
+      template_id: template.id,
+      template_name: template.name,
+      content_type: actual_content_type,
+      content: apple_content['content'] || '',
+      content_attributes: transformed_attrs,
+      attachments: load_template_attachments,
+      webhook_data: generate_webhook_data
+    }
+  end
+
+  # Load images from ActiveStorage and add them to content_attributes
+  def load_images_from_storage(attrs)
+    # Collect all image identifiers referenced in the template
+    image_identifiers = collect_image_identifiers(attrs)
+    return attrs if image_identifiers.empty?
+
+    # Load images from ActiveStorage (use distinct to avoid duplicates)
+    images = AppleListPickerImage
+             .where(account_id: template.account_id, identifier: image_identifiers)
+             .includes(image_attachment: :blob)
+             .group_by(&:identifier)
+             .transform_values(&:first) # Take first record for each identifier
+
+    return attrs if images.empty?
+
+    # Convert images to base64 format, maintaining order of identifiers
+    images_array = image_identifiers.filter_map do |identifier|
+      img = images[identifier]
+      next unless img&.image&.attached?
+
+      begin
+        # Read the image data and encode to base64
+        image_data = img.image.download
+        base64_data = Base64.strict_encode64(image_data)
+
+        {
+          'identifier' => img.identifier,
+          'data' => base64_data,
+          'description' => img.description
+        }.compact
+      rescue StandardError => e
+        Rails.logger.error "[BotRendererService] Failed to load image #{img.identifier}: #{e.message}"
+        nil
+      end
+    end
+
+    # Add images to content_attributes
+    attrs['images'] = images_array unless images_array.empty?
+    attrs
+  end
+
+  # Collect all image identifiers from sections and received_message
+  def collect_image_identifiers(attrs)
+    identifiers = []
+
+    # Collect from sections items
+    sections = attrs['sections'] || []
+    sections.each do |section|
+      items = section['items'] || []
+      items.each do |item|
+        identifiers << item['image_identifier'] if item['image_identifier'].present?
+      end
+    end
+
+    # Collect from received_message
+    identifiers << attrs['received_image_identifier'] if attrs['received_image_identifier'].present?
+
+    # Collect from reply_message
+    identifiers << attrs['reply_image_identifier'] if attrs['reply_image_identifier'].present?
+
+    identifiers.compact.uniq
+  end
+
+  # Filter parameters to only allow valid root-level keys for the content type
+  def filter_parameters_for_content_type(params, content_type)
+    case content_type
+    when 'apple_list_picker'
+      # Only allow these keys at root level for list picker
+      allowed_keys = %w[
+        sections images
+        received_title received_subtitle received_image_identifier received_style
+        reply_title reply_subtitle reply_image_title reply_image_subtitle
+        reply_secondary_subtitle reply_tertiary_subtitle reply_image_identifier reply_style
+      ]
+      params.select { |key, _| allowed_keys.include?(key.to_s) }
+    when 'apple_time_picker'
+      # Only allow these keys at root level for time picker
+      allowed_keys = %w[
+        event timezone_offset timeslots
+        received_title received_subtitle received_image_identifier received_style
+        reply_title reply_subtitle reply_image_title reply_image_subtitle
+        reply_secondary_subtitle reply_tertiary_subtitle reply_image_identifier reply_style
+      ]
+      params.select { |key, _| allowed_keys.include?(key.to_s) }
+    when 'apple_form'
+      # Only allow these keys at root level for forms
+      allowed_keys = %w[
+        title description fields pages submit_url method validation_rules images
+        received_message reply_message version form_id use_live_layout submit_button cancel_button
+      ]
+      params.select { |key, _| allowed_keys.include?(key.to_s) }
+    else
+      # For other types, allow all parameters (they'll be validated by the model)
+      params
+    end
+  end
+
+  # Detect the actual Apple Messages content type from content_attributes structure
+  def detect_content_type_from_attributes(attrs)
+    # Check for dynamic content (List Picker, Time Picker, Forms) - old bot format
+    if attrs['dynamic'].present?
+      template_type = attrs.dig('dynamic', 'template')
+      case template_type
+      when 'formSelect'
+        return 'apple_list_picker'
+      when 'timePicker'
+        return 'apple_time_picker'
+      when 'form'
+        return 'apple_form'
+      end
+    end
+
+    # Check for newer bot format with explicit type wrappers
+    return 'apple_list_picker' if attrs['list_picker'].present? && attrs.dig('list_picker', 'sections').present?
+    return 'apple_time_picker' if attrs['time_picker'].present? || (attrs['event'].present? && attrs['event']['timeslots'].present?)
+    return 'apple_form' if attrs['form'].present?
+
+    # Check for direct sections at root level (Chatwoot format)
+    return 'apple_list_picker' if attrs['sections'].present?
+
+    # Check for direct pages at root level (Apple Messages Forms format)
+    return 'apple_form' if attrs['pages'].present? && attrs['pages'].is_a?(Array) && attrs['pages'].first&.dig('items').present?
+
+    # Check for other Apple Messages types (support both underscore and hyphenated keys)
+    return 'apple_quick_reply' if attrs['quick_reply'].present? || attrs['quick-reply'].present? || attrs['replies'].present?
+    return 'apple_rich_link' if attrs['url'].present? && attrs['title'].present?
+    return 'apple_pay' if attrs['payment'].present?
+    return 'apple_authentication' if attrs['oauth2'].present?
+
+    # Default to text
+    'text'
+  end
+
+  # Transform old bot format to Chatwoot format
+  def transform_bot_format_to_chatwoot(attrs, content_type)
+    case content_type
+    when 'apple_list_picker'
+      transform_list_picker_format(attrs)
+    when 'apple_time_picker'
+      transform_time_picker_format(attrs)
+    when 'apple_form'
+      transform_form_format(attrs)
+    when 'apple_quick_reply'
+      transform_quick_reply_format(attrs)
+    else
+      # For other types or already in correct format, return as-is
+      attrs
+    end
+  end
+
+  # Transform List Picker from bot format to Chatwoot format
+  def transform_list_picker_format(attrs)
+    result = {}
+
+    # Handle old format: dynamic.page.sections
+    if attrs['dynamic'].present? && attrs.dig('dynamic', 'page', 'sections').present?
+      result['sections'] = attrs.dig('dynamic', 'page', 'sections')
+    # NOTE: title/subtitle from dynamic.page are NOT copied to root level
+    # They should be inside each section if needed
+    # Handle newer format: list_picker.sections
+    elsif attrs['list_picker'].present? && attrs.dig('list_picker', 'sections').present?
+      result['sections'] = attrs.dig('list_picker', 'sections')
+    # NOTE: multiple_selection is NOT copied to root level
+    # It should be inside each section if needed
+    # Already has sections at root - copy them
+    elsif attrs['sections'].present?
+      result['sections'] = attrs['sections']
+    end
+
+    # Normalize sections: rename 'fields' to 'items' and fix invalid style values
+    if result['sections'].present?
+      # Valid item keys per Chatwoot validation
+      valid_item_keys = %w[identifier title subtitle image_identifier imageIdentifier order style]
+
+      result['sections'] = result['sections'].map do |section|
+        normalized_section = section.dup
+
+        # Rename 'fields' to 'items' (old nested list picker format)
+        normalized_section['items'] = normalized_section.delete('fields') if normalized_section['fields'].present?
+
+        # Normalize items: fix invalid style values and remove invalid keys
+        if normalized_section['items'].present?
+          normalized_section['items'] = normalized_section['items'].map do |item|
+            # Filter to only valid keys
+            normalized_item = item.select { |k, _v| valid_item_keys.include?(k.to_s) }
+
+            # Convert invalid 'default' style to 'icon'
+            normalized_item['style'] = 'icon' if normalized_item['style'] == 'default'
+
+            # Ensure required fields have defaults
+            normalized_item['style'] ||= 'icon'
+            normalized_item['identifier'] ||= "item_#{SecureRandom.hex(8)}"
+
+            normalized_item
+          end
+        end
+
+        normalized_section
+      end
+    end
+
+    # Copy received_message and reply_message fields (these ARE valid at root level)
+    result['received_title'] = attrs.dig('received_message', 'title')
+    result['received_subtitle'] = attrs.dig('received_message', 'subtitle')
+    result['received_image_identifier'] = attrs.dig('received_message', 'image_identifier')
+    result['received_style'] = attrs.dig('received_message', 'style')
+    result['reply_title'] = attrs.dig('reply_message', 'title')
+    result['reply_subtitle'] = attrs.dig('reply_message', 'subtitle')
+    result['reply_image_identifier'] = attrs.dig('reply_message', 'image_identifier')
+    result['reply_style'] = attrs.dig('reply_message', 'style')
+
+    # Copy images if present
+    result['images'] = attrs['images'] if attrs['images'].present?
+
+    result.compact
+  end
+
+  # Transform Time Picker from bot format to Chatwoot format
+  def transform_time_picker_format(attrs)
+    result = {}
+
+    # Handle old format: dynamic.event
+    if attrs['dynamic'].present? && attrs.dig('dynamic', 'event').present?
+      result['event'] = attrs.dig('dynamic', 'event')
+    # Already in Chatwoot format
+    elsif attrs['event'].present?
+      return attrs
+    end
+
+    # Copy received_message and reply_message
+    result['received_title'] = attrs.dig('received_message', 'title')
+    result['received_subtitle'] = attrs.dig('received_message', 'subtitle')
+    result['received_image_identifier'] = attrs.dig('received_message', 'image_identifier')
+    result['reply_title'] = attrs.dig('reply_message', 'title')
+    result['reply_subtitle'] = attrs.dig('reply_message', 'subtitle')
+    result['reply_image_identifier'] = attrs.dig('reply_message', 'image_identifier')
+
+    result.compact
+  end
+
+  # Transform Form from bot format to Chatwoot format
+  def transform_form_format(attrs)
+    result = {}
+
+    # Handle old format: dynamic.form
+    if attrs['dynamic'].present? && attrs.dig('dynamic', 'form').present?
+      result['form'] = attrs.dig('dynamic', 'form')
+    # Already in Chatwoot format with 'form' wrapper
+    elsif attrs['form'].present?
+      return attrs
+    # Already in Chatwoot format with pages at root level (new Apple Messages Forms format)
+    elsif attrs['pages'].present?
+      return attrs
+    end
+
+    # Copy received_message and reply_message (for legacy format only)
+    result['received_title'] = attrs.dig('received_message', 'title')
+    result['received_subtitle'] = attrs.dig('received_message', 'subtitle')
+    result['received_image_identifier'] = attrs.dig('received_message', 'image_identifier')
+    result['reply_title'] = attrs.dig('reply_message', 'title')
+    result['reply_subtitle'] = attrs.dig('reply_message', 'subtitle')
+    result['reply_image_identifier'] = attrs.dig('reply_message', 'image_identifier')
+
+    result.compact
+  end
+
+  # Transform Quick Reply from bot format to Chatwoot format
+  def transform_quick_reply_format(attrs)
+    result = {}
+
+    # Handle old format with hyphenated key: quick-reply
+    if attrs['quick-reply'].present?
+      quick_reply_data = attrs['quick-reply']
+      result['items'] = quick_reply_data['items'] if quick_reply_data['items'].present?
+      result['summary_text'] = quick_reply_data['summary_text'] if quick_reply_data['summary_text'].present?
+    # Handle format with underscore key: quick_reply
+    elsif attrs['quick_reply'].present?
+      quick_reply_data = attrs['quick_reply']
+      result['items'] = quick_reply_data['items'] if quick_reply_data['items'].present?
+      result['summary_text'] = quick_reply_data['summary_text'] if quick_reply_data['summary_text'].present?
+    # Already in Chatwoot format (items at root level)
+    elsif attrs['items'].present? || attrs['replies'].present?
+      return attrs
+    end
+
+    result.compact
+  end
 
   # Validate that all required parameters are present and correct type
   def validate_parameters!
@@ -222,5 +550,33 @@ class Templates::BotRendererService
       channel_type: channel_type,
       timestamp: Time.current.iso8601
     }
+  end
+
+  # Load template attachments and return metadata for message creation
+  def load_template_attachments
+    return [] unless template.attachments.attached?
+
+    # Get ordered attachment IDs from metadata
+    display_order = template.attachment_metadata.dig('display_order') || []
+
+    # Sort attachments by display order
+    ordered_attachments = if display_order.present?
+                            display_order.filter_map { |id| template.attachments.find { |a| a.id == id } }
+                          else
+                            template.attachments.to_a
+                          end
+
+    # Return attachment metadata for message creation
+    ordered_attachments.map do |attachment|
+      {
+        id: attachment.id,
+        filename: attachment.filename.to_s,
+        content_type: attachment.content_type,
+        byte_size: attachment.byte_size,
+        blob_id: attachment.blob.id,
+        signed_id: attachment.signed_id,
+        description: template.attachment_metadata.dig('descriptions', attachment.id.to_s)
+      }
+    end
   end
 end

@@ -146,10 +146,6 @@ class AppleMessagesForBusiness::SendMessageService
       useLiveLayout: true
     }
 
-    # Add images array if present (enrich with base64 data from database)
-    images = enrich_images_with_data(content_attributes['images'])
-    base_data[:data][:images] = images if images.present?
-
     # Add the specific interactive content based on message type
     case @message.content_type
     when 'apple_quick_reply'
@@ -168,6 +164,16 @@ class AppleMessagesForBusiness::SendMessageService
       base_data[:data][:dynamic] = build_form_dynamic_data
       base_data[:receivedMessage] = build_received_message
       base_data[:replyMessage] = build_reply_message
+    end
+
+    # Add images array if present
+    # For forms, use @form_images loaded during build_form_dynamic_data
+    # For other types, enrich from content_attributes['images']
+    if @message.content_type == 'apple_form' && @form_images.present?
+      base_data[:data][:images] = @form_images
+    elsif content_attributes['images'].present?
+      images = enrich_images_with_data(content_attributes['images'])
+      base_data[:data][:images] = images if images.present?
     end
 
     base_data
@@ -373,6 +379,10 @@ class AppleMessagesForBusiness::SendMessageService
       pages = convert_form_builder_pages_to_msp(form_data['pages'])
       # Set startPageIdentifier to the first page's ID
       start_page_id = pages.first&.dig(:pageIdentifier) || '0'
+
+      # Collect image identifiers from form pages and load images
+      image_identifiers = collect_form_image_identifiers(form_data['pages'])
+      load_form_images(image_identifiers) if image_identifiers.any?
     else
       # Legacy: Convert flat fields array to MSP format
       pages = convert_legacy_fields_to_msp(form_data['fields'] || [])
@@ -388,6 +398,63 @@ class AppleMessagesForBusiness::SendMessageService
         pages: pages
       }
     }
+  end
+
+  # Collect all image identifiers referenced in form pages
+  def collect_form_image_identifiers(pages)
+    identifiers = []
+
+    # Collect from page items (singleSelect/multiSelect options)
+    pages.each do |page|
+      items = page['items'] || []
+      items.each do |item|
+        next unless item['item_type'] == 'singleSelect' || item['item_type'] == 'multiSelect'
+
+        options = item['options'] || []
+        options.each do |option|
+          identifiers << option['imageIdentifier'] if option['imageIdentifier'].present?
+        end
+      end
+    end
+
+    # Collect from received_message and reply_message
+    received_msg = content_attributes['received_message'] || {}
+    reply_msg = content_attributes['reply_message'] || {}
+
+    identifiers << received_msg['image_identifier'] if received_msg['image_identifier'].present?
+    identifiers << reply_msg['image_identifier'] if reply_msg['image_identifier'].present?
+
+    identifiers.compact.uniq
+  end
+
+  # Load form images and add them to the base_data[:data][:images] array
+  def load_form_images(identifiers)
+    return if identifiers.empty?
+
+    # Fetch images from database
+    stored_images = AppleListPickerImage.where(
+      inbox_id: @channel.inbox.id,
+      identifier: identifiers
+    ).includes(image_attachment: :blob).index_by(&:identifier)
+
+    # Build images array for payload
+    images_array = identifiers.filter_map do |identifier|
+      stored_image = stored_images[identifier]
+
+      if stored_image&.image&.attached?
+        {
+          identifier: identifier,
+          data: stored_image.image_data_base64,
+          description: stored_image.description || identifier
+        }
+      else
+        Rails.logger.warn "[AMB Send] Form image #{identifier} not found in database for inbox #{@channel.inbox.id}"
+        nil
+      end
+    end
+
+    # Add to the payload (this will be accessed by build_interactive_data)
+    @form_images = images_array unless images_array.empty?
   end
 
   def convert_form_builder_pages_to_msp(builder_pages)
@@ -460,6 +527,8 @@ class AppleMessagesForBusiness::SendMessageService
           value: option['value'],
           identifier: "#{item_page_id}_#{opt_index}"
         }
+        # Add imageIdentifier if present
+        item_data[:imageIdentifier] = option['imageIdentifier'] if option['imageIdentifier'].present?
         # For single select, each item can specify next page
         item_data[:nextPageIdentifier] = next_page_id if !multiple_selection && next_page_id
         item_data
@@ -498,6 +567,48 @@ class AppleMessagesForBusiness::SendMessageService
           labelText: item['title'] || 'Date'
         }.compact
       }
+    when 'picker'
+      # Handle picker type - use picker_type to determine the specific picker format
+      case item['picker_type']
+      when 'date', 'dateTime'
+        # Get current date/time for default values
+        current_datetime = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
+        # Set maximum date to 1 year from now to allow future bookings
+        max_date = (Time.now.utc + 365.days).strftime('%Y-%m-%d')
+
+        {
+          pageIdentifier: item_page_id,
+          type: 'datePicker',
+          title: item['title'] || 'Select Date',
+          subtitle: item['description'] || 'Please select a date',
+          nextPageIdentifier: next_page_id,
+          submitForm: is_last,
+          options: {
+            required: item['required'] || false,
+            startDate: current_datetime,      # Default to current date/time
+            maximumDate: max_date,            # Allow up to 1 year in the future
+            labelText: item['title'] || 'Date'
+          }.compact
+        }
+      else
+        # For unsupported picker types, fall back to text input
+        Rails.logger.warn "[SendMessageService] Unsupported picker_type '#{item['picker_type']}' for item '#{item['title']}', falling back to text input"
+        {
+          pageIdentifier: item_page_id,
+          type: 'input',
+          title: item['title'] || 'Input',
+          subtitle: item['description'] || item['placeholder'] || '',
+          nextPageIdentifier: next_page_id,
+          submitForm: is_last,
+          options: {
+            required: item['required'] || false,
+            inputType: 'singleline',
+            keyboardType: 'default',
+            placeholder: item['placeholder'] || '',
+            maximumCharacterCount: 300
+          }.compact
+        }
+      end
     when 'toggle'
       {
         pageIdentifier: item_page_id,
