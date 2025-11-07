@@ -33,8 +33,8 @@ Rails.application.routes.draw do
   end
 
   # Apple Pay domain verification (both with and without .txt extension)
-  get '/.well-known/apple-developer-merchantid-domain-association', to: proc { |env|
-    file_path = Rails.root.join('public', '.well-known', 'apple-developer-merchantid-domain-association')
+  get '/.well-known/apple-developer-merchantid-domain-association', to: proc { |_env|
+    file_path = Rails.public_path.join('.well-known/apple-developer-merchantid-domain-association')
     if File.exist?(file_path)
       [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
     else
@@ -42,8 +42,8 @@ Rails.application.routes.draw do
     end
   }
 
-  get '/.well-known/apple-developer-merchantid-domain-association.txt', to: proc { |env|
-    file_path = Rails.root.join('public', '.well-known', 'apple-developer-merchantid-domain-association')
+  get '/.well-known/apple-developer-merchantid-domain-association.txt', to: proc { |_env|
+    file_path = Rails.public_path.join('.well-known/apple-developer-merchantid-domain-association')
     if File.exist?(file_path)
       [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
     else
@@ -98,6 +98,9 @@ Rails.application.routes.draw do
           resources :templates, only: [:index, :show, :create, :update, :destroy] do
             member do
               post :render_template
+              post :attach_files
+              delete 'attachments/:attachment_id', action: :remove_attachment, as: :remove_attachment
+              put :reorder_attachments
             end
             collection do
               post :from_apple_message

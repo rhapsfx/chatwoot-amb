@@ -76,6 +76,37 @@ class TemplatesAPI extends ApiClient {
       tags: payload.tags || [],
     });
   }
+
+  // Template Attachments API
+  uploadAttachment(templateId, file, orderIndex = 0) {
+    const formData = new FormData();
+    formData.append('attachments[]', file);
+    if (orderIndex !== undefined) {
+      formData.append('order_index', orderIndex);
+    }
+
+    return axios.post(`${this.url}/${templateId}/attach_files`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  }
+
+  getAttachments(templateId) {
+    return axios.get(`${this.url}/${templateId}`);
+  }
+
+  deleteAttachment(templateId, attachmentId) {
+    return axios.delete(
+      `${this.url}/${templateId}/attachments/${attachmentId}`
+    );
+  }
+
+  reorderAttachments(templateId, attachmentIds) {
+    return axios.put(`${this.url}/${templateId}/reorder_attachments`, {
+      attachment_ids: attachmentIds,
+    });
+  }
 }
 
 export default new TemplatesAPI();
