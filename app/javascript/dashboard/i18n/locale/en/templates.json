@@ -472,6 +472,11 @@
         "TEST_PARAMETERS": "Test with Parameters",
         "ENTER_PARAMETERS": "Enter parameter values to see live preview"
       },
+      "ATTACHMENTS": {
+        "TITLE": "Template Attachments",
+        "SAVE_FIRST": "Please save the template first before adding attachments. You can save now with just the basic information and add attachments after.",
+        "INFO_HINT": "For Apple Messages for Business, you can create attachment-only templates. Just save the template with basic info, then add your files in the Attachments tab."
+      },
       "VALIDATION": {
         "NAME_REQUIRED": "Template name is required",
         "CATEGORY_REQUIRED": "Please select a category",
@@ -494,6 +499,31 @@
       "DUPLICATE_ERROR": "Failed to duplicate template",
       "TEST_SUCCESS": "Template test sent successfully",
       "TEST_ERROR": "Failed to test template"
+    }
+  },
+  "TEMPLATE_ATTACHMENTS": {
+    "LABEL": "Template Attachments",
+    "DESCRIPTION": "Upload files to be sent with this template. Maximum {max} files allowed.",
+    "DRAG_DROP": "Drag and drop files here, or click to browse",
+    "DROP_HERE": "Drop files here to upload",
+    "FILE_TYPES": "Supported: Images, Videos, Audio, Documents, 3D Models (USDZ), Archives",
+    "MAX_SIZE": "Maximum file size: {size}",
+    "FILES_LABEL": "{count} of {max} files",
+    "DRAG_TO_REORDER": "Drag to reorder",
+    "NO_FILES": "No attachments added yet",
+    "UPLOADING": "Uploading files...",
+    "REMOVE": "Remove",
+    "ERRORS": {
+      "TOO_MANY_FILES": "Cannot add more than {max} files",
+      "FILE_TOO_LARGE": "File '{name}' is too large. Maximum size is {max}",
+      "INVALID_FILE_TYPE": "File '{name}' has an unsupported file type",
+      "UPLOAD_FAILED": "Failed to upload files. Please try again.",
+      "REMOVE_FAILED": "Failed to remove file. Please try again.",
+      "REORDER_FAILED": "Failed to reorder files. Please try again."
+    },
+    "SUCCESS": {
+      "FILES_UPLOADED": "Files uploaded successfully",
+      "FILE_REMOVED": "File removed successfully"
     }
   }
 }
