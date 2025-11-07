@@ -1290,10 +1290,13 @@ const handleTemplateSelect = async item => {
         const messageData = {
           content_type: renderedData.content_type,
           content_attributes: renderedData.content_attributes,
-          content: renderedData.content
+          content: renderedData.content,
+          // Include template_id so backend can attach template files
+          template_id: template.id
         };
 
         console.log('[AMB Templates] Emitting sendAppleMessage event with:', messageData);
+        console.log('[AMB Templates] Template has', renderedData.attachments?.length || 0, 'attachments');
 
         emit('send', messageData);
         emit('sendAppleMessage', messageData);

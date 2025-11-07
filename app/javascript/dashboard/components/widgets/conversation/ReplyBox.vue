@@ -907,6 +907,29 @@ export default {
         // eslint-disable-next-line no-console
         console.log('🎯 Full template fetched:', fullTemplate);
 
+        // FIRST: Check if template has attachments
+        // Templates with attachments should be sent as messages, not inserted as text
+        const hasAttachments = fullTemplate.attachmentsSummary && fullTemplate.attachmentsSummary.length > 0;
+
+        // eslint-disable-next-line no-console
+        console.log('🎯 Has attachments:', hasAttachments, fullTemplate.attachmentsSummary);
+
+        if (hasAttachments) {
+          // Template with attachments - send directly as a message
+          // eslint-disable-next-line no-console
+          console.log('📎 Template with attachments detected, sending directly');
+
+          const messageData = {
+            content: '', // Empty content - backend will handle placeholder text
+            content_type: 'text',
+            content_attributes: {},
+            template_id: fullTemplate.id,
+          };
+
+          await this.sendAppleMessage(messageData);
+          return;
+        }
+
         // Check if this is an Apple Messages interactive template
         // Interactive templates have specific content structures:
         // - type field (explicit type like 'list_picker', 'time_picker', 'form', etc.)
@@ -1279,6 +1302,8 @@ export default {
                 type: 'time_picker',
                 content_type: 'apple_time_picker',
                 content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
               };
             } else {
               // Fallback to stored content if rendering fails
@@ -1337,6 +1362,9 @@ export default {
                 data: img.data, // Keep data for now, backend will handle
               }));
           }
+
+          // Include template_id so backend can attach template files if present
+          messageData.template_id = fullTemplate.id;
 
           await this.sendAppleMessage(messageData);
           return;
@@ -1721,14 +1749,26 @@ export default {
     },
     async sendAppleMessage(messageData) {
       try {
+        // Handle content: allow empty string for attachment-only messages
+        let messageContent = 'Apple Message'; // default fallback
+        if (messageData.content !== undefined && messageData.content !== null) {
+          messageContent = messageData.content; // Use provided content (even if empty string)
+        } else if (messageData.summary_text) {
+          messageContent = messageData.summary_text;
+        }
+
         const messagePayload = {
           conversationId: this.currentChat.id,
-          message:
-            messageData.content || messageData.summary_text || 'Apple Message',
+          message: messageContent,
           content_type: messageData.content_type,
           content_attributes: messageData.content_attributes,
           private: false,
         };
+
+        // Include template_id if present (for template attachments)
+        if (messageData.template_id) {
+          messagePayload.template_id = messageData.template_id;
+        }
 
         // Use createPendingMessageAndSend directly to ensure proper message creation
         await this.$store.dispatch(

@@ -17,7 +17,7 @@ const formConfig = computed(() => ({
   pages: formData.value.pages || [],
   submitButton: formData.value.submit_button || { title: 'Submit' },
   cancelButton: formData.value.cancel_button || { title: 'Cancel' },
-  version: formData.value.version || '1.0',
+  version: formData.value.version || '1.2',
 }));
 
 // Form state
