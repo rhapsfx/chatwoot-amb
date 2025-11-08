@@ -39,7 +39,7 @@ class LlmFormatter::ConversationLlmFormatter < LlmFormatter::DefaultLlmFormatter
   end
 
   def format_message(message)
-    sender = message.message_type == 'incoming' ? 'User' : 'Support agent'
+    sender = message.message_type.to_s == 'incoming' ? 'User' : 'Support agent'
     sender = "[Private Note] #{sender}" if message.private?
     "#{sender}: #{message.content}\n"
   end

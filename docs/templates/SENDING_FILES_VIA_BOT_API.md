@@ -1728,6 +1728,181 @@ DELETE /api/v1/accounts/:account_id/message_templates/bulk_remove_attachments
 | Attachment Versioning | P4 | Medium | Low | 3 weeks |
 | Batch Operations | P4 | Low | Low | 1 week |
 
+## Critical Bug Fixes (November 2025)
+
+### Bot Template Attachments Not Showing (RESOLVED ✅)
+
+**Date**: November 8, 2025
+**Status**: ✅ **FIXED**
+**Impact**: Critical - Bot template messages with attachments were failing to send
+
+#### Problem Description
+
+When sending bot template messages with file attachments via the Bot API, the following issues occurred:
+
+1. **Wrong Sender**: Messages appeared on the left side (as Contact) instead of right side (as AgentBot)
+2. **No Delivery**: Messages did not appear in transcript or deliver to remote device
+3. **Timing Issue**: Attachments were being added AFTER the message was sent to Apple MSP
+
+#### Root Causes
+
+**Root Cause #1: Symbol/String Comparison Bug**
+
+Location: `app/builders/messages/message_builder.rb:185`
+
+```ruby
+# BROKEN CODE (before fix)
+def sender
+  message_type == 'outgoing' ? (message_sender || @user) : @conversation.contact
+end
+
+# The bug: message_type is a Symbol (:outgoing) from Rails enum
+# Comparing :outgoing == 'outgoing' always returns false
+# Result: sender was always set to Contact instead of AgentBot
+```
+
+**Fixed Code**:
+```ruby
+def sender
+  # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
+  message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
+end
+```
+
+**Root Cause #2: Attachment Timing Race Condition**
+
+Location: `app/services/templates/bot_messaging_service.rb:38-60`
+
+When using MessageProcessorService path with attachments:
+1. MessageProcessorService creates message
+2. `send_reply` callback fires immediately → sends to Apple MSP **without attachments**
+3. Then attachments are added → **too late**, message already sent
+4. Apple rejects incomplete message → doesn't show in transcript
+
+**Fixed Logic**:
+```ruby
+# FIXED CODE
+# For Apple Messages text messages, use MessageProcessorService for automatic URL-to-Rich Link conversion
+# BUT: If there are attachments, use direct creation to ensure attachments are present before send_reply
+if apple_messages_channel? && should_use_message_processor?(rendered) && rendered[:attachments].blank?
+  # Use MessageProcessorService only when NO attachments
+  message = processor.process_and_send
+else
+  # For messages WITH attachments, use create_message_with_attachments
+  if rendered[:attachments].present?
+    message = create_message_with_attachments(rendered)  # Skips callbacks, attaches files, then triggers send
+  else
+    message = create_message(rendered)
+  end
+end
+```
+
+**Root Cause #3: Additional Symbol/String Bugs**
+
+Found and fixed in 5 additional files:
+- `app/models/concerns/liquidable.rb` (2 instances)
+- `app/services/llm_formatter/conversation_llm_formatter.rb` (1 instance)
+- `lib/integrations/slack/send_on_slack_service.rb` (2 instances)
+- `lib/integrations/captain/processor_service.rb` (1 instance)
+- `enterprise/app/jobs/captain/conversation/response_builder_job.rb` (1 instance)
+
+**Root Cause #4: TemplateUsageLog Errors**
+
+Fixed two logging errors:
+1. Removed non-existent `error_message` column
+2. Added `normalize_channel_type()` helper to convert `'Channel::AppleMessagesForBusiness'` → `'apple_messages_for_business'`
+
+#### Files Modified
+
+1. `app/builders/messages/message_builder.rb` - Critical sender fix
+2. `app/services/templates/bot_messaging_service.rb` - Attachment timing fix
+3. `app/models/concerns/liquidable.rb` - Symbol/String fixes
+4. `app/services/llm_formatter/conversation_llm_formatter.rb` - Symbol/String fix
+5. `lib/integrations/slack/send_on_slack_service.rb` - Symbol/String fixes
+6. `lib/integrations/captain/processor_service.rb` - Symbol/String fix
+7. `enterprise/app/jobs/captain/conversation/response_builder_job.rb` - Symbol/String fix
+8. `app/controllers/api/v1/accounts/bot_templates_controller.rb` - Logging fixes
+
+#### How to Verify Fix
+
+**Test Script**:
+```javascript
+// n8n HTTP Request Node
+{
+  method: 'POST',
+  url: `${chatwootUrl}/api/v1/accounts/${accountId}/bot_templates/send_message`,
+  headers: {
+    'api_access_token': botToken,
+    'Content-Type': 'application/json'
+  },
+  body: {
+    conversation_id: conversationId,
+    template_id: templateId  // Template with file attachment
+  }
+}
+```
+
+**Expected Logs**:
+```
+🔵 [BotMessagingService] Rendered template:
+🔵   - Content type: text
+🔵   - Has attachments: true
+🔵   - Attachment count: 1
+🔵   - Should use processor: true
+🔵 [BotMessagingService] Using create_message_with_attachments path (1 attachments)
+🟢 BotMessagingService - Message created! ID: 1781
+🟢 BotMessagingService - Attaching 1 files to message 1781
+[BotMessagingService] Attached file 'iphone-17-pro-e-sim.usdz' to message 1781
+```
+
+**Expected Result**:
+- ✅ Message appears on **right side** (correct AgentBot sender)
+- ✅ File attachment **successfully delivered**
+- ✅ Message visible in **Chatwoot transcript**
+- ✅ Message delivered to **remote device**
+- ✅ **No errors** in logs
+
+#### Prevention
+
+To prevent similar bugs in the future:
+
+**1. Always use `.to_s` when comparing enum values to strings**:
+```ruby
+# CORRECT
+if message.message_type.to_s == 'outgoing'
+
+# WRONG
+if message.message_type == 'outgoing'  # Will always be false!
+```
+
+**2. Understand Rails enum behavior**:
+```ruby
+# Rails enum definition
+enum message_type: { incoming: 0, outgoing: 1, activity: 2, template: 3 }
+
+# Enum exposes Symbols, not Strings
+message.message_type          # => :outgoing (Symbol)
+message.message_type.to_s     # => "outgoing" (String)
+message.message_type == 'outgoing'      # => false (comparing Symbol to String)
+message.message_type.to_s == 'outgoing' # => true (correct)
+```
+
+**3. Test attachment flow with callbacks**:
+- Ensure attachments are present BEFORE `send_reply` callback fires
+- Use callback skipping pattern when needed
+- Add logging to track attachment attachment timing
+
+#### Related Issues
+
+- Bot messages showing on wrong side (left instead of right)
+- Template messages with attachments not delivering
+- "Message has no content or attachments" errors
+- Liquid template variables not processing correctly
+- Slack activity messages not formatting correctly
+- Captain AI message history incorrect roles
+
+All related issues were traced back to the same Symbol/String comparison bug pattern.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -1747,6 +1922,16 @@ DELETE /api/v1/accounts/:account_id/message_templates/bulk_remove_attachments
 **Issue**: Attachment not showing in Apple Messages
 - **Cause**: Missing `\uFFFC` character in body
 - **Solution**: Ensure body includes Unicode Object Replacement Character
+
+**Issue**: Bot messages appearing on left side (as Contact)
+- **Cause**: Symbol/String comparison bug in sender determination
+- **Solution**: ✅ **FIXED** - See "Critical Bug Fixes" section above
+- **Version**: Fixed in November 2025
+
+**Issue**: Template attachments not delivering to device
+- **Cause**: Attachment timing race condition with MessageProcessorService
+- **Solution**: ✅ **FIXED** - Attachments now added before send_reply callback
+- **Version**: Fixed in November 2025
 
 ## References
 
@@ -1984,6 +2169,6 @@ await sendDirectMessage(conversationId, {
 ---
 
 **Document Status**: ✅ Complete specification with full implementation
-**Last Updated**: 2025-01-07
+**Last Updated**: 2025-11-08
 **Implementation Status**: Production Ready
 **Version**: 2.0 (includes all bug fixes and enhancements)

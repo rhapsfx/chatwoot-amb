@@ -22,6 +22,13 @@ class Templates::BotMessagingService
 
     rendered = renderer.render_for_bot
 
+    Rails.logger.info '🔵 [BotMessagingService] Rendered template:'
+    Rails.logger.info "🔵   - Content type: #{rendered[:content_type]}"
+    Rails.logger.info "🔵   - Has attachments: #{rendered[:attachments].present?}"
+    Rails.logger.info "🔵   - Attachment count: #{rendered[:attachments]&.count || 0}"
+    Rails.logger.info "🔵   - Apple Messages channel: #{apple_messages_channel?}"
+    Rails.logger.info "🔵   - Should use processor: #{apple_messages_channel? && should_use_message_processor?(rendered)}"
+
     # Show typing indicator for Apple Messages
     if apple_messages_channel?
       send_typing_indicator(:start)
@@ -29,7 +36,9 @@ class Templates::BotMessagingService
     end
 
     # For Apple Messages text messages, use MessageProcessorService for automatic URL-to-Rich Link conversion
-    if apple_messages_channel? && should_use_message_processor?(rendered)
+    # BUT: If there are attachments, use direct creation to ensure attachments are present before send_reply
+    if apple_messages_channel? && should_use_message_processor?(rendered) && rendered[:attachments].blank?
+      Rails.logger.info '🔵 [BotMessagingService] Using MessageProcessorService path (no attachments)'
       message_params = build_message_params(rendered)
       processor = AppleMessagesForBusiness::MessageProcessorService.new(
         @conversation,
@@ -39,16 +48,17 @@ class Templates::BotMessagingService
       message = processor.process_and_send
       # Handle multiple messages case (when URLs are split)
       message = message.last if message.is_a?(Array)
+    elsif rendered[:attachments].present?
+      # For messages with attachments, create message with attachments to prevent race condition
+      Rails.logger.info "🔵 [BotMessagingService] Using create_message_with_attachments path (#{rendered[:attachments].count} attachments)"
+      message = create_message_with_attachments(rendered)
     else
-      # Create the message directly for complex content types
+      Rails.logger.info '🔵 [BotMessagingService] Using create_message path (no attachments)'
       message = create_message(rendered)
     end
 
-    # Attach template files to message
-    attach_template_files_to_message(message, rendered[:attachments])
-
-    # Trigger conversation events
-    trigger_events(message)
+    # Trigger conversation events - handled automatically by Message model's after_create_commit
+    # No need to manually trigger events here
 
     message
   rescue StandardError => e
@@ -153,6 +163,103 @@ class Templates::BotMessagingService
     @conversation.messages.create!(message_params)
   end
 
+  # Create message with attachments already attached (prevents race condition in send_reply)
+  def create_message_with_attachments(rendered)
+    content_type = rendered[:content_type] || rendered[:contentType]
+
+    # Clean placeholder content, but preserve minimal content if attachments are present
+    content = clean_content_for_template_messages(rendered[:content], content_type, rendered[:attachments])
+
+    message_params = {
+      account_id: @conversation.account_id,
+      inbox_id: @conversation.inbox_id,
+      message_type: :outgoing,
+      content: content,
+      sender_type: @sender.class.name,
+      sender_id: @sender.id
+    }
+
+    # Add content_type and content_attributes if present (check both camelCase and snake_case)
+    message_params[:content_type] = content_type if content_type.present?
+    if rendered[:content_attributes].present? || rendered[:contentAttributes].present?
+      message_params[:content_attributes] =
+        rendered[:content_attributes] || rendered[:contentAttributes]
+    end
+
+    Rails.logger.info '🟢 BotMessagingService - Creating message with attachments'
+    Rails.logger.info "🟢 BotMessagingService - Sender: #{@sender.class.name} (ID: #{@sender.id})"
+    Rails.logger.info "🟢 BotMessagingService - Message params sender_type: #{message_params[:sender_type]}"
+    Rails.logger.info "🟢 BotMessagingService - Message params sender_id: #{message_params[:sender_id]}"
+    if message_params[:content_type] == 'apple_time_picker'
+      Rails.logger.info "🟢 BotMessagingService - Event timeslots: #{message_params.dig(:content_attributes, 'event', 'timeslots').inspect}"
+    end
+
+    # Add additional metadata
+    message_params[:additional_attributes] = {
+      template_id: @template.id,
+      template_name: @template.name,
+      rendered_at: Time.current.iso8601
+    }
+
+    message = nil
+
+    # CRITICAL FIX: Skip callbacks, create message, attach files, then manually trigger send_reply
+    # This ensures attachments are present before send_reply checks
+    Message.skip_callback(:commit, :after, :execute_after_create_commit_callbacks)
+
+    begin
+      # Create message without triggering callbacks
+      message = @conversation.messages.create!(message_params)
+
+      Rails.logger.info "🟢 BotMessagingService - Message created! ID: #{message.id}"
+      Rails.logger.info "🟢 BotMessagingService - ACTUAL sender_type: #{message.sender_type}"
+      Rails.logger.info "🟢 BotMessagingService - ACTUAL sender_id: #{message.sender_id}"
+      Rails.logger.info "🟢 BotMessagingService - ACTUAL message_type: #{message.message_type}"
+
+      # Attach template files immediately
+      if rendered[:attachments].present?
+        Rails.logger.info "🟢 BotMessagingService - Attaching #{rendered[:attachments].count} files to message #{message.id}"
+        attach_files_to_message(message, rendered[:attachments])
+      end
+
+      # Manually run the callbacks with attachments in place
+      message.send(:execute_after_create_commit_callbacks)
+
+    ensure
+      # Re-enable the callback for other messages
+      Message.set_callback(:commit, :after, :execute_after_create_commit_callbacks)
+    end
+
+    message
+  end
+
+  # Helper to attach files to an existing message
+  def attach_files_to_message(message, template_attachments)
+    template_attachments.each do |attachment_data|
+      # Find the ActiveStorage blob
+      blob = ActiveStorage::Blob.find(attachment_data[:blob_id])
+
+      # Download the blob content
+      file_content = blob.download
+
+      # Create attachment record
+      message.attachments.create!(
+        file_type: determine_file_type(blob.content_type),
+        account_id: message.account_id,
+        file: {
+          io: StringIO.new(file_content),
+          filename: blob.filename.to_s,
+          content_type: blob.content_type
+        }
+      )
+
+      Rails.logger.info "[BotMessagingService] Attached file '#{blob.filename}' to message #{message.id}"
+    rescue StandardError => e
+      Rails.logger.error "[BotMessagingService] Failed to attach file #{attachment_data[:filename]}: #{e.message}"
+      # Continue with other attachments even if one fails
+    end
+  end
+
   # Clean content for template messages
   # Removes placeholder text but preserves necessary content for attachments
   def clean_content_for_template_messages(content, content_type, template_attachments)
@@ -188,20 +295,6 @@ class Templates::BotMessagingService
 
     # Return original content if it's meaningful
     content
-  end
-
-  def trigger_events(message)
-    # Trigger Rails events for message creation
-    # This will be picked up by webhooks and other listeners
-    Rails.configuration.dispatcher.dispatch(
-      Events::BASE_EVENTS[:message_created],
-      Time.zone.now,
-      message: message,
-      conversation: @conversation
-    )
-  rescue StandardError => e
-    Rails.logger.error "[Templates::BotMessagingService] Failed to trigger events: #{e.message}"
-    # Don't fail the message creation if event dispatch fails
   end
 
   # Attach template files to the created message

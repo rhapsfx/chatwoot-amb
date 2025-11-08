@@ -246,6 +246,7 @@ class Attachment < ApplicationRecord
       data_url: file_url,
       thumb_url: thumb_url,
       file_size: file.byte_size,
+      file_name: file.filename.to_s,  # Add filename for UI display
       width: file.metadata[:width],
       height: file.metadata[:height]
     }

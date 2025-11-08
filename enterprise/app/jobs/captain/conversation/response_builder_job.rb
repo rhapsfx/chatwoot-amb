@@ -62,7 +62,8 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
   end
 
   def determine_role(message)
-    message.message_type == 'incoming' ? 'user' : 'assistant'
+    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
+    message.message_type.to_s == 'incoming' ? 'user' : 'assistant'
   end
 
   def prepare_multimodal_message_content(message)
