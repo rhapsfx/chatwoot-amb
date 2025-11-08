@@ -13,17 +13,46 @@ Apple Messages for Business (AMB) implementation documentation, including:
 - Payload validation
 - Phase completion reports
 
+**Subdirectories:**
+- `fixes/` - Bug fixes and troubleshooting documentation
+- `guides/` - Setup and configuration guides
+- `implementation/` - Feature implementation details
+- `phases/` - Phase completion reports and milestones
+- `scripts/` - Utility scripts (debug, test, utilities)
+- `testing/` - Test documentation and results
+- `data/` - Data files and references
+
 **Key Files:**
 - [`README.md`](apple-messages/README.md) - Overview of AMB features
 - [`case-normalization-specification.md`](apple-messages/case-normalization-specification.md) - CaseTransformer specification
 - [`APPLE_PAY_GUIDE.md`](apple-messages/APPLE_PAY_GUIDE.md) - Apple Pay integration guide
+- [`MIGRATION_GUIDE.md`](apple-messages/MIGRATION_GUIDE.md) - Step-by-step migration procedures
+- [`PAYLOAD_VALIDATION_IMPLEMENTATION.md`](apple-messages/PAYLOAD_VALIDATION_IMPLEMENTATION.md) - Payload validation details
+
+**Fixes:**
+- [`fixes/WEBHOOK_JWT_FIX.md`](apple-messages/fixes/WEBHOOK_JWT_FIX.md) - Webhook JWT authentication fix
+
+**Phase Reports:**
+- [`phases/PHASE_1_COMPLETE.md`](apple-messages/phases/PHASE_1_COMPLETE.md) - Phase 1 implementation details
+- [`phases/PHASE_3_COMPLETE.md`](apple-messages/phases/PHASE_3_COMPLETE.md) - Phase 3 service layer cleanup
+- [`phases/MIGRATION_IMPLEMENTATION_COMPLETE.md`](apple-messages/phases/MIGRATION_IMPLEMENTATION_COMPLETE.md) - Phase 2 migration guide
+
+**Implementation:**
+- [`implementation/APPLE_MSP_COMPLETE_IMPLEMENTATION_GUIDE.md`](apple-messages/implementation/APPLE_MSP_COMPLETE_IMPLEMENTATION_GUIDE.md) - Complete MSP implementation
+- [`implementation/APPLE_MESSAGES_LIST_PICKER_IMPLEMENTATION.md`](apple-messages/implementation/APPLE_MESSAGES_LIST_PICKER_IMPLEMENTATION.md) - List picker implementation
+- [`implementation/APPLE_RICH_LINK_FAVICON_IMPLEMENTATION.md`](apple-messages/implementation/APPLE_RICH_LINK_FAVICON_IMPLEMENTATION.md) - Rich link implementation
+- [`implementation/APPLE_TYPING_INDICATOR_IMPLEMENTATION.md`](apple-messages/implementation/APPLE_TYPING_INDICATOR_IMPLEMENTATION.md) - Typing indicator implementation
+
+**Guides:**
+- [`guides/APPLE_MESSAGES_OAUTH2_APPLEPAY_CONFIGURATION_GUIDE.md`](apple-messages/guides/APPLE_MESSAGES_OAUTH2_APPLEPAY_CONFIGURATION_GUIDE.md) - OAuth2 and Apple Pay setup
+- [`guides/APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md`](apple-messages/guides/APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md) - Troubleshooting common issues
+- [`guides/CHATWOOT_MESSAGING_CHANNEL_GUIDE.md`](apple-messages/guides/CHATWOOT_MESSAGING_CHANNEL_GUIDE.md) - Messaging channel configuration
 
 ### `/bot-migration/`
 Documentation for migrating the old Acoustic House Flask/Python bot to Chatwoot's bot system.
 
 **Files:**
 - [`APPLE_BOT_MIGRATION_GUIDE.md`](bot-migration/APPLE_BOT_MIGRATION_GUIDE.md) - Step-by-step migration guide
-- [`APPLE_BOT_MIGRATION_SUMMARY.md`](bot-migration/APPLE_BOT_MIGRATION_SUMMARY.md) - Executive summary
 - [`COMPLETE_MIGRATION_SUMMARY.md`](bot-migration/COMPLETE_MIGRATION_SUMMARY.md) - Complete migration toolkit summary
 - [`ACOUSTIC_HOUSE_FILTER_RESULTS.md`](bot-migration/ACOUSTIC_HOUSE_FILTER_RESULTS.md) - Core vs test template filtering results
 - [`DRY_RUN_REFERENCE.md`](bot-migration/DRY_RUN_REFERENCE.md) - Dry-run mode examples
@@ -32,11 +61,26 @@ Documentation for migrating the old Acoustic House Flask/Python bot to Chatwoot'
 ### `/templates/`
 Documentation for template import, fixes, and troubleshooting.
 
-**Files:**
-- [`FIX_TEMPLATES_NOT_SHOWING.md`](templates/FIX_TEMPLATES_NOT_SHOWING.md) - Fix for templates not appearing in UI
-- [`BLOCK_EDITOR_FIX.md`](templates/BLOCK_EDITOR_FIX.md) - Block editor UI fixes
-- [`IMAGE_EXTRACTION_UPDATE.md`](templates/IMAGE_EXTRACTION_UPDATE.md) - Image extraction fixes for template editor
-- [`ADDITIONAL_FIXES.md`](templates/ADDITIONAL_FIXES.md) - Additional template migration fixes
+**Subdirectories:**
+- `fixes/` - Template-related bug fixes and troubleshooting
+
+**Key Files:**
+- [`README.md`](templates/README.md) - Template system overview
+- [`MESSAGETEMPLATE_ARCHITECTURE.md`](templates/MESSAGETEMPLATE_ARCHITECTURE.md) - Template architecture documentation
+- [`MESSAGETEMPLATE_API_REFERENCE.md`](templates/MESSAGETEMPLATE_API_REFERENCE.md) - Template API reference
+- [`BOT_RENDERER_VERIFICATION_REPORT.md`](templates/BOT_RENDERER_VERIFICATION_REPORT.md) - Bot renderer verification results
+- [`GUITAR_FORM_TEMPLATE.md`](templates/GUITAR_FORM_TEMPLATE.md) - Guitar form template example
+- [`SENDING_FILES_VIA_BOT_API.md`](templates/SENDING_FILES_VIA_BOT_API.md) - File sending via bot API
+- [`TEMPLATE_ATTACHMENT_TESTS.md`](templates/TEMPLATE_ATTACHMENT_TESTS.md) - Template attachment test documentation
+- [`TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md`](templates/TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md) - Test implementation summary
+- [`TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md`](templates/TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md) - Quick reference guide
+
+**Fixes:**
+- [`fixes/FIX_TEMPLATES_NOT_SHOWING.md`](templates/fixes/FIX_TEMPLATES_NOT_SHOWING.md) - Fix for templates not appearing in UI
+- [`fixes/BLOCK_EDITOR_FIX.md`](templates/fixes/BLOCK_EDITOR_FIX.md) - Block editor UI fixes
+- [`fixes/GUITAR_FORM_FIXES.md`](templates/fixes/GUITAR_FORM_FIXES.md) - Guitar form fixes summary
+- [`fixes/TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md`](templates/fixes/TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md) - Template editor image display fix
+- [`fixes/TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md`](templates/fixes/TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md) - Template migration image format fix
 
 ### `/n8n/`
 n8n workflow automation integration with Chatwoot.
@@ -44,12 +88,22 @@ n8n workflow automation integration with Chatwoot.
 **Files:**
 - [`n8n-bot-integration-guide.md`](n8n/n8n-bot-integration-guide.md) - Complete n8n integration guide
 - [`n8n-quick-reply-routing-example.md`](n8n/n8n-quick-reply-routing-example.md) - Quick reply response routing examples
+- [`N8N_PRODUCTION_SETUP.md`](n8n/N8N_PRODUCTION_SETUP.md) - Production setup guide
+- [`CUSTOM_NODES_FIXED.md`](n8n/CUSTOM_NODES_FIXED.md) - Custom nodes fixes
+- [`NODE_STATUS_REPORT.md`](n8n/NODE_STATUS_REPORT.md) - Node status tracking
+- [`NETWORK_AND_ICONS_SETUP.md`](n8n/NETWORK_AND_ICONS_SETUP.md) - Network and icons configuration
 
 ### `/deployment/`
 Production deployment documentation and procedures.
 
 **Files:**
 - [`DEPLOYMENT_SUMMARY.md`](deployment/DEPLOYMENT_SUMMARY.md) - Production deployment summary and scripts
+
+### `/development/`
+Development guidelines and code review standards.
+
+**Files:**
+- [`CODE_REVIEW_GUIDELINES.md`](development/CODE_REVIEW_GUIDELINES.md) - Code review best practices
 
 ### `/guides/`
 General setup and implementation guides.
@@ -64,6 +118,10 @@ General setup and implementation guides.
 ### `/api/`
 API documentation and specifications.
 
+**Files:**
+- [`BOT_TEMPLATES_API.md`](api/BOT_TEMPLATES_API.md) - Bot templates API documentation
+- [`TEMPLATE_SCHEMA_REFERENCE.md`](api/TEMPLATE_SCHEMA_REFERENCE.md) - Template schema reference
+
 ### `/backups/`
 Backup files and rollback scripts.
 
@@ -73,6 +131,7 @@ Backup files and rollback scripts.
 1. Start with [`apple-messages/README.md`](apple-messages/README.md)
 2. Review [`apple-messages/case-normalization-specification.md`](apple-messages/case-normalization-specification.md)
 3. For Apple Pay: [`apple-messages/APPLE_PAY_GUIDE.md`](apple-messages/APPLE_PAY_GUIDE.md)
+4. For troubleshooting: [`apple-messages/guides/APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md`](apple-messages/guides/APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md)
 
 ### For Bot Migration
 1. Read [`bot-migration/APPLE_BOT_MIGRATION_GUIDE.md`](bot-migration/APPLE_BOT_MIGRATION_GUIDE.md)
@@ -82,11 +141,19 @@ Backup files and rollback scripts.
 ### For n8n Integration
 1. Follow [`n8n/n8n-bot-integration-guide.md`](n8n/n8n-bot-integration-guide.md)
 2. For quick replies: [`n8n/n8n-quick-reply-routing-example.md`](n8n/n8n-quick-reply-routing-example.md)
+3. Production setup: [`n8n/N8N_PRODUCTION_SETUP.md`](n8n/N8N_PRODUCTION_SETUP.md)
 
 ### For Template Issues
-1. Templates not showing: [`templates/FIX_TEMPLATES_NOT_SHOWING.md`](templates/FIX_TEMPLATES_NOT_SHOWING.md)
-2. Block editor issues: [`templates/BLOCK_EDITOR_FIX.md`](templates/BLOCK_EDITOR_FIX.md)
-3. Image problems: [`templates/IMAGE_EXTRACTION_UPDATE.md`](templates/IMAGE_EXTRACTION_UPDATE.md)
+1. Templates not showing: [`templates/fixes/FIX_TEMPLATES_NOT_SHOWING.md`](templates/fixes/FIX_TEMPLATES_NOT_SHOWING.md)
+2. Block editor issues: [`templates/fixes/BLOCK_EDITOR_FIX.md`](templates/fixes/BLOCK_EDITOR_FIX.md)
+3. Guitar form issues: [`templates/fixes/GUITAR_FORM_FIXES.md`](templates/fixes/GUITAR_FORM_FIXES.md)
+4. Image display problems: [`templates/fixes/TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md`](templates/fixes/TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md)
+5. Image format migration: [`templates/fixes/TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md`](templates/fixes/TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md)
+
+### For Template Development
+1. Architecture overview: [`templates/MESSAGETEMPLATE_ARCHITECTURE.md`](templates/MESSAGETEMPLATE_ARCHITECTURE.md)
+2. API reference: [`templates/MESSAGETEMPLATE_API_REFERENCE.md`](templates/MESSAGETEMPLATE_API_REFERENCE.md)
+3. Attachment tests: [`templates/TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md`](templates/TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md)
 
 ### For Deployment
 1. Review [`deployment/DEPLOYMENT_SUMMARY.md`](deployment/DEPLOYMENT_SUMMARY.md)
@@ -162,6 +229,8 @@ When adding new documentation:
 2. Update this README with links
 3. Use clear, descriptive filenames
 4. Include a summary at the top of each document
+5. For bug fixes: place in the `fixes/` subdirectory
+6. For phase completions: place in the `phases/` subdirectory
 
 ## 📄 License
 
