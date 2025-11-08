@@ -14,6 +14,8 @@
 4. [Configuration Guide](#configuration-guide)
    - [Environment Setup](#environment-setup)
    - [Certificate Generation](#certificate-generation)
+   - [Apple Developer Portal Setup](#apple-developer-portal-setup)
+   - [Domain Verification](#domain-verification)
    - [Channel Configuration](#channel-configuration)
    - [Apple Business Register Setup](#apple-business-register-setup)
 5. [Critical Implementation Details](#critical-implementation-details)
@@ -295,6 +297,156 @@ Apple's CSR validator checks:
 
 Keychain Access generates CSRs in the exact format Apple expects.
 
+### Apple Developer Portal Setup
+
+#### Create Merchant ID
+
+1. Go to https://developer.apple.com/account
+2. Navigate to Certificates, Identifiers & Profiles
+3. Click the "+" button to add a new identifier
+4. Select "Merchant IDs" and click Continue
+5. Enter a description: "Your Company Apple Pay"
+6. Enter an identifier: `merchant.com.yourcompany.chatwoot`
+7. Click Register
+
+#### Generate Certificates
+
+1. Click on your newly created Merchant ID
+2. Under "Apple Pay Merchant Identity Certificate", click "Create Certificate"
+3. Upload your CSR file (generated in [Certificate Generation](#certificate-generation) section)
+4. Download the certificate
+5. Under "Apple Pay Payment Processing Certificate", click "Create Certificate"
+6. Upload your ECC CSR file (generated with Keychain Access)
+7. Download the certificate
+8. Convert both certificates to PEM format (see Certificate Generation section)
+
+### Domain Verification
+
+After creating your Merchant ID, you must verify domain ownership.
+
+#### Step 1: Download Domain Verification File
+
+1. In Apple Developer Portal, go to your Merchant ID settings: https://developer.apple.com/account/resources/identifiers/list/merchant
+2. Click on your Merchant ID (e.g., `MS58PRCFSS.com.apple.apple-pay-matthieu`)
+3. Scroll to the "Merchant Domains" section
+4. Click "Add Domain"
+5. Enter your domain: `yourdomain.com` (without https://)
+6. Click "Download" to get the verification file
+
+**Important**: The file has NO extension and should be named exactly:
+```
+apple-developer-merchantid-domain-association
+```
+
+#### Step 2: Deploy Verification File
+
+Save the downloaded file to your project:
+```
+public/.well-known/apple-developer-merchantid-domain-association
+```
+
+This file must be publicly accessible at:
+```
+https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association
+```
+
+**For Production Servers**:
+
+If using Docker or remote deployment:
+```bash
+# Upload to server
+scp public/.well-known/apple-developer-merchantid-domain-association \
+  user@server:/opt/chatwoot/public/.well-known/
+
+# Set proper permissions
+ssh user@server "chmod 644 /opt/chatwoot/public/.well-known/apple-developer-merchantid-domain-association"
+```
+
+**Nginx Configuration** (if needed):
+
+Add to your Nginx config to ensure proper serving:
+```nginx
+location /.well-known/apple-developer-merchantid-domain-association {
+    default_type text/plain;
+}
+```
+
+#### Step 3: Verify Domain in Apple Developer Portal
+
+After deploying the file:
+
+1. Return to Apple Developer Portal
+2. Go to your Merchant ID settings
+3. Click "Verify" next to your domain
+4. Apple will check: `https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association`
+5. If successful, the domain will show as "Verified" ✅
+
+#### Step 4: Test Verification File
+
+Test that the file is accessible:
+
+```bash
+curl https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association
+```
+
+You should see base64-encoded content starting with:
+```
+MIIQcwYJKoZIhvcNAQcCoIIQZDCCEGACAQExCzAJBgUrDgMCGgUAMIGBBgkqhkiG9w0BBwGgdARy...
+```
+
+#### Troubleshooting Domain Verification
+
+**Problem**: File returns 404 Not Found
+
+**Solutions**:
+1. Check file location in your project's `public/.well-known/` directory
+2. Verify file permissions: `chmod 644`
+3. Check that your web server serves static files from the `public/` directory
+4. Restart your web service
+5. Ensure no authentication is required to access the file
+
+**Problem**: Apple says "Unable to verify domain"
+
+**Checklist**:
+- [ ] File is accessible via HTTPS (not HTTP)
+- [ ] File has correct name (no extension)
+- [ ] File contains the exact content downloaded from Apple
+- [ ] SSL certificate is valid
+- [ ] No authentication or redirects block access
+
+**Problem**: Wrong Content Type
+
+If the file downloads instead of displaying, add Nginx configuration:
+```nginx
+location /.well-known/apple-developer-merchantid-domain-association {
+    default_type text/plain;
+}
+```
+
+#### File Structure After Deployment
+
+Your server should have:
+
+```
+/opt/chatwoot/  (or your installation directory)
+├── certs/
+│   └── apple_pay/
+│       ├── apple_pay_cert.pem              # Merchant Identity Certificate
+│       ├── apple_pay_private.key           # Merchant Identity Private Key
+│       ├── payment_processing_cert.pem     # Payment Processing Certificate
+│       └── payment_processing_private.key  # Payment Processing Private Key
+└── public/
+    └── .well-known/
+        └── apple-developer-merchantid-domain-association  # Domain verification
+```
+
+#### Security Notes
+
+- Domain verification file is public (must be accessible without authentication)
+- Certificate private keys should have 600 permissions (owner read/write only)
+- Certificates should have 644 permissions (owner read/write, others read)
+- All certificate files should be owned by the appropriate system user
+
 ### Channel Configuration
 
 Configure Apple Pay settings in the Rails console:
@@ -324,33 +476,151 @@ channel.update!(
 )
 ```
 
-### Apple Developer Portal Setup
-
-**Create Merchant ID**:
-1. Go to https://developer.apple.com/account
-2. Navigate to Certificates, Identifiers & Profiles
-3. Create new Merchant ID: `merchant.com.yourcompany.chatwoot`
-
-**Generate Certificates**:
-1. Create Merchant Identity Certificate (RSA 2048-bit)
-2. Create Payment Processing Certificate (ECC 256-bit)
-3. Download and convert to PEM format
-
-**Verify Domain**:
-1. Add your domain to the Merchant ID
-2. Upload verification file to `/.well-known/apple-developer-merchantid-domain-association`
-
 ### Apple Business Register Setup
 
-**Link Merchant ID to Business ID**:
+**Critical Step**: Link Merchant ID to your Apple Messages for Business account
 
-1. Go to https://register.apple.com/business-chat
-2. Select your Business ID
-3. Navigate to "Optional Integrations" → "Apple Pay"
-4. Enter your Merchant ID (for example, `MS58PRCFSS.com.apple.apple-pay-matthieu`)
-5. Save configuration
+#### Why This Is Required
 
-This authorizes your Business ID to process payments using the Merchant ID.
+Even after configuring certificates and domain verification, you may encounter:
+
+```
+HTTP 400: Merchant Id not found in business registration
+```
+
+This means the merchant ID needs to be registered in Apple Business Register for your Apple Messages for Business account.
+
+#### Step-by-Step Registration
+
+**1. Access Apple Business Register**
+
+Go to: **https://register.apple.com/business-chat**
+
+Log in with your Apple ID that manages your Apple Messages for Business account.
+
+**2. Navigate to Your Business**
+
+1. Select your business from the dashboard
+2. Look for your Apple Messages for Business account
+
+**3. Add Payment Configuration**
+
+1. Find the **Payment Settings** or **Apple Pay Configuration** section
+   - May be under "Optional Integrations" or "Messaging Extensions"
+   - Could be labeled "Business Chat" settings
+2. Click **Add Merchant ID** or **Configure Apple Pay**
+
+**4. Enter Merchant Information**
+
+You need to provide:
+
+**Merchant Identifier**: `MS58PRCFSS.com.apple.apple-pay-matthieu`
+- Use the FULL merchant ID including the team prefix
+- Format: `[TEAM_ID].[merchant.identifier]`
+
+**Display Name**: `Your Store Name`
+- This is what customers see during payment
+
+**Domain**: `yourdomain.com`
+- Your verified domain (without https://)
+
+**5. Upload Certificates (if required)**
+
+Some configurations may require you to upload:
+- **Merchant Identity Certificate** (`apple_pay_cert.pem`)
+- **Payment Processing Certificate** (`payment_processing_cert.pem`)
+
+These are the same certificates you already configured in your channel.
+
+**6. Verify Domain Association**
+
+Apple Business Register may ask you to verify domain ownership:
+- They will check for: `https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association`
+- If you completed the [Domain Verification](#domain-verification) section, this file should already be in place
+
+**7. Save Configuration**
+
+After entering all information:
+1. Click **Save** or **Submit**
+2. Wait for Apple to verify the configuration (usually instant)
+3. You should see a confirmation that the merchant ID is registered
+
+#### Verify Existing Configuration
+
+If you've already configured Apple Pay in Business Register, verify:
+
+1. **Merchant ID matches exactly**: `MS58PRCFSS.com.apple.apple-pay-matthieu`
+2. **Domain is correct**: `yourdomain.com`
+3. **Configuration is active** (not in draft or pending state)
+
+#### What Happens Behind the Scenes
+
+1. **Chatwoot sends payment request** with merchant ID `com.apple.apple-pay-matthieu` (without team prefix)
+2. **Apple Pay API** creates merchant session successfully (HTTP 200)
+3. **Apple MSP** checks if merchant ID is registered for your business
+4. **Business Register** must have `MS58PRCFSS.com.apple.apple-pay-matthieu` registered
+5. If registered → Payment proceeds to device
+6. If not registered → Error: "Merchant Id not found in business registration"
+
+#### Why Two Different Formats?
+
+- **Apple Pay API** uses: `com.apple.apple-pay-matthieu` (without team prefix)
+- **Business Register** uses: `MS58PRCFSS.com.apple.apple-pay-matthieu` (with team prefix)
+- Chatwoot automatically strips the team prefix when calling Apple Pay API
+- But Business Register needs the full ID for authorization
+
+#### After Registration
+
+Once the merchant ID is registered in Apple Business Register:
+
+1. **No code changes needed** - Chatwoot is already configured correctly
+2. **Test immediately** - Send another Apple Pay payment request
+3. **Monitor logs** - Check for successful payment processing
+
+#### Troubleshooting Business Register
+
+**Issue**: Can't find Payment Settings in Business Register
+
+**Solution**:
+- Look for "Messaging Extensions" or "iMessage Apps" section
+- Apple Pay configuration may be under "Business Chat" settings
+- Contact Apple Business Chat support if you can't locate it
+
+**Issue**: Domain verification fails in Business Register
+
+**Solution**:
+```bash
+# Verify file is accessible
+curl https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association
+
+# Should return the domain verification file content
+```
+
+**Issue**: Wrong merchant ID format
+
+**Solution**:
+- Use the FULL merchant ID: `MS58PRCFSS.com.apple.apple-pay-matthieu`
+- Don't use just: `com.apple.apple-pay-matthieu` (this is for API calls only)
+- The Business Register requires the full ID with team prefix
+
+#### Configuration Status Summary
+
+| Component | Status | Value |
+|-----------|--------|-------|
+| Merchant ID (full) | Required | `MS58PRCFSS.com.apple.apple-pay-matthieu` |
+| Merchant ID (API) | Auto-stripped | `com.apple.apple-pay-matthieu` |
+| Display Name | Required | `Your Store Name` |
+| Domain | Required | `yourdomain.com` |
+| Certificates | Required | Merchant Identity + Payment Processing |
+| Domain Verification | Required | `/.well-known/apple-developer-merchantid-domain-association` |
+| Business Register | CRITICAL | Merchant ID must be registered |
+
+#### Support Resources
+
+- **Apple Business Register**: https://register.apple.com
+- **Apple Business Chat Support**: https://register.apple.com/support
+- **Apple Pay Documentation**: https://developer.apple.com/apple-pay/
+- **Messages for Business Guide**: https://register.apple.com/resources
 
 ---
 
@@ -772,6 +1042,8 @@ Content-Type: application/json
 3. Add Merchant ID in "Optional Integrations" → "Apple Pay"
 4. Save configuration
 
+See detailed steps in [Apple Business Register Setup](#apple-business-register-setup) section.
+
 #### Error 2: "Apple Pay session merchant identifier mismatch"
 
 **Cause**: Using hash in both applePay config and merchantSession
@@ -897,6 +1169,31 @@ end
 # NOT this:
 [Apple Pay] Test mode enabled - using fake merchant session  # Wrong
 ```
+
+#### Error 9: "Merchant Id not found in business registration"
+
+**Cause**: Merchant ID not registered in Apple Business Register for your Apple Messages for Business account
+
+**Solution**: See [Apple Business Register Setup](#apple-business-register-setup) section for complete registration steps.
+
+Quick fix:
+1. Go to https://register.apple.com
+2. Add merchant ID `MS58PRCFSS.com.apple.apple-pay-matthieu` to your Business ID
+3. Verify domain ownership
+4. Save configuration
+
+#### Error 10: Domain Verification File Not Found (404)
+
+**Cause**: Domain verification file not deployed or not accessible
+
+**Solution**:
+1. Check file exists: `public/.well-known/apple-developer-merchantid-domain-association`
+2. Verify file permissions: `chmod 644`
+3. Test accessibility: `curl https://yourdomain.com/.well-known/apple-developer-merchantid-domain-association`
+4. Check web server serves static files from `public/` directory
+5. Restart web service
+
+See [Domain Verification](#domain-verification) section for complete deployment steps.
 
 ### Debugging Tips
 
