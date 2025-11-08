@@ -115,6 +115,8 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
 
     # Determine sender (current user or bot)
     sender = determine_sender
+    Rails.logger.info "🔵 [BotTemplates] Sender determined: #{sender.class.name} (ID: #{sender.id})"
+    Rails.logger.info "🔵 [BotTemplates] @resource: #{@resource.class.name if @resource.present?} (ID: #{@resource&.id})"
 
     # Send template message
     service = Templates::BotMessagingService.new(
@@ -126,11 +128,11 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
 
     message = service.send_template_message
 
-    # Log template usage
+    # Log template usage with normalized channel type
     log_template_usage(
       template: template,
       parameters: params[:parameters] || {},
-      channel_type: conversation.inbox.channel_type,
+      channel_type: normalize_channel_type(conversation.inbox.channel_type),
       conversation_id: conversation.id,
       success: true
     )
@@ -158,6 +160,35 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
     return if @resource.present?
 
     render json: { error: 'Authentication required' }, status: :unauthorized
+  end
+
+  def normalize_channel_type(channel_type)
+    # Convert channel class names to standardized template channel type
+    case channel_type
+    when 'Channel::AppleMessagesForBusiness'
+      'apple_messages_for_business'
+    when 'Channel::Whatsapp'
+      'whatsapp'
+    when 'Channel::WebWidget'
+      'web_widget'
+    when 'Channel::Api'
+      'website'
+    when 'Channel::Sms'
+      'sms'
+    when 'Channel::Email'
+      'email'
+    when 'Channel::Telegram'
+      'telegram'
+    when 'Channel::Line'
+      'line'
+    when 'Channel::TwitterProfile'
+      'twitter'
+    when 'Channel::FacebookPage'
+      'facebook'
+    else
+      # Fallback: convert to snake_case and remove 'Channel::' prefix
+      channel_type.to_s.demodulize.underscore
+    end
   end
 
   def determine_sender
@@ -188,6 +219,8 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
 
     sender_id = @resource&.id
 
+    # NOTE: error parameter is accepted but not stored (no error_message column in DB)
+    # This is intentional - we track success/failure, but not error details
     TemplateUsageLog.create!(
       message_template_id: template.id,
       account_id: Current.account.id,
@@ -196,8 +229,7 @@ class Api::V1::Accounts::BotTemplatesController < Api::V1::Accounts::BaseControl
       sender_id: sender_id,
       parameters_used: parameters,
       channel_type: channel_type,
-      success: success,
-      error_message: error
+      success: success
     )
   rescue StandardError => e
     Rails.logger.error "[BotTemplates] Failed to log template usage: #{e.message}"
