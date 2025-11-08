@@ -9,12 +9,16 @@
 5. [Creating a Bot in Chatwoot](#creating-a-bot-in-chatwoot)
 6. [Configuring n8n Webhook](#configuring-n8n-webhook)
 7. [Working with Active Conversations](#working-with-active-conversations)
-8. [Using Chatwoot Templates via Bot API](#using-chatwoot-templates-via-bot-api)
-9. [Apple Messages for Business Content Types](#apple-messages-for-business-content-types)
-10. [Building Bot Flows in n8n](#building-bot-flows-in-n8n)
-11. [Example Workflows](#example-workflows)
-12. [Troubleshooting](#troubleshooting)
-
+8. [Sending Messages from n8n to Chatwoot](#sending-messages-from-n8n-to-chatwoot)
+9. [Using Chatwoot Templates via Bot API](#using-chatwoot-templates-via-bot-api)
+10. [Apple Messages for Business Content Types](#apple-messages-for-business-content-types)
+11. [Building Bot Flows in n8n](#building-bot-flows-in-n8n)
+12. [Example Workflows](#example-workflows)
+13. [Troubleshooting](#troubleshooting)
+14. [Production Deployment](#production-deployment)
+15. [Best Practices](#best-practices)
+16. [Resources](#resources)
+17. [Support](#support)
 ---
 
 ## Overview
@@ -1996,242 +2000,362 @@ Once you've tested your n8n bot workflows locally, you'll need to deploy to prod
 ```
 ┌──────────────────────────────────┐
 │    Nginx Proxy Manager (SSL)    │
-│  https://msp.rhaps.net           │
-│  https://n8n.msp.rhaps.net       │
-└──────────┬───────────────┬───────┘
-           │               │
-    ┌──────▼──────┐  ┌────▼─────┐
-    │  Chatwoot   │  │   n8n    │
-    │  /opt/      │◄─┤  /opt/   │
-    │  chatwoot   │  │  n8n/    │
-    └─────────────┘  └──────────┘
-         Docker Network Bridge
+
+### Step-by-Step Production Setup
+
+This section provides complete instructions for setting up n8n in production alongside Chatwoot.
+
+#### Step 1: Create n8n Directory Structure
+
+```bash
+ssh root@msp.rhaps.net
+
+# Create directory structure
+mkdir -p /opt/n8n/data/custom/node_modules
+cd /opt/n8n
 ```
 
-**For complete production setup instructions**, see:
-- **[n8n Production Setup Guide](N8N_PRODUCTION_SETUP.md)** - Complete guide to set up n8n in production
+**Directory Layout**:
+```
+/opt/n8n/
+├── docker-compose.yml          # n8n container config
+├── .env                         # Environment variables
+└── data/                        # Persistent data (mounted volume)
+    ├── custom/
+    │   └── node_modules/
+    │       └── n8n-nodes-chatwoot-amb/  # Custom AMB nodes
+    └── [n8n database files]
+```
 
-### Quick Reference: Deploy Custom Nodes and Backend
+#### Step 2: Create docker-compose.yml
 
-**Prerequisites for n8n node deployment**:
+Create `/opt/n8n/docker-compose.yml`:
 
-If you want to deploy custom n8n nodes, ensure they are built locally first:
+```yaml
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n.msp.rhaps.net
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.msp.rhaps.net
+      - NODE_ENV=production
+      - N8N_SECURE_COOKIE=true
+      # Custom nodes path (automatically detected)
+      - N8N_CUSTOM_EXTENSIONS=/home/node/.n8n/custom
+    volumes:
+      - ./data:/home/node/.n8n
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - n8n-network
+      - chatwoot_default  # Connect to Chatwoot network
+
+networks:
+  n8n-network:
+    driver: bridge
+  chatwoot_default:
+    external: true  # Use existing Chatwoot network
+```
+
+**Important Settings**:
+- `N8N_HOST`: Your n8n domain (for webhooks)
+- `WEBHOOK_URL`: Full webhook URL (with https)
+- `N8N_SECURE_COOKIE=true`: Required for HTTPS
+- `volumes`: Mounts `./data` so custom nodes persist
+- `networks`: Connects to both n8n network and Chatwoot network
+- `dns`: Public DNS for external API access
+
+#### Step 3: Create .env File (Optional)
+
+Create `/opt/n8n/.env` for sensitive variables:
+
 ```bash
-# Build custom nodes (icons are automatically copied during build)
+# Encryption key (generate with: openssl rand -base64 32)
+N8N_ENCRYPTION_KEY=your-encryption-key-here
+
+# Basic auth (optional, recommended for production)
+N8N_BASIC_AUTH_ACTIVE=true
+N8N_BASIC_AUTH_USER=admin
+N8N_BASIC_AUTH_PASSWORD=your-secure-password
+
+# Timezone
+GENERIC_TIMEZONE=America/Los_Angeles
+
+# Execution mode
+EXECUTIONS_MODE=regular
+```
+
+**Security Best Practices**:
+- Always set `N8N_ENCRYPTION_KEY` in production
+- Use `N8N_BASIC_AUTH` or configure OAuth
+- Keep `.env` file secure (don't commit to git)
+
+#### Step 4: Connect n8n to Chatwoot Network
+
+The key to making n8n and Chatwoot communicate is sharing a Docker network.
+
+**Verify Chatwoot network exists**:
+```bash
+docker network ls | grep chatwoot
+# Should show: chatwoot_default
+```
+
+**If network doesn't exist, create it**:
+```bash
+docker network create chatwoot_default
+```
+
+**Then connect Chatwoot web container** (if not already connected):
+```bash
+cd /opt/chatwoot
+docker compose -f docker-compose.production.yml down
+# Edit docker-compose.production.yml to add network
+docker compose -f docker-compose.production.yml up -d
+```
+
+#### Step 5: Start n8n
+
+```bash
+cd /opt/n8n
+docker compose up -d
+
+# Check it's running
+docker compose ps
+docker compose logs -f
+
+# Verify custom nodes directory
+docker compose exec n8n ls -la /home/node/.n8n/custom/node_modules/
+```
+
+**Expected Output**:
+```
+NAME                COMMAND                  SERVICE             STATUS              PORTS
+n8n                 "tini -- /docker-ent…"   n8n                 running             0.0.0.0:5678->5678/tcp
+```
+
+#### Step 6: Configure Nginx Proxy Manager
+
+Add SSL reverse proxy for n8n.
+
+**Access Nginx Proxy Manager**:
+- URL: `http://msp.rhaps.net:81`
+- Default: `admin@example.com` / `changeme`
+
+**Add Proxy Host for n8n**:
+
+1. Click **Hosts → Proxy Hosts → Add Proxy Host**
+
+2. **Details Tab**:
+   - Domain Names: `n8n.msp.rhaps.net`
+   - Scheme: `http`
+   - Forward Hostname/IP: `n8n` (container name)
+   - Forward Port: `5678`
+   - ✅ Cache Assets
+   - ✅ Block Common Exploits
+   - ✅ Websockets Support (required for n8n)
+
+3. **SSL Tab**:
+   - SSL Certificate: Request a new SSL Certificate
+   - ✅ Force SSL
+   - ✅ HTTP/2 Support
+   - Email: `your-email@example.com`
+   - ✅ Agree to Let's Encrypt ToS
+
+4. Click **Save**
+
+#### Step 7: Configure DNS
+
+Add DNS A record for n8n subdomain:
+
+- **Subdomain**: `n8n.msp.rhaps.net`
+- **Type**: `A`
+- **Value**: `82.64.228.224` (server IP)
+- **TTL**: `300` (5 minutes)
+
+**Verify DNS**:
+```bash
+nslookup n8n.msp.rhaps.net
+dig n8n.msp.rhaps.net +short
+```
+
+#### Step 8: Test n8n Access
+
+**Via Browser**:
+1. Open `https://n8n.msp.rhaps.net`
+2. Should load n8n UI with valid SSL
+3. Check browser console for errors (F12 → Console)
+
+**From Chatwoot Container**:
+```bash
+# Test n8n is accessible from Chatwoot
+docker exec chatwoot-web curl -I http://n8n:5678
+# Should return: HTTP/1.1 200 OK
+
+# Test webhook endpoint
+docker exec chatwoot-web curl -X POST http://n8n:5678/webhook/test \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
+```
+
+**From n8n Container**:
+```bash
+# Test Chatwoot API is accessible from n8n
+docker exec n8n curl -I http://chatwoot-web:3000/api/v1/accounts/1/conversations
+# Should return: HTTP/1.1 401 Unauthorized (expected without token)
+```
+
+#### Step 9: Deploy Custom AMB Nodes
+
+**From Local Machine**:
+
+```bash
+# Build custom nodes locally (if not already built)
 cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
 npm install
 npm run build
 
-# Verify build output
-ls -la dist/nodes/ChatwootAMBListPicker/
-# Should show: ChatwootAMBListPicker.node.js, amb.svg, chatwoot.svg
+# Install to local n8n for testing
+cp -r . ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
 
-# Install to local n8n
-rm -rf ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb
-cp -r ~/LocalGit/chatwoot/n8n-nodes-chatwoot-amb ~/.n8n/custom/node_modules/
-```
-
-**Deploy using**:
-```bash
-./script/deploy-backend-changes-safe.sh
-```
-
-This script:
-- ✅ Syncs all backend code (models, controllers, services, migrations)
-- ✅ Includes bot-related files automatically
-- ✅ **Syncs n8n custom AMB nodes** from `~/.n8n/` to `/opt/n8n/data/`
-- ✅ **Restarts n8n container** at `/opt/n8n/` to load new nodes
-- ✅ Runs database migrations
-- ✅ Restarts Chatwoot web and worker services
-- ✅ Preserves sensitive configuration (Apple Pay, certs, .env)
-
-**n8n Custom Nodes Deployment**:
-- Custom nodes are synced to `/opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/`
-- n8n automatically loads custom nodes from this directory (via Docker volume mount)
-- The n8n container is restarted via `docker compose restart` in `/opt/n8n/`
-- If n8n is not set up at `/opt/n8n/`, deployment is skipped (see [setup guide](N8N_PRODUCTION_SETUP.md))
-
-**Verify deployment**:
-```bash
-# Check bot services deployed
-ssh root@msp.rhaps.net "docker exec chatwoot-web ls -la app/services/templates/bot_messaging_service.rb"
-
-# Check bot API endpoints
-ssh root@msp.rhaps.net "docker exec chatwoot-web ls -la app/controllers/api/v1/accounts/bot_templates_controller.rb"
-
-# Test bot API
-curl https://msp.rhaps.net/api/v1/accounts/1/bot_templates/search \
-  -H "api_access_token: YOUR_BOT_TOKEN"
-
-# Verify n8n custom nodes deployed (if applicable)
-ssh root@msp.rhaps.net "ls -la /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/"
-
-# Check n8n container is running
-ssh root@msp.rhaps.net "cd /opt/n8n && docker compose ps"
-
-# Check n8n logs for custom node loading
-ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs | tail -20"
-```
-
-### Frontend Changes (Bot UI Components)
-
-If you've only changed bot-related UI components (rare for n8n integration):
-```bash
-./script/deploy-assets-only.sh
-```
-
-### n8n Configuration Updates
-
-**Production n8n webhook URL**:
-
-n8n and Chatwoot communicate via Docker networking using **internal hostnames**.
-
-**Update bot's outgoing URL** (in Chatwoot):
-```bash
-# Via API
-curl -X PATCH https://msp.rhaps.net/api/v1/accounts/1/agent_bots/AGENT_BOT_ID \
-  -H "api_access_token: YOUR_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "outgoing_url": "http://n8n:5678/webhook/chatwoot"
-  }'
-
-# Or via Rails console
-ssh root@msp.rhaps.net "docker exec -it chatwoot-web rails console"
-# Then run:
-# bot = AgentBot.find(YOUR_BOT_ID)
-# bot.outgoing_url = "http://n8n:5678/webhook/chatwoot"
-# bot.save!
-```
-
-**Important Notes**:
-- ✅ Use internal hostname: `http://n8n:5678/webhook/chatwoot` (not https://n8n.msp.rhaps.net)
-- ✅ Containers communicate directly via Docker network (faster, no SSL overhead)
-- ✅ External SSL is handled by Nginx Proxy Manager for browser access only
-- ✅ Both containers must be on `chatwoot_default` network ([setup guide](N8N_PRODUCTION_SETUP.md))
-
-**Users access n8n UI via**:
-- Public URL: `https://n8n.msp.rhaps.net` (via Nginx Proxy Manager with SSL)
-
-### Post-Deployment Testing
-
-1. **Test bot webhook**:
-   - Send test message in production Apple Messages channel
-   - Check n8n execution logs
-   - Verify webhook payload received
-
-2. **Test template sending**:
-   - Trigger n8n workflow that sends a template
-   - Verify template displays correctly in Apple Messages
-   - Check for any API errors in logs
-
-3. **Monitor logs**:
-   ```bash
-   # Follow Chatwoot logs
-   ssh root@msp.rhaps.net "cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web -f | grep -E 'BotMessaging|AgentBot'"
-
-   # Check for errors
-   ssh root@msp.rhaps.net "cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web --tail=100 | grep -i error"
-   ```
-
-### Complete Deployment Workflow Reference
-
-For comprehensive deployment procedures, troubleshooting, and maintenance commands, see:
-- **[Deployment Summary](/docs/deployment/DEPLOYMENT_SUMMARY.md)** - Complete production deployment guide
-- **Production URL**: https://msp.rhaps.net
-- **Server IP**: 82.64.228.224
-
-### Troubleshooting n8n Node Deployment
-
-**Custom nodes not appearing in n8n UI**:
-
-1. **Verify nodes were synced to server**:
-   ```bash
-   ssh root@msp.rhaps.net "ls -la /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/"
-   ```
-   Should show directories for all 6 node types with `.node.js` files and `.svg` icons.
-
-2. **Check n8n container is running**:
-   ```bash
-   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose ps"
-   ```
-   If not running, start it:
-   ```bash
-   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose up -d"
-   ```
-
-3. **Check n8n logs for errors**:
-   ```bash
-   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs | grep -i 'custom\|community\|chatwoot'"
-   ```
-   Look for loading messages or errors.
-
-4. **Manually restart n8n**:
-   ```bash
-   ssh root@msp.rhaps.net "cd /opt/n8n && docker compose restart"
-   ```
-   Wait 10-15 seconds, then check the UI.
-
-5. **Clear browser cache**:
-   - Hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
-   - Or clear browser cache and reload
-
-**Icons showing as "?" in n8n UI**:
-
-This means icon files weren't synced or aren't in the correct location.
-
-```bash
-# Verify icons exist in each node directory
-ssh root@msp.rhaps.net "ls /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/*/amb.svg"
-
-# If missing, rebuild locally and redeploy
-cd /Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb
-npm run build  # Icons are copied during build
+# Deploy to production (syncs to /opt/n8n/data/)
 cd /Users/rhaps/LocalGit/chatwoot
 ./script/deploy-backend-changes-safe.sh
 ```
 
-**n8n container not found during deployment**:
+**The deployment script automatically**:
+- Syncs custom nodes to `/opt/n8n/data/custom/node_modules/`
+- Restarts n8n container
+- Verifies deployment
 
-The deployment script looks for n8n at `/opt/n8n/docker-compose.yml`.
-
-If you have a different setup:
-
-```bash
-# Check where n8n is running
-ssh root@msp.rhaps.net "docker ps | grep n8n"
-
-# Manually copy nodes to your n8n location
-ssh root@msp.rhaps.net "docker exec n8n ls -la /home/node/.n8n/custom/node_modules/"
-
-# Restart your n8n setup
-ssh root@msp.rhaps.net "docker restart YOUR_N8N_CONTAINER_NAME"
-```
-
-**Custom nodes show old version after deployment**:
-
-n8n may cache node definitions. Force a clean restart:
+**Verify Custom Nodes Loaded**:
 
 ```bash
-ssh root@msp.rhaps.net "cd /opt/n8n && docker compose down && docker compose up -d"
+# Check files on server
+ssh root@msp.rhaps.net "ls -la /opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/dist/nodes/"
+
+# Check n8n logs for loading
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs | grep -i 'custom\|community'"
+
+# Check in n8n UI
+# 1. Open https://n8n.msp.rhaps.net
+# 2. Create workflow
+# 3. Click "+ Add node"
+# 4. Search "Chatwoot AMB"
+# 5. Should see all 6 custom nodes
 ```
 
-Then clear browser cache and reload the n8n UI.
+#### Step 10: Configure Chatwoot Bot Webhook
 
-**Network connectivity issues**:
+Update bot to use n8n internal hostname.
 
-If Chatwoot can't reach n8n:
+**Create/Update Agent Bot**:
 
 ```bash
-# Test connectivity from Chatwoot container
-ssh root@msp.rhaps.net "docker exec chatwoot-web ping -c 3 n8n"
-ssh root@msp.rhaps.net "docker exec chatwoot-web curl -I http://n8n:5678"
+# Via Rails console
+ssh root@msp.rhaps.net
+docker exec -it chatwoot-web rails console
 
-# Verify both on same network
-ssh root@msp.rhaps.net "docker network inspect chatwoot_default | grep -E 'n8n|chatwoot-web'"
+# Create bot
+bot = AgentBot.create\!(
+  name: 'n8n Production Bot',
+  description: 'Automated workflows via n8n',
+  outgoing_url: 'http://n8n:5678/webhook/chatwoot'  # Internal hostname
+)
+
+# Copy the access token
+puts bot.access_token
+
+# Assign to inbox
+inbox = Inbox.find_by(channel_type: 'Channel::AppleMessagesForBusiness')
+inbox.agent_bot = bot
+inbox.save\!
 ```
 
-If n8n is not on the network, see [N8N_PRODUCTION_SETUP.md](N8N_PRODUCTION_SETUP.md#step-4-connect-n8n-to-chatwoot-network).
+**Important**: Use internal Docker hostname `n8n:5678`, not the public URL.
+
+### Network Configuration Summary
+
+#### Internal Communication (Container-to-Container)
+
+**Chatwoot → n8n**:
+- URL: `http://n8n:5678/webhook/chatwoot`
+- Network: `chatwoot_default` Docker bridge
+- No SSL (internal traffic)
+
+**n8n → Chatwoot**:
+- URL: `http://chatwoot-web:3000/api/v1/...`
+- Network: `chatwoot_default` Docker bridge
+- No SSL (internal traffic)
+
+#### External Access (User/Browser)
+
+**Users → Chatwoot**:
+- URL: `https://msp.rhaps.net`
+- Via: Nginx Proxy Manager (SSL termination)
+- SSL: Let's Encrypt certificate
+
+**Users → n8n**:
+- URL: `https://n8n.msp.rhaps.net`
+- Via: Nginx Proxy Manager (SSL termination)
+- SSL: Let's Encrypt certificate
+
+### Maintenance Commands
+
+**View n8n Logs**:
+```bash
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose logs -f"
+```
+
+**Restart n8n**:
+```bash
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose restart"
+```
+
+**Update n8n Version**:
+```bash
+ssh root@msp.rhaps.net "cd /opt/n8n && docker compose pull && docker compose up -d"
+```
+
+**Backup n8n Data**:
+```bash
+ssh root@msp.rhaps.net "cd /opt/n8n && tar -czf n8n-backup-$(date +%Y%m%d).tar.gz data/"
+```
+
+**Check Custom Nodes**:
+```bash
+ssh root@msp.rhaps.net "docker exec n8n ls -la /home/node/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/"
+```
+
+**Redeploy Custom Nodes**:
+```bash
+# From local machine
+./script/deploy-backend-changes-safe.sh
+```
+
+### Security Considerations
+
+**Production Checklist**:
+- ✅ Use `N8N_ENCRYPTION_KEY` for data encryption
+- ✅ Enable `N8N_BASIC_AUTH` or OAuth
+- ✅ Use HTTPS for all external access
+- ✅ Keep n8n updated (`docker compose pull`)
+- ✅ Regular backups of `/opt/n8n/data/`
+- ✅ Restrict firewall rules (only 80, 443, 22, 81)
+- ✅ Use internal Docker hostnames for inter-container communication
+- ✅ Keep credentials in `.env` file (not in docker-compose.yml)
+
+**Network Security**:
+- **Internal traffic**: Unencrypted HTTP over Docker bridge (secure, isolated network)
+- **External traffic**: HTTPS with Let's Encrypt (SSL termination at Nginx)
+- **Firewall**: Only expose ports 80 (HTTP), 443 (HTTPS), 22 (SSH), 81 (Nginx UI)
 
 ---
 
