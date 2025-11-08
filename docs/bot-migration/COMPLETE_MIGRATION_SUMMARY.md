@@ -37,14 +37,13 @@ Successfully created a **complete migration toolkit** for converting the old Aco
 
 - Detailed filter report
 
-### 2. Documentation (6 documents)
+### 2. Documentation (5 documents)
 
 1. **`docs/n8n-bot-migration-analysis.md`** - Technical deep-dive
 2. **`docs/APPLE_BOT_MIGRATION_GUIDE.md`** - Step-by-step guide
-3. **`docs/APPLE_BOT_MIGRATION_SUMMARY.md`** - Executive summary
-4. **`docs/DRY_RUN_REFERENCE.md`** - Dry-run usage examples
-5. **`docs/ACOUSTIC_HOUSE_FILTER_RESULTS.md`** - Filter analysis ⭐ NEW
-6. **This file** - Complete summary
+3. **`docs/DRY_RUN_REFERENCE.md`** - Dry-run usage examples
+4. **`docs/ACOUSTIC_HOUSE_FILTER_RESULTS.md`** - Filter analysis
+5. **This file** - Complete summary
 
 ### 3. Migration Data
 
