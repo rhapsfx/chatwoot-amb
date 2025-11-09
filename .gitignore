@@ -122,3 +122,5 @@ docs/backups/*.sql
 
 # Documentation PDFs (may contain sensitive info)
 docs/**/*.pdf
+.roo/mcp.json
+/n8n-flows

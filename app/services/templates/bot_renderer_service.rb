@@ -82,7 +82,47 @@ class Templates::BotRendererService
       filtered_params = filter_parameters_for_content_type(parameters, actual_content_type)
       # Remove blank/empty values to prevent overriding template defaults
       filtered_params = filtered_params.reject { |_k, v| v.blank? }
-      transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+
+      # Special handling for time picker: preserve template timeslots if not providing available_slots
+      # This prevents accidentally clearing timeslots when passing other event parameters
+      if actual_content_type == 'apple_time_picker' &&
+         parameters['available_slots'].blank? &&
+         parameters[:available_slots].blank?
+
+        # Check if parameters contain an event that would clear timeslots
+        if filtered_params['event'].present? && transformed_attrs['event'].present?
+          # Preserve template timeslots if parameter event has empty/nil timeslots
+          template_timeslots = transformed_attrs.dig('event', 'timeslots')
+          param_timeslots = filtered_params.dig('event', 'timeslots')
+
+          if template_timeslots.present? && (param_timeslots.nil? || param_timeslots.empty?)
+            # Save template timeslots, merge other event fields, then restore timeslots
+            saved_timeslots = template_timeslots
+            transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+            transformed_attrs['event']['timeslots'] = saved_timeslots
+            Rails.logger.info "[BotRendererService] Preserved #{saved_timeslots.length} template timeslots"
+          else
+            transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+          end
+        else
+          transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+        end
+      else
+        transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+      end
+    end
+
+    # Handle available_slots parameter for time picker (bot API compatibility)
+    # CRITICAL: Do this AFTER merging parameters to ensure available_slots takes precedence
+    if actual_content_type == 'apple_time_picker'
+      available_slots = parameters['available_slots'] || parameters[:available_slots]
+      if available_slots.present?
+        # Convert available_slots to proper event.timeslots structure
+        formatted_timeslots = format_timeslots_for_bot(available_slots)
+        transformed_attrs['event'] ||= {}
+        transformed_attrs['event']['timeslots'] = formatted_timeslots
+        Rails.logger.info "[BotRendererService] Converted #{available_slots.length} available_slots to timeslots"
+      end
     end
 
     {
@@ -577,6 +617,46 @@ class Templates::BotRendererService
         signed_id: attachment.signed_id,
         description: template.attachment_metadata.dig('descriptions', attachment.id.to_s)
       }
+    end
+  end
+
+  # Format timeslots from bot API format to Apple Messages format
+  # Handles both string timestamps and hash objects
+  def format_timeslots_for_bot(slots)
+    return [] unless slots.is_a?(Array)
+
+    slots.map.with_index do |slot_time, index|
+      # Handle both string timestamps and hash objects
+      if slot_time.is_a?(Hash)
+        # Already in proper format (or close to it)
+        {
+          'identifier' => slot_time['identifier'] || "slot_#{index}",
+          'start_time' => slot_time['start_time'] || slot_time['startTime'],
+          'duration' => slot_time['duration'] || 3600
+        }.compact
+      elsif slot_time.is_a?(String) || slot_time.is_a?(Time) || slot_time.is_a?(DateTime)
+        # Convert timestamp string to proper format
+        {
+          'identifier' => "slot_#{index}",
+          'start_time' => parse_timestamp(slot_time),
+          'duration' => 3600 # Default 1 hour
+        }
+      end
+    end.compact
+  end
+
+  # Parse various timestamp formats to Unix timestamp
+  def parse_timestamp(timestamp)
+    return timestamp if timestamp.is_a?(Integer) || timestamp.to_i.to_s == timestamp.to_s
+
+    begin
+      # Try parsing as ISO8601, RFC3339, or common formats
+      time = Time.zone.parse(timestamp.to_s)
+      time.to_i
+    rescue ArgumentError
+      # If parsing fails, return nil and let validation catch it
+      Rails.logger.error "[BotRendererService] Failed to parse timestamp: #{timestamp}"
+      nil
     end
   end
 end

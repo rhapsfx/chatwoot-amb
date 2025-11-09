@@ -487,6 +487,53 @@
         "DUPLICATE_PARAMETER": "Parameter name already exists"
       }
     },
+    "SAVE_AS_TEMPLATE": {
+      "TITLE": "Save as Template",
+      "SUBTITLE": "Save this {messageType} configuration as a reusable template",
+      "TEMPLATE_NAME": {
+        "LABEL": "Template Name",
+        "REQUIRED": "*",
+        "PLACEHOLDER": "Enter a descriptive template name",
+        "ERROR_REQUIRED": "Template name is required",
+        "ERROR_EXISTS": "Template name already exists",
+        "SUCCESS_AVAILABLE": "Template name is available",
+        "HELP": "A clear, descriptive name for your template"
+      },
+      "SHORT_CODE": {
+        "LABEL": "Short Code",
+        "REQUIRED": "*",
+        "PLACEHOLDER": "Enter a unique shortcode",
+        "ERROR_REQUIRED": "Shortcode is required",
+        "ERROR_EXISTS": "Shortcode already exists",
+        "SUCCESS_AVAILABLE": "Short code is available",
+        "HELP": "A unique identifier to quickly find this template"
+      },
+      "CATEGORY": {
+        "LABEL": "Category",
+        "HELP": "Organize templates by category for easier discovery"
+      },
+      "DESCRIPTION": {
+        "LABEL": "Description",
+        "REQUIRED": "*",
+        "HELP": "Help team members understand when to use this template"
+      },
+      "TAGS": {
+        "LABEL": "Tags (optional)",
+        "PLACEHOLDER": "e.g., urgent, follow-up, customer",
+        "HELP": "Add tags to improve searchability (separate with commas)"
+      },
+      "PREVIEW": {
+        "TITLE": "Template Preview",
+        "TYPE": "Type:",
+        "CODE": "Code:",
+        "CATEGORY": "Category:"
+      },
+      "ACTIONS": {
+        "CANCEL": "Cancel",
+        "SAVE": "Save Template",
+        "SAVE_AND_SEND": "Save & Send"
+      }
+    },
     "API": {
       "FETCH_ERROR": "Failed to load templates",
       "CREATE_SUCCESS": "Template created successfully",

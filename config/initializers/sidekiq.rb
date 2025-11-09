@@ -14,6 +14,9 @@ Sidekiq.configure_server do |config|
     config.logger.formatter = Sidekiq::Logger::Formatters::JSON.new
     config[:skip_default_job_logging] = true
     config.logger.level = Logger.const_get(ENV.fetch('LOG_LEVEL', 'info').upcase.to_s)
+  elsif Rails.env.development?
+    # Reduce logging verbosity in development
+    config.logger.level = Logger::WARN
   end
 end
 

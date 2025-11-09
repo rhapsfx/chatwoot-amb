@@ -112,8 +112,13 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
 
     # Get slots from parameters (for dynamic bot usage) or properties (for static templates)
     # CRITICAL: Timeslots are nested inside event object when saved from frontend
-    slots = @parameters['available_slots'] || @parameters[:available_slots] ||
-            properties.dig('event', 'timeslots') || properties['timeslots'] || properties['slots']
+    # CRITICAL: Use .present? to check for non-empty arrays, not just truthiness
+    #           Empty array [] is truthy but should fall through to template defaults
+    param_slots = @parameters['available_slots'] || @parameters[:available_slots]
+    template_slots = properties.dig('event', 'timeslots') || properties['timeslots'] || properties['slots']
+
+    # Use parameter slots ONLY if they are present (non-empty), otherwise use template defaults
+    slots = (param_slots.presence || template_slots)
 
     Rails.logger.info "[TemplateAdapter] Found slots: #{slots.inspect}"
 
