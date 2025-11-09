@@ -909,15 +909,23 @@ export default {
 
         // FIRST: Check if template has attachments
         // Templates with attachments should be sent as messages, not inserted as text
-        const hasAttachments = fullTemplate.attachmentsSummary && fullTemplate.attachmentsSummary.length > 0;
+        const hasAttachments =
+          fullTemplate.attachmentsSummary &&
+          fullTemplate.attachmentsSummary.length > 0;
 
         // eslint-disable-next-line no-console
-        console.log('🎯 Has attachments:', hasAttachments, fullTemplate.attachmentsSummary);
+        console.log(
+          '🎯 Has attachments:',
+          hasAttachments,
+          fullTemplate.attachmentsSummary
+        );
 
         if (hasAttachments) {
           // Template with attachments - send directly as a message
           // eslint-disable-next-line no-console
-          console.log('📎 Template with attachments detected, sending directly');
+          console.log(
+            '📎 Template with attachments detected, sending directly'
+          );
 
           const messageData = {
             content: '', // Empty content - backend will handle placeholder text

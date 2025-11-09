@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import TemplatesAPI from 'dashboard/api/templates';
 
 const props = defineProps({
   show: {
@@ -30,6 +32,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'saveAndSend']);
 
+const { t } = useI18n();
+
 const store = useStore();
 
 // Form state
@@ -39,18 +43,20 @@ const category = ref('general');
 const description = ref('');
 const tags = ref('');
 const shortCodeError = ref('');
+const templateNameError = ref('');
+const existingTemplates = ref([]);
 
 // Category options - must match MessageTemplate::CATEGORIES
 const categoryOptions = [
-  { value: 'general', label: 'General' },
-  { value: 'payment', label: 'Payment' },
-  { value: 'scheduling', label: 'Scheduling' },
-  { value: 'support', label: 'Support' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'feedback', label: 'Feedback' },
-  { value: 'notification', label: 'Notification' },
-  { value: 'confirmation', label: 'Confirmation' },
-  { value: 'sales', label: 'Sales' },
+  { value: 'general', label: t('TEMPLATES.CATEGORIES.GENERAL') },
+  { value: 'payment', label: t('TEMPLATES.CATEGORIES.PAYMENT') },
+  { value: 'scheduling', label: t('TEMPLATES.CATEGORIES.SCHEDULING') },
+  { value: 'support', label: t('TEMPLATES.CATEGORIES.SUPPORT') },
+  { value: 'marketing', label: t('TEMPLATES.CATEGORIES.MARKETING') },
+  { value: 'feedback', label: t('TEMPLATES.CATEGORIES.FEEDBACK') },
+  { value: 'notification', label: t('TEMPLATES.CATEGORIES.NOTIFICATION') },
+  { value: 'confirmation', label: t('TEMPLATES.CATEGORIES.CONFIRMATION') },
+  { value: 'sales', label: t('TEMPLATES.CATEGORIES.SALES') },
 ];
 
 // Computed
@@ -66,9 +72,19 @@ const isShortCodeUnique = computed(() => {
   );
 });
 
+const isTemplateNameUnique = computed(() => {
+  if (!templateName.value) return true;
+  return !existingTemplates.value.some(
+    template =>
+      template.name.toLowerCase() === templateName.value.trim().toLowerCase()
+  );
+});
+
 const isFormValid = computed(() => {
   return (
-    templateName.value.trim().length > 0 && description.value.trim().length > 0
+    templateName.value.trim().length > 0 &&
+    description.value.trim().length > 0 &&
+    isTemplateNameUnique.value
   );
 });
 
@@ -135,7 +151,36 @@ const generateTemplateName = () => {
     ? `${baseType} ${contentSuffix}`
     : `${baseType} Template`;
 
-  return baseName.replace(/\s+/g, '_').replace(/_+/g, '_').toLowerCase();
+  const normalizedBaseName = baseName
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+
+  // Ensure uniqueness by checking existing templates
+  const existingNames = existingTemplates.value.map(template =>
+    template.name.toLowerCase()
+  );
+
+  // Debug logging
+  // eslint-disable-next-line no-console
+  console.log('[SaveAsTemplateModal] Generating name:', {
+    baseName: normalizedBaseName,
+    existingTemplatesCount: existingTemplates.value.length,
+    existingNames,
+  });
+
+  let candidateName = normalizedBaseName;
+  let counter = 1;
+
+  while (existingNames.includes(candidateName.toLowerCase())) {
+    candidateName = `${normalizedBaseName}_${counter}`;
+    counter += 1;
+  }
+
+  // eslint-disable-next-line no-console
+  console.log('[SaveAsTemplateModal] Generated unique name:', candidateName);
+
+  return candidateName;
 };
 
 const generateShortCode = () => {
@@ -248,16 +293,40 @@ const initializeFormFields = () => {
   category.value = detectCategory();
   tags.value = '';
   shortCodeError.value = '';
+  templateNameError.value = '';
+};
+
+const validateTemplateName = () => {
+  if (!templateName.value.trim()) {
+    templateNameError.value = t(
+      'TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.ERROR_REQUIRED'
+    );
+    return false;
+  }
+
+  if (!isTemplateNameUnique.value) {
+    templateNameError.value = t(
+      'TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.ERROR_EXISTS'
+    );
+    return false;
+  }
+
+  templateNameError.value = '';
+  return true;
 };
 
 const validateShortCode = () => {
   if (!shortCode.value.trim()) {
-    shortCodeError.value = 'Short code is required';
+    shortCodeError.value = t(
+      'TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.ERROR_REQUIRED'
+    );
     return false;
   }
 
   if (!isShortCodeUnique.value) {
-    shortCodeError.value = 'Short code already exists';
+    shortCodeError.value = t(
+      'TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.ERROR_EXISTS'
+    );
     return false;
   }
 
@@ -267,6 +336,26 @@ const validateShortCode = () => {
 
 const handleClose = () => {
   emit('close');
+};
+
+// Load templates helper function
+const loadTemplates = async () => {
+  try {
+    const response = await TemplatesAPI.get();
+    existingTemplates.value = response.data?.templates || [];
+    // eslint-disable-next-line no-console
+    console.log('[SaveAsTemplateModal] Templates loaded:', {
+      count: existingTemplates.value.length,
+      templates: existingTemplates.value.map(template => ({
+        id: template.id,
+        name: template.name,
+      })),
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[SaveAsTemplateModal] Failed to load templates:', error);
+    existingTemplates.value = [];
+  }
 };
 
 const handleSave = async () => {
@@ -348,13 +437,27 @@ const handleSaveAndSend = async () => {
 // Watch props.show to initialize form
 watch(
   () => props.show,
-  newShow => {
+  async newShow => {
     if (newShow) {
+      // eslint-disable-next-line no-console
+      console.log('[SaveAsTemplateModal] Modal opened, loading templates...');
+      // Load templates first to ensure we have fresh data
+      await loadTemplates();
+      // eslint-disable-next-line no-console
+      console.log(
+        '[SaveAsTemplateModal] Templates loaded, initializing form...'
+      );
+      // Then initialize form with unique name
       initializeFormFields();
     }
   },
   { immediate: true }
 );
+
+// Watch templateName for validation
+watch(templateName, () => {
+  validateTemplateName();
+});
 
 // Watch shortCode for validation
 watch(shortCode, () => {
@@ -385,11 +488,14 @@ onMounted(async () => {
       >
         <div>
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            Save as Template
+            {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.TITLE') }}
           </h2>
           <p class="text-sm text-slate-600 dark:text-n-slate-11 mt-1">
-            Save this {{ messageType.replace('_', ' ') }} configuration as a
-            reusable template
+            {{
+              $t('TEMPLATES.SAVE_AS_TEMPLATE.SUBTITLE', {
+                messageType: messageType.replace('_', ' '),
+              })
+            }}
           </p>
         </div>
         <button
@@ -412,20 +518,39 @@ onMounted(async () => {
             <label
               class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
-              Template Name
-              <span class="text-red-500">*</span>
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.LABEL') }}
+              <span class="text-red-500">{{
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.REQUIRED')
+              }}</span>
             </label>
             <input
               v-model="templateName"
               type="text"
-              placeholder="Enter a descriptive template name"
-              class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
+              :placeholder="
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.PLACEHOLDER')
+              "
+              class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
               :class="{
-                'border-red-500': templateName.trim().length === 0,
+                'border-red-500': templateNameError,
+                'border-slate-300 dark:border-slate-600': !templateNameError,
               }"
             />
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              A clear, descriptive name for your template
+            <p
+              v-if="templateNameError"
+              class="text-xs text-red-500 dark:text-red-400 mt-1"
+            >
+              {{ templateNameError }}
+            </p>
+            <p
+              v-else-if="isTemplateNameUnique && templateName.trim().length > 0"
+              class="text-xs text-green-600 dark:text-green-400 mt-1"
+            >
+              {{
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.SUCCESS_AVAILABLE')
+              }}
+            </p>
+            <p v-else class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.TEMPLATE_NAME.HELP') }}
             </p>
           </div>
 
@@ -434,13 +559,17 @@ onMounted(async () => {
             <label
               class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
-              Short Code
-              <span class="text-red-500">*</span>
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.LABEL') }}
+              <span class="text-red-500">{{
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.REQUIRED')
+              }}</span>
             </label>
             <input
               v-model="shortCode"
               type="text"
-              placeholder="Enter a unique short code"
+              :placeholder="
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.PLACEHOLDER')
+              "
               class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
               :class="{
                 'border-red-500': shortCodeError,
@@ -457,10 +586,12 @@ onMounted(async () => {
               v-else-if="isShortCodeUnique && shortCode.trim().length > 0"
               class="text-xs text-green-600 dark:text-green-400 mt-1"
             >
-              Short code is available
+              {{
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.SUCCESS_AVAILABLE')
+              }}
             </p>
             <p v-else class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              A unique identifier to quickly find this template
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.SHORT_CODE.HELP') }}
             </p>
           </div>
 
@@ -469,7 +600,7 @@ onMounted(async () => {
             <label
               class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
-              Category
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.CATEGORY.LABEL') }}
             </label>
             <select
               v-model="category"
@@ -484,7 +615,7 @@ onMounted(async () => {
               </option>
             </select>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Organize templates by category for easier discovery
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.CATEGORY.HELP') }}
             </p>
           </div>
 
@@ -493,8 +624,10 @@ onMounted(async () => {
             <label
               class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
-              Description
-              <span class="text-red-500">*</span>
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.DESCRIPTION.LABEL') }}
+              <span class="text-red-500">{{
+                $t('TEMPLATES.SAVE_AS_TEMPLATE.DESCRIPTION.REQUIRED')
+              }}</span>
             </label>
             <textarea
               v-model="description"
@@ -506,7 +639,7 @@ onMounted(async () => {
               }"
             />
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Help team members understand when to use this template
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.DESCRIPTION.HELP') }}
             </p>
           </div>
 
@@ -515,16 +648,16 @@ onMounted(async () => {
             <label
               class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
-              Tags (optional)
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.TAGS.LABEL') }}
             </label>
             <input
               v-model="tags"
               type="text"
-              placeholder="e.g., appointment, booking, urgent (comma-separated)"
+              :placeholder="$t('TEMPLATES.SAVE_AS_TEMPLATE.TAGS.PLACEHOLDER')"
               class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-slate-700 dark:text-white"
             />
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Add tags to improve searchability (separate with commas)
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.TAGS.HELP') }}
             </p>
           </div>
 
@@ -535,23 +668,29 @@ onMounted(async () => {
             <h4
               class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2"
             >
-              Template Preview
+              {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.PREVIEW.TITLE') }}
             </h4>
             <div class="space-y-2 text-sm">
               <div class="flex">
-                <span class="text-slate-600 dark:text-slate-400 w-24">Type:</span>
+                <span class="text-slate-600 dark:text-slate-400 w-24">
+                  {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.PREVIEW.TYPE') }}
+                </span>
                 <span class="text-slate-900 dark:text-slate-100 font-medium">
                   {{ messageType.replace('_', ' ').toUpperCase() }}
                 </span>
               </div>
               <div class="flex">
-                <span class="text-slate-600 dark:text-slate-400 w-24">Code:</span>
+                <span class="text-slate-600 dark:text-slate-400 w-24">
+                  {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.PREVIEW.CODE') }}
+                </span>
                 <span class="text-slate-900 dark:text-slate-100 font-mono">
                   {{ shortCode || '(not set)' }}
                 </span>
               </div>
               <div class="flex">
-                <span class="text-slate-600 dark:text-slate-400 w-24">Category:</span>
+                <span class="text-slate-600 dark:text-slate-400 w-24">
+                  {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.PREVIEW.CATEGORY') }}
+                </span>
                 <span class="text-slate-900 dark:text-slate-100 capitalize">
                   {{ category }}
                 </span>
@@ -569,21 +708,21 @@ onMounted(async () => {
           class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
           @click="handleClose"
         >
-          Cancel
+          {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.ACTIONS.CANCEL') }}
         </button>
         <button
           :disabled="!isFormValid"
           class="px-4 py-2 bg-slate-500 text-white rounded-md hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           @click="handleSave"
         >
-          Save Template
+          {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.ACTIONS.SAVE') }}
         </button>
         <button
           :disabled="!isFormValid"
           class="px-4 py-2 bg-woot-500 text-white rounded-md hover:bg-woot-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           @click="handleSaveAndSend"
         >
-          Save & Send
+          {{ $t('TEMPLATES.SAVE_AS_TEMPLATE.ACTIONS.SAVE_AND_SEND') }}
         </button>
       </div>
     </div>

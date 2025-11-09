@@ -35,8 +35,11 @@ class ContentAttributeValidator < ActiveModel::Validator
   APPLE_STYLE_VALUES = %w[icon small large].freeze
 
   def validate(record)
-    Rails.logger.info "🔥🔥🔥 ContentAttributeValidator.validate CALLED for content_type: #{record.content_type}"
-    Rails.logger.info "🔥🔥🔥 ContentAttributeValidator - content_attributes keys: #{record.content_attributes&.keys&.inspect}"
+    # Only log for Apple Messages content types to reduce noise
+    if record.content_type&.start_with?('apple_') || %w[input_select cards form article].include?(record.content_type)
+      Rails.logger.info "🔥 ContentAttributeValidator.validate CALLED for content_type: #{record.content_type}"
+      Rails.logger.info "🔥 ContentAttributeValidator - content_attributes keys: #{record.content_attributes&.keys&.inspect}"
+    end
 
     case record.content_type
     when 'input_select'
