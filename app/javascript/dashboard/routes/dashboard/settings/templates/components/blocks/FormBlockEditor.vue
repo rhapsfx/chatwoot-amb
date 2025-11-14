@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -16,29 +16,100 @@ const emit = defineEmits(['update:properties']);
 
 const { t } = useI18n();
 
+// Helper to normalize message objects from snake_case or camelCase to camelCase
+const normalizeMessageObject = msg => {
+  if (!msg) {
+    return {
+      title: '',
+      subtitle: '',
+      imageIdentifier: '',
+      style: 'large',
+    };
+  }
+
+  return {
+    title: msg.title || '',
+    subtitle: msg.subtitle || '',
+    // Handle both snake_case and camelCase
+    imageIdentifier: msg.imageIdentifier || msg.image_identifier || '',
+    style: msg.style || 'large',
+  };
+};
+
+// Flag to prevent infinite loop between watchers
+const isUpdatingFromProps = ref(false);
+
 const localProps = ref({
-  title: props.properties.title || '',
-  description: props.properties.description || '',
-  pages: props.properties.pages || [],
-  receivedMessage: props.properties.receivedMessage || {
+  title: '',
+  description: '',
+  pages: [],
+  receivedMessage: {
     title: '',
     subtitle: '',
     imageIdentifier: '',
     style: 'large',
   },
-  replyMessage: props.properties.replyMessage || {
+  replyMessage: {
     title: '',
     subtitle: '',
     imageIdentifier: '',
     style: 'large',
   },
-  images: props.properties.images || [],
+  images: [],
 });
+
+// Watch for props changes (e.g., when template data loads)
+watch(
+  () => props.properties,
+  async newProps => {
+    isUpdatingFromProps.value = true;
+
+    if (newProps && Object.keys(newProps).length > 0) {
+      // Handle nested form structure from database
+      // Database may store form data nested in a 'form' object
+      const form = newProps.form || {};
+
+      // Create a new object to trigger reactivity
+      localProps.value = {
+        // Form details (may be nested in form object)
+        title: newProps.title || form.title || '',
+        description: newProps.description || form.description || '',
+        pages: newProps.pages || form.pages || [],
+
+        // Message configuration (flat structure)
+        // Handle both camelCase (frontend) and snake_case (database)
+        receivedMessage: normalizeMessageObject(
+          newProps.receivedMessage ||
+            newProps.received_message ||
+            form.receivedMessage ||
+            form.received_message
+        ),
+        replyMessage: normalizeMessageObject(
+          newProps.replyMessage ||
+            newProps.reply_message ||
+            form.replyMessage ||
+            form.reply_message
+        ),
+
+        // Images - try multiple possible locations
+        images: newProps.images || form.images || [],
+      };
+    }
+
+    // Wait for Vue to process all reactive updates before resetting flag
+    await nextTick();
+    isUpdatingFromProps.value = false;
+  },
+  { deep: true, immediate: true }
+);
 
 watch(
   localProps,
   newValue => {
-    emit('update:properties', newValue);
+    // Only emit if this change didn't come from props
+    if (!isUpdatingFromProps.value) {
+      emit('update:properties', newValue);
+    }
   },
   { deep: true }
 );
@@ -50,8 +121,7 @@ watch(
     if (localProps.value.replyMessage) {
       localProps.value.replyMessage.imageIdentifier = newIdentifier || '';
     }
-  },
-  { immediate: true }
+  }
 );
 
 // Automatically sync received message title with form title
@@ -61,8 +131,7 @@ watch(
     if (localProps.value.receivedMessage) {
       localProps.value.receivedMessage.title = newTitle || '';
     }
-  },
-  { immediate: true }
+  }
 );
 
 // Automatically sync received message subtitle with form description
@@ -77,8 +146,7 @@ watch(
     ) {
       localProps.value.receivedMessage.subtitle = newDescription || '';
     }
-  },
-  { immediate: true }
+  }
 );
 
 const fieldTypes = computed(() => [
@@ -145,9 +213,24 @@ const fieldTypes = computed(() => [
 ]);
 
 const styleOptions = [
-  { value: 'icon', label: 'Icon (280x65)' },
-  { value: 'small', label: 'Small (280x85)' },
-  { value: 'large', label: 'Large (280x210)' },
+  {
+    value: 'icon',
+    label: 'Icon',
+    dimensions: '280×65',
+    description: 'Compact header with small icon',
+  },
+  {
+    value: 'small',
+    label: 'Small',
+    dimensions: '280×85',
+    description: 'Medium-sized header',
+  },
+  {
+    value: 'large',
+    label: 'Large',
+    dimensions: '280×210',
+    description: 'Full-width banner image',
+  },
 ];
 
 const currentPageIndex = ref(0);
@@ -196,9 +279,13 @@ const getImagePreviewUrl = identifier => {
   const image = localProps.value.images.find(
     img => img.identifier === identifier
   );
+
   if (!image) return null;
   return (
-    image.preview || image.imageUrl || `data:image/jpeg;base64,${image.data}`
+    image.preview ||
+    image.imageUrl ||
+    image.image_url ||
+    `data:image/jpeg;base64,${image.data}`
   );
 };
 
@@ -234,6 +321,18 @@ const handleFileSelected = async event => {
   reader.readAsDataURL(file);
 
   event.target.value = '';
+};
+
+const removeImage = index => {
+  localProps.value.images.splice(index, 1);
+};
+
+const formatFileSize = bytes => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
 };
 
 const addNewPage = () => {
@@ -335,7 +434,13 @@ const addFieldToCurrentPage = () => {
   }
 
   if (fieldData.options) {
-    fieldData.options = fieldData.options.filter(opt => opt.value && opt.title);
+    fieldData.options = fieldData.options
+      .filter(opt => opt.value && opt.title)
+      .map(opt => ({
+        ...opt,
+        // Convert camelCase imageIdentifier back to snake_case for database
+        image_identifier: opt.imageIdentifier || opt.image_identifier || '',
+      }));
   }
 
   if (isEditing) {
@@ -349,8 +454,15 @@ const addFieldToCurrentPage = () => {
 };
 
 const removeField = fieldIndex => {
+  // eslint-disable-next-line no-console
+  console.log('removeField called with index:', fieldIndex);
   if (currentPage.value && currentPage.value.items) {
     currentPage.value.items.splice(fieldIndex, 1);
+    // eslint-disable-next-line no-console
+    console.log(
+      'Field removed, remaining items:',
+      currentPage.value.items.length
+    );
   }
 };
 
@@ -359,8 +471,15 @@ const editField = fieldIndex => {
     const field = currentPage.value.items[fieldIndex];
     newField.value = { ...field };
 
+    // Normalize options to handle both snake_case and camelCase
     if (!newField.value.options || newField.value.options.length === 0) {
       newField.value.options = [{ value: '', title: '' }];
+    } else {
+      // Convert snake_case image_identifier to camelCase imageIdentifier for the editor
+      newField.value.options = newField.value.options.map(opt => ({
+        ...opt,
+        imageIdentifier: opt.imageIdentifier || opt.image_identifier || '',
+      }));
     }
 
     newField.value.editingIndex = fieldIndex;
@@ -435,46 +554,177 @@ if (localProps.value.pages.length === 0) {
       @change="handleFileSelected"
     />
 
+    <!-- Images Section - Gallery Grid -->
+    <div
+      class="bg-n-alpha-2 dark:bg-n-alpha-3 p-6 rounded-lg border border-n-weak dark:border-n-slate-6"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h4
+            class="text-base font-semibold text-n-slate-12 dark:text-n-slate-11"
+          >
+            Choose 1 image for the Form
+          </h4>
+          <p class="text-sm text-n-slate-10 dark:text-n-slate-9 mt-1">
+            Upload images to use in your form messages
+          </p>
+        </div>
+        <button
+          class="px-4 py-2 bg-n-blue-9 dark:bg-n-blue-10 text-white rounded-lg text-sm font-medium hover:bg-n-blue-10 dark:hover:bg-n-blue-11 transition-colors"
+          @click="handleImageUpload"
+        >
+          Add Image
+        </button>
+      </div>
+
+      <!-- Image Gallery Grid -->
+      <div
+        v-if="localProps.images.length === 0"
+        class="text-center py-12 border-2 border-dashed border-n-slate-6 dark:border-n-slate-7 rounded-lg"
+      >
+        <svg
+          class="mx-auto h-12 w-12 text-n-slate-9 dark:text-n-slate-8"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
+        <p class="mt-2 text-sm text-n-slate-11 dark:text-n-slate-10">
+          No images uploaded yet
+        </p>
+        <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1">
+          Click "Add Image" to upload images for your form
+        </p>
+      </div>
+
+      <div v-else class="grid grid-cols-4 gap-3">
+        <div
+          v-for="(image, index) in localProps.images"
+          :key="image.identifier"
+          class="relative group border-2 rounded-lg overflow-hidden transition-all duration-200 cursor-pointer aspect-square"
+          :class="
+            localProps.receivedMessage.imageIdentifier === image.identifier
+              ? 'border-n-blue-8 ring-2 ring-n-blue-8 dark:border-n-blue-9 dark:ring-n-blue-9'
+              : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
+          "
+          @click="localProps.receivedMessage.imageIdentifier = image.identifier"
+        >
+          <!-- Image -->
+          <img
+            v-if="image.preview"
+            :src="image.preview"
+            :alt="image.originalName || image.description"
+            class="w-full h-full object-cover"
+          />
+
+          <!-- Selected indicator -->
+          <div
+            v-if="
+              localProps.receivedMessage.imageIdentifier === image.identifier
+            "
+            class="absolute top-2 right-2 bg-n-blue-9 dark:bg-n-blue-10 text-white rounded-full p-1"
+          >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fill-rule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+
+          <!-- Hover overlay with remove button -->
+          <div
+            class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center"
+          >
+            <button
+              class="opacity-0 group-hover:opacity-100 px-3 py-1.5 bg-n-ruby-9 text-white rounded text-sm font-medium hover:bg-n-ruby-10 transition-all"
+              @click.stop="removeImage(index)"
+            >
+              Remove
+            </button>
+          </div>
+
+          <!-- Image info -->
+          <div
+            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2"
+          >
+            <p
+              class="text-xs text-white truncate font-medium"
+              :title="`${image.originalName || image.description}`"
+            >
+              {{ image.originalName || image.description }}
+            </p>
+            <p class="text-xs text-white opacity-75">
+              {{ formatFileSize(image.size) }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Form Details -->
-    <div class="space-y-4">
-      <h3 class="text-base font-semibold text-n-slate-12">
+    <div
+      class="bg-n-alpha-2 dark:bg-n-alpha-3 p-6 rounded-lg border border-n-weak dark:border-n-slate-6"
+    >
+      <h3
+        class="text-base font-semibold text-n-slate-12 dark:text-n-slate-11 mb-6"
+      >
         {{ t('APPLE_FORM.FORM_DETAILS') }}
       </h3>
 
-      <div>
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
-          {{ t('APPLE_FORM.FORM_TITLE_LABEL') }}
-        </label>
-        <input
-          v-model="localProps.title"
-          type="text"
-          :placeholder="t('APPLE_FORM.FORM_TITLE_PLACEHOLDER')"
-          class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-        />
-      </div>
+      <div class="space-y-4">
+        <div>
+          <label
+            class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+          >
+            {{ t('APPLE_FORM.FORM_TITLE_LABEL') }}
+          </label>
+          <input
+            v-model="localProps.title"
+            type="text"
+            :placeholder="t('APPLE_FORM.FORM_TITLE_PLACEHOLDER')"
+            class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8"
+          />
+        </div>
 
-      <div>
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
-          {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
-        </label>
-        <textarea
-          v-model="localProps.description"
-          rows="2"
-          :placeholder="t('APPLE_FORM.DESCRIPTION_PLACEHOLDER')"
-          class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-        />
+        <div>
+          <label
+            class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+          >
+            {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
+          </label>
+          <textarea
+            v-model="localProps.description"
+            rows="2"
+            :placeholder="t('APPLE_FORM.DESCRIPTION_PLACEHOLDER')"
+            class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8"
+          />
+        </div>
       </div>
     </div>
 
     <!-- Message Configuration -->
-    <div class="space-y-4">
-      <h3 class="text-base font-semibold text-n-slate-12">
+    <div
+      class="bg-n-alpha-2 dark:bg-n-alpha-3 p-6 rounded-lg border border-n-weak dark:border-n-slate-6"
+    >
+      <h3
+        class="text-base font-semibold text-n-slate-12 dark:text-n-slate-11 mb-6"
+      >
         {{ t('APPLE_FORM.MESSAGES_TAB.MESSAGE_CONFIGURATION') }}
       </h3>
 
       <!-- Received Message Subtitle -->
-      <div>
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
+      <div class="mb-8">
+        <label
+          class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+        >
           {{ t('APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_LABEL') }}
         </label>
         <input
@@ -483,130 +733,283 @@ if (localProps.value.pages.length === 0) {
           :placeholder="
             t('APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER')
           "
-          class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
+          class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8"
         />
       </div>
 
-      <!-- Image Selection -->
-      <div>
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
-          {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
-        </label>
-        <div class="flex items-center gap-2">
-          <select
-            v-model="localProps.receivedMessage.imageIdentifier"
-            class="flex-1 px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-          >
-            <option value="">
-              {{ t('APPLE_FORM.MESSAGES_TAB.NO_IMAGE') }}
-            </option>
-            <option
-              v-for="image in localProps.images"
-              :key="image.identifier"
-              :value="image.identifier"
-            >
-              {{ image.description || image.identifier }}
-            </option>
-          </select>
-          <Button icon="i-lucide-upload" xs @click="handleImageUpload">
-            {{ t('APPLE_FORM.MESSAGES_TAB.UPLOAD_BUTTON') }}
-          </Button>
-        </div>
-        <div v-if="localProps.receivedMessage.imageIdentifier" class="mt-2">
-          <img
-            :src="
-              getImagePreviewUrl(localProps.receivedMessage.imageIdentifier)
-            "
-            class="h-16 rounded border border-n-slate-7"
-            alt="Preview"
-          />
-        </div>
-      </div>
-
-      <!-- Style Selection -->
-      <div>
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
+      <!-- Received Style Selection -->
+      <div class="mb-8">
+        <label
+          class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-4"
+        >
           {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
         </label>
-        <select
-          v-model="localProps.receivedMessage.style"
-          class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-        >
-          <option
+        <div class="grid grid-cols-3 gap-4">
+          <div
             v-for="style in styleOptions"
             :key="style.value"
-            :value="style.value"
+            class="border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+            :class="
+              localProps.receivedMessage.style === style.value
+                ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
+                : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
+            "
+            @click="localProps.receivedMessage.style = style.value"
           >
-            {{ style.label }}
-          </option>
-        </select>
+            <div class="text-center">
+              <!-- Style Preview -->
+              <div
+                class="mx-auto mb-3 rounded border-2 bg-white dark:bg-n-alpha-2 flex items-center justify-center"
+                :class="
+                  style.value === 'icon'
+                    ? 'w-24 h-8'
+                    : style.value === 'small'
+                      ? 'w-24 h-10'
+                      : 'w-24 h-20'
+                "
+              >
+                <img
+                  v-if="
+                    localProps.receivedMessage.imageIdentifier &&
+                    getImagePreviewUrl(
+                      localProps.receivedMessage.imageIdentifier
+                    )
+                  "
+                  :src="
+                    getImagePreviewUrl(
+                      localProps.receivedMessage.imageIdentifier
+                    )
+                  "
+                  class="w-full h-full object-cover rounded"
+                  alt="Preview"
+                />
+                <svg
+                  v-else
+                  class="w-8 h-8 text-n-slate-8"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+
+              <p
+                class="font-medium text-sm text-n-slate-12 dark:text-n-slate-11"
+              >
+                {{ style.label }} ({{ style.dimensions }})
+              </p>
+              <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1">
+                {{ style.description }}
+              </p>
+
+              <!-- Selected indicator -->
+              <div
+                v-if="localProps.receivedMessage.style === style.value"
+                class="mt-2 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Reply Message -->
-      <div class="space-y-4 pt-4 border-t border-n-slate-6">
-        <h4 class="text-sm font-semibold text-n-slate-12">
+      <div class="border-t border-n-weak dark:border-n-slate-6 pt-8">
+        <h4
+          class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-6"
+        >
           {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
         </h4>
 
-        <div>
-          <label class="block text-sm font-medium text-n-slate-12 mb-2">
-            {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
-          </label>
-          <input
-            v-model="localProps.replyMessage.title"
-            type="text"
-            :placeholder="t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')"
-            class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-          />
-        </div>
+        <div class="space-y-4">
+          <div>
+            <label
+              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+            >
+              {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
+            </label>
+            <input
+              v-model="localProps.replyMessage.title"
+              type="text"
+              :placeholder="t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')"
+              class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8"
+            />
+          </div>
 
-        <div>
-          <label class="block text-sm font-medium text-n-slate-12 mb-2">
-            {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
-          </label>
-          <input
-            v-model="localProps.replyMessage.subtitle"
-            type="text"
-            :placeholder="t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')"
-            class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7"
-          />
+          <div>
+            <label
+              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+            >
+              {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
+            </label>
+            <input
+              v-model="localProps.replyMessage.subtitle"
+              type="text"
+              :placeholder="t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')"
+              class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8"
+            />
+          </div>
+
+          <!-- Reply Style Selection -->
+          <div>
+            <label
+              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-4"
+            >
+              Reply Style
+            </label>
+            <div class="grid grid-cols-3 gap-4">
+              <div
+                v-for="style in styleOptions"
+                :key="style.value"
+                class="border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+                :class="
+                  localProps.replyMessage.style === style.value
+                    ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
+                    : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
+                "
+                @click="localProps.replyMessage.style = style.value"
+              >
+                <div class="text-center">
+                  <!-- Style Preview -->
+                  <div
+                    class="mx-auto mb-3 rounded border-2 bg-white dark:bg-n-alpha-2 flex items-center justify-center"
+                    :class="
+                      style.value === 'icon'
+                        ? 'w-24 h-8'
+                        : style.value === 'small'
+                          ? 'w-24 h-10'
+                          : 'w-24 h-20'
+                    "
+                  >
+                    <img
+                      v-if="
+                        localProps.replyMessage.imageIdentifier &&
+                        getImagePreviewUrl(
+                          localProps.replyMessage.imageIdentifier
+                        )
+                      "
+                      :src="
+                        getImagePreviewUrl(
+                          localProps.replyMessage.imageIdentifier
+                        )
+                      "
+                      class="w-full h-full object-cover rounded"
+                      alt="Preview"
+                    />
+                    <svg
+                      v-else
+                      class="w-8 h-8 text-n-slate-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+
+                  <p
+                    class="font-medium text-sm text-n-slate-12 dark:text-n-slate-11"
+                  >
+                    {{ style.label }} ({{ style.dimensions }})
+                  </p>
+                  <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1">
+                    {{ style.description }}
+                  </p>
+
+                  <!-- Selected indicator -->
+                  <div
+                    v-if="localProps.replyMessage.style === style.value"
+                    class="mt-2 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Pages Management -->
-    <div class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-n-slate-12">
-          {{ t('APPLE_FORM.PAGES') }}
-        </h3>
-        <Button icon="i-lucide-plus" xs @click="addNewPage">
-          {{ t('APPLE_FORM.ADD_PAGE') }}
-        </Button>
+    <div
+      class="bg-n-alpha-2 dark:bg-n-alpha-3 p-6 rounded-lg border border-n-weak dark:border-n-slate-6"
+    >
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3
+            class="text-base font-semibold text-n-slate-12 dark:text-n-slate-11"
+          >
+            {{ t('APPLE_FORM.PAGES') }}
+          </h3>
+          <p class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1">
+            Click a page to view and edit its fields
+          </p>
+        </div>
+        <Button icon="i-lucide-plus" xs @click="addNewPage" />
       </div>
 
       <div class="space-y-2">
         <div
           v-for="(page, index) in localProps.pages"
           :key="page.page_id"
-          class="flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors"
+          class="flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors group"
           :class="[
             index === currentPageIndex
               ? 'border-n-blue-7 bg-n-blue-2'
-              : 'border-n-slate-7 hover:border-n-slate-8',
+              : 'border-n-slate-7 hover:border-n-blue-6 hover:bg-n-blue-1',
           ]"
           @click="currentPageIndex = index"
         >
-          <div class="flex-1 min-w-0">
-            <input
-              v-model="page.title"
-              class="w-full text-sm font-medium text-n-slate-12 bg-transparent border-none p-0 focus:outline-none truncate"
-              @click.stop
+          <div class="flex-1 min-w-0 flex items-center gap-3">
+            <!-- Click indicator icon -->
+            <i
+              class="i-lucide-chevron-right text-lg transition-transform"
+              :class="[
+                index === currentPageIndex
+                  ? 'rotate-90 text-n-blue-10'
+                  : 'text-n-slate-9 group-hover:text-n-blue-9',
+              ]"
             />
-            <p class="text-xs text-n-slate-11">
-              {{ page.items ? page.items.length : 0 }}
-              {{ t('APPLE_FORM.FIELDS_COUNT') }}
-            </p>
+            <div class="flex-1">
+              <input
+                v-model="page.title"
+                class="w-full text-sm font-medium text-n-slate-12 bg-transparent border-none p-0 focus:outline-none truncate"
+                @click.stop
+              />
+              <p class="text-xs text-n-slate-11">
+                {{ page.items ? page.items.length : 0 }}
+                {{ t('APPLE_FORM.FIELDS_COUNT') }}
+              </p>
+            </div>
           </div>
           <Button
             v-if="localProps.pages.length > 1"
@@ -621,14 +1024,17 @@ if (localProps.value.pages.length === 0) {
     </div>
 
     <!-- Current Page Fields -->
-    <div v-if="currentPage" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h4 class="text-sm font-semibold text-n-slate-12 truncate">
+    <div
+      v-if="currentPage"
+      class="bg-n-alpha-2 dark:bg-n-alpha-3 p-6 rounded-lg border border-n-weak dark:border-n-slate-6"
+    >
+      <div class="flex items-center justify-between mb-4">
+        <h4
+          class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 truncate"
+        >
           {{ t('APPLE_FORM.FIELDS_TITLE', { page: currentPage.title }) }}
         </h4>
-        <Button icon="i-lucide-plus" xs @click="openAddFieldModal">
-          {{ t('APPLE_FORM.ADD_FIELD') }}
-        </Button>
+        <Button icon="i-lucide-plus" xs @click="openAddFieldModal" />
       </div>
 
       <div class="space-y-2">

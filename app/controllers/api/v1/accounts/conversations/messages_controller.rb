@@ -18,6 +18,9 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
       if @message.is_a?(Array)
         @message = @message.last # Return the last message for response
       end
+
+      # Trigger bot if enabled and message is incoming
+      trigger_apple_messages_bot(@message) if @message.incoming?
     else
       # Regular message creation for non-Apple Messages conversations
       mb = Messages::MessageBuilder.new(user, @conversation, create_params)
@@ -117,6 +120,33 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   private
 
+  def trigger_apple_messages_bot(message)
+    return unless bot_enabled?
+    return unless message.incoming?
+
+    bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
+      @conversation,
+      message
+    )
+
+    # Check if this is an interactive response (quick reply, list picker, time picker, etc.)
+    if params[:interactive_data].present?
+      bot_service.process_interactive_response(params[:interactive_data].to_unsafe_h)
+    else
+      bot_service.process_message
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Apple Messages Bot] Error processing message: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def bot_enabled?
+    # Check if bot is enabled in conversation custom_attributes
+    # Default to true if not set (opt-out model)
+    attrs = @conversation.custom_attributes || {}
+    attrs.fetch('bot_enabled', true)
+  end
+
   def message
     @message ||= @conversation.messages.find(permitted_params[:id])
   end
@@ -136,6 +166,8 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
     permitted = params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at, :template_id,
                               :attachments => [],
+                              # Apple Messages interactive response data
+                              :interactive_data => [:requestIdentifier, :data => {}],
                               :content_attributes => [
                                 # Common type field for all Apple Messages
                                 :type,

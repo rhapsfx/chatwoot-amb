@@ -2,7 +2,8 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   # CRUD controller for managing message templates
   # Uses MessageTemplatePolicy for authorization
 
-  before_action :fetch_template, only: [:show, :update, :destroy, :render_template, :attach_files, :remove_attachment, :reorder_attachments]
+  before_action :fetch_template,
+                only: [:show, :update, :destroy, :render_template, :attach_files, :remove_attachment, :reorder_attachments, :validate_images]
   before_action :check_authorization
 
   # GET /api/v1/accounts/:account_id/templates
@@ -48,6 +49,40 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   # Show a specific template with all details
   def show
     render json: @template.detailed_json(include_content_blocks: true)
+  end
+
+  # GET /api/v1/accounts/:account_id/templates/:id/validate_images?inbox_id=123
+  # Check if template images are available in specified inbox(es)
+  def validate_images
+    inbox_ids = if params[:inbox_id].present?
+                  [params[:inbox_id].to_i]
+                else
+                  Current.account.inboxes.where(channel_type: 'Channel::AppleMessagesForBusiness').pluck(:id)
+                end
+
+    identifiers = @template.extract_image_identifiers_from_blocks
+
+    results = inbox_ids.map do |inbox_id|
+      inbox = Current.account.inboxes.find(inbox_id)
+      available = AppleListPickerImage.where(inbox_id: inbox_id, identifier: identifiers).pluck(:identifier)
+      missing = identifiers - available
+
+      {
+        inboxId: inbox_id,
+        inboxName: inbox.name,
+        identifiers: identifiers,
+        available: available,
+        missing: missing,
+        allAvailable: missing.empty?
+      }
+    end
+
+    render json: {
+      templateId: @template.id,
+      templateName: @template.name,
+      totalIdentifiers: identifiers.length,
+      validationResults: results
+    }
   end
 
   # POST /api/v1/accounts/:account_id/templates

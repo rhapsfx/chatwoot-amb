@@ -1,28 +1,6 @@
 class AppleMessagesForBusiness::SendQuickReplyService < AppleMessagesForBusiness::SendMessageService
   private
 
-  def message_payload
-    {
-      sourceId: source_id,
-      destinationId: destination_id,
-      v: 1,
-      type: 'interactive',
-      interactiveData: {
-        bid: channel.imessage_extension_bid,
-        data: {
-          requestIdentifier: SecureRandom.uuid,
-          mspVersion: '1.0',
-          quickReply: {
-            summaryText: content_attributes['summary_text'] || 'Quick Reply',
-            items: build_quick_reply_items
-          }
-        },
-        receivedMessage: build_received_message,
-        replyMessage: build_reply_message
-      }
-    }
-  end
-
   def build_quick_reply_items
     items = content_attributes['items'] || []
 

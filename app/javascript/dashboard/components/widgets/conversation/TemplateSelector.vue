@@ -60,20 +60,47 @@ export default {
       }));
     },
     templateItems() {
+      // eslint-disable-next-line no-console
+      console.log(
+        '🔍 [TemplateSelector] Filtering templates. channelType:',
+        this.channelType
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        '🔍 [TemplateSelector] filteredTemplates count:',
+        this.filteredTemplates.length
+      );
+
       return this.filteredTemplates
-        .filter(
-          template =>
-            (
-              template.supportedChannels ||
-              template.supported_channels ||
-              []
-            ).includes(this.channelType) &&
-            template.status === 'active' &&
-            // Exclude bot_api_only templates from UI
-            !(template.useCases || template.use_cases || []).includes(
-              'bot_api_only'
-            )
-        )
+        .filter(template => {
+          const supportedChannels =
+            template.supportedChannels || template.supported_channels || [];
+          const channelMatch = supportedChannels.includes(this.channelType);
+          const statusMatch = template.status === 'active';
+          const useCases = template.useCases || template.use_cases || [];
+          const notBotOnly = !useCases.includes('bot_api_only');
+
+          const passes = channelMatch && statusMatch && notBotOnly;
+
+          // Debug log for templates that don't pass
+          if (!passes) {
+            // eslint-disable-next-line no-console
+            console.log(
+              `🔍 [TemplateSelector] Template "${template.name}" filtered out:`,
+              {
+                supportedChannels,
+                channelType: this.channelType,
+                channelMatch,
+                status: template.status,
+                statusMatch,
+                useCases,
+                notBotOnly,
+              }
+            );
+          }
+
+          return passes;
+        })
         .map(template => ({
           label: template.name,
           key: `template_${template.id}`,

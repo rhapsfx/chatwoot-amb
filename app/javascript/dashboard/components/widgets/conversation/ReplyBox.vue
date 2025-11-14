@@ -1013,7 +1013,15 @@ export default {
         // eslint-disable-next-line no-console
         console.log('🎯 isAppleInteractive:', isAppleInteractive);
 
+        // eslint-disable-next-line no-console
+        console.log(
+          '🎯 isAppleMessagesConversation:',
+          this.isAppleMessagesConversation
+        );
+
         if (isAppleInteractive && this.isAppleMessagesConversation) {
+          // eslint-disable-next-line no-console
+          console.log('✅ Entering Apple interactive message handling block');
           // This is an Apple Messages interactive template - send it directly
 
           // Check if this is an array-based template (content is an array of blocks)
@@ -1141,18 +1149,27 @@ export default {
           }
 
           // Single interactive message - detect the message type and wrap the content appropriately
+          // eslint-disable-next-line no-console
+          console.log('🔍 Detecting message type from content structure');
+
           let messageData;
           if (
             (content.content_type || content.contentType) &&
             (content.content_attributes || content.contentAttributes)
           ) {
             // Content already has the right structure - use it directly
+            // eslint-disable-next-line no-console
+            console.log(
+              '✅ Branch 1: Content has content_type and content_attributes'
+            );
             messageData = {
               content_type: content.content_type || content.contentType,
               content_attributes:
                 content.content_attributes || content.contentAttributes,
               type: content.type,
             };
+            // eslint-disable-next-line no-console
+            console.log('📤 messageData created:', messageData);
           } else if (content.type) {
             // Content has explicit type - use it directly
             messageData = content;
@@ -1363,18 +1380,71 @@ export default {
 
           // Clean up images array - remove base64 data and preview, keep only identifiers
           if (messageData.content_attributes?.images) {
-            messageData.content_attributes.images =
-              messageData.content_attributes.images.map(img => ({
-                identifier: img.identifier,
-                description: img.description || '',
-                data: img.data, // Keep data for now, backend will handle
-              }));
+            // eslint-disable-next-line no-console
+            console.log(
+              '🖼️  Cleaning up images. Before:',
+              messageData.content_attributes.images
+            );
+
+            try {
+              // Check if images is an object (dictionary) or array
+              const imagesData = messageData.content_attributes.images;
+
+              if (Array.isArray(imagesData)) {
+                // Array format - map over items
+                messageData.content_attributes.images = imagesData.map(img => ({
+                  identifier: img.identifier,
+                  description: img.description || '',
+                  data: img.data,
+                }));
+              } else if (typeof imagesData === 'object') {
+                // Object/dictionary format (keys are identifiers, values are base64 strings)
+                // Convert to array format expected by backend
+                // eslint-disable-next-line no-console
+                console.log(
+                  '🖼️  Images is an object/dictionary - converting to array format'
+                );
+
+                messageData.content_attributes.images = Object.entries(
+                  imagesData
+                ).map(([identifier, data]) => ({
+                  identifier: identifier,
+                  description: '',
+                  data: data,
+                }));
+
+                // eslint-disable-next-line no-console
+                console.log(
+                  '🖼️  Converted to array with',
+                  messageData.content_attributes.images.length,
+                  'images'
+                );
+              }
+
+              // eslint-disable-next-line no-console
+              console.log(
+                '🖼️  After cleanup:',
+                messageData.content_attributes.images
+              );
+            } catch (error) {
+              // eslint-disable-next-line no-console
+              console.error('❌ Error cleaning up images:', error);
+              throw error;
+            }
           }
 
           // Include template_id so backend can attach template files if present
           messageData.template_id = fullTemplate.id;
 
+          // eslint-disable-next-line no-console
+          console.log(
+            '🚀 About to call sendAppleMessage with messageData:',
+            messageData
+          );
+
           await this.sendAppleMessage(messageData);
+          // eslint-disable-next-line no-console
+          console.log('✅ sendAppleMessage completed successfully');
           return;
         }
 
@@ -1426,6 +1496,10 @@ export default {
           // TODO: Open a modal to collect parameters
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('❌ Error in handleUnifiedTemplate:', error);
+        // eslint-disable-next-line no-console
+        console.error('❌ Error stack:', error.stack);
         this.$store.dispatch('alerts/show', {
           message: error?.message || 'Failed to load template',
           type: 'error',
