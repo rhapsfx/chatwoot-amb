@@ -569,6 +569,7 @@ onMounted(() => {
           <ContentBlockList
             :blocks="template.contentBlocks"
             :parameters="template.parameters"
+            :referenced-images="template.referencedImages || []"
             @update:blocks="updateContentBlocks"
           />
         </div>

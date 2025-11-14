@@ -572,5 +572,30 @@
       "FILES_UPLOADED": "Files uploaded successfully",
       "FILE_REMOVED": "File removed successfully"
     }
+  },
+  "IMAGE_VALIDATION": {
+    "TITLE": "Template Image Validation",
+    "SUBTITLE": "Template \"{name}\" uses {count} image identifier(s)",
+    "ISSUES_FOUND": "Missing Images Detected",
+    "ISSUES_DESCRIPTION": "{count} inbox(es) are missing some images required by this template",
+    "ALL_GOOD": "All Images Available",
+    "ALL_GOOD_DESCRIPTION": "All inboxes have all required images for this template",
+    "INBOXES_WITH_ISSUES": "Inboxes Missing Images",
+    "INBOXES_COMPLETE": "Inboxes with All Images",
+    "FIX_MISSING": "Fix Missing",
+    "MISSING_COUNT": "Missing {count} image(s)",
+    "ALL_IMAGES_AVAILABLE": "All {count} images available",
+    "COPY_IMAGES": "Copy Images Between Inboxes",
+    "SOURCE_INBOX": "Copy From",
+    "TARGET_INBOX": "Copy To",
+    "SELECT_SOURCE": "Select source inbox...",
+    "SELECT_TARGET": "Select target inbox...",
+    "IDENTIFIERS_TO_COPY": "Select identifiers to copy",
+    "COPY_SELECTED": "Copy Selected Images",
+    "CLOSE": "Close",
+    "FETCH_ERROR": "Failed to load image validation data",
+    "COPY_SUCCESS": "Successfully copied {count} of {total} images",
+    "COPY_PARTIAL_ERROR": "{count} image(s) could not be copied",
+    "COPY_ERROR": "Failed to copy images. Please try again."
   }
 }

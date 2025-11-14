@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import TextBlockEditor from './blocks/TextBlockEditor.vue';
 import TimePickerBlockEditor from './blocks/TimePickerBlockEditor.vue';
 import ListPickerBlockEditor from './blocks/ListPickerBlockEditor.vue';
@@ -25,6 +25,20 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:properties']);
+
+// Debug: Watch properties to see what's being passed
+watch(
+  () => props.properties,
+  newProps => {
+    // eslint-disable-next-line no-console
+    console.log('ContentBlockEditor received properties:', {
+      blockType: props.blockType,
+      properties: newProps,
+      keys: Object.keys(newProps),
+    });
+  },
+  { immediate: true, deep: true }
+);
 
 const currentComponent = computed(() => {
   const components = {

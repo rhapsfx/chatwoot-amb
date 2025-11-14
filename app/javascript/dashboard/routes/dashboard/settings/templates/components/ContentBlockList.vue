@@ -13,11 +13,46 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  referencedImages: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['update:blocks']);
 
 const { t } = useI18n();
+
+// Transform referenced images into format expected by block editors
+const imagesFromTemplate = computed(() => {
+  if (!props.referencedImages || props.referencedImages.length === 0) {
+    return [];
+  }
+
+  return props.referencedImages.map(image => ({
+    identifier: image.identifier,
+    data: null, // Will be loaded from URL
+    preview: image.imageUrl, // Use imageUrl from backend
+    description: image.description,
+    originalName: image.originalName,
+    size: image.size || 0,
+    image_url: image.imageUrl, // AMB modal expects this format too
+  }));
+});
+
+// Inject images into block properties for editors
+const getBlockProperties = block => {
+  const properties = { ...block.properties };
+
+  // For time_picker and form blocks, inject images from referenced images
+  if (['time_picker', 'form'].includes(block.blockType)) {
+    if (imagesFromTemplate.value.length > 0) {
+      properties.images = imagesFromTemplate.value;
+    }
+  }
+
+  return properties;
+};
 
 // State
 const showBlockTypeSelector = ref(false);
@@ -380,7 +415,7 @@ const getBlockLabel = type => {
         >
           <ContentBlockEditor
             :block-type="block.blockType"
-            :properties="block.properties"
+            :properties="getBlockProperties(block)"
             :parameters="parameters"
             @update:properties="props => updateBlock(index, props)"
           />
