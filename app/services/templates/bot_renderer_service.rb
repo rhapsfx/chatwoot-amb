@@ -74,7 +74,19 @@ class Templates::BotRendererService
     transformed_attrs = transform_bot_format_to_chatwoot(content_attrs, actual_content_type)
 
     # Load images from ActiveStorage if template references them
-    transformed_attrs = load_images_from_storage(transformed_attrs) if actual_content_type == 'apple_list_picker'
+    # All interactive Apple Messages types can have images
+    interactive_types_with_images = %w[
+      apple_list_picker
+      apple_form
+      apple_time_picker
+      apple_imessage_app
+      apple_pay
+      apple_auth
+    ]
+
+    if interactive_types_with_images.include?(actual_content_type)
+      transformed_attrs = load_images_from_storage(transformed_attrs)
+    end
 
     # Merge parameters if provided, but filter out keys that would be invalid at root level
     if parameters.present?
@@ -177,11 +189,11 @@ class Templates::BotRendererService
     attrs
   end
 
-  # Collect all image identifiers from sections and received_message
+  # Collect all image identifiers from all interactive message types
   def collect_image_identifiers(attrs)
     identifiers = []
 
-    # Collect from sections items
+    # 1. LIST PICKERS: Collect from sections items
     sections = attrs['sections'] || []
     sections.each do |section|
       items = section['items'] || []
@@ -190,11 +202,70 @@ class Templates::BotRendererService
       end
     end
 
-    # Collect from received_message
+    # 2. FORMS: Collect from form pages
+    pages = attrs['pages'] || []
+    pages.each do |page|
+      items = page['items'] || []
+      items.each do |item|
+        # Only singleSelect and multiSelect items have options with images
+        next unless %w[singleSelect multiSelect].include?(item['item_type'])
+
+        options = item['options'] || []
+        options.each do |option|
+          # Support both camelCase and snake_case
+          image_id = option['imageIdentifier'] || option['image_identifier']
+          identifiers << image_id if image_id.present?
+        end
+      end
+    end
+
+    # 3. TIME PICKERS: Collect from event object
+    if attrs['event'].is_a?(Hash)
+      event = attrs['event']
+      image_id = event['imageIdentifier'] || event['image_identifier']
+      identifiers << image_id if image_id.present?
+    end
+
+    # 4. ALL TYPES: Collect from flat received_image_identifier
     identifiers << attrs['received_image_identifier'] if attrs['received_image_identifier'].present?
 
-    # Collect from reply_message
+    # 5. ALL TYPES: Collect from nested received_message object
+    if attrs['received_message'].is_a?(Hash)
+      received_msg = attrs['received_message']
+      image_id = received_msg['imageIdentifier'] || received_msg['image_identifier']
+      identifiers << image_id if image_id.present?
+    end
+
+    # 6. ALL TYPES: Collect from receivedMessage (camelCase format)
+    if attrs['receivedMessage'].is_a?(Hash)
+      received_msg = attrs['receivedMessage']
+      image_id = received_msg['imageIdentifier'] || received_msg['image_identifier']
+      identifiers << image_id if image_id.present?
+    end
+
+    # 7. ALL TYPES: Collect from flat reply_image_identifier
     identifiers << attrs['reply_image_identifier'] if attrs['reply_image_identifier'].present?
+
+    # 8. ALL TYPES: Collect from nested reply_message object
+    if attrs['reply_message'].is_a?(Hash)
+      reply_msg = attrs['reply_message']
+      image_id = reply_msg['imageIdentifier'] || reply_msg['image_identifier']
+      identifiers << image_id if image_id.present?
+    end
+
+    # 9. ALL TYPES: Collect from replyMessage (camelCase format)
+    if attrs['replyMessage'].is_a?(Hash)
+      reply_msg = attrs['replyMessage']
+      image_id = reply_msg['imageIdentifier'] || reply_msg['image_identifier']
+      identifiers << image_id if image_id.present?
+    end
+
+    # 10. ALL TYPES: Collect from existing images array (if already partially loaded)
+    if attrs['images'].is_a?(Array)
+      attrs['images'].each do |img|
+        identifiers << img['identifier'] if img['identifier'].present?
+      end
+    end
 
     identifiers.compact.uniq
   end
