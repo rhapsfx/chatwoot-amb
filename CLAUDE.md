@@ -315,18 +315,47 @@ end
 - Frontend Modal: `app/javascript/dashboard/components-next/message/modals/AppleFormBuilder.vue`
 - Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
 
-## Database Access
+## Database Access - CRITICAL
 
-- **NEVER use `psql` directly** - Claude Code runs in a macOS sandbox that blocks direct PostgreSQL access
-- **ALWAYS use `rails runner`** for database queries:
-  ```bash
-  rails runner "puts User.count"
-  rails runner "puts Message.last.inspect"
-  rails runner "puts ActiveRecord::Base.connection.execute('SELECT version()').to_a"
-  ```
-- **Alternative**: Use `rails console` for interactive queries
-- **Logs**: Check `log/development.log` for Rails database activity
-- **Only ask user to run `psql`** if rails runner cannot accomplish the task
+**🚨 ABSOLUTE RULE: NEVER attempt direct PostgreSQL access via `psql` or connection strings**
+
+Claude Code runs in a macOS sandbox that **ALWAYS BLOCKS** direct database connections. This will ALWAYS fail.
+
+**✅ ONLY use these methods for ALL database operations**:
+
+1. **`rails runner`** - For quick queries and scripts:
+   ```bash
+   rails runner "puts User.count"
+   rails runner "puts Message.last.inspect"
+   rails runner "Channel::AppleMessagesForBusiness.all.each { |c| puts c.inspect }"
+   rails runner "script/some_script.rb"
+   ```
+
+2. **`rails console`** - For interactive exploration:
+   ```bash
+   rails console
+   # Then run queries interactively
+   ```
+
+3. **Ruby scripts executed via `rails runner`** - For complex operations:
+   ```ruby
+   # Create script/my_query.rb, then:
+   rails runner script/my_query.rb
+   ```
+
+**❌ NEVER do**:
+- `/opt/homebrew/opt/postgresql@15/bin/psql` (WILL FAIL - sandbox blocks it)
+- Direct database connections
+- `ActiveRecord::Base.connection.execute` outside of rails runner context
+- Any attempt to bypass Rails to access PostgreSQL
+
+**📊 For database queries**:
+- Simple count/check → `rails runner "puts Model.count"`
+- Complex query → Create a script file, run via `rails runner`
+- Interactive exploration → `rails console`
+- Check logs → `tail -f log/development.log`
+
+**Remember**: The sandbox restriction is PERMANENT and CANNOT be bypassed. Always work through Rails.
 
 ## Deployment Scripts
 

@@ -111,6 +111,8 @@ services:
   worker:
     image: chatwoot:production
     container_name: chatwoot-worker
+    ports:
+      - "7433:7433" 
     depends_on:
       postgres:
         condition: service_healthy
