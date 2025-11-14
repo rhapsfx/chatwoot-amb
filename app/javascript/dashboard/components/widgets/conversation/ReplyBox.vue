@@ -1157,17 +1157,65 @@ export default {
             (content.content_type || content.contentType) &&
             (content.content_attributes || content.contentAttributes)
           ) {
-            // Content already has the right structure - use it directly
-            // eslint-disable-next-line no-console
-            console.log(
-              '✅ Branch 1: Content has content_type and content_attributes'
-            );
-            messageData = {
-              content_type: content.content_type || content.contentType,
-              content_attributes:
-                content.content_attributes || content.contentAttributes,
-              type: content.type,
-            };
+            // Content already has content_type and content_attributes
+            // Check if this is a template type that needs render API for image loading
+            const contentType = content.content_type || content.contentType;
+            const needsRenderAPI =
+              contentType === 'apple_list_picker' ||
+              contentType === 'apple_time_picker' ||
+              contentType === 'apple_form';
+
+            if (needsRenderAPI) {
+              // eslint-disable-next-line no-console
+              console.log(
+                `🔄 Content type ${contentType} needs render API for image loading`
+              );
+
+              // Call render API to fetch images and ensure proper format
+              const rendered = await this.$store.dispatch(
+                'messageTemplates/render',
+                {
+                  templateId: fullTemplate.id,
+                  parameters: {}, // No dynamic parameters for these templates
+                  channelType:
+                    this.currentChat?.inbox?.channel_type ||
+                    'apple_messages_for_business',
+                }
+              );
+
+              const renderedData = rendered.data || rendered;
+              // eslint-disable-next-line no-console
+              console.log('🔄 Render API response:', renderedData);
+
+              if (renderedData?.content_attributes) {
+                messageData = {
+                  content_type: renderedData.content_type || contentType,
+                  content_attributes: renderedData.content_attributes,
+                  type: content.type,
+                  template_id: fullTemplate.id,
+                };
+              } else {
+                // Fallback to direct content if render fails
+                messageData = {
+                  content_type: contentType,
+                  content_attributes:
+                    content.content_attributes || content.contentAttributes,
+                  type: content.type,
+                };
+              }
+            } else {
+              // Use content directly for non-template types
+              // eslint-disable-next-line no-console
+              console.log(
+                '✅ Branch 1: Content has content_type and content_attributes'
+              );
+              messageData = {
+                content_type: contentType,
+                content_attributes:
+                  content.content_attributes || content.contentAttributes,
+                type: content.type,
+              };
+            }
             // eslint-disable-next-line no-console
             console.log('📤 messageData created:', messageData);
           } else if (content.type) {
@@ -1200,66 +1248,95 @@ export default {
             (content.sections && content.images) ||
             (contentAttrs?.sections && contentAttrs?.images)
           ) {
-            // List picker structure - normalize field names
-            // Handle both nested (content.list_picker) and direct (content.sections) structures
-            const listPickerData =
-              content.list_picker ||
-              content.listPicker ||
-              contentAttrs ||
-              content;
+            // List picker structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+            // eslint-disable-next-line no-console
+            console.log('📋 Calling render API for list picker template');
 
-            messageData = {
-              type: 'list_picker',
-              content_type: 'apple_list_picker',
-              content_attributes: {
-                sections: listPickerData.sections || [],
-                images: listPickerData.images || [],
-                received_title:
-                  listPickerData.received_title ||
-                  listPickerData.receivedTitle ||
-                  'Please select an option',
-                received_subtitle:
-                  listPickerData.received_subtitle ||
-                  listPickerData.receivedSubtitle ||
-                  '',
-                received_image_identifier:
-                  listPickerData.received_image_identifier ||
-                  listPickerData.receivedImageIdentifier ||
-                  '',
-                received_style:
-                  listPickerData.received_style ||
-                  listPickerData.receivedStyle ||
-                  'icon',
-                reply_title:
-                  listPickerData.reply_title ||
-                  listPickerData.replyTitle ||
-                  'Selection Made',
-                reply_subtitle:
-                  listPickerData.reply_subtitle ||
-                  listPickerData.replySubtitle ||
-                  '',
-                reply_style:
-                  listPickerData.reply_style ||
-                  listPickerData.replyStyle ||
-                  'icon',
-                reply_image_title:
-                  listPickerData.reply_image_title ||
-                  listPickerData.replyImageTitle ||
-                  '',
-                reply_image_subtitle:
-                  listPickerData.reply_image_subtitle ||
-                  listPickerData.replyImageSubtitle ||
-                  '',
-                reply_secondary_subtitle:
-                  listPickerData.reply_secondary_subtitle ||
-                  listPickerData.replySecondarySubtitle ||
-                  '',
-                reply_tertiary_subtitle:
-                  listPickerData.reply_tertiary_subtitle ||
-                  listPickerData.replyTertiarySubtitle ||
-                  '',
-              },
-            };
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for list pickers
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+            // eslint-disable-next-line no-console
+            console.log('📋 Render API response:', renderedData);
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              const listPickerData =
+                content.list_picker ||
+                content.listPicker ||
+                contentAttrs ||
+                content;
+
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: {
+                  sections: listPickerData.sections || [],
+                  images: listPickerData.images || [],
+                  received_title:
+                    listPickerData.received_title ||
+                    listPickerData.receivedTitle ||
+                    'Please select an option',
+                  received_subtitle:
+                    listPickerData.received_subtitle ||
+                    listPickerData.receivedSubtitle ||
+                    '',
+                  received_image_identifier:
+                    listPickerData.received_image_identifier ||
+                    listPickerData.receivedImageIdentifier ||
+                    '',
+                  received_style:
+                    listPickerData.received_style ||
+                    listPickerData.receivedStyle ||
+                    'icon',
+                  reply_title:
+                    listPickerData.reply_title ||
+                    listPickerData.replyTitle ||
+                    'Selection Made',
+                  reply_subtitle:
+                    listPickerData.reply_subtitle ||
+                    listPickerData.replySubtitle ||
+                    '',
+                  reply_style:
+                    listPickerData.reply_style ||
+                    listPickerData.replyStyle ||
+                    'icon',
+                  reply_image_title:
+                    listPickerData.reply_image_title ||
+                    listPickerData.replyImageTitle ||
+                    '',
+                  reply_image_subtitle:
+                    listPickerData.reply_image_subtitle ||
+                    listPickerData.replyImageSubtitle ||
+                    '',
+                  reply_secondary_subtitle:
+                    listPickerData.reply_secondary_subtitle ||
+                    listPickerData.replySecondarySubtitle ||
+                    '',
+                  reply_tertiary_subtitle:
+                    listPickerData.reply_tertiary_subtitle ||
+                    listPickerData.replyTertiarySubtitle ||
+                    '',
+                },
+              };
+            }
           } else if (
             content.time_picker ||
             content.timePicker ||
@@ -1359,13 +1436,46 @@ export default {
                 content_attributes: normalizedAttrs,
               };
             }
-          } else if (content.form) {
-            // Form structure
-            messageData = {
-              type: 'form',
-              content_type: 'form',
-              content_attributes: content,
-            };
+          } else if (
+            content.form ||
+            (content.pages && content.received_message)
+          ) {
+            // Form structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+            // eslint-disable-next-line no-console
+            console.log('📝 Calling render API for form template');
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for forms
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+            // eslint-disable-next-line no-console
+            console.log('📝 Render API response:', renderedData);
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: content,
+              };
+            }
           } else if (content.apple_pay || content.applePay) {
             // Apple Pay structure
             messageData = {
