@@ -35,49 +35,50 @@ puts '-' * 80
 all_identifiers = Set.new
 
 content_blocks.each_with_index do |block, idx|
-  block_type = block['block_type'] || block['blockType']
-  block_config = block['block_config'] || block['blockConfig'] || {}
+  block_type = block.block_type
 
   puts "\nBlock #{idx + 1}: #{block_type}"
 
   # Extract images from form configuration
   next unless block_type == 'form'
 
-  # Check for header image
-  received_msg = block_config['received_message'] || block_config['receivedMessage'] || {}
-  header_image = received_msg['image_identifier'] || received_msg['imageIdentifier']
+  props = block.properties
 
-  if header_image.present?
-    puts "  📷 Header image: #{header_image}"
-    all_identifiers << header_image
-  end
-
-  # Check for images in form section
-  form_section = block_config['form'] || {}
-  form_images = form_section['images'] || []
-
-  if form_images.any?
-    puts "  📷 Form images (#{form_images.count}):"
-    form_images.each do |img|
-      identifier = img['identifier']
-      puts "     - #{identifier}"
-      all_identifiers << identifier if identifier.present?
+  # Check for header image in received_message
+  if props['received_message']
+    header_image = props['received_message']['image_identifier']
+    if header_image.present?
+      puts "  📷 Header image (received): #{header_image}"
+      all_identifiers << header_image
     end
   end
 
-  # Check for images in field options
-  fields = form_section['fields'] || []
-  fields.each do |field|
-    field_type = field['field_type'] || field['fieldType']
+  # Check for header image in reply_message
+  if props['reply_message']
+    reply_image = props['reply_message']['image_identifier']
+    if reply_image.present? && reply_image != header_image
+      puts "  📷 Reply image: #{reply_image}"
+      all_identifiers << reply_image
+    end
+  end
 
-    next unless %w[single_choice multiple_choice].include?(field_type)
+  # Check pages for items with options
+  pages = props['pages'] || []
+  pages.each_with_index do |page, _page_idx|
+    items = page['items'] || []
+    items.each do |item|
+      # Check if item has options (single_choice or multiple_choice)
+      item_type = item['item_type']
+      next unless %w[singleSelect multipleSelect].include?(item_type)
 
-    options = field['options'] || []
-    options.each do |opt|
-      image_id = opt['image_identifier'] || opt['imageIdentifier']
-      if image_id.present?
-        puts "  📷 Field option image: #{image_id}"
-        all_identifiers << image_id
+      options = item['options'] || []
+      options.each do |opt|
+        # Handle both camelCase and snake_case
+        image_id = opt['imageIdentifier'] || opt['image_identifier']
+        if image_id.present?
+          puts "  📷 Option image (#{item['title']}): #{image_id}"
+          all_identifiers << image_id
+        end
       end
     end
   end
