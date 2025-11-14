@@ -3,7 +3,10 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert, useTrack } from 'dashboard/composables';
 import TemplatesAPI from 'dashboard/api/templates';
-import AppleListPickerImagesAPI from 'dashboard/api/appleListPickerImages';
+// Phase 1: Migrating to new apple_amb_images endpoint
+import AppleAmbImagesAPI from 'dashboard/api/appleAmbImages';
+// Old import (kept commented for Phase 1 rollback capability):
+// import AppleListPickerImagesAPI from 'dashboard/api/appleListPickerImages';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Spinner from 'shared/components/Spinner.vue';
 
@@ -75,7 +78,7 @@ const copyImages = async () => {
 
   copying.value = true;
   try {
-    const response = await AppleListPickerImagesAPI.copyFromInbox(
+    const response = await AppleAmbImagesAPI.copyFromInbox(
       selectedTarget.value,
       selectedSource.value,
       selectedIdentifiers.value

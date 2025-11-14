@@ -1,14 +1,13 @@
-class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Inboxes::AppleAmbImagesController < Api::V1::Accounts::BaseController
   before_action :fetch_inbox
-  before_action :log_deprecation_warning
   # No authorization check needed - if user can access the inbox via fetch_inbox, they can manage images
 
   def index
     @images = @inbox.apple_list_picker_images.for_inbox(@inbox.id)
-    Rails.logger.info "[AppleListPickerImages API] Returning #{@images.count} images for inbox #{@inbox.id}"
+    Rails.logger.info "[AppleAmbImages API] Returning #{@images.count} images for inbox #{@inbox.id}"
     render json: serialize_images(@images)
   rescue StandardError => e
-    Rails.logger.error "[AppleListPickerImages API] Error loading images: #{e.message}"
+    Rails.logger.error "[AppleAmbImages API] Error loading images: #{e.message}"
     render json: { error: e.message }, status: :internal_server_error
   end
 
@@ -44,7 +43,7 @@ class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Acc
     head :no_content
   end
 
-  # POST /api/v1/accounts/:account_id/inboxes/:inbox_id/apple_list_picker_images/copy_from
+  # POST /api/v1/accounts/:account_id/inboxes/:inbox_id/apple_amb_images/copy_from
   # Copy images from another inbox
   # Params: { source_inbox_id: 123, identifiers: ['0', '1', '2'] }
   def copy_from
@@ -101,7 +100,7 @@ class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Acc
 
         results[:copied] << serialize_image(new_image)
       rescue StandardError => e
-        Rails.logger.error "[AppleListPickerImages] Copy failed for #{identifier}: #{e.message}"
+        Rails.logger.error "[AppleAmbImages] Copy failed for #{identifier}: #{e.message}"
         results[:errors] << { identifier: identifier, error: e.message }
       end
     end
@@ -109,7 +108,7 @@ class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Acc
     render json: results, status: :ok
   end
 
-  # POST /api/v1/accounts/:account_id/inboxes/:inbox_id/apple_list_picker_images/bulk_upload
+  # POST /api/v1/accounts/:account_id/inboxes/:inbox_id/apple_amb_images/bulk_upload
   # Upload same image to multiple inboxes
   # Params: { inbox_ids: [4, 5], identifier: '0', image_data: 'base64...', filename: 'image.png' }
   def bulk_upload
@@ -179,7 +178,7 @@ class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Acc
     rescue ActiveRecord::RecordNotFound
       results[:errors] << { inboxId: inbox_id, error: 'Inbox not found' }
     rescue StandardError => e
-      Rails.logger.error "[AppleListPickerImages] Bulk upload failed for inbox #{inbox_id}: #{e.message}"
+      Rails.logger.error "[AppleAmbImages] Bulk upload failed for inbox #{inbox_id}: #{e.message}"
       results[:errors] << { inboxId: inbox_id, error: e.message }
     end
 
@@ -190,15 +189,6 @@ class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Acc
 
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:inbox_id])
-  end
-
-  def log_deprecation_warning
-    Rails.logger.warn(
-      '[DEPRECATED] apple_list_picker_images endpoint used. ' \
-      'Please migrate to apple_amb_images. ' \
-      "Endpoint: #{action_name}, IP: #{request.remote_ip}, " \
-      "Account: #{Current.account&.id}, Inbox: #{params[:inbox_id]}"
-    )
   end
 
   def image_params

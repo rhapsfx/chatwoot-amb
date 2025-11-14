@@ -10,6 +10,13 @@
     "FILTER_BY_CATEGORY": "Category",
     "FILTER_BY_CHANNEL": "Channel",
     "FILTER_BY_TAGS": "Filter by Tags",
+    "SORT_BY": "Sort By",
+    "SORT": {
+      "NAME": "Name (A-Z)",
+      "ID": "ID (Oldest First)",
+      "CREATED_DATE": "Created Date (Newest First)",
+      "UPDATED_DATE": "Updated Date (Newest First)"
+    },
     "SUPPORTED_CHANNELS": "Channels",
     "VERSION": "Version",
     "UPDATED": "Updated",
