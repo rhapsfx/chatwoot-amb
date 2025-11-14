@@ -262,7 +262,10 @@ end
 **Related Files**:
 - Service: `app/services/apple_messages_for_business/send_list_picker_service.rb`
 - Model: `app/models/apple_list_picker_image.rb`
-- Controller: `app/controllers/api/v1/accounts/inboxes/apple_list_picker_images_controller.rb`
+- Controllers:
+  - **NEW (recommended)**: `app/controllers/api/v1/accounts/inboxes/apple_amb_images_controller.rb`
+  - OLD (deprecated): `app/controllers/api/v1/accounts/inboxes/apple_list_picker_images_controller.rb`
+- **Note**: Both endpoints work during Phase 1 migration. Prefer `apple_amb_images` for new integrations.
 
 ### Time Picker with Images
 
