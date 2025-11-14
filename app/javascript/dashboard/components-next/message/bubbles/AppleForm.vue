@@ -20,6 +20,26 @@ const formConfig = computed(() => ({
   version: formData.value.version || '1.2',
 }));
 
+// Get received message configuration (supports both snake_case and camelCase)
+const receivedMessage = computed(() => {
+  return formData.value.received_message || formData.value.receivedMessage || {};
+});
+
+// Get header image identifier
+const headerImageIdentifier = computed(() => {
+  return receivedMessage.value.image_identifier || receivedMessage.value.imageIdentifier || '';
+});
+
+// Get images array
+const images = computed(() => formData.value.images || []);
+
+// Get image by identifier
+const getImageById = imageId => {
+  if (!imageId) return null;
+  const image = images.value.find(img => img.identifier === imageId);
+  return image ? `data:image/jpeg;base64,${image.data}` : null;
+};
+
 // Form state
 const responses = ref({});
 const isSubmitting = ref(false);
@@ -160,10 +180,18 @@ const getInputType = item => {
     <!-- Collapsed Form Preview -->
     <div
       v-if="!isExpanded"
-      class="apple-form-preview cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors p-4 rounded-lg border border-slate-200 dark:border-slate-600"
+      class="apple-form-preview cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden"
       @click="toggleExpanded"
     >
-      <div class="flex items-start space-x-3">
+      <!-- Header Image -->
+      <img
+        v-if="headerImageIdentifier && getImageById(headerImageIdentifier)"
+        :src="getImageById(headerImageIdentifier)"
+        :alt="formConfig.title"
+        class="w-full h-40 object-cover"
+      />
+      
+      <div class="flex items-start space-x-3 p-4">
         <!-- Form Icon -->
         <div
           class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0"
