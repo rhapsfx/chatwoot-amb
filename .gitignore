@@ -110,6 +110,10 @@ deploy-assets-only.sh
 # Test and validation scripts
 test_*.rb
 validate_*.rb
+debug_*.rb
+
+# Debug output files
+output.txt
 
 # Sensitive files - certificates and keys
 certs/**/*.key
