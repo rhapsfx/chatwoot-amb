@@ -39,7 +39,10 @@ import { zonedTimeToUtc } from 'date-fns-tz';
 import EnhancedTimePickerModal from 'dashboard/components-next/message/modals/EnhancedTimePickerModal.vue';
 import AppleFormBuilder from 'dashboard/components-next/message/modals/AppleFormBuilder.vue';
 import SaveAsTemplateModal from 'dashboard/components-next/message/modals/SaveAsTemplateModal.vue';
-import AppleMessagesImagesAPI from 'dashboard/api/appleMessagesImages';
+// Phase 1: Migrating to new apple_amb_images endpoint
+import AppleMessagesImagesAPI from 'dashboard/api/appleAmbMessagesImages';
+// Old import (kept commented for Phase 1 rollback capability):
+// import AppleMessagesImagesAPI from 'dashboard/api/appleMessagesImages';
 import TemplateSelector from 'dashboard/components/widgets/conversation/TemplateSelector.vue';
 
 const { t } = useI18n();

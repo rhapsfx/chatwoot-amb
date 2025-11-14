@@ -19,8 +19,37 @@ const searchQuery = ref('');
 const selectedCategory = ref('all');
 const selectedChannel = ref('all');
 const selectedTags = ref([]);
+const selectedSortBy = ref('name'); // Default sort by name
 const showDeleteConfirmation = ref(false);
 const templateToDelete = ref(null);
+
+// Helper function for sorting templates
+const sortTemplatesList = templatesList => {
+  const sorted = [...templatesList];
+
+  switch (selectedSortBy.value) {
+    case 'name':
+      return sorted.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+    case 'id':
+      return sorted.sort((a, b) => a.id - b.id);
+    case 'created_at':
+      return sorted.sort(
+        (a, b) =>
+          new Date(b.createdAt || b.created_at || 0) -
+          new Date(a.createdAt || a.created_at || 0)
+      );
+    case 'updated_at':
+      return sorted.sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.updated_at || 0) -
+          new Date(a.updatedAt || a.updated_at || 0)
+      );
+    default:
+      return sorted;
+  }
+};
 
 // Computed
 const filteredTemplates = computed(() => {
@@ -54,8 +83,16 @@ const filteredTemplates = computed(() => {
     );
   }
 
-  return filtered;
+  // Apply sorting
+  return sortTemplatesList(filtered);
 });
+
+const sortOptions = computed(() => [
+  { value: 'name', label: t('TEMPLATES.SORT.NAME') },
+  { value: 'id', label: t('TEMPLATES.SORT.ID') },
+  { value: 'created_at', label: t('TEMPLATES.SORT.CREATED_DATE') },
+  { value: 'updated_at', label: t('TEMPLATES.SORT.UPDATED_DATE') },
+]);
 
 const categories = computed(() => {
   const cats = new Set(
@@ -251,6 +288,7 @@ const clearFilters = () => {
   selectedCategory.value = 'all';
   selectedChannel.value = 'all';
   selectedTags.value = [];
+  selectedSortBy.value = 'name'; // Reset to default sort
 };
 
 onMounted(() => {
@@ -364,7 +402,7 @@ watch(
         </Button>
       </div>
 
-      <!-- Category and Channel Filters -->
+      <!-- Category, Channel, and Sort Filters -->
       <div class="flex gap-3">
         <div class="flex-1">
           <label class="block text-sm font-medium text-n-slate-12 mb-2">
@@ -398,6 +436,24 @@ watch(
               :value="channel.value"
             >
               {{ channel.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-n-slate-12 mb-2">
+            {{ t('TEMPLATES.SORT_BY') }}
+          </label>
+          <select
+            v-model="selectedSortBy"
+            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
+          >
+            <option
+              v-for="option in sortOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
             </option>
           </select>
         </div>
