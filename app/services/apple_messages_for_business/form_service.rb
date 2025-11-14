@@ -201,11 +201,17 @@ class AppleMessagesForBusiness::FormService
 
   def add_select_item_fields(base_item, item_config)
     base_item[:options] = item_config['options'].map do |option|
-      {
+      option_data = {
         value: option['value'],
         title: option['title'],
         description: option['description']
-      }.compact
+      }
+
+      # Include image_identifier if present (handle both camelCase and snake_case)
+      image_id = option['imageIdentifier'] || option['image_identifier']
+      option_data[:imageIdentifier] = image_id if image_id.present?
+
+      option_data.compact
     end
   end
 
@@ -277,16 +283,81 @@ class AppleMessagesForBusiness::FormService
   end
 
   def build_images_array
-    images_data = @form_config['images'] || []
-    return [] if images_data.empty?
+    # Extract all image identifiers from form config
+    identifiers = extract_image_identifiers
+    return [] if identifiers.empty?
 
-    images_data.map do |image|
-      {
-        identifier: image['identifier'],
-        data: image['data'], # Base64 encoded image data
-        description: image['description']
-      }
+    # Fetch and encode images from database
+    fetch_and_encode_images(identifiers)
+  end
+
+  def extract_image_identifiers
+    identifiers = Set.new
+
+    # Add header image from received_message
+    received_msg = @form_config['received_message'] || {}
+    header_image = received_msg['image_identifier']
+    identifiers << header_image if header_image.present?
+
+    # Add reply image if different from header
+    reply_msg = @form_config['reply_message'] || {}
+    reply_image = reply_msg['image_identifier']
+    identifiers << reply_image if reply_image.present? && reply_image != header_image
+
+    # Add images from form option items
+    pages = @form_config['pages'] || []
+    pages.each do |page|
+      items = page['items'] || []
+      items.each do |item|
+        # Check for select items with image options
+        next unless ['singleSelect', 'multiSelect'].include?(item['item_type'])
+
+        options = item['options'] || []
+        options.each do |option|
+          # Handle both camelCase and snake_case
+          image_id = option['imageIdentifier'] || option['image_identifier']
+          identifiers << image_id if image_id.present?
+        end
+      end
     end
+
+    identifiers.to_a
+  end
+
+  def fetch_and_encode_images(identifiers)
+    return [] if identifiers.empty?
+
+    # Get inbox_id from channel
+    inbox_id = @channel.inbox_id
+
+    # Fetch images from database
+    picker_images = AppleListPickerImage
+                      .where(inbox_id: inbox_id, identifier: identifiers)
+                      .includes(image_attachment: :blob)
+
+    Rails.logger.info "[AMB FormService] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
+    Rails.logger.info "[AMB FormService] 🖼️ Found #{picker_images.count} images in ActiveStorage"
+
+    # Encode images as base64
+    picker_images.map do |picker_image|
+      if picker_image.image.attached?
+        blob = picker_image.image.blob
+        image_data = blob.download
+
+        {
+          identifier: picker_image.identifier,
+          data: Base64.strict_encode64(image_data),
+          description: picker_image.description || picker_image.identifier
+        }
+      else
+        Rails.logger.warn "[AMB FormService] ⚠️ Image not attached for identifier: #{picker_image.identifier}"
+        nil
+      end
+    end.compact
+  rescue StandardError => e
+    Rails.logger.error "[AMB FormService] ❌ Error fetching images: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    []
   end
 
   def send_to_apple_gateway(payload, message_id)
