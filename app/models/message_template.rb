@@ -237,9 +237,156 @@ class MessageTemplate < ApplicationRecord
           fieldMappings: mapping.field_mappings || {}
         }
       end
+
+      # Include referenced AppleListPickerImage records for time_picker and form blocks
+      result[:referencedImages] = referenced_images
     end
 
     result
+  end
+
+  # Returns all AppleListPickerImage records referenced in content blocks
+  # Extracts image identifiers from time_picker and form blocks and loads the images
+  def referenced_images
+    identifiers = extract_image_identifiers_from_blocks
+    return [] if identifiers.empty?
+
+    # Load images by identifier
+    # AppleListPickerImage records are scoped to the account
+    images = AppleListPickerImage.where(account_id: account_id, identifier: identifiers)
+
+    # Serialize images in the same format as the API
+    images.map do |image|
+      {
+        id: image.id,
+        identifier: image.identifier,
+        description: image.description,
+        originalName: image.original_name,
+        imageUrl: image.image_url,
+        createdAt: image.created_at,
+        updatedAt: image.updated_at
+      }
+    end
+  end
+
+  # Extracts all image identifiers from content block properties
+  # Looks for common image identifier fields in time_picker and form blocks
+  def extract_image_identifiers_from_blocks
+    identifiers = Set.new
+
+    content_blocks.each do |block|
+      properties = block.properties || {}
+
+      case block.block_type
+      when 'list_picker'
+        # Extract from list_picker message properties
+        identifiers << properties['received_image_identifier'] if properties['received_image_identifier'].present?
+        identifiers << properties['reply_image_identifier'] if properties['reply_image_identifier'].present?
+        identifiers << properties['receivedImageIdentifier'] if properties['receivedImageIdentifier'].present?
+        identifiers << properties['replyImageIdentifier'] if properties['replyImageIdentifier'].present?
+
+        # Extract from images array
+        if properties['images'].is_a?(Array)
+          properties['images'].each do |img|
+            identifiers << img['identifier'] if img.is_a?(Hash) && img['identifier'].present?
+          end
+        end
+
+        # Extract from section items
+        sections = properties['sections'] || []
+        sections.each do |section|
+          items = section['items'] || []
+          items.each do |item|
+            # Handle both snake_case and camelCase
+            identifiers << item['image_identifier'] if item['image_identifier'].present?
+            identifiers << item['imageIdentifier'] if item['imageIdentifier'].present?
+          end
+        end
+
+      when 'time_picker'
+        # Extract from time_picker properties
+        identifiers << properties['received_image_identifier'] if properties['received_image_identifier'].present?
+        identifiers << properties['reply_image_identifier'] if properties['reply_image_identifier'].present?
+        identifiers << properties['receivedImageIdentifier'] if properties['receivedImageIdentifier'].present?
+        identifiers << properties['replyImageIdentifier'] if properties['replyImageIdentifier'].present?
+
+        # Extract from nested event structure
+        if properties['event'].is_a?(Hash)
+          identifiers << properties['event']['image_identifier'] if properties['event']['image_identifier'].present?
+          identifiers << properties['event']['imageIdentifier'] if properties['event']['imageIdentifier'].present?
+        end
+
+        # Extract from images array
+        if properties['images'].is_a?(Array)
+          properties['images'].each do |img|
+            identifiers << img['identifier'] if img.is_a?(Hash) && img['identifier'].present?
+          end
+        end
+
+      when 'form'
+        # Extract from form properties
+        if properties['received_message'].is_a?(Hash)
+          identifiers << properties['received_message']['image_identifier'] if properties['received_message']['image_identifier'].present?
+          identifiers << properties['received_message']['imageIdentifier'] if properties['received_message']['imageIdentifier'].present?
+        end
+
+        if properties['reply_message'].is_a?(Hash)
+          identifiers << properties['reply_message']['image_identifier'] if properties['reply_message']['image_identifier'].present?
+          identifiers << properties['reply_message']['imageIdentifier'] if properties['reply_message']['imageIdentifier'].present?
+        end
+
+        if properties['receivedMessage'].is_a?(Hash)
+          identifiers << properties['receivedMessage']['imageIdentifier'] if properties['receivedMessage']['imageIdentifier'].present?
+        end
+
+        if properties['replyMessage'].is_a?(Hash)
+          identifiers << properties['replyMessage']['imageIdentifier'] if properties['replyMessage']['imageIdentifier'].present?
+        end
+
+        # Extract from nested form structure
+        if properties['form'].is_a?(Hash)
+          form = properties['form']
+          if form['received_message'].is_a?(Hash)
+            identifiers << form['received_message']['image_identifier'] if form['received_message']['image_identifier'].present?
+          end
+          if form['reply_message'].is_a?(Hash)
+            identifiers << form['reply_message']['image_identifier'] if form['reply_message']['image_identifier'].present?
+          end
+        end
+
+        # Extract from images array
+        if properties['images'].is_a?(Array)
+          properties['images'].each do |img|
+            identifiers << img['identifier'] if img.is_a?(Hash) && img['identifier'].present?
+          end
+        end
+
+        # Extract from form images array (nested structure)
+        if properties['form'].is_a?(Hash) && properties['form']['images'].is_a?(Array)
+          properties['form']['images'].each do |img|
+            identifiers << img['identifier'] if img.is_a?(Hash) && img['identifier'].present?
+          end
+        end
+
+        # Extract from field options (singleSelect/multiSelect fields)
+        pages = properties['pages'] || []
+        pages.each do |page|
+          items = page['items'] || []
+          items.each do |item|
+            next unless %w[singleSelect multiSelect].include?(item['item_type'])
+            next unless item['options'].is_a?(Array)
+
+            item['options'].each do |option|
+              # Handle both snake_case and camelCase
+              identifiers << option['image_identifier'] if option['image_identifier'].present?
+              identifiers << option['imageIdentifier'] if option['imageIdentifier'].present?
+            end
+          end
+        end
+      end
+    end
+
+    identifiers.to_a.compact
   end
 
   # Build content from metadata or content blocks

@@ -150,6 +150,9 @@ class AppleMessagesForBusiness::IncomingMessageService
 
     @message.save!
     Rails.logger.info "[AMB IncomingMessage] Message created successfully - ID: #{@message.id}, content_type: #{@message.content_type}"
+
+    # Trigger bot if enabled for this conversation
+    trigger_bot_if_enabled
   end
 
   def source_id
@@ -1023,5 +1026,38 @@ class AppleMessagesForBusiness::IncomingMessageService
       Rails.logger.error "[AMB IncomingMessage] Failed to download IDR early: #{e.message}"
       nil
     end
+  end
+
+  def trigger_bot_if_enabled
+    return unless @message.incoming?
+
+    # Check if bot is enabled for this conversation
+    attrs = @conversation.custom_attributes || {}
+    bot_enabled = attrs.fetch('bot_enabled', true)
+
+    return unless bot_enabled
+
+    Rails.logger.info '[Bot] Triggering bot for incoming message'
+
+    bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
+      @conversation,
+      @message
+    )
+
+    # Form responses should go through process_message (where content_type is checked)
+    # Other interactive responses (quick replies, list pickers, time pickers) go through process_interactive_response
+    if @message.content_type == 'apple_form_response'
+      Rails.logger.info '[Bot] Form response detected - using process_message'
+      bot_service.process_message
+    elsif @idr_data.present? || @params['interactiveData'].present?
+      Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
+      interactive_data = @idr_data || @params['interactiveData']
+      bot_service.process_interactive_response(interactive_data)
+    else
+      bot_service.process_message
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Error processing message: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
   end
 end

@@ -107,6 +107,12 @@ class TemplatesAPI extends ApiClient {
       attachment_ids: attachmentIds,
     });
   }
+
+  // Validate template images across inboxes
+  validateImages(templateId, inboxId = null) {
+    const params = inboxId ? `?inbox_id=${inboxId}` : '';
+    return axios.get(`${this.url}/${templateId}/validate_images${params}`);
+  }
 }
 
 export default new TemplatesAPI();

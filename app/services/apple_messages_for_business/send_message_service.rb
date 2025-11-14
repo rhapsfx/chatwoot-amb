@@ -91,6 +91,8 @@ class AppleMessagesForBusiness::SendMessageService
   def send_interactive_message
     message_id = SecureRandom.uuid
 
+    Rails.logger.info "[AMB Send] 🚀 Sending interactive message - Message ID: #{@message.id}, Apple MSP ID: #{message_id}, Content Type: #{@message.content_type}"
+
     payload = build_apple_msp_payload(message_id)
 
     # Check if this message should request IDR for large responses
@@ -99,6 +101,7 @@ class AppleMessagesForBusiness::SendMessageService
     response = send_to_apple_gateway(payload, message_id, request_idr: request_idr)
 
     if response.success?
+      Rails.logger.info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
       # Store the payload in the message for debugging
       @message.update(apple_msp_payload: payload)
 
