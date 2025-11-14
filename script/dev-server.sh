@@ -67,6 +67,14 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Function to print a clickable URL (OSC 8 hyperlink support)
+print_url() {
+    local url=$1
+    local display_text=${2:-$url}  # Use URL as display text if not provided
+    # OSC 8 hyperlink format: \e]8;;URL\e\\DISPLAY_TEXT\e]8;;\e\\
+    printf '\e]8;;%s\e\\%b%s%b\e]8;;\e\\\n' "$url" "$BLUE" "$display_text" "$NC"
+}
+
 # Function to check if a process is running
 is_running() {
     local pid_file=$1
@@ -188,7 +196,8 @@ start_nginx() {
     # Start nginx
     if sudo nginx; then
         print_success "Nginx started successfully"
-        print_status "HTTPS proxy available at: https://dev.rhaps.net"
+        printf "        HTTPS proxy available at: "
+        print_url "https://dev.rhaps.net"
     else
         print_error "Failed to start nginx"
         print_status "Check nginx configuration with: sudo nginx -t"
@@ -283,7 +292,8 @@ start_rails() {
     # Final check
     if [ "$port_ready" = true ]; then
         print_success "Rails server started successfully (PID: $RAILS_PID)"
-        print_status "Server available at: http://localhost:10750"
+        printf "        Server available at: "
+        print_url "http://localhost:10750"
     else
         print_error "Failed to start Rails server after ${max_attempts} seconds"
         print_status "Check log/rails.log for details:"
@@ -378,11 +388,12 @@ start_ngrok() {
                 local ngrok_url=$(echo "$tunnels_json" | grep -o '"public_url":"https://[^"]*"' | grep -o 'https://[^"]*' | head -1)
                 if [ -n "$ngrok_url" ]; then
                     print_success "Ngrok started successfully (PID: $NGROK_PID)"
-                    print_status "Public URL: $ngrok_url"
-                    
+                    printf "        Public URL: "
+                    print_url "$ngrok_url"
+
                     # Update Rails configuration with ngrok URL
                     # The function to update the .env file has been removed.
-                    
+
                     return 0
                 fi
             fi
@@ -480,7 +491,8 @@ start_tailscale_funnel() {
         local funnel_url=$(echo "$tailscale_funnel_output" | grep -E "https://.*\.ts\.net" | head -1 | sed 's/.*https:\/\///' | sed 's/ .*//' | sed 's|/$||')
         if [ -n "$funnel_url" ]; then
             echo "$funnel_url" > "$TAILSCALE_URL_FILE"
-            print_status "Public URL: https://$funnel_url"
+            printf "        Public URL: "
+            print_url "https://$funnel_url"
         fi
 
         # Create tracking file
@@ -544,7 +556,8 @@ start_tailscale_funnel() {
         fi
     fi
 
-    print_status "Public URL: https://$funnel_url"
+    printf "    Public URL: "
+    print_url "https://$funnel_url"
     return 0
 }
 
@@ -732,7 +745,8 @@ show_status() {
     
     if is_running "$RAILS_PID_FILE"; then
         echo -e "Rails Server: ${GREEN}RUNNING${NC} (PID: $(cat $RAILS_PID_FILE))"
-        echo -e "Local URL: ${BLUE}http://localhost:10750${NC}"
+        printf "Local URL: "
+        print_url "http://localhost:10750"
     else
         echo -e "Rails Server: ${RED}STOPPED${NC}"
     fi
@@ -788,14 +802,17 @@ show_status() {
 
     # Determine which public URL to show based on what's actually running
     if echo "$tailscale_status" | grep -q "RUNNING" && [ -n "$tailscale_url" ]; then
-        echo -e "HTTPS URL: ${BLUE}https://$tailscale_url${NC}"
+        printf "HTTPS URL: "
+        print_url "https://$tailscale_url"
         echo -e "${YELLOW}Note: Apple Messages for Business attachments will use Tailscale Funnel URLs${NC}"
     elif [ "$USE_CUSTOM_DOMAIN" = true ] && is_nginx_running; then
-        echo -e "HTTPS URL: ${BLUE}https://$CUSTOM_DOMAIN${NC}"
+        printf "HTTPS URL: "
+        print_url "https://$CUSTOM_DOMAIN"
         echo -e "${YELLOW}Note: Apple Messages for Business attachments will use custom domain URLs${NC}"
         echo -e "${YELLOW}Ensure port forwarding is configured: External port 3000 -> Internal IP:3000${NC}"
     elif [ -n "$ngrok_url" ]; then
-        echo -e "Public URL: ${BLUE}$ngrok_url${NC}"
+        printf "Public URL: "
+        print_url "$ngrok_url"
         echo -e "${YELLOW}Note: Apple Messages for Business attachments will use ngrok URLs${NC}"
     else
         echo -e "${YELLOW}Note: Apple Messages for Business attachments will use localhost URLs${NC}"
