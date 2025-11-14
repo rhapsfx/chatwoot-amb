@@ -68,6 +68,7 @@ export const CONTENT_TYPES = {
   APPLE_LIST_PICKER: 'apple_list_picker',
   APPLE_TIME_PICKER: 'apple_time_picker',
   APPLE_QUICK_REPLY: 'apple_quick_reply',
+  APPLE_FORM: 'apple_form',
   APPLE_PAY: 'apple_pay',
   APPLE_RICH_LINK: 'apple_rich_link',
   APPLE_FORM_RESPONSE: 'apple_form_response',

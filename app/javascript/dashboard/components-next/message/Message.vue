@@ -40,6 +40,7 @@ import VoiceCallBubble from './bubbles/VoiceCall.vue';
 import AppleListPickerBubble from './bubbles/AppleListPicker.vue';
 import AppleTimePickerBubble from './bubbles/AppleTimePicker.vue';
 import AppleQuickReplyBubble from './bubbles/AppleQuickReply.vue';
+import AppleFormBubble from './bubbles/AppleForm.vue';
 import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
 import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
 import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
@@ -314,6 +315,10 @@ const componentToRender = computed(() => {
 
   if (props.contentType === CONTENT_TYPES.APPLE_QUICK_REPLY) {
     return AppleQuickReplyBubble;
+  }
+
+  if (props.contentType === CONTENT_TYPES.APPLE_FORM) {
+    return AppleFormBubble;
   }
 
   if (props.contentType === CONTENT_TYPES.APPLE_RICH_LINK) {
