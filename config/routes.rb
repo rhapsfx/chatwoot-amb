@@ -101,6 +101,7 @@ Rails.application.routes.draw do
               post :attach_files
               delete 'attachments/:attachment_id', action: :remove_attachment, as: :remove_attachment
               put :reorder_attachments
+              get :validate_images
             end
             collection do
               post :from_apple_message
@@ -243,7 +244,12 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
-            resources :apple_list_picker_images, only: [:index, :create, :destroy], module: :inboxes
+            resources :apple_list_picker_images, only: [:index, :create, :destroy], module: :inboxes do
+              collection do
+                post :copy_from
+                post :bulk_upload
+              end
+            end
             get :health, on: :member
           end
           resources :inbox_members, only: [:create, :show], param: :inbox_id do
