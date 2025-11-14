@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'base64'
+require_relative 'log_sanitizer'
 
 class AppleMessagesForBusiness::SendRichLinkService
   AMB_SERVER = 'https://mspgw.push.apple.com/v1'
@@ -26,10 +27,12 @@ class AppleMessagesForBusiness::SendRichLinkService
       richLinkData: rich_link_data
     }
 
-    Rails.logger.info "🔍 Rich Link - Final payload richLinkData: #{rich_link_data.to_json}"
+    # Log sanitized payload (truncate base64 data)
+    sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
+    Rails.logger.info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
     Rails.logger.info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
     if rich_link_data[:assets]&.key?(:image)
-      Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length}"
+      Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
       Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
     end
 

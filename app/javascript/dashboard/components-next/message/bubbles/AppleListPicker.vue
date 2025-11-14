@@ -13,6 +13,9 @@ const receivedTitle = computed(
 const receivedSubtitle = computed(
   () => contentAttributes.value?.received_subtitle
 );
+const receivedImageIdentifier = computed(
+  () => contentAttributes.value?.received_image_identifier
+);
 
 const getImageById = imageId => {
   const image = images.value.find(img => img.identifier === imageId);
@@ -30,6 +33,16 @@ const handleItemClick = (section, item) => {
     <div class="apple-list-picker max-w-sm">
       <!-- Header -->
       <div class="mb-4 p-3 bg-n-alpha-2 rounded-lg">
+        <!-- Header Image -->
+        <img
+          v-if="
+            receivedImageIdentifier && getImageById(receivedImageIdentifier)
+          "
+          :src="getImageById(receivedImageIdentifier)"
+          :alt="receivedTitle"
+          class="w-full h-32 rounded-lg object-cover mb-3"
+        />
+        
         <h3 class="text-sm font-medium text-n-slate-12 mb-1">
           {{ receivedTitle }}
         </h3>

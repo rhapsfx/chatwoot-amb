@@ -7,7 +7,50 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
     super
   end
 
+  # Override to update content_attributes with images after successful send
+  def send_interactive_message
+    result = super
+    
+    # If send was successful, update content_attributes with images from payload
+    if result[:success] && @message.apple_msp_payload.present?
+      update_content_attributes_with_images
+    end
+    
+    result
+  end
+
   private
+
+  def update_content_attributes_with_images
+    payload = @message.apple_msp_payload
+    interactive_data = payload['interactiveData'] || payload[:interactiveData]
+    return unless interactive_data
+
+    data = interactive_data['data'] || interactive_data[:data]
+    received_message = interactive_data['receivedMessage'] || interactive_data[:receivedMessage]
+    
+    # Update content_attributes with images and received_image_identifier
+    updated_attrs = @message.content_attributes.dup
+    
+    # Copy images array from payload to content_attributes
+    if data && data['images'].present?
+      updated_attrs['images'] = data['images']
+      Rails.logger.info "[AMB ListPicker] Copied #{data['images'].length} images to content_attributes"
+    end
+    
+    # Copy received_image_identifier from receivedMessage
+    if received_message && received_message['imageIdentifier'].present?
+      updated_attrs['received_image_identifier'] = received_message['imageIdentifier']
+      Rails.logger.info "[AMB ListPicker] Copied received_image_identifier: #{received_message['imageIdentifier']}"
+    end
+    
+    # Update the message with the new content_attributes
+    @message.update(content_attributes: updated_attrs)
+    Rails.logger.info "[AMB ListPicker] Updated content_attributes with images for frontend display"
+  rescue StandardError => e
+    Rails.logger.error "[AMB ListPicker] Failed to update content_attributes with images: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
 
   # Override parent to use transformed images
   def build_interactive_data
@@ -197,18 +240,77 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
   end
 
   def build_images_array
-    images = content_attributes['images'] || []
-    Rails.logger.info "[AMB ListPicker] Building images array with #{images.length} images"
-    return [] if images.empty?
+    # Extract all image identifiers from list picker config
+    identifiers = extract_image_identifiers
+    return [] if identifiers.empty?
 
-    # Transform images to Apple MSP format with base64 data
-    images.map do |image|
-      {
-        identifier: image['identifier'],
-        data: image['data'], # base64 encoded
-        description: image['description']
-      }.compact
+    # Fetch and encode images from database
+    fetch_and_encode_images(identifiers)
+  end
+
+  def extract_image_identifiers
+    identifiers = Set.new
+
+    # Add header image from received_message
+    header_image = content_attributes['received_image_identifier']
+    identifiers << header_image if header_image.present?
+
+    # Add reply image if different from header
+    reply_image = content_attributes['reply_image_identifier']
+    identifiers << reply_image if reply_image.present? && reply_image != header_image
+
+    # Add images from list picker items
+    sections = content_attributes['sections']
+    if sections.is_a?(Array)
+      sections.each do |section|
+        items = section['items']
+        next unless items.is_a?(Array)
+
+        items.each do |item|
+          # Handle both camelCase and snake_case
+          image_id = item['imageIdentifier'] || item['image_identifier']
+          identifiers << image_id if image_id.present?
+        end
+      end
     end
+
+    identifiers.to_a
+  end
+
+  def fetch_and_encode_images(identifiers)
+    return [] if identifiers.empty?
+
+    # Get inbox_id from message
+    inbox_id = message.inbox_id
+
+    # Fetch images from database
+    picker_images = AppleListPickerImage
+                      .where(inbox_id: inbox_id, identifier: identifiers)
+                      .includes(image_attachment: :blob)
+
+    Rails.logger.info "[AMB ListPicker] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
+    Rails.logger.info "[AMB ListPicker] 🖼️ Found #{picker_images.count} images in ActiveStorage"
+
+    # Encode images as base64
+    picker_images.map do |picker_image|
+      if picker_image.image.attached?
+        blob = picker_image.image.blob
+        image_data = blob.download
+
+        {
+          identifier: picker_image.identifier,
+          data: Base64.strict_encode64(image_data),
+          description: picker_image.description || picker_image.identifier
+        }
+      else
+        Rails.logger.warn "[AMB ListPicker] ⚠️ Image not attached for identifier: #{picker_image.identifier}"
+        nil
+      end
+    end.compact
+  rescue StandardError => e
+    Rails.logger.error "[AMB ListPicker] ❌ Error fetching images: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    []
   end
 
   def build_received_message
