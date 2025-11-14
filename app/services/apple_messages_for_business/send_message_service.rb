@@ -1,3 +1,5 @@
+require_relative 'log_sanitizer'
+
 class AppleMessagesForBusiness::SendMessageService
   AMB_SERVER = 'https://mspgw.push.apple.com/v1'.freeze
 
@@ -144,7 +146,7 @@ class AppleMessagesForBusiness::SendMessageService
       bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
       data: {
         version: '1.0',
-        requestIdentifier: SecureRandom.uuid
+        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid
       },
       useLiveLayout: true
     }
@@ -187,7 +189,7 @@ class AppleMessagesForBusiness::SendMessageService
     return [] if images_array.blank?
 
     # Get all identifiers
-    identifiers = images_array.map { |img| img['identifier'] }.compact
+    identifiers = images_array.filter_map { |img| img['identifier'] }
 
     # Performance Optimization: Batch fetch images with eager loading to avoid N+1 queries
     # The .includes ensures ActiveStorage attachments and blobs are preloaded
@@ -197,7 +199,7 @@ class AppleMessagesForBusiness::SendMessageService
     ).includes(image_attachment: :blob).index_by(&:identifier)
 
     # Enrich each image with data from database
-    images_array.map do |img|
+    images_array.filter_map do |img|
       identifier = img['identifier']
       stored_image = stored_images[identifier]
 
@@ -213,7 +215,7 @@ class AppleMessagesForBusiness::SendMessageService
         Rails.logger.warn "[AMB Send] Image #{identifier} not found in database for inbox #{@channel.inbox.id}"
         img
       end
-    end.compact
+    end
   end
 
   # Override these methods in subclasses for specific message types
@@ -278,7 +280,7 @@ class AppleMessagesForBusiness::SendMessageService
         # Convert local time to GMT if it contains timezone info
         if start_time&.include?('+') || start_time&.include?('Z')
           begin
-            parsed_time = Time.parse(start_time)
+            parsed_time = Time.zone.parse(start_time)
             start_time = parsed_time.utc.strftime('%Y-%m-%dT%H:%M+0000')
           rescue StandardError
             # If parsing fails, keep original format
@@ -337,7 +339,7 @@ class AppleMessagesForBusiness::SendMessageService
 
   def build_reply_message
     # For Apple forms, use a form-specific reply title if no custom title is set
-    default_reply_title = if @message.content_type == 'apple_form' && content_attributes['title'].present? && !content_attributes['reply_title'].present?
+    default_reply_title = if @message.content_type == 'apple_form' && content_attributes['title'].present? && content_attributes['reply_title'].blank?
                             "#{content_attributes['title']} - Submitted"
                           else
                             'Selection Made'
@@ -530,8 +532,9 @@ class AppleMessagesForBusiness::SendMessageService
           value: option['value'],
           identifier: "#{item_page_id}_#{opt_index}"
         }
-        # Add imageIdentifier if present
-        item_data[:imageIdentifier] = option['imageIdentifier'] if option['imageIdentifier'].present?
+        # Add imageIdentifier if present (check both camelCase and snake_case)
+        image_id = option['imageIdentifier'] || option['image_identifier']
+        item_data[:imageIdentifier] = image_id if image_id.present?
         # For single select, each item can specify next page
         item_data[:nextPageIdentifier] = next_page_id if !multiple_selection && next_page_id
         item_data
@@ -679,6 +682,9 @@ class AppleMessagesForBusiness::SendMessageService
             value: option['value'] || option['title'],
             identifier: "#{page_id}_#{opt_index}"
           }
+          # Add imageIdentifier if present (check both camelCase and snake_case)
+          image_id = option['imageIdentifier'] || option['image_identifier']
+          item_data[:imageIdentifier] = image_id if image_id.present?
           # For single select, each item can specify next page
           item_data[:nextPageIdentifier] = next_page_id if !multiple_selection && next_page_id
           item_data
@@ -944,7 +950,7 @@ class AppleMessagesForBusiness::SendMessageService
     if payload[:interactiveData] && payload[:interactiveData][:data] && payload[:interactiveData][:data][:listPicker]
       list_picker = payload[:interactiveData][:data][:listPicker]
       Rails.logger.info "[AMB Send] 🔍 Final listPicker payload: #{list_picker.to_json}"
-      if list_picker[:sections] && list_picker[:sections].first && list_picker[:sections].first['items']
+      if list_picker[:sections]&.first && list_picker[:sections].first['items']
         first_item = list_picker[:sections].first['items'].first
         Rails.logger.info "[AMB Send] 🔍 First item keys: #{first_item.keys.inspect}"
         Rails.logger.info "[AMB Send] 🔍 First item: #{first_item.to_json}"
