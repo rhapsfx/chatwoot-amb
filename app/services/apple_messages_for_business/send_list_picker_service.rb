@@ -10,12 +10,10 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
   # Override to update content_attributes with images after successful send
   def send_interactive_message
     result = super
-    
+
     # If send was successful, update content_attributes with images from payload
-    if result[:success] && @message.apple_msp_payload.present?
-      update_content_attributes_with_images
-    end
-    
+    update_content_attributes_with_images if result[:success] && @message.apple_msp_payload.present?
+
     result
   end
 
@@ -28,28 +26,39 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
     data = interactive_data['data'] || interactive_data[:data]
     received_message = interactive_data['receivedMessage'] || interactive_data[:receivedMessage]
-    
+
     # Update content_attributes with images and received_image_identifier
     updated_attrs = @message.content_attributes.dup
-    
+
     # Copy images array from payload to content_attributes
     if data && data['images'].present?
       updated_attrs['images'] = data['images']
       Rails.logger.info "[AMB ListPicker] Copied #{data['images'].length} images to content_attributes"
     end
-    
+
     # Copy received_image_identifier from receivedMessage
     if received_message && received_message['imageIdentifier'].present?
       updated_attrs['received_image_identifier'] = received_message['imageIdentifier']
       Rails.logger.info "[AMB ListPicker] Copied received_image_identifier: #{received_message['imageIdentifier']}"
     end
-    
+
     # Update the message with the new content_attributes
+    # Temporarily disable SQL logging to avoid base64 spam in logs
+    old_log_level = ActiveRecord::Base.logger&.level
+    ActiveRecord::Base.logger&.level = Logger::WARN if old_log_level
+
     @message.update(content_attributes: updated_attrs)
-    Rails.logger.info "[AMB ListPicker] Updated content_attributes with images for frontend display"
+
+    # Restore log level
+    ActiveRecord::Base.logger&.level = old_log_level if old_log_level
+
+    Rails.logger.info '[AMB ListPicker] Updated content_attributes with images for frontend display'
   rescue StandardError => e
     Rails.logger.error "[AMB ListPicker] Failed to update content_attributes with images: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
+  ensure
+    # Ensure log level is restored even if there's an error
+    ActiveRecord::Base.logger&.level = old_log_level if old_log_level
   end
 
   # Override parent to use transformed images
@@ -285,8 +294,8 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
     # Fetch images from database
     picker_images = AppleListPickerImage
-                      .where(inbox_id: inbox_id, identifier: identifiers)
-                      .includes(image_attachment: :blob)
+                    .where(inbox_id: inbox_id, identifier: identifiers)
+                    .includes(image_attachment: :blob)
 
     Rails.logger.info "[AMB ListPicker] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
     Rails.logger.info "[AMB ListPicker] 🖼️ Found #{picker_images.count} images in ActiveStorage"

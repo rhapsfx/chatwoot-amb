@@ -164,7 +164,7 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
       receivedMessage: build_received_message,
       bid: @channel.imessage_extension_bid || default_bid,
       data: {
-        requestIdentifier: SecureRandom.uuid,
+        requestIdentifier: @payment_data['request_identifier'] || SecureRandom.uuid,
         mspVersion: '1.0',
         payment: payment_data
       }
@@ -277,7 +277,7 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     # CRITICAL: This MUST match the initiativeContext used in the merchant session request
     # Otherwise Apple will reject with "payment gateway url mismatch"
     payment_settings = @channel.payment_settings || {}
-    domain = payment_settings.dig('merchantDomain') ||
+    domain = payment_settings['merchantDomain'] ||
              payment_settings.dig('apple_pay', 'merchant_domain') ||
              ENV['APPLE_PAY_MERCHANT_DOMAIN'] ||
              ENV['BASE_URL']&.gsub(%r{^https?://}, '')

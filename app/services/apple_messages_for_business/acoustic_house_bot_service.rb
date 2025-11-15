@@ -52,6 +52,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def process_message
     Rails.logger.info "[Bot] 🔄 process_message - Current state: #{@bot_state}, Message content: #{@message.content&.truncate(50)}"
+    Rails.logger.info "[Bot] 🔄 Message content_type: #{@message.content_type}"
+    sanitized_attrs = LogSanitizerService.sanitize_for_log(@message.content_attributes)
+    Rails.logger.info "[Bot] 🔄 Message content_attributes: #{sanitized_attrs.inspect}"
 
     # Check for timeout - restart if idle > 30 minutes
     if conversation_timed_out?
@@ -70,6 +73,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     # Handle form responses by content_type (forms don't have custom identifiers)
     if @message.content_type == 'apple_form_response'
+      Rails.logger.info '[Bot] ✅ Detected form response, calling handle_form_response'
       handle_form_response
       return
     end
@@ -79,16 +83,23 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def process_interactive_response(interactive_data)
+    Rails.logger.info '[Bot] 🎯 process_interactive_response called'
+    Rails.logger.info "[Bot] 🎯 Interactive data: #{interactive_data.inspect}"
+
     # For quick replies, Apple uses 'selectedIdentifier' (our custom identifier)
     # For other types (list picker, time picker), use 'requestIdentifier'
     data = interactive_data['data'] || {}
 
     request_id = if data['quick-reply']
                    # Quick reply uses selectedIdentifier (the identifier we set on items)
-                   data.dig('quick-reply', 'selectedIdentifier')
+                   selected_id = data.dig('quick-reply', 'selectedIdentifier')
+                   Rails.logger.info "[Bot] 🎯 Quick reply detected - selectedIdentifier: #{selected_id}"
+                   selected_id
                  else
                    # Other interactive types use requestIdentifier
-                   data['requestIdentifier']
+                   req_id = data['requestIdentifier']
+                   Rails.logger.info "[Bot] 🎯 Interactive type detected - requestIdentifier: #{req_id}"
+                   req_id
                  end
 
     Rails.logger.info "[Bot] 🎯 Processing interactive response - requestId: #{request_id}"
@@ -825,6 +836,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         content: title,
         content_type: 'apple_quick_reply',
         content_attributes: {
+          'request_identifier' => request_id,
           'summary_text' => title,
           'received_title' => title,
           'reply_title' => 'Selected: ${item.title}',
@@ -867,7 +879,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     received_message = template_attrs['received_message'] || {}
     reply_message = template_attrs['reply_message'] || {}
 
-    unless sections.present?
+    if sections.blank?
       Rails.logger.error '[Bot] Guitar List Picker template has no sections'
       send_text_message('Guitar selection temporarily unavailable.')
       return
@@ -907,7 +919,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Build content attributes with all components
     content_attrs = {
       'sections' => sections,
-      'images' => images
+      'images' => images,
+      'request_identifier' => 'lp_guitar_0319'
     }
 
     # Add received_message fields (flattened with received_ prefix)
@@ -966,7 +979,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     Rails.logger.info "[Bot] 🖼️ Found #{picker_images.count} images in ActiveStorage: #{picker_images.map(&:identifier).inspect}"
 
     # Convert to base64 array format expected by SendListPickerService
-    picker_images.map do |picker_image|
+    picker_images.filter_map do |picker_image|
       next unless picker_image.image.attached?
 
       begin
@@ -985,7 +998,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         Rails.logger.error "[Bot] Failed to encode image #{picker_image.identifier}: #{e.message}"
         nil
       end
-    end.compact
+    end
   end
 
   def send_guitar_info_form
@@ -1005,6 +1018,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     Rails.logger.info "[Bot] Sending Guitar Info Form (ID: 343, Name: #{template.name})"
 
+    # Extract content attributes and add request_identifier
+    content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
+    content_attrs['request_identifier'] = 'form_0343' if content_attrs['request_identifier'].blank?
+
     # Create outgoing message with form content
     Messages::MessageBuilder.new(
       bot_user,
@@ -1013,7 +1030,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         message_type: :outgoing,
         content: template.metadata.dig('apple_message_content', 'title') || 'Guitar Info Form',
         content_type: 'apple_form',
-        content_attributes: template.metadata.dig('apple_message_content', 'content_attributes')
+        content_attributes: content_attrs
       }
     ).perform
 
@@ -1041,6 +1058,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
 
     # Create outgoing message with list picker content
+    content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
+    # Add request_identifier for proper routing (summary list picker doesn't need a handler)
+    content_attrs['request_identifier'] = 'lp_summary_0319' if content_attrs['request_identifier'].blank?
+
     message = Messages::MessageBuilder.new(
       bot_user,
       @conversation,
@@ -1048,7 +1069,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         message_type: :outgoing,
         content: 'Feature Sheet',
         content_type: 'apple_list_picker',
-        content_attributes: template.metadata.dig('apple_message_content', 'content_attributes')
+        content_attributes: content_attrs
       }
     ).perform
 
@@ -1124,6 +1145,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     destination_id = contact_inbox.source_id
 
     payment_data = {
+      'request_identifier' => 'applepay_1018',
       'merchant_name' => 'Acoustic House',
       'currency_code' => 'USD',
       'country_code' => 'US',
@@ -1235,6 +1257,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         content: "Schedule a lesson with your #{guitar}",
         content_type: 'apple_time_picker',
         content_attributes: {
+          'request_identifier' => 'time_0319',
           'received_title' => "Schedule a lesson with your #{guitar}",
           'received_subtitle' => location[:name],
           'reply_title' => 'Thank you!',

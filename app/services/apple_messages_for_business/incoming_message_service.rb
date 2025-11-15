@@ -209,7 +209,7 @@ class AppleMessagesForBusiness::IncomingMessageService
   def extract_contact_name
     # Apple Messages doesn't provide contact name in payload
     # Use source_id as fallback
-    "Apple User #{source_id[-8..-1]}"
+    "Apple User #{source_id[-8..]}"
   end
 
   def conversation_params
@@ -316,7 +316,7 @@ class AppleMessagesForBusiness::IncomingMessageService
     Rails.logger.info "[AMB IncomingMessage] Extracting content from interactive data, keys: #{interactive_data&.keys&.inspect}"
 
     # Handle NSKeyedArchiver format (from list picker responses)
-    if interactive_data['$objects'] && interactive_data['$objects'].is_a?(Array)
+    if interactive_data['$objects'].is_a?(Array)
       Rails.logger.info '[AMB IncomingMessage] Detected NSKeyedArchiver format'
       return extract_from_nskeyed_archiver(interactive_data)
     end
@@ -375,7 +375,7 @@ class AppleMessagesForBusiness::IncomingMessageService
         selected_section = list_picker['sections'].find { |s| s['title']&.include?('Selected') }
         if selected_section && selected_section['items']&.any?
           # Handle multiple selections
-          selected_titles = selected_section['items'].map { |item| item['title'] }.compact
+          selected_titles = selected_section['items'].filter_map { |item| item['title'] }
           return selected_titles.join(', ') if selected_titles.any?
         end
       end
@@ -488,7 +488,7 @@ class AppleMessagesForBusiness::IncomingMessageService
     Rails.logger.info "[AMB] Processing attachment with params: #{attachment_params.inspect}"
     # Apple Messages attachments can be either direct URLs or encrypted MMCS URLs
     url = attachment_params['url'] || attachment_params['mmcs-url']
-    unless url.present?
+    if url.blank?
       Rails.logger.warn '[AMB] Attachment has no URL, skipping.'
       return
     end
@@ -736,43 +736,26 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def determine_content_type_from_data(interactive_data)
-    return 'text' unless interactive_data&.dig('data')
+    # Check for NSKeyedArchiver format first (used for forms with attachments)
+    # NSKeyedArchiver format has "$archiver", "$objects", "$top" keys instead of "data"
+    if interactive_data['$archiver'] == 'NSKeyedArchiver'
+      Rails.logger.info '[AMB IncomingMessage] 🔍 Detected NSKeyedArchiver format'
 
-    data_keys = interactive_data['data'].keys
-    first_key = data_keys.first
+      # Check if URL contains form-related parameters (receivedMessage/replyMessage)
+      # NSKeyedArchiver encodes the data in the URL as base64
+      objects = interactive_data['$objects'] || []
+      url_string = objects.find { |obj| obj.is_a?(String) && obj.include?('receivedMessage') }
 
-    case first_key
-    when 'listPicker'
-      'apple_list_picker'
-    when 'timePicker'
-      'apple_time_picker'
-    when 'event'
-      # Check if it's a time picker being sent (has multiple timeslots) vs a user selection response (single selected timeslot)
-      event_data = interactive_data['data']['event']
-      if event_data['timeslots']&.length.to_i > 1
-        # Multiple timeslots = displaying a time picker
-        'apple_time_picker'
-      else
-        # Single timeslot or no timeslots = user selection response, display as text
-        'text'
+      if url_string
+        Rails.logger.info '[AMB IncomingMessage] 🔍 Found form-related URL in NSKeyedArchiver'
+        return 'apple_form_response'
       end
-    when 'authenticate'
-      'apple_auth'
-    when 'payment'
-      'apple_pay'
-    else
-      'text'
+
+      # Fallback for NSKeyedArchiver without clear form indicators
+      Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver format without form indicators, treating as text'
+      return 'text'
     end
-  end
 
-  def determine_content_type
-    return 'input_email' if attachments_present?
-
-    # For IDR responses, we need to peek at the cached data to determine type
-    # This prevents UI flicker from content_type changing after IDR download
-    return determine_content_type_from_data(@idr_data) if @params['interactiveDataRef'].present? && @idr_data.present?
-
-    interactive_data = @params['interactiveData']
     return 'text' unless interactive_data&.dig('data')
 
     # Check for Apple MSP form response first
@@ -805,8 +788,131 @@ class AppleMessagesForBusiness::IncomingMessageService
     end
   end
 
+  # Check if this message is a response to a form
+  # Forms in IDR format use NSKeyedArchiver encoding which doesn't preserve the form structure
+  # So we check conversation history to see if the last outgoing message was a form
+  def is_form_response?
+    Rails.logger.info '[AMB IncomingMessage] 🔍 is_form_response? called'
+
+    # DEBUG: Show last 10 outgoing messages to understand what's in the database
+    recent_outgoing = @conversation.messages
+                                   .outgoing
+                                   .order(created_at: :desc)
+                                   .limit(10)
+                                   .pluck(:id, :content_type, :created_at)
+
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Last 10 outgoing messages: #{recent_outgoing.inspect}"
+
+    # Get the most recent outgoing message before this one
+    last_outgoing = @conversation.messages
+                                 .outgoing
+                                 .where('created_at < ?', Time.current)
+                                 .order(created_at: :desc)
+                                 .first
+
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Last outgoing message: ID=#{last_outgoing&.id}, content_type=#{last_outgoing&.content_type}, created_at=#{last_outgoing&.created_at}"
+
+    return false unless last_outgoing
+
+    # Check if it was a form
+    is_form = last_outgoing.content_type == 'apple_form'
+    Rails.logger.info "[AMB IncomingMessage] 🔍 is_form_response? returning: #{is_form}"
+    is_form
+  end
+
+  def determine_content_type
+    Rails.logger.info '[AMB IncomingMessage] 🔍 determine_content_type called'
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Has IDR: #{@params['interactiveDataRef'].present?}, IDR data cached: #{@idr_data.present?}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveData: #{@params['interactiveData'].present?}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Has attachments: #{attachments_present?}"
+
+    # CRITICAL: Check for form responses BEFORE checking attachments
+    # Forms can have attachments (photos), and we need to route them correctly
+
+    # For IDR responses, check if it's a form first
+    if @params['interactiveDataRef'].present? && @idr_data.present?
+      Rails.logger.info '[AMB IncomingMessage] 🔍 Branch: IDR response detected'
+
+      type_from_idr = determine_content_type_from_data(@idr_data)
+      Rails.logger.info "[AMB IncomingMessage] 🔍 Type from IDR data: #{type_from_idr}"
+
+      if type_from_idr == 'apple_form_response'
+        Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_form_response (from IDR data structure)'
+        return type_from_idr
+      end
+
+      # Check if this is a response to a form (NSKeyedArchiver format doesn't preserve form structure)
+      # If the most recent outgoing message was a form, treat this as a form response
+      if is_form_response?
+        Rails.logger.info '[AMB IncomingMessage] ✅ Detected form response based on conversation history (IDR)'
+        return 'apple_form_response'
+      end
+    end
+
+    # For direct interactive data, check if it's a form
+    interactive_data = @params['interactiveData']
+    if interactive_data&.dig('data', 'dynamic', 'template') == 'messageForms'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_form_response (direct interactiveData structure)'
+      return 'apple_form_response'
+    end
+
+    # Check for form response by conversation history (fallback)
+    if interactive_data.present? && is_form_response?
+      Rails.logger.info '[AMB IncomingMessage] ✅ Detected form response based on conversation history (direct data)'
+      return 'apple_form_response'
+    end
+
+    # THEN check for attachments (after form check)
+    if attachments_present?
+      Rails.logger.info '[AMB IncomingMessage] 📎 Returning input_email (attachments present, not a form)'
+      return 'input_email'
+    end
+
+    # For other IDR responses, determine type from data
+    if @params['interactiveDataRef'].present? && @idr_data.present?
+      type = determine_content_type_from_data(@idr_data)
+      Rails.logger.info "[AMB IncomingMessage] ✅ Returning #{type} (from IDR data)"
+      return type
+    end
+
+    return 'text' unless interactive_data&.dig('data')
+
+    data_keys = interactive_data['data'].keys
+    first_key = data_keys.first
+
+    case first_key
+    when 'listPicker'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_list_picker'
+      'apple_list_picker'
+    when 'timePicker'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_time_picker'
+      'apple_time_picker'
+    when 'event'
+      # Check if it's a time picker being sent (has multiple timeslots) vs a user selection response (single selected timeslot)
+      event_data = interactive_data['data']['event']
+      if event_data['timeslots']&.length.to_i > 1
+        # Multiple timeslots = displaying a time picker
+        Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_time_picker (multiple timeslots)'
+        'apple_time_picker'
+      else
+        # Single timeslot or no timeslots = user selection response, display as text
+        Rails.logger.info '[AMB IncomingMessage] ✅ Returning text (single/no timeslot)'
+        'text'
+      end
+    when 'authenticate'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_auth'
+      'apple_auth'
+    when 'payment'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_pay'
+      'apple_pay'
+    else
+      Rails.logger.info "[AMB IncomingMessage] ✅ Returning text (default, first_key: #{first_key})"
+      'text'
+    end
+  end
+
   def update_contact_capabilities
-    return unless @headers[:capability_list].present?
+    return if @headers[:capability_list].blank?
 
     current_attributes = @contact.additional_attributes || {}
     updated_attributes = current_attributes.merge(
@@ -818,7 +924,7 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def update_conversation_capabilities
-    return unless @headers[:capability_list].present?
+    return if @headers[:capability_list].blank?
 
     current_attributes = @conversation.additional_attributes || {}
     updated_attributes = current_attributes.merge(
@@ -845,7 +951,7 @@ class AppleMessagesForBusiness::IncomingMessageService
 
       if items.any?
         # Multiple items selected (or single item)
-        item_titles = items.map { |item| item['title'] || item['value'] }.compact
+        item_titles = items.filter_map { |item| item['title'] || item['value'] }
         response_summary << "#{page_title}: #{item_titles.join(', ')}" if item_titles.any?
       else
         # Handle case where there might be a direct value
@@ -858,7 +964,7 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   def format_time_slot(time_string)
     # Parse the ISO 8601 time string
-    time = Time.parse(time_string)
+    time = Time.zone.parse(time_string)
     # Format it into a more readable string
     time.strftime('%B %d, %Y at %I:%M %p %Z')
   rescue ArgumentError
@@ -985,7 +1091,7 @@ class AppleMessagesForBusiness::IncomingMessageService
     # Extract referenced message text if present (between quotes)
     if (match = body.match(/["](.+?)["]$/))
       attributes[:tapback_referenced_text] = match[1]
-    elsif body.match?(/Business Message/)
+    elsif body.include?('Business Message')
       attributes[:tapback_referenced_text] = 'Business Message'
     elsif (match = body.match(/an?\s+(image|video|audio|file)$/))
       attributes[:tapback_referenced_text] = match[1]
@@ -1029,15 +1135,27 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def trigger_bot_if_enabled
-    return unless @message.incoming?
+    Rails.logger.info "[Bot] 🤖 trigger_bot_if_enabled called - Message ID: #{@message&.id}, Message Type: #{@message&.message_type}"
+
+    unless @message.incoming?
+      Rails.logger.info '[Bot] ⏭️  Skipping bot - message is not incoming'
+      return
+    end
+
+    Rails.logger.info '[Bot] ✅ Message is incoming, checking if bot enabled'
 
     # Check if bot is enabled for this conversation
     attrs = @conversation.custom_attributes || {}
     bot_enabled = attrs.fetch('bot_enabled', true)
 
-    return unless bot_enabled
+    Rails.logger.info "[Bot] Bot enabled status: #{bot_enabled} (from conversation custom_attributes)"
 
-    Rails.logger.info '[Bot] Triggering bot for incoming message'
+    unless bot_enabled
+      Rails.logger.info '[Bot] ⏭️  Skipping bot - bot_enabled is false'
+      return
+    end
+
+    Rails.logger.info '[Bot] 🚀 Triggering bot for incoming message'
 
     bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
       @conversation,
@@ -1054,10 +1172,11 @@ class AppleMessagesForBusiness::IncomingMessageService
       interactive_data = @idr_data || @params['interactiveData']
       bot_service.process_interactive_response(interactive_data)
     else
+      Rails.logger.info '[Bot] Regular message - using process_message'
       bot_service.process_message
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Error processing message: #{e.message}"
+    Rails.logger.error "[Bot] ❌ Error processing message: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
   end
 end

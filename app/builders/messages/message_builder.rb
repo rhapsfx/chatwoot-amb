@@ -31,12 +31,9 @@ class Messages::MessageBuilder
     process_attachments
     process_emails
 
-    # 🔥 DEBUG: Log validation attempt for Apple Messages
+    # Debug log for Apple Messages
     if @message.content_type&.start_with?('apple_')
-      Rails.logger.info '🔥 MessageBuilder - Attempting to save Apple message:'
-      Rails.logger.info "🔥 Content Type: #{@message.content_type}"
-      Rails.logger.info "🔥 Content Attributes: #{@message.content_attributes.inspect}"
-      Rails.logger.info "🔥 Valid?: #{@message.valid?}"
+      Rails.logger.debug { "🔥 MessageBuilder - Saving #{@message.content_type} message (valid: #{@message.valid?})" }
       Rails.logger.error "🔥 Validation Errors: #{@message.errors.full_messages}" unless @message.valid?
     end
 
@@ -57,12 +54,10 @@ class Messages::MessageBuilder
     params = convert_to_hash(@params)
     content_attributes = params.fetch(:content_attributes, {})
 
-    # 🔥 DEBUG: Log what we're receiving
+    # Debug log for Apple Messages
     if @params[:content_type]&.start_with?('apple_')
-      Rails.logger.info "🔥 MessageBuilder content_attributes - Raw params keys: #{params.keys}"
-      Rails.logger.info "🔥 MessageBuilder content_attributes - Images in params: #{params.key?(:images) ? 'YES' : 'NO'}"
-      Rails.logger.info "🔥 MessageBuilder content_attributes - Images data: #{params[:images].inspect}" if params.key?(:images)
-      Rails.logger.info "🔥 MessageBuilder content_attributes - Content attributes: #{content_attributes.inspect}"
+      image_count = params.key?(:images) ? params[:images]&.length : 0
+      Rails.logger.debug { "🔥 MessageBuilder content_attributes - Type: #{@params[:content_type]}, Images: #{image_count}" }
     end
 
     parsed_content_attributes = if content_attributes.is_a?(String)
@@ -81,7 +76,9 @@ class Messages::MessageBuilder
         Rails.logger.info '🔥 MessageBuilder content_attributes - Added images from separate parameter'
       elsif parsed_content_attributes.key?(:images) || parsed_content_attributes.key?('images')
         # Images are already in content_attributes, keep them there
-        Rails.logger.info "🔥 MessageBuilder content_attributes - Images already in content_attributes: #{parsed_content_attributes[:images] || parsed_content_attributes['images']}"
+        images_data = parsed_content_attributes[:images] || parsed_content_attributes['images']
+        sanitized_images = LogSanitizerService.sanitize_for_log(images_data)
+        Rails.logger.info "🔥 MessageBuilder content_attributes - Images already in content_attributes: #{sanitized_images.inspect}"
       else
         Rails.logger.info '🔥 MessageBuilder content_attributes - No images found anywhere'
       end
@@ -171,18 +168,10 @@ class Messages::MessageBuilder
   end
 
   def sender
-    Rails.logger.info '🔵🔵 sender method called:'
-    Rails.logger.info "🔵🔵   message_type: #{message_type.inspect}"
-    Rails.logger.info "🔵🔵   message_type == 'outgoing': #{message_type == 'outgoing'}"
-    Rails.logger.info "🔵🔵   message_type.to_s == 'outgoing': #{message_type.to_s == 'outgoing'}"
-    Rails.logger.info "🔵🔵   message_sender: #{message_sender.inspect}"
-    Rails.logger.info "🔵🔵   @user: #{@user.inspect}"
-    Rails.logger.info "🔵🔵   @conversation.contact: #{@conversation.contact.inspect}"
-
     # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
     result = message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
 
-    Rails.logger.info "🔵🔵   RESULT: #{result.class.name}, ID: #{result.id}"
+    Rails.logger.debug { "🔵 MessageBuilder sender: #{result.class.name} ID:#{result.id} (type: #{message_type})" }
     result
   end
 

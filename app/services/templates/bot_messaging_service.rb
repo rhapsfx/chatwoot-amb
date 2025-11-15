@@ -148,7 +148,8 @@ class Templates::BotMessagingService
         rendered[:content_attributes] || rendered[:contentAttributes]
     end
 
-    Rails.logger.info "🟢 BotMessagingService - Creating message with content_attributes: #{message_params[:content_attributes].inspect}"
+    sanitized_attrs = LogSanitizerService.sanitize_for_log(message_params[:content_attributes])
+    Rails.logger.info "🟢 BotMessagingService - Creating message with content_attributes: #{sanitized_attrs.inspect}"
     if message_params[:content_type] == 'apple_time_picker'
       Rails.logger.info "🟢 BotMessagingService - Event timeslots: #{message_params.dig(:content_attributes, 'event', 'timeslots').inspect}"
     end
