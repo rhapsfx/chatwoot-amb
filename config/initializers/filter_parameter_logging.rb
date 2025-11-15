@@ -11,3 +11,56 @@ filter_regex = /\A(?!.*\bwebsite_token\b).*token/i
 
 # Apply the regex for filtering
 Rails.application.config.filter_parameters += [filter_regex]
+
+# Custom parameter filter for heavy data fields (base64 images, large content)
+module ParameterFilterHelper
+  HEAVY_DATA_KEYS = /\b(data|image|content|file|attachment|base64)\b/i
+  MIN_SIZE = 1024 # Only filter data > 1KB
+
+  def self.should_truncate?(key, value)
+    value.is_a?(String) &&
+      key.to_s.match?(HEAVY_DATA_KEYS) &&
+      value.length > MIN_SIZE
+  end
+
+  def self.truncate(_key, value)
+    size_kb = (value.length / 1024.0).round(2)
+    preview_length = 100
+
+    if value.match?(%r{\A[A-Za-z0-9+/]+=*\z})
+      "[BASE64 DATA FILTERED - #{size_kb} KB - preview: #{value[0...preview_length]}...]"
+    else
+      "[LARGE DATA FILTERED - #{size_kb} KB - preview: #{value[0...preview_length]}...]"
+    end
+  end
+
+  def self.filter_value(key, value)
+    case value
+    when Hash
+      # Recurse into hash, checking each nested key
+      value.each_with_object({}) do |(nested_key, nested_value), result|
+        result[nested_key] = filter_value(nested_key, nested_value)
+      end
+    when Array
+      # Recurse into array items
+      value.map do |item|
+        if item.is_a?(Hash)
+          item.each_with_object({}) do |(nested_key, nested_value), result|
+            result[nested_key] = filter_value(nested_key, nested_value)
+          end
+        else
+          item
+        end
+      end
+    when String
+      should_truncate?(key, value) ? truncate(key, value) : value
+    else
+      value
+    end
+  end
+end
+
+# Apply recursive filtering for nested data structures
+Rails.application.config.filter_parameters << lambda do |key, value|
+  ParameterFilterHelper.filter_value(key, value)
+end
