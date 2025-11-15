@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Accounts::BaseController
+  include LogSanitizable
+
   before_action :fetch_inbox
   before_action :log_deprecation_warning
   # No authorization check needed - if user can access the inbox via fetch_inbox, they can manage images

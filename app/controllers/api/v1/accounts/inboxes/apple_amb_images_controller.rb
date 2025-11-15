@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Inboxes::AppleAmbImagesController < Api::V1::Accounts::BaseController
+  include LogSanitizable
+
   before_action :fetch_inbox
   # No authorization check needed - if user can access the inbox via fetch_inbox, they can manage images
 

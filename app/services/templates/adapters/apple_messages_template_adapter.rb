@@ -56,7 +56,8 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
       content_attributes: map_attributes(mapping.field_mappings)
     }
 
-    Rails.logger.info "[TemplateAdapter] Result content_attributes: #{result[:content_attributes].inspect}"
+    sanitized_attrs = LogSanitizerService.sanitize_for_log(result[:content_attributes])
+    Rails.logger.info "[TemplateAdapter] Result content_attributes: #{sanitized_attrs.inspect}"
     result
   end
 
@@ -145,7 +146,8 @@ class Templates::Adapters::AppleMessagesTemplateAdapter
       }.compact
     }
 
-    Rails.logger.info "[TemplateAdapter] adapt_time_picker returning content_attributes['event']['timeslots']: #{result[:content_attributes]['event']['timeslots'].inspect}"
+    sanitized_timeslots = LogSanitizerService.sanitize_for_log(result[:content_attributes]['event']['timeslots'])
+    Rails.logger.info "[TemplateAdapter] adapt_time_picker returning content_attributes['event']['timeslots']: #{sanitized_timeslots.inspect}"
     result
   end
 

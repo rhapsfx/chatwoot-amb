@@ -820,6 +820,31 @@ show_status() {
     echo ""
 }
 
+# Function to rotate log file
+rotate_log() {
+    local log_file="log/development.log"
+    
+    if [ -f "$log_file" ]; then
+        local timestamp=$(date +"%Y%m%d_%H%M%S")
+        local rotated_log="log/development.log.${timestamp}"
+        
+        print_status "Rotating development log..."
+        mv "$log_file" "$rotated_log"
+        print_success "Log rotated to: ${rotated_log}"
+        
+        # Optionally compress old log to save space
+        if command -v gzip >/dev/null 2>&1; then
+            gzip "$rotated_log"
+            print_success "Compressed rotated log: ${rotated_log}.gz"
+        fi
+        
+        # Create new empty log file
+        touch "$log_file"
+    else
+        print_warning "No development log file found to rotate"
+    fi
+}
+
 # Function to restart services
 restart_services() {
     print_status "Restarting development services..."
@@ -833,6 +858,10 @@ restart_services() {
         stop_ngrok true
     fi
     sleep 2
+    
+    # Rotate the development log file
+    rotate_log
+    
     if [ "$USE_CUSTOM_DOMAIN" = true ]; then
         start_nginx
     elif [ "$USE_TAILSCALE_FUNNEL" = true ]; then

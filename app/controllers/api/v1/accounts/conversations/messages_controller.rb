@@ -160,14 +160,15 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   def create_params
-    Rails.logger.info "🔥 MessagesController create_params called with: #{params.inspect}"
-    Rails.logger.info "🔥 MessagesController content_attributes: #{params[:content_attributes]}"
-    Rails.logger.info "🔥 MessagesController images in content_attributes: #{params.dig(:content_attributes, :images)}"
+    if params[:content_type]&.start_with?('apple_')
+      image_count = params.dig(:content_attributes, :images)&.length || 0
+      Rails.logger.debug { "🔥 MessagesController create_params - Type: #{params[:content_type]}, Images: #{image_count}" }
+    end
 
     permitted = params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at, :template_id,
                               :attachments => [],
                               # Apple Messages interactive response data
-                              :interactive_data => [:requestIdentifier, :data => {}],
+                              :interactive_data => [:requestIdentifier, { :data => {} }],
                               :content_attributes => [
                                 # Common type field for all Apple Messages
                                 :type,
@@ -231,9 +232,10 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                                 :required_shipping_fields, :requiredShippingFields
                               ])
 
-    Rails.logger.info "🔥 MessagesController permitted params: #{permitted.inspect}"
-    Rails.logger.info "🔥 MessagesController permitted content_attributes: #{permitted[:content_attributes]}"
-    Rails.logger.info "🔥 MessagesController permitted images: #{permitted.dig(:content_attributes, :images)}"
+    if permitted[:content_type]&.start_with?('apple_')
+      image_count = permitted.dig(:content_attributes, :images)&.length || 0
+      Rails.logger.debug { "🔥 MessagesController permitted - Type: #{permitted[:content_type]}, Images: #{image_count}" }
+    end
 
     permitted
   end
@@ -249,14 +251,16 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     return unless apple_messages_content_type?
 
     Rails.logger.info '[API] Normalizing Apple Messages content_attributes from camelCase to snake_case'
-    Rails.logger.info "[API] Before normalization: #{params[:content_attributes].inspect}"
+    sanitized_before = LogSanitizerService.sanitize_for_log(params[:content_attributes])
+    Rails.logger.info "[API] Before normalization: #{sanitized_before.inspect}"
 
     # Convert from frontend camelCase to internal snake_case
     params[:content_attributes] = AppleMessagesForBusiness::CaseTransformer.from_apple_format(
       params[:content_attributes].to_unsafe_h
     )
 
-    Rails.logger.info "[API] After normalization: #{params[:content_attributes].inspect}"
+    sanitized_after = LogSanitizerService.sanitize_for_log(params[:content_attributes])
+    Rails.logger.info "[API] After normalization: #{sanitized_after.inspect}"
   end
 
   def apple_messages_content_type?

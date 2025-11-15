@@ -136,8 +136,10 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
     event_data = content_attributes['event'] || {}
 
     Rails.logger.info '[AMB TimePicker] build_time_picker_data - Reading from database:'
-    Rails.logger.info "[AMB TimePicker] content_attributes['event']: #{content_attributes['event'].inspect}"
-    Rails.logger.info "[AMB TimePicker] event_data['timeslots']: #{event_data['timeslots'].inspect}"
+    sanitized_event = LogSanitizerService.sanitize_for_log(content_attributes['event'])
+    Rails.logger.info "[AMB TimePicker] content_attributes['event']: #{sanitized_event.inspect}"
+    sanitized_timeslots = LogSanitizerService.sanitize_for_log(event_data['timeslots'])
+    Rails.logger.info "[AMB TimePicker] event_data['timeslots']: #{sanitized_timeslots.inspect}"
 
     # Build event with snake_case, then transform to Apple format
     event = {

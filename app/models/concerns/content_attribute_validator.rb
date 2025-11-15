@@ -6,13 +6,13 @@ class ContentAttributeValidator < ActiveModel::Validator
   ALLOWED_ARTICLE_KEYS = [:title, :description, :link].freeze
 
   # Apple Messages for Business validation keys
-  ALLOWED_APPLE_LIST_PICKER_KEYS = [:sections, :images, :received_title, :received_subtitle, :received_image_identifier, :received_style,
+  ALLOWED_APPLE_LIST_PICKER_KEYS = [:sections, :images, :request_identifier, :received_title, :received_subtitle, :received_image_identifier, :received_style,
                                     :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
   ALLOWED_APPLE_LIST_PICKER_SECTION_KEYS = [:title, :multiple_selection, :multipleSelection, :order, :items].freeze
   ALLOWED_APPLE_LIST_PICKER_ITEM_KEYS = [:identifier, :title, :subtitle, :image_identifier, :imageIdentifier, :order, :style].freeze
-  ALLOWED_APPLE_TIME_PICKER_KEYS = [:event, :timezone_offset, :timeslots, :received_title, :received_subtitle, :received_image_identifier,
+  ALLOWED_APPLE_TIME_PICKER_KEYS = [:event, :request_identifier, :timezone_offset, :timeslots, :received_title, :received_subtitle, :received_image_identifier,
                                     :received_style, :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
-  ALLOWED_APPLE_QUICK_REPLY_KEYS = [:summary_text, :items, :received_title, :received_subtitle, :received_style,
+  ALLOWED_APPLE_QUICK_REPLY_KEYS = [:summary_text, :request_identifier, :items, :received_title, :received_subtitle, :received_style,
                                     :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
                                     :reply_secondary_subtitle, :reply_tertiary_subtitle].freeze
   ALLOWED_APPLE_QUICK_REPLY_ITEM_KEYS = [:identifier, :title].freeze
@@ -27,7 +27,7 @@ class ContentAttributeValidator < ActiveModel::Validator
                             :received_title, :received_subtitle, :received_style,
                             :received_image_identifier].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
-  ALLOWED_APPLE_FORM_KEYS = [:title, :description, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
+  ALLOWED_APPLE_FORM_KEYS = [:title, :description, :request_identifier, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
                              :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary].freeze
   ALLOWED_APPLE_CUSTOM_APP_KEYS = [:app_id, :app_name, :bid, :url, :use_live_layout].freeze
 
@@ -35,10 +35,9 @@ class ContentAttributeValidator < ActiveModel::Validator
   APPLE_STYLE_VALUES = %w[icon small large].freeze
 
   def validate(record)
-    # Only log for Apple Messages content types to reduce noise
+    # Only log basic info for Apple Messages content types
     if record.content_type&.start_with?('apple_') || %w[input_select cards form article].include?(record.content_type)
-      Rails.logger.info "🔥 ContentAttributeValidator.validate CALLED for content_type: #{record.content_type}"
-      Rails.logger.info "🔥 ContentAttributeValidator - content_attributes keys: #{record.content_attributes&.keys&.inspect}"
+      Rails.logger.debug { "ContentAttributeValidator validating #{record.content_type}" }
     end
 
     case record.content_type
@@ -108,13 +107,6 @@ class ContentAttributeValidator < ActiveModel::Validator
   def auto_generate_apple_identifiers!(record)
     content_attrs = record.content_attributes || {}
 
-    # 🔥 DEBUG: Log what we receive
-    if record.content_type&.start_with?('apple_')
-      Rails.logger.info "🔥 ContentAttributeValidator - Processing #{record.content_type}"
-      Rails.logger.info "🔥 ContentAttributeValidator - Input content_attrs: #{content_attrs.inspect}"
-      Rails.logger.info "🔥 ContentAttributeValidator - Images present: #{content_attrs['images']&.length || 0}"
-    end
-
     case record.content_type
     when 'apple_list_picker'
       # Normalize list picker structure for Apple MSP
@@ -179,7 +171,6 @@ class ContentAttributeValidator < ActiveModel::Validator
       end
 
       timeslots = event['timeslots'] || []
-      Rails.logger.info "🔥 ContentAttributeValidator - Timeslots BEFORE processing: #{timeslots.inspect}"
 
       timeslots.each do |slot|
         next unless slot.is_a?(Hash)
@@ -187,8 +178,6 @@ class ContentAttributeValidator < ActiveModel::Validator
         # Auto-generate identifier if not present (platform-generated, not agent-exposed)
         slot['identifier'] ||= SecureRandom.hex(1) # Use simple numeric-like identifier
       end
-
-      Rails.logger.info "🔥 ContentAttributeValidator - Timeslots AFTER processing: #{timeslots.inspect}"
 
       # Ensure timezone offset is properly named
       if content_attrs['timezone_offset'] && !event['timezoneOffset']
@@ -201,8 +190,6 @@ class ContentAttributeValidator < ActiveModel::Validator
       event['title'] = '' # Apple sample uses empty string for title
 
       content_attrs['event'] = event
-
-      Rails.logger.info "🔥 ContentAttributeValidator - Final event: #{content_attrs['event'].inspect}"
 
       # Add default received/reply message structure if not present
       content_attrs['received_title'] ||= event['title'] || record.content || 'Select a time'

@@ -93,11 +93,12 @@ docker cp config/initializers/. $WEB_CONTAINER:/app/config/initializers/
 docker cp config/locales/. $WEB_CONTAINER:/app/config/locales/ 2>/dev/null || true
 docker cp config/environments/. $WEB_CONTAINER:/app/config/environments/ 2>/dev/null || true
 
-# DO NOT copy these sensitive files:
+# DO NOT copy these sensitive/environment-specific files:
 # - config/database.yml (production credentials)
 # - config/storage.yml (storage credentials)
 # - config/credentials.yml.enc (encrypted credentials)
 # - config/master.key (encryption key)
+# - config/schedule.yml (production has different scheduled jobs)
 
 if [ -n "$WORKER_CONTAINER" ]; then
     echo ""
@@ -108,6 +109,7 @@ if [ -n "$WORKER_CONTAINER" ]; then
     docker cp lib/. $WORKER_CONTAINER:/app/lib/ 2>/dev/null || true
     docker cp config/routes.rb $WORKER_CONTAINER:/app/config/
     docker cp config/initializers/. $WORKER_CONTAINER:/app/config/initializers/
+    # Note: schedule.yml is NOT copied to preserve production scheduled jobs
 fi
 
 echo ""

@@ -6,36 +6,25 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
   end
 
   def perform_reply
-    Rails.logger.info '🔥 SendOnAppleMessagesForBusinessService - Processing message:'
-    Rails.logger.info "🔥 Message ID: #{message.id}"
-    Rails.logger.info "🔥 Content Type: #{message.content_type}"
-    Rails.logger.info "🔥 Content: #{message.content}"
-    Rails.logger.info "🔥 Content Attributes: #{message.content_attributes}"
+    Rails.logger.debug { "🔥 SendOnAMB - Processing #{message.content_type} message ID:#{message.id}" }
 
     case message.content_type
     when 'text'
-      Rails.logger.info '🔥 Routing to text message service'
       send_text_or_attachment_message
     when 'apple_list_picker'
-      Rails.logger.info '🔥 Routing to list picker service'
       send_list_picker_message
     when 'apple_time_picker'
-      Rails.logger.info '🔥 Routing to time picker service'
       send_time_picker_message
     when 'apple_quick_reply'
-      Rails.logger.info '🔥 Routing to quick reply service'
       send_quick_reply_message
     when 'apple_rich_link'
-      Rails.logger.info '🔥 Routing to rich link service'
       send_rich_link_message
     when 'apple_form'
-      Rails.logger.info '🔥 Routing to form service'
       send_form_message
     when 'apple_pay'
-      Rails.logger.info '🔥 Routing to Apple Pay service'
       send_apple_pay_message
     else
-      Rails.logger.info '🔥 Unknown content type, routing to text message service (fallback)'
+      Rails.logger.debug '🔥 Unknown content type, using fallback'
       send_text_or_attachment_message # fallback
     end
   end
