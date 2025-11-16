@@ -46,7 +46,7 @@
       "dist/nodes/ChatwootAMBForm/ChatwootAMBForm.node.js",
       "dist/nodes/ChatwootAMBApplePay/ChatwootAMBApplePay.node.js",
       "dist/nodes/ChatwootAMBRichLink/ChatwootAMBRichLink.node.js",
-      "dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.js"
+      "dist/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.js"
     ]
   },
   "devDependencies": {

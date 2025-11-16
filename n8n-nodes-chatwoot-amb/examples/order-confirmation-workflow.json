@@ -66,7 +66,7 @@
       },
       "id": "template-message-1",
       "name": "Send Order Confirmation",
-      "type": "n8n-nodes-chatwoot-amb.chatwootAMBTemplateMessage",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBFileAttachment",
       "typeVersion": 1,
       "position": [650, 300],
       "credentials": {
