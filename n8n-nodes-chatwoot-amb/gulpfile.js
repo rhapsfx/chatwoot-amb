@@ -15,7 +15,7 @@ function buildIconsNodes() {
     .pipe(dest('dist/nodes/ChatwootAMBForm'))
     .pipe(dest('dist/nodes/ChatwootAMBApplePay'))
     .pipe(dest('dist/nodes/ChatwootAMBRichLink'))
-    .pipe(dest('dist/nodes/ChatwootAMBTemplateMessage'));
+    .pipe(dest('dist/nodes/ChatwootAMBFileAttachment'));
 }
 
 // Run both tasks in parallel

@@ -40,7 +40,7 @@
       },
       "id": "template-message-1",
       "name": "Send Welcome Package",
-      "type": "n8n-nodes-chatwoot-amb.chatwootAMBTemplateMessage",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBFileAttachment",
       "typeVersion": 1,
       "position": [450, 300],
       "credentials": {

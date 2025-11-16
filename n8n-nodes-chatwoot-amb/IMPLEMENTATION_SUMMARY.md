@@ -12,7 +12,7 @@ Successfully created a new n8n custom node for sending Chatwoot message template
 
 ### 1. Core Node Implementation
 
-**File**: `/Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.ts`
+**File**: `/Users/rhaps/LocalGit/chatwoot/n8n-nodes-chatwoot-amb/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.ts`
 
 **Key Features**:
 - Template selection by ID or name search
@@ -48,7 +48,7 @@ Added new node to n8n configuration:
 {
   "n8n": {
     "nodes": [
-      "dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.js"
+      "dist/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.js"
     ]
   }
 }
@@ -141,8 +141,8 @@ Created 3 ready-to-use workflow JSON files:
 **Output**:
 ```
 ✓ TypeScript compilation complete
-✓ dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.js
-✓ dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.d.ts
+✓ dist/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.js
+✓ dist/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.d.ts
 ✓ Icons copied
 ✓ No build errors
 ```
@@ -360,13 +360,13 @@ The new n8n node directly interfaces with these existing Chatwoot features:
 ```
 n8n-nodes-chatwoot-amb/
 ├── nodes/
-│   └── ChatwootAMBTemplateMessage/
-│       └── ChatwootAMBTemplateMessage.node.ts ✨ NEW
+│   └── ChatwootAMBFileAttachment/
+│       └── ChatwootAMBFileAttachment.node.ts ✨ NEW
 ├── dist/
 │   └── nodes/
-│       └── ChatwootAMBTemplateMessage/
-│           ├── ChatwootAMBTemplateMessage.node.js ✨ NEW
-│           └── ChatwootAMBTemplateMessage.node.d.ts ✨ NEW
+│       └── ChatwootAMBFileAttachment/
+│           ├── ChatwootAMBFileAttachment.node.js ✨ NEW
+│           └── ChatwootAMBFileAttachment.node.d.ts ✨ NEW
 ├── docs/
 │   ├── TEMPLATE_MESSAGE_NODE.md ✨ NEW
 │   ├── QUICK_START_TEMPLATE_MESSAGE.md ✨ NEW

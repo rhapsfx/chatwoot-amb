@@ -6,17 +6,17 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 
-export class ChatwootAMBTemplateMessage implements INodeType {
+export class ChatwootAMBFileAttachment implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Chatwoot AMB Send File',
-		name: 'chatwootAMBTemplateMessage',
+		displayName: 'Chatwoot AMB File Attachment',
+		name: 'chatwootAMBFileAttachment',
 		icon: 'file:amb.svg',
 		group: ['transform'],
 		version: 1,
 		subtitle: 'Send File/Attachment via Template',
 		description: 'Send files and attachments using Chatwoot templates with automatic attachment handling',
 		defaults: {
-			name: 'AMB Send File',
+			name: 'AMB File Attachment',
 		},
 		inputs: ['main'],
 		outputs: ['main'],

@@ -98,7 +98,7 @@
       },
       "id": "template-message-1",
       "name": "Send Newsletter",
-      "type": "n8n-nodes-chatwoot-amb.chatwootAMBTemplateMessage",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBFileAttachment",
       "typeVersion": 1,
       "position": [1250, 300],
       "credentials": {

@@ -31,10 +31,10 @@ npm install
 
 ```bash
 # Check new node file exists
-ls -la nodes/ChatwootAMBTemplateMessage/
+ls -la nodes/ChatwootAMBFileAttachment/
 
 # Should show:
-# ChatwootAMBTemplateMessage.node.ts
+# ChatwootAMBFileAttachment.node.ts
 ```
 
 ## Build Process
@@ -61,11 +61,11 @@ This will:
 ### 2. Verify Build Output
 
 ```bash
-ls -la dist/nodes/ChatwootAMBTemplateMessage/
+ls -la dist/nodes/ChatwootAMBFileAttachment/
 
 # Should show:
-# ChatwootAMBTemplateMessage.node.js
-# ChatwootAMBTemplateMessage.node.d.ts
+# ChatwootAMBFileAttachment.node.js
+# ChatwootAMBFileAttachment.node.d.ts
 ```
 
 ### 3. Check for Errors
@@ -375,7 +375,7 @@ Check `package.json` files field:
 Verify icon is copied to dist:
 
 ```bash
-ls -la dist/nodes/ChatwootAMBTemplateMessage/
+ls -la dist/nodes/ChatwootAMBFileAttachment/
 # Should see amb.svg or similar
 ```
 
@@ -388,7 +388,7 @@ Check gulpfile.js includes icon copy task.
 {
   "n8n": {
     "nodes": [
-      "dist/nodes/ChatwootAMBTemplateMessage/ChatwootAMBTemplateMessage.node.js"
+      "dist/nodes/ChatwootAMBFileAttachment/ChatwootAMBFileAttachment.node.js"
     ]
   }
 }
