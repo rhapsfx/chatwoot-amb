@@ -195,7 +195,9 @@ class Templates::NameGeneratorService
     while shortcode_exists?(shortcode, account_id)
       # Calculate available space for counter
       suffix = "_#{counter}"
-      max_base_length = MAX_SHORTCODE_LENGTH - suffix.length
+      # Leave one extra char of buffer to ensure we don't hit exactly max length
+      max_base_length = MAX_SHORTCODE_LENGTH - suffix.length - 1
+      # Truncate the base shortcode to make room for the suffix
       base = base_shortcode[0...max_base_length]
       shortcode = "#{base}#{suffix}"
       counter += 1
@@ -220,7 +222,11 @@ class Templates::NameGeneratorService
                     0
 
     if title.present?
-      "Quick reply: #{truncate_description(title)} (#{replies_count} options)"
+      prefix = 'Quick reply: '
+      suffix = " (#{replies_count} options)"
+      max_title_length = 100 - prefix.length - suffix.length
+      truncated_title = truncate_description(title, max_title_length)
+      "#{prefix}#{truncated_title}#{suffix}"
     else
       "Quick reply with #{replies_count} options"
     end
@@ -238,7 +244,11 @@ class Templates::NameGeneratorService
     total_items = sections.sum { |s| s['items']&.count || 0 }
 
     if title.present?
-      "List picker: #{truncate_description(title)} (#{sections.count} sections, #{total_items} items)"
+      prefix = 'List picker: '
+      suffix = " (#{sections.count} sections, #{total_items} items)"
+      max_title_length = 100 - prefix.length - suffix.length
+      truncated_title = truncate_description(title, max_title_length)
+      "#{prefix}#{truncated_title}#{suffix}"
     else
       "List picker with #{sections.count} sections and #{total_items} items"
     end
@@ -255,7 +265,11 @@ class Templates::NameGeneratorService
                   0
 
     if title.present?
-      "Time picker: #{truncate_description(title)} (#{slots_count} time slots)"
+      prefix = 'Time picker: '
+      suffix = " (#{slots_count} time slots)"
+      max_title_length = 100 - prefix.length - suffix.length
+      truncated_title = truncate_description(title, max_title_length)
+      "#{prefix}#{truncated_title}#{suffix}"
     else
       "Time picker with #{slots_count} available time slots"
     end
@@ -269,7 +283,11 @@ class Templates::NameGeneratorService
     fields = message_data.dig('form', 'fields') || []
 
     if title.present?
-      "Form: #{truncate_description(title)} (#{fields.count} fields)"
+      prefix = 'Form: '
+      suffix = " (#{fields.count} fields)"
+      max_title_length = 100 - prefix.length - suffix.length
+      truncated_title = truncate_description(title, max_title_length)
+      "#{prefix}#{truncated_title}#{suffix}"
     else
       "Form with #{fields.count} fields"
     end
@@ -294,6 +312,8 @@ class Templates::NameGeneratorService
     text = text.to_s.strip
     return text if text.length <= max_length
 
-    "#{text[0...max_length]}..."
+    # Account for the '...' that will be added
+    truncate_at = max_length - 3
+    "#{text[0...truncate_at]}..."
   end
 end
