@@ -15,11 +15,13 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
     templates = templates.where(category: params[:category]) if params[:category].present?
 
     # Filter by status - default to active templates only
-    templates = if params[:status].present?
-                  templates.where(status: params[:status])
-                else
-                  templates.where.not(status: 'deprecated')
-                end
+    # Use status='all' to get all templates regardless of status (for uniqueness checks)
+    if params[:status].present? && params[:status] != 'all'
+      templates = templates.where(status: params[:status])
+    elsif params[:status] != 'all'
+      templates = templates.where.not(status: 'deprecated')
+    end
+    # If status='all', don't apply any status filter (templates remains unchanged)
 
     templates = templates.where('? = ANY(supported_channels)', params[:channel]) if params[:channel].present?
 

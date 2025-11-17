@@ -26,7 +26,11 @@ Rails.application.configure do
             channel.update!(webhook_url: new_webhook_url)
             Rails.logger.info "[Apple Messages for Business] Updated webhook URL for channel #{channel.id} (MSP: #{channel.msp_id}, Business: #{channel.business_id}): #{new_webhook_url}"
           end
+          
+          true # Explicitly return true to avoid nil being logged
         end
+        
+        nil # Suppress any return value from find_each
       rescue StandardError => e
         Rails.logger.error "[Apple Messages for Business] Error updating webhook URLs: #{e.message}"
       end

@@ -341,14 +341,19 @@ const handleClose = () => {
 // Load templates helper function
 const loadTemplates = async () => {
   try {
-    const response = await TemplatesAPI.get();
+    // Fetch ALL templates by requesting a large per_page value and including all statuses
+    // This ensures we check against all existing template names for uniqueness
+    // including deprecated ones to avoid name conflicts
+    const response = await TemplatesAPI.get({ per_page: 1000, status: 'all' });
     existingTemplates.value = response.data?.templates || [];
     // eslint-disable-next-line no-console
     console.log('[SaveAsTemplateModal] Templates loaded:', {
       count: existingTemplates.value.length,
+      total: response.data?.total,
       templates: existingTemplates.value.map(template => ({
         id: template.id,
         name: template.name,
+        status: template.status,
       })),
     });
   } catch (error) {

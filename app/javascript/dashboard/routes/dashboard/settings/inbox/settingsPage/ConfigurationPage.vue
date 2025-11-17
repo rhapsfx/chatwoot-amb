@@ -1358,7 +1358,7 @@ export default {
                 />
               </div>
 
-              <div>
+              <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                   {{ $t('INBOX_MGMT.SETTINGS_POPUP.IMESSAGE_APPS.APP_URL') }}
                 </label>

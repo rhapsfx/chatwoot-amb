@@ -166,6 +166,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
   def call_decode_payload(decrypted_data)
     Rails.logger.info '[AMB IDR] Calling /decodePayload to parse interactive data'
+    Rails.logger.info "[AMB IDR] Decrypted data size: #{decrypted_data.bytesize} bytes"
 
     # Headers from Python reference (lines 108-114)
     headers = {
@@ -193,8 +194,11 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
     # Parse the response - it should be JSON
     interactive_data = JSON.parse(response.body)
-    Rails.logger.info '[AMB IDR] Successfully decoded interactive data'
+    Rails.logger.info '[AMB IDR] Successfully decoded interactive data via /decodePayload'
     Rails.logger.info "[AMB IDR] Decoded data keys: #{interactive_data.keys.inspect}"
+
+    # COMPREHENSIVE DEBUG: Log the entire structure
+    log_interactive_data_structure(interactive_data, 'decodePayload response')
 
     # Remove image bitmaps to keep payload manageable (per Python reference line 159)
     interactive_data.delete('images') if interactive_data.key?('images')
@@ -208,6 +212,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
   def manual_decompress_and_parse(decrypted_data)
     Rails.logger.info '[AMB IDR] Manually decompressing gzipped data'
+    Rails.logger.info "[AMB IDR] Encrypted data size: #{decrypted_data.bytesize} bytes"
 
     # The decrypted data is gzip compressed, decompress it
     begin
@@ -220,11 +225,14 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       decompressed_data = decrypted_data
     end
 
+    # Log first bytes to identify format
+    Rails.logger.info "[AMB IDR] First 20 bytes: #{decompressed_data[0..19].inspect}"
+
     # The decompressed data should be binary plist or JSON
     begin
       # Check if it's a binary plist (starts with 'bplist')
       if decompressed_data.start_with?('bplist')
-        Rails.logger.info '[AMB IDR] Data is binary plist format, converting to JSON using plutil'
+        Rails.logger.info '[AMB IDR] Data is binary plist format, converting using plutil'
         interactive_data = convert_binary_plist_to_hash(decompressed_data)
         Rails.logger.info '[AMB IDR] Successfully parsed binary plist'
       else
@@ -237,6 +245,10 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       interactive_data.delete('images') if interactive_data.key?('images')
 
       Rails.logger.info "[AMB IDR] Parsed data keys: #{interactive_data.keys.inspect}"
+
+      # COMPREHENSIVE DEBUG: Log the entire structure
+      log_interactive_data_structure(interactive_data, 'manual parse')
+
       interactive_data
     rescue JSON::ParserError => e
       Rails.logger.error "[AMB IDR] Failed to parse as JSON: #{e.message}"
@@ -293,6 +305,15 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     end
 
     Rails.logger.info "[AMB IDR] Extracted plist keys: #{result.keys.inspect}"
+
+    # For NSKeyedArchiver format, decode the structure to extract form data
+    if result['$archiver'] == 'NSKeyedArchiver' && result['$objects'] && result['$top']
+      Rails.logger.info '[AMB IDR] Decoding NSKeyedArchiver structure for form data'
+      decoded = decode_nskeyedarchiver(result)
+      Rails.logger.info "[AMB IDR] Decoded NSKeyedArchiver keys: #{decoded.keys.inspect}"
+      return decoded
+    end
+
     result
   end
 
@@ -328,5 +349,298 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
   def self.process_idr_response(idr_data, channel)
     service = new(idr_data: idr_data, channel: channel)
     service.retrieve_and_decrypt
+  end
+
+  # Decode NSKeyedArchiver format to extract form data
+  # NSKeyedArchiver stores objects in $objects array with CF$UID references
+  def decode_nskeyedarchiver(archiver_data)
+    objects = archiver_data['$objects']
+    top = archiver_data['$top']
+
+    return {} unless objects && top
+
+    # Get root object
+    root_uid = top['root']
+    return {} unless root_uid && root_uid['CF$UID']
+
+    root_obj = resolve_uid(root_uid['CF$UID'], objects)
+
+    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object type: #{root_obj.class.name}"
+    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object keys: #{root_obj.keys.inspect}" if root_obj.is_a?(Hash)
+    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object sample: #{root_obj.inspect[0..500]}"
+
+    # Try to find NS.keys and NS.objects (NSKeyedArchiver dict format)
+    if root_obj.is_a?(Hash) && root_obj['NS.keys'].is_a?(Array) && root_obj['NS.objects'].is_a?(Array)
+      Rails.logger.info '[AMB IDR] Found NS.keys/NS.objects structure, resolving dictionary'
+      resolved_dict = resolve_ns_dictionary(root_obj, objects)
+      Rails.logger.info "[AMB IDR] Resolved dictionary keys: #{resolved_dict.keys.inspect}"
+
+      # Fully resolve all nested CF$UID references in the dictionary
+      fully_resolved = resolve_object_recursive(resolved_dict, objects, max_depth: 5)
+      Rails.logger.info "[AMB IDR] 🔍 DEBUG: Fully resolved dictionary keys: #{fully_resolved.keys.inspect}"
+
+      # Check if URL field contains form data
+      if fully_resolved.key?('URL')
+        url_value = fully_resolved['URL']
+        Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value type: #{url_value.class.name}"
+        Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value: #{url_value.inspect[0..500]}"
+
+        # Handle both string and dict formats
+        url_string = if url_value.is_a?(String)
+                       url_value
+                     elsif url_value.is_a?(Hash) && (url_value['NS.base'] || url_value['NS.relative'])
+                       # Fallback: manually combine NS.base and NS.relative if not already resolved
+                       base = url_value['NS.base']
+                       relative = url_value['NS.relative']
+                       if base.nil? || base == '$null' || base.to_s.empty?
+                         relative.to_s
+                       else
+                         "#{base}#{relative}"
+                       end
+                     end
+
+        if url_string.present? && url_string.include?('?')
+          # URL contains query parameters - likely form data
+          Rails.logger.info '[AMB IDR] Found URL with parameters, parsing for form data'
+          form_data = parse_url_encoded_form_data(url_string)
+          return form_data if form_data.present?
+        end
+      end
+
+      # Check if data field contains form data
+      if fully_resolved.key?('data')
+        data_value = fully_resolved['data']
+        Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value type: #{data_value.class.name}"
+        Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value: #{data_value.inspect[0..200]}"
+
+        if data_value.is_a?(String) && data_value.include?('?')
+          # Data is a URL string - parse it for form data
+          Rails.logger.info '[AMB IDR] Found URL string in data field, parsing for form data'
+          form_data = parse_url_encoded_form_data(data_value)
+          return form_data if form_data.present?
+        end
+      end
+
+      # Return fully resolved dictionary
+      return fully_resolved
+    end
+
+    # For forms, look for 'data' key in root object
+    if root_obj.is_a?(Hash) && root_obj.key?('data')
+      data_uid = root_obj['data']
+      data_obj = resolve_uid(data_uid['CF$UID'], objects) if data_uid.is_a?(Hash) && data_uid['CF$UID']
+
+      if data_obj.is_a?(String)
+        # Data is a URL string with encoded parameters - try to parse it
+        Rails.logger.info "[AMB IDR] Found URL string in data: #{data_obj[0..100]}"
+        return parse_url_encoded_form_data(data_obj)
+      elsif data_obj.is_a?(Hash)
+        # Data is an object - resolve it recursively
+        resolved_data = resolve_object_recursive(data_obj, objects, max_depth: 5)
+        return { 'data' => resolved_data }
+      end
+    end
+
+    # Fallback: return the raw archiver structure
+    Rails.logger.warn '[AMB IDR] Could not decode NSKeyedArchiver structure for form data'
+    archiver_data
+  end
+
+  # Resolve a CF$UID reference to the actual object
+  def resolve_uid(uid, objects)
+    return nil if uid.nil? || uid >= objects.length
+
+    objects[uid]
+  end
+
+  # Resolve NSKeyedArchiver dictionary format (NS.keys + NS.objects)
+  def resolve_ns_dictionary(dict_obj, objects)
+    keys = dict_obj['NS.keys'] || []
+    values = dict_obj['NS.objects'] || []
+
+    result = {}
+    keys.each_with_index do |key_ref, index|
+      key = if key_ref.is_a?(Hash) && key_ref['CF$UID']
+              resolve_uid(key_ref['CF$UID'], objects)
+            else
+              key_ref
+            end
+
+      value_ref = values[index]
+      value = if value_ref.is_a?(Hash) && value_ref['CF$UID']
+                resolve_uid(value_ref['CF$UID'], objects)
+              else
+                value_ref
+              end
+
+      result[key] = value if key
+    end
+    result
+  end
+
+  # Recursively resolve an object and its CF$UID references
+  def resolve_object_recursive(obj, objects, depth: 0, max_depth: 3)
+    return obj if depth >= max_depth
+    return obj unless obj.is_a?(Hash)
+
+    # If this is a CF$UID reference, resolve it
+    if obj.key?('CF$UID')
+      resolved = resolve_uid(obj['CF$UID'], objects)
+      return resolve_object_recursive(resolved, objects, depth: depth + 1, max_depth: max_depth)
+    end
+
+    # Resolve all values in the hash
+    result = {}
+    obj.each do |key, value|
+      result[key] = if value.is_a?(Hash)
+                      resolve_object_recursive(value, objects, depth: depth + 1, max_depth: max_depth)
+                    elsif value.is_a?(Array)
+                      value.map { |v| resolve_object_recursive(v, objects, depth: depth + 1, max_depth: max_depth) }
+                    else
+                      value
+                    end
+    end
+
+    # Special handling for NSURL objects (NS.base + NS.relative)
+    if result.key?('NS.base') && result.key?('NS.relative')
+      base = result['NS.base']
+      relative = result['NS.relative']
+
+      # Combine base and relative into full URL
+      # If base is "$null" or nil, just use relative
+      if base.nil? || base == '$null' || base.to_s.empty?
+        return relative.to_s
+      else
+        # Combine base and relative
+        return "#{base}#{relative}"
+      end
+    end
+
+    result
+  end
+
+  # Parse URL-encoded form data from NSKeyedArchiver URL string
+  def parse_url_encoded_form_data(url_string)
+    require 'uri'
+    require 'cgi'
+    require 'base64'
+    require 'json'
+
+    Rails.logger.info "[AMB IDR] 🔍 Parsing URL for form data: #{url_string[0..200]}"
+
+    # Extract query parameters
+    params = CGI.parse(url_string.sub(/^[^?]*\?/, ''))
+
+    Rails.logger.info "[AMB IDR] 🔍 URL params keys: #{params.keys.inspect}"
+    Rails.logger.info "[AMB IDR] 🔍 URL params: #{params.inspect[0..500]}"
+
+    # Look for form data in various possible parameters
+    form_selections = []
+
+    # Try to find form data in receivedMessage or replyMessage parameters
+    %w[receivedMessage replyMessage data selections].each do |param_key|
+      next unless params[param_key].present?
+
+      param_values = params[param_key]
+      param_values.each do |param_value|
+        begin
+          # Try base64 decode first
+          decoded = if param_value.include?('=') || param_value.length % 4 == 0
+                      Base64.decode64(param_value)
+                    else
+                      param_value
+                    end
+
+          # Try to parse as JSON
+          parsed = JSON.parse(decoded)
+          Rails.logger.info "[AMB IDR] 🔍 Decoded #{param_key}: #{parsed.inspect[0..500]}"
+
+          # Extract selections if present
+          if parsed.is_a?(Hash)
+            if parsed['selections'].present?
+              form_selections.concat(parsed['selections'])
+            elsif parsed['dynamic'].present? && parsed['dynamic']['selections'].present?
+              form_selections.concat(parsed['dynamic']['selections'])
+            end
+          elsif parsed.is_a?(Array)
+            form_selections.concat(parsed)
+          end
+        rescue JSON::ParserError, ArgumentError => e
+          Rails.logger.warn "[AMB IDR] Failed to parse #{param_key}: #{e.message}"
+        end
+      end
+    end
+
+    if form_selections.any?
+      Rails.logger.info "[AMB IDR] ✅ Extracted #{form_selections.length} form selections from URL"
+      Rails.logger.info "[AMB IDR] 🔍 Form selections: #{form_selections.inspect}"
+
+      # Return form data in the expected format
+      {
+        'data' => {
+          'dynamic' => {
+            'template' => 'messageForms',
+            'selections' => form_selections
+          }
+        }
+      }
+    else
+      Rails.logger.warn '[AMB IDR] No form selections found in URL parameters'
+      {}
+    end
+  end
+
+  # Comprehensively log the entire interactive data structure
+  # This helps identify where form selections and other data are actually located
+  def log_interactive_data_structure(data, source, prefix = '', depth = 0, max_depth = 10)
+    return if depth >= max_depth
+
+    case data
+    when Hash
+      Rails.logger.info "#{prefix}[AMB IDR] (#{source}) Hash with #{data.keys.length} keys: #{data.keys.inspect}"
+      data.each do |key, value|
+        value_preview = case value
+                        when Hash
+                          "{...#{value.keys.length} keys}"
+                        when Array
+                          "[...#{value.length} items]"
+                        when String
+                          value.length > 50 ? "\"#{value[0..50]}...\"" : "\"#{value}\""
+                        when NilClass
+                          'nil'
+                        else
+                          value.inspect
+                        end
+        Rails.logger.info "#{prefix}[AMB IDR] (#{source})   #{key}: #{value.class.name} = #{value_preview}"
+        log_interactive_data_structure(value, source, "#{prefix}  ", depth + 1, max_depth)
+      end
+    when Array
+      Rails.logger.info "#{prefix}[AMB IDR] (#{source}) Array with #{data.length} items"
+      data.each_with_index do |item, index|
+        item_preview = case item
+                       when Hash
+                         "{...#{item.keys.length} keys}"
+                       when Array
+                         "[...#{item.length} items]"
+                       when String
+                         item.length > 50 ? "\"#{item[0..50]}...\"" : "\"#{item}\""
+                       when NilClass
+                         'nil'
+                       else
+                         item.inspect
+                       end
+        Rails.logger.info "#{prefix}[AMB IDR] (#{source})   [#{index}]: #{item.class.name} = #{item_preview}"
+        log_interactive_data_structure(item, source, "#{prefix}  ", depth + 1, max_depth)
+      end
+    when String
+      truncated = data.length > 200 ? "#{data[0..200]}..." : data
+      Rails.logger.info "#{prefix}[AMB IDR] (#{source}) String(#{data.length} chars): #{truncated.inspect}"
+    when NilClass
+      Rails.logger.info "#{prefix}[AMB IDR] (#{source}) nil"
+    else
+      Rails.logger.info "#{prefix}[AMB IDR] (#{source}) #{data.class.name}: #{data.inspect}"
+    end
+  rescue StandardError => e
+    Rails.logger.error "#{prefix}[AMB IDR] (#{source}) Error logging structure: #{e.message}"
   end
 end

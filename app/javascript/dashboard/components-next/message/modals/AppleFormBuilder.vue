@@ -21,7 +21,17 @@ const emit = defineEmits([
   'save-as-template',
 ]);
 
-const { t } = useI18n();
+const { t: i18nT } = useI18n();
+
+// Safe translation wrapper to prevent vue-i18n parsing errors
+const t = (key, defaultValue = '') => {
+  try {
+    return i18nT(key);
+  } catch (error) {
+    // Return the key itself as fallback
+    return defaultValue || key.split('.').pop();
+  }
+};
 
 // Form builder state
 const formData = ref({
@@ -151,107 +161,117 @@ const styleOptions = [
 ];
 
 // Field types configuration - use computed to ensure i18n is ready
-const fieldTypes = computed(() => [
-  {
-    value: 'text',
-    label: t('APPLE_FORM.FIELD_TYPES.TEXT'),
-    icon: '📝',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT'),
-  },
-  {
-    value: 'textArea',
-    label: t('APPLE_FORM.FIELD_TYPES.TEXT_AREA'),
-    icon: '📄',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT_AREA'),
-  },
-  {
-    value: 'email',
-    label: t('APPLE_FORM.FIELD_TYPES.EMAIL'),
-    icon: '📧',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.EMAIL'),
-  },
-  {
-    value: 'phone',
-    label: t('APPLE_FORM.FIELD_TYPES.PHONE'),
-    icon: '📱',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.PHONE'),
-  },
-  {
-    value: 'singleSelect',
-    label: t('APPLE_FORM.FIELD_TYPES.SINGLE_CHOICE'),
-    icon: '🔘',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.SINGLE_CHOICE'),
-  },
-  {
-    value: 'multiSelect',
-    label: t('APPLE_FORM.FIELD_TYPES.MULTIPLE_CHOICE'),
-    icon: '☑️',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.MULTIPLE_CHOICE'),
-  },
-  {
-    value: 'dateTime',
-    label: t('APPLE_FORM.FIELD_TYPES.DATE_TIME'),
-    icon: '📅',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.DATE_TIME'),
-  },
-  {
-    value: 'toggle',
-    label: t('APPLE_FORM.FIELD_TYPES.TOGGLE'),
-    icon: '🔄',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TOGGLE'),
-  },
-  {
-    value: 'stepper',
-    label: t('APPLE_FORM.FIELD_TYPES.STEPPER'),
-    icon: '🔢',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.STEPPER'),
-  },
-  {
-    value: 'richLink',
-    label: t('APPLE_FORM.FIELD_TYPES.RICH_LINK'),
-    icon: '🔗',
-    description: t('APPLE_FORM.FIELD_DESCRIPTIONS.RICH_LINK'),
-  },
-]);
+const fieldTypes = computed(() => {
+  // Ensure i18n is fully loaded before accessing translations
+  if (!t) return [];
+
+  return [
+    {
+      value: 'text',
+      label: t('APPLE_FORM.FIELD_TYPES.TEXT'),
+      icon: '📝',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT'),
+    },
+    {
+      value: 'textArea',
+      label: t('APPLE_FORM.FIELD_TYPES.TEXT_AREA'),
+      icon: '📄',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT_AREA'),
+    },
+    {
+      value: 'email',
+      label: t('APPLE_FORM.FIELD_TYPES.EMAIL'),
+      icon: '📧',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.EMAIL'),
+    },
+    {
+      value: 'phone',
+      label: t('APPLE_FORM.FIELD_TYPES.PHONE'),
+      icon: '📱',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.PHONE'),
+    },
+    {
+      value: 'singleSelect',
+      label: t('APPLE_FORM.FIELD_TYPES.SINGLE_CHOICE'),
+      icon: '🔘',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.SINGLE_CHOICE'),
+    },
+    {
+      value: 'multiSelect',
+      label: t('APPLE_FORM.FIELD_TYPES.MULTIPLE_CHOICE'),
+      icon: '☑️',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.MULTIPLE_CHOICE'),
+    },
+    {
+      value: 'dateTime',
+      label: t('APPLE_FORM.FIELD_TYPES.DATE_TIME'),
+      icon: '📅',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.DATE_TIME'),
+    },
+    {
+      value: 'toggle',
+      label: t('APPLE_FORM.FIELD_TYPES.TOGGLE'),
+      icon: '🔄',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TOGGLE'),
+    },
+    {
+      value: 'stepper',
+      label: t('APPLE_FORM.FIELD_TYPES.STEPPER'),
+      icon: '🔢',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.STEPPER'),
+    },
+    {
+      value: 'richLink',
+      label: t('APPLE_FORM.FIELD_TYPES.RICH_LINK'),
+      icon: '🔗',
+      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.RICH_LINK'),
+    },
+  ];
+});
 
 // Form templates - use computed to ensure i18n is ready
-const formTemplates = computed(() => [
-  {
-    id: 'contact',
-    name: t('APPLE_FORM.TEMPLATES.CONTACT.NAME'),
-    description: t('APPLE_FORM.TEMPLATES.CONTACT.DESCRIPTION'),
-    icon: '👤',
-    fields: ['name', 'email', 'phone', 'message'],
-  },
-  {
-    id: 'feedback',
-    name: t('APPLE_FORM.TEMPLATES.FEEDBACK.NAME'),
-    description: t('APPLE_FORM.TEMPLATES.FEEDBACK.DESCRIPTION'),
-    icon: '⭐',
-    fields: ['rating', 'comments', 'recommend'],
-  },
-  {
-    id: 'appointment',
-    name: t('APPLE_FORM.TEMPLATES.APPOINTMENT.NAME'),
-    description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.DESCRIPTION'),
-    icon: '📅',
-    fields: ['name', 'date', 'service', 'notes'],
-  },
-  {
-    id: 'survey',
-    name: t('APPLE_FORM.TEMPLATES.SURVEY.NAME'),
-    description: t('APPLE_FORM.TEMPLATES.SURVEY.DESCRIPTION'),
-    icon: '📊',
-    fields: ['demographics', 'preferences', 'satisfaction'],
-  },
-  {
-    id: 'order',
-    name: t('APPLE_FORM.TEMPLATES.ORDER.NAME'),
-    description: t('APPLE_FORM.TEMPLATES.ORDER.DESCRIPTION'),
-    icon: '🛒',
-    fields: ['product', 'quantity', 'billing', 'terms'],
-  },
-]);
+const formTemplates = computed(() => {
+  // Ensure i18n is fully loaded before accessing translations
+  if (!t) return [];
+
+  return [
+    {
+      id: 'contact',
+      name: t('APPLE_FORM.TEMPLATES.CONTACT.NAME'),
+      description: t('APPLE_FORM.TEMPLATES.CONTACT.DESCRIPTION'),
+      icon: '👤',
+      fields: ['name', 'email', 'phone', 'message'],
+    },
+    {
+      id: 'feedback',
+      name: t('APPLE_FORM.TEMPLATES.FEEDBACK.NAME'),
+      description: t('APPLE_FORM.TEMPLATES.FEEDBACK.DESCRIPTION'),
+      icon: '⭐',
+      fields: ['rating', 'comments', 'recommend'],
+    },
+    {
+      id: 'appointment',
+      name: t('APPLE_FORM.TEMPLATES.APPOINTMENT.NAME'),
+      description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.DESCRIPTION'),
+      icon: '📅',
+      fields: ['name', 'date', 'service', 'notes'],
+    },
+    {
+      id: 'survey',
+      name: t('APPLE_FORM.TEMPLATES.SURVEY.NAME'),
+      description: t('APPLE_FORM.TEMPLATES.SURVEY.DESCRIPTION'),
+      icon: '📊',
+      fields: ['demographics', 'preferences', 'satisfaction'],
+    },
+    {
+      id: 'order',
+      name: t('APPLE_FORM.TEMPLATES.ORDER.NAME'),
+      description: t('APPLE_FORM.TEMPLATES.ORDER.DESCRIPTION'),
+      icon: '🛒',
+      fields: ['product', 'quantity', 'billing', 'terms'],
+    },
+  ];
+});
 
 // New field data
 const newField = ref({

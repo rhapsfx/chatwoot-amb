@@ -4,9 +4,9 @@ class AppleMessagesForBusiness::MerchantSessionService
   end
 
   def create_session
-    # NOTE: Always create real merchant sessions, even in test mode
-    # Test mode only affects payment processing in the payment gateway controller
-    # The merchant session must be real for Apple MSP to accept the payment request
+    # NOTE: Always create real merchant sessions (even in test mode)
+    # Test mode is for payment processing, not merchant session creation
+    # To send Apple Pay to device, we need valid merchant session from Apple
 
     validate_merchant_configuration
     return { error: 'Merchant configuration invalid' } unless merchant_configured?
@@ -18,7 +18,8 @@ class AppleMessagesForBusiness::MerchantSessionService
         success: true,
         session_data: session_data,
         expires_at: 5.minutes.from_now,
-        merchant_identifier: merchant_identifier
+        merchant_identifier: merchant_identifier,
+        test_mode: test_mode_enabled?  # Pass test mode flag to payment service
       }
     rescue StandardError => e
       {

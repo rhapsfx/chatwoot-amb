@@ -2,14 +2,16 @@
 
 class AppleMessagesForBusiness::AcousticHouseBotService
   IDLE_TIMEOUT = 30.minutes
+  
+  # Typing indicator configuration
+  # Set to false during development for faster testing
+  # Set to true in production for better user experience
+  TYPING_INDICATORS_ENABLED = false
+  TYPING_INDICATOR_DELAY = 1.5 # seconds
 
   # Keyword message routing
-  KEYWORD_HANDLERS = {
-    'menu' => :handle_menu,
-    'startover' => :handle_start_over,
-    'start over' => :handle_start_over,
-    'stop' => :handle_stop,
-    'summary' => :handle_summary,
+  # Keywords that trigger template demos (isolated, don't continue flow)
+  DEMO_KEYWORDS = {
     'list picker' => :handle_list_picker_demo,
     'listpicker' => :handle_list_picker_demo,
     'guitar' => :handle_list_picker_demo,
@@ -27,12 +29,34 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'augmented reality' => :handle_ar_demo
   }.freeze
 
+  # Keywords that control flow (reset, navigation, etc.)
+  FLOW_CONTROL_KEYWORDS = {
+    'menu' => :handle_menu,
+    'startover' => :handle_start_over,
+    'start over' => :handle_start_over,
+    'restart' => :handle_start_over,
+    'begin' => :handle_start_over,
+    'reset' => :handle_start_over,
+    'stop' => :handle_stop,
+    'summary' => :handle_summary,
+    'skip' => :handle_skip_payment,
+    'schedule' => :handle_schedule_lesson,
+    'schedule lesson' => :handle_schedule_lesson,
+    'lesson' => :handle_schedule_lesson
+  }.freeze
+
+  # Combined keyword handlers for backward compatibility
+  KEYWORD_HANDLERS = DEMO_KEYWORDS.merge(FLOW_CONTROL_KEYWORDS).freeze
+
   # Interactive response routing
   INTERACTIVE_HANDLERS = {
     'qr_travel' => :handle_region_selection,
-    'qr_name' => :handle_name_selection,
+    'qr_name' => :handle_name_preference_selection,
     'lp_guitar_0319' => :handle_guitar_selection,
+    'lp_store_selection' => :handle_store_selection,
+    'qr_store_selection' => :handle_store_selection_qr,
     'applepay_1018' => :handle_apple_pay_response,
+    'qr_skip_payment' => :handle_skip_payment,
     'time_0319' => :handle_time_picker_response,
     'qr_view_ar' => :handle_ar_view_response,
     'qr_place_ar' => :handle_ar_place_response,
@@ -95,10 +119,53 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                    selected_id = data.dig('quick-reply', 'selectedIdentifier')
                    Rails.logger.info "[Bot] 🎯 Quick reply detected - selectedIdentifier: #{selected_id}"
                    selected_id
-                 else
+                 elsif data['requestIdentifier'].present?
                    # Other interactive types use requestIdentifier
                    req_id = data['requestIdentifier']
                    Rails.logger.info "[Bot] 🎯 Interactive type detected - requestIdentifier: #{req_id}"
+                   req_id
+                 else
+                   # NSKeyedArchiver format doesn't have 'data' key
+                   # Infer requestIdentifier from bot state instead of searching old messages
+                   Rails.logger.info '[Bot] 🎯 NSKeyedArchiver format detected - inferring requestIdentifier from bot state'
+                   Rails.logger.info "[Bot] 🎯 Current bot state: #{@bot_state}"
+
+                   # Map bot states to expected request identifiers
+                   req_id = case @bot_state
+                            when 'AHA2'
+                              'qr_travel' # Region selection
+                            when 'AHB1'
+                              # Form response - but this shouldn't come through interactive path
+                              # Route it to form handler manually
+                              Rails.logger.info '[Bot] 🎯 Form response detected via NSKeyedArchiver - routing to form handler'
+                              handle_form_response
+                              return # Exit early, form handler already called
+                            when 'AHB2'
+                              'qr_name' # Name preference
+                            when 'AHC1'
+                              'lp_guitar_0319' # Guitar list picker
+                            when 'AHD1'
+                              'qr_view_ar' # AR view question
+                            when 'AHE1'
+                              'qr_place_ar' # AR place question
+                            when 'AHG2'
+                              'lp_store_selection' # Store selection list picker
+                            when 'AHH1'
+                              'time_0319' # Time picker
+                            when 'AHI1'
+                              'qr_continue' # Continue prompt
+                            when 'AHJ1'
+                              'qr_photo' # Photo question
+                            when 'AHK1'
+                              'qr_learn_more' # Learn more question
+                            when 'AHF1'
+                              'applepay_1018' # Apple Pay
+                            else
+                              Rails.logger.warn "[Bot] ⚠️ Unknown bot state for NSKeyedArchiver: #{@bot_state}"
+                              nil
+                            end
+
+                   Rails.logger.info "[Bot] 🎯 Inferred requestIdentifier from state #{@bot_state}: #{req_id}"
                    req_id
                  end
 
@@ -154,9 +221,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     return false if @message.content.blank?
 
     keyword = @message.content.downcase.strip
-    handler_method = KEYWORD_HANDLERS[keyword]
-
-    if handler_method
+    
+    # Check if it's a demo keyword (isolated template execution)
+    if DEMO_KEYWORDS.key?(keyword)
+      handler_method = DEMO_KEYWORDS[keyword]
+      send(handler_method)
+      # Set demo mode state to prevent flow continuation
+      update_bot_state('DEMO_MODE')
+      return true
+    end
+    
+    # Check if it's a flow control keyword
+    if FLOW_CONTROL_KEYWORDS.key?(keyword)
+      handler_method = FLOW_CONTROL_KEYWORDS[keyword]
       send(handler_method)
       return true
     end
@@ -167,6 +244,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # State machine flow
   def process_state
     Rails.logger.info "[Bot] ⚙️ process_state - Handling state: #{@bot_state}"
+    
+    # If in demo mode, don't process state - wait for reset keyword
+    if @bot_state == 'DEMO_MODE'
+      send_text_message("Type 'startover' to begin the full experience, or try another demo keyword (form, ar, list picker, etc.)")
+      return
+    end
+    
     case @bot_state
     when 'AHA1'
       handle_welcome
@@ -196,12 +280,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       handle_apple_pay_prompt
     when 'AHF1'
       handle_apple_pay_catcher
+    when 'AHF1_skip'
+      # Waiting for skip payment quick reply response
+      # No action needed - response will route through interactive handler
+      send_text_message("Please select 'Skip Payment' or 'Try Again' from the options above.")
     when 'AHF2'
       handle_lesson_introduction
     when 'AHF3'
       handle_location_request
     when 'AHG1'
       handle_location_response
+    when 'AHG2'
+      # Store selection state - waiting for list picker response
+      # Interactive handler will process the selection
+      send_text_message('Please select a store from the list above.')
     when 'AHH1'
       handle_time_picker_catcher
     when 'AHH2'
@@ -255,19 +347,35 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       request_id: 'qr_travel',
       items: [
         { title: 'Americas', value: 'Americas' },
-        { title: 'Europe', value: 'Europe' },
+        { title: 'EMEA', value: 'EMEA' },
         { title: 'Asia Pacific', value: 'Asia Pacific' }
       ]
     )
   end
 
   def handle_region_selection(interactive_data)
-    # Extract selected option from Apple quick reply format
-    quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
-    selected_index = quick_reply_data['selectedIndex']
-    items = quick_reply_data['items'] || []
+    Rails.logger.info "[Bot] 🌍 handle_region_selection called"
+    Rails.logger.info "[Bot] 🌍 interactive_data keys: #{interactive_data.keys.inspect}"
 
-    selection = items[selected_index]&.fetch('title', nil) if selected_index
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                  # NSKeyedArchiver format - extract title from $objects array
+                  objects = interactive_data['$objects'] || []
+                  # Find the selected region name in the objects array
+                  # Look for strings that match region names
+                  region_name = objects.find { |obj| obj.is_a?(String) && obj.match?(/Americas|EMEA|Asia Pacific/i) }
+                  Rails.logger.info "[Bot] 🌍 NSKeyedArchiver region selection: #{region_name}"
+                  region_name
+                else
+                  # Standard quick reply format
+                  quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                  selected_index = quick_reply_data['selectedIndex']
+                  items = quick_reply_data['items'] || []
+
+                  selected_title = items[selected_index]&.fetch('title', nil) if selected_index
+                  Rails.logger.info "[Bot] 🌍 Standard format region selection: #{selected_title}"
+                  selected_title
+                end
 
     update_conversation_attribute('region', selection)
 
@@ -286,11 +394,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       send_guitar_info_form
       update_bot_state('AHB1') # Wait for form response
     else
-      Rails.logger.info '[Bot] Device does not support FORM - skipping to guitar list'
-      send_text_message('Tell us about yourself!')
-      # Skip form and go directly to guitar list
-      update_bot_state('AHB3')
-      handle_guitar_list_prompt
+      Rails.logger.info '[Bot] Device does not support FORM - asking for name via text'
+      send_text_message("What's your name?")
+      # Skip form and ask for text name input
+      update_bot_state('AHB1_2') # Wait for text name input
     end
   end
 
@@ -301,38 +408,140 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     form_data = @message.content_attributes.dig('form_response', 'selections') || []
 
     Rails.logger.info "[Bot] 📝 Parsing form response with #{form_data.length} selections"
+    Rails.logger.info "[Bot] 📝 Full form_data structure: #{form_data.inspect}"
 
-    # Extract customer name (Full Name field - index 1)
-    full_name_section = form_data[1]
+    # Log each section to understand the structure
+    form_data.each_with_index do |section, index|
+      Rails.logger.info "[Bot] 📝 Section #{index}: #{section.inspect}"
+    end
+
+    # Extract customer name by matching field title (case-insensitive)
+    full_name_section = form_data.find { |section| section['title']&.downcase&.include?('full') && section['title']&.downcase&.include?('name') }
     customer_name = full_name_section&.dig('items', 0, 'value')
 
-    # Extract stage name (Stage Name field - index 2)
-    stage_name_section = form_data[2]
+    # Extract stage name by matching field title (case-insensitive)
+    stage_name_section = form_data.find { |section| section['title']&.downcase&.include?('stage') && section['title']&.downcase&.include?('name') }
     stage_name = stage_name_section&.dig('items', 0, 'value')
+
+    # Extract address information
+    address_data = extract_address_from_form(form_data)
+
+    Rails.logger.info "[Bot] 📝 Extracted customer_name: #{customer_name.inspect} (from '#{full_name_section&.dig('title')}' field)"
+    Rails.logger.info "[Bot] 📝 Extracted stage_name: #{stage_name.inspect} (from '#{stage_name_section&.dig('title')}' field)"
+    Rails.logger.info "[Bot] 📝 Extracted address: #{address_data.inspect}"
 
     # Store in conversation attributes
     update_conversation_attribute('customer_name', customer_name) if customer_name.present?
     update_conversation_attribute('stage_name', stage_name) if stage_name.present?
 
-    Rails.logger.info "[Bot] ✅ Form parsed - customer_name: #{customer_name}, stage_name: #{stage_name}"
+    # Store address information if found
+    if address_data.present?
+      update_conversation_attribute('delivery_address', address_data)
+    end
 
-    # Thank user and continue to guitar list
-    send_text_message("Thank you#{customer_name.present? ? ", #{customer_name}" : ''}!")
+    # Reload conversation to ensure attributes are fresh
+    @conversation.reload
 
-    update_bot_state('AHB3')
-    handle_guitar_list_prompt
+    Rails.logger.info "[Bot] ✅ Form parsed - customer_name: #{customer_name}, stage_name: #{stage_name}, address: #{address_data.present? ? 'Yes' : 'No'}"
+    Rails.logger.info "[Bot] ✅ Stored attributes: #{@conversation.custom_attributes.inspect}"
+
+    # Thank user - use generic message if both names present (we'll ask which to use next)
+    if customer_name.present? && stage_name.present?
+      # Both names present - don't assume which to use yet
+      send_text_message('Thank you for your submission!')
+    else
+      # Only one name - safe to use it
+      send_text_message("Thank you#{customer_name.present? ? ", #{customer_name}" : ''}!")
+    end
+
+    # Send delivery confirmation if address was provided
+    if address_data.present?
+      send_delivery_confirmation(address_data, customer_name)
+    end
+
+    # Ask for name preference via quick reply
+    update_bot_state('AHB2')
+    handle_name_preference_prompt
   end
 
   def handle_text_name_input
-    # Handle plain text name input
+    # Handle plain text name input (for devices without form support)
     customer_name = @message.content.strip
     update_conversation_attribute('customer_name', customer_name)
+
+    send_text_message("Thank you, #{customer_name}!")
+
+    # Skip name preference (no stage name to choose from) - go directly to guitar list
     update_bot_state('AHB3')
     handle_guitar_list_prompt
   end
 
-  def handle_name_preference_selection
-    # TODO: Handle name preference selection (real name vs stage name)
+  def handle_name_preference_prompt
+    # Ask user how they prefer to be addressed
+    customer_name = get_conversation_attribute('customer_name')
+    stage_name = get_conversation_attribute('stage_name')
+
+    Rails.logger.info "[Bot] 🏷️ handle_name_preference_prompt - customer_name: #{customer_name.inspect}, stage_name: #{stage_name.inspect}"
+    Rails.logger.info "[Bot] 🏷️ All conversation attributes: #{@conversation.custom_attributes.inspect}"
+
+    # If both names are present, ask for preference
+    if customer_name.present? && stage_name.present?
+      send_text_message('How would you prefer to be addressed?')
+      send_quick_reply(
+        title: 'Name Preference',
+        request_id: 'qr_name',
+        items: [
+          { title: customer_name, value: 'real_name' },
+          { title: stage_name, value: 'stage_name' }
+        ]
+      )
+    else
+      # Only one name available - skip to guitar list
+      Rails.logger.warn "[Bot] ⚠️ Skipping name preference - customer_name: #{customer_name.inspect}, stage_name: #{stage_name.inspect}"
+      update_bot_state('AHB3')
+      handle_guitar_list_prompt
+    end
+  end
+
+  def handle_name_preference_selection(interactive_data)
+    Rails.logger.info "[Bot] 🏷️ handle_name_preference_selection called"
+    Rails.logger.info "[Bot] 🏷️ interactive_data keys: #{interactive_data.keys.inspect}"
+
+    # Extract selected name - handle both standard format and NSKeyedArchiver
+    selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                  # NSKeyedArchiver format - extract title from $objects array
+                  objects = interactive_data['$objects'] || []
+                  # Find the selected name in the objects array (look for strings)
+                  name = objects.find { |obj| obj.is_a?(String) && obj.length > 1 && obj != '$null' && !obj.start_with?('NS') }
+                  Rails.logger.info "[Bot] 🏷️ NSKeyedArchiver name selection: #{name}"
+                  name
+                else
+                  # Standard quick reply format
+                  quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                  selected_index = quick_reply_data['selectedIndex']
+                  items = quick_reply_data['items'] || []
+
+                  selected_title = items[selected_index]&.fetch('title', nil) if selected_index
+                  Rails.logger.info "[Bot] 🏷️ Standard format name selection: #{selected_title}"
+                  selected_title
+                end
+
+    # Determine which name was selected
+    customer_name = get_conversation_attribute('customer_name')
+    stage_name = get_conversation_attribute('stage_name')
+
+    preferred_name = if selection == customer_name
+                       'real_name'
+                     elsif selection == stage_name
+                       'stage_name'
+                     else
+                       'real_name' # default
+                     end
+
+    update_conversation_attribute('preferred_name', preferred_name)
+
+    send_text_message("Great! I'll call you #{selection}.")
+
     update_bot_state('AHB3')
     handle_guitar_list_prompt
   end
@@ -376,13 +585,35 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_guitar_selection(interactive_data)
-    selection = interactive_data.dig('data', 'reply', 'title')
+    Rails.logger.info "[Bot] 🎸 handle_guitar_selection called"
+    Rails.logger.info "[Bot] 🎸 interactive_data keys: #{interactive_data.keys.inspect}"
+
+    # Extract selection from interactive data
+    # For list picker responses from IDR, the selection is in the 'ldtext' field
+    selection = if interactive_data['ldtext'].present?
+                  # Resolved NSKeyedArchiver/IDR format - selection is in ldtext
+                  guitar_name = interactive_data['ldtext']
+                  Rails.logger.info "[Bot] 🎸 IDR format guitar selection (ldtext): #{guitar_name}"
+                  guitar_name
+                elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
+                  # Raw NSKeyedArchiver format - extract from $objects array
+                  objects = interactive_data['$objects'] || []
+                  guitar_name = objects.find { |obj| obj.is_a?(String) && obj.match?(/guitar|stratocaster|les paul|dreadnought|gibson|fender|martin/i) }
+                  Rails.logger.info "[Bot] 🎸 NSKeyedArchiver guitar selection: #{guitar_name}"
+                  guitar_name
+                else
+                  # Standard format
+                  guitar_name = interactive_data.dig('data', 'reply', 'title')
+                  Rails.logger.info "[Bot] 🎸 Standard format guitar selection: #{guitar_name}"
+                  guitar_name
+                end
+
     update_conversation_attribute('selected_guitar', selection)
     reset_retry_count
 
     send_text_message("Great choice! You selected #{selection}.")
-    update_bot_state('AHC2')
-    handle_ar_introduction
+    update_bot_state('AHE2')
+    handle_apple_pay_prompt
   end
 
   def auto_select_guitar(guitar_name)
@@ -397,9 +628,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     update_bot_state('AHC3')
 
-    # Wait 20 seconds then proceed to AHC3
-    # Note: In production, this would be a scheduled job
-    # For now, we'll proceed immediately
+    # Wait even longer for AR file to upload and be delivered before asking question
+    # AR file has 2s delay in after_commit + network latency
+    # Need minimum 5s to ensure file arrives before question
+    sleep(5.5)
     handle_ar_first_question
   end
 
@@ -416,17 +648,32 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_view_response(interactive_data)
     # AHD1: AR view response
-    selection_value = interactive_data.dig('data', 'reply', 'identifier')
+    Rails.logger.info "[Bot] 🎨 handle_ar_view_response called"
+    Rails.logger.info "[Bot] 🎨 interactive_data keys: #{interactive_data.keys.inspect}"
 
-    if selection_value == '111' # Yes
-      # User clicked and saw AR view
-      customer_name = get_conversation_attribute('customer_name') || 'there'
-      send_text_message("Awesome! #{customer_name} did you select AR from the top of the image and set it down in front of you?")
-    else
-      # User didn't see AR view
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection_value = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                        # NSKeyedArchiver format - check for Yes/No in objects
+                        objects = interactive_data['$objects'] || []
+                        response = objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
+                        Rails.logger.info "[Bot] 🎨 NSKeyedArchiver AR response: #{response}"
+                        response&.downcase == 'yes' ? '111' : '222'
+                      else
+                        # Standard quick reply format - use selectedIndex to determine Yes (0) or No (1)
+                        quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                        selected_index = quick_reply_data['selectedIndex']
+
+                        # selectedIndex: 0 = Yes (111), 1 = No (222)
+                        identifier = selected_index == 0 ? '111' : '222'
+                        Rails.logger.info "[Bot] 🎨 Standard format AR response - selectedIndex: #{selected_index}, mapped to: #{identifier}"
+                        identifier
+                      end
+
+    if selection_value == '222' # No - User didn't see AR view
       send_text_message('Try tapping on the image to see the AR image of the guitar!')
-      send_text_message('Did you select AR from the top of the image and set it down in front of you?')
     end
+
+    # Send the AR placement question (with quick reply) - no need for duplicate text message
     send_ar_place_question
 
     update_bot_state('AHE1')
@@ -434,16 +681,31 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_place_response(interactive_data)
     # AHE1: AR place response
-    selection_value = interactive_data.dig('data', 'reply', 'identifier')
+    Rails.logger.info "[Bot] 🎨 handle_ar_place_response called"
+
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection_value = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                        # NSKeyedArchiver format - check for Yes/No in objects
+                        objects = interactive_data['$objects'] || []
+                        response = objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
+                        response&.downcase == 'yes' ? '111' : '222'
+                      else
+                        # Standard quick reply format - use selectedIndex to determine Yes (0) or No (1)
+                        quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                        selected_index = quick_reply_data['selectedIndex']
+
+                        # selectedIndex: 0 = Yes (111), 1 = No (222)
+                        selected_index == 0 ? '111' : '222'
+                      end
+
+    Rails.logger.info "[Bot] 🎨 AR place response - selection_value: #{selection_value}"
 
     send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - they didn't place AR
 
-    # Always proceed to Apple Pay
-    guitar_name = get_conversation_attribute('selected_guitar') || 'guitar'
-    send_text_message("Great, let's buy your new #{guitar_name}.")
-
-    update_bot_state('AHE2')
-    handle_apple_pay_prompt
+    # AR is at the end of flow, proceed to summary
+    send_text_message("We've thrown a handful of Messages for Business features at you today. Check out what you saw.")
+    update_bot_state('AHK1')
+    handle_summary
   end
 
   def handle_apple_pay_prompt
@@ -456,8 +718,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       update_bot_state('AHF1')
     else
       send_text_message('We are experiencing some technical difficulties with our Apple Pay service. We apologize for this inconvenience and we are working on a fix.')
-      update_bot_state('AHF2')
-      handle_lesson_introduction
+      send_text_message('You can skip the payment for now and continue with the demo.')
+
+      # Offer skip option via quick reply
+      send_quick_reply(
+        title: 'Skip Payment?',
+        request_id: 'qr_skip_payment',
+        items: [
+          { title: 'Skip Payment', value: 'skip' },
+          { title: 'Try Again', value: 'retry' }
+        ]
+      )
+
+      update_bot_state('AHF1_skip')
     end
   end
 
@@ -480,10 +753,60 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_apple_pay_response(interactive_data)
     # Handle Apple Pay completion
-    payment_status = interactive_data.dig('data', 'payment', 'status')
+    payment_state = interactive_data.dig('data', 'payment', 'state')
 
-    send_text_message('Payment received! (Just kidding - this is a demo)') if payment_status == 'success'
+    Rails.logger.info "[Bot] 💳 Apple Pay response - state: #{payment_state}"
 
+    if payment_state == 'paid'
+      customer_name = get_conversation_attribute('customer_name') || 'there'
+      send_text_message("Just kidding #{customer_name}. We wouldn't process a payment for this demo.")
+    else
+      send_text_message('Payment was not completed. Let\'s continue with the demo.')
+    end
+
+    reset_retry_count
+    update_bot_state('AHF2')
+    handle_lesson_introduction
+  end
+
+  def handle_skip_payment(_interactive_data = nil)
+    # Handle skip payment request - can be called from quick reply or keyword
+    Rails.logger.info "[Bot] 💳 Skip payment requested"
+
+    # Only allow skip if we're in a payment-related state
+    unless ['AHF1', 'AHF1_skip', 'AHE2'].include?(@bot_state)
+      send_text_message("The 'skip' command is only available during payment processing.")
+      return
+    end
+
+    # Check if this is a quick reply response (has interactive_data)
+    if _interactive_data.present?
+      # Extract selected option - handle both standard format and NSKeyedArchiver
+      selection = if _interactive_data['$archiver'] == 'NSKeyedArchiver'
+                    # NSKeyedArchiver format - extract title from $objects array
+                    objects = _interactive_data['$objects'] || []
+                    objects.find { |obj| obj.is_a?(String) && obj.match?(/skip|try|retry/i) }
+                  else
+                    # Standard quick reply format
+                    quick_reply_data = _interactive_data.dig('data', 'quick-reply') || {}
+                    selected_index = quick_reply_data['selectedIndex']
+                    items = quick_reply_data['items'] || []
+
+                    items[selected_index]&.fetch('title', nil) if selected_index
+                  end
+
+      Rails.logger.info "[Bot] 💳 Skip payment selection: #{selection}"
+
+      # If user selected "Try Again", retry payment
+      if selection&.match?(/try|retry/i)
+        send_text_message('Retrying payment...')
+        handle_apple_pay_prompt
+        return
+      end
+    end
+
+    # Skip payment and continue
+    send_text_message('No problem! Skipping payment and continuing with the demo.')
     reset_retry_count
     update_bot_state('AHF2')
     handle_lesson_introduction
@@ -521,7 +844,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if intent == 'Traveling'
       send_text_message('We can find a few locations near your travel destination, just provide us with the zipcode.')
     else
-      send_text_message('We can find the closest location for you, just message us your zipcode. Where are you?')
+      send_text_message('We can find the closest location for you, just message us your zipcode and city. Where are you?')
     end
 
     update_bot_state('AHG1')
@@ -531,30 +854,100 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # AHG1: Process location input (zipcode or Apple Maps link)
     user_message = @message.content.strip
 
+    # Initialize Apple Maps service
+    maps_service = AppleMessagesForBusiness::AppleMapsService.new
+
+    # Extract coordinates from input
+    coordinates = nil
+
     # Check if Apple Maps link
     if user_message.include?('maps.apple.com')
-      match = user_message.match(/ll=([-\d.]+),([-\d.]+)/)
+      coordinates = maps_service.extract_coordinates_from_url(user_message)
+      if coordinates
+        Rails.logger.info "[Bot] 📍 Extracted coordinates from Apple Maps link: #{coordinates.inspect}"
+      else
+        Rails.logger.warn "[Bot] ⚠️ Failed to extract coordinates from Apple Maps URL: #{user_message}"
+      end
+    end
 
-      if match
-        location = {
-          name: 'Selected Location',
-          latitude: match[1].to_f,
-          longitude: match[2].to_f,
-          timezone_offset: '-0800'
+    # If not a maps link or extraction failed, try geocoding as zipcode/address
+    if coordinates.nil?
+      Rails.logger.info "[Bot] 📍 Attempting geocoding for: '#{user_message}'"
+      geocode_result = maps_service.geocode(user_message)
+
+      if geocode_result
+        coordinates = {
+          latitude: geocode_result[:latitude],
+          longitude: geocode_result[:longitude]
         }
+        Rails.logger.info "[Bot] 📍 Geocoded '#{user_message}' to: #{coordinates.inspect}"
+      else
+        # Geocoding failed - provide helpful message based on region
+        region = get_conversation_attribute('region')
+        Rails.logger.warn "[Bot] ⚠️ Geocoding failed for: '#{user_message}'"
 
-        send_text_message("Great! Here are available times at #{location[:name]}.")
-        send_lesson_time_picker(location)
-        update_bot_state('AHH1')
-        reset_retry_count
+        if region == 'EMEA'
+          send_text_message("I couldn't find that postal code. Please try again with your city and country (e.g., '#{user_message} Paris, France' or '78120 Rambouillet, France').")
+        else
+          send_text_message("I couldn't find that location. Please try again with more details like your city or full address.")
+        end
+
+        # Stay in same state to wait for better input
         return
       end
     end
 
-    # Try geocoding zipcode (MVP: hardcoded lookup)
-    location = geocode_zipcode(user_message)
+    # If we have coordinates, search for nearby Apple Stores
+    if coordinates
+      Rails.logger.info "[Bot] 🔍 Searching for Apple Stores near: #{coordinates.inspect}"
+      stores = maps_service.search_nearby(
+        coordinates[:latitude],
+        coordinates[:longitude],
+        'Apple Store',
+        radius: 50_000 # 50 km
+      )
 
+      if stores.present?
+        Rails.logger.info "[Bot] 🏪 Found #{stores.length} Apple Stores nearby"
+
+        # Route based on number of stores found
+        case stores.length
+        when 1
+          # Single store: Send as Apple Maps rich link and proceed to time picker
+          send_single_store_rich_link(stores.first, coordinates)
+        when 2..5
+          # 2-5 stores: Send as quick reply buttons
+          send_store_quick_reply(stores, coordinates)
+          update_bot_state('AHG2') # Wait for selection
+        else
+          # 6+ stores: Send as list picker
+          send_store_selection_list_picker(stores, coordinates)
+          update_bot_state('AHG2') # Wait for selection
+        end
+
+        reset_retry_count
+        return
+      else
+        Rails.logger.warn "[Bot] ⚠️ Search returned 0 stores near: #{coordinates.inspect}"
+      end
+    else
+      Rails.logger.warn "[Bot] ⚠️ No coordinates available after URL parsing and geocoding"
+    end
+
+    # Fallback: No coordinates or no stores found
+    Rails.logger.warn "[Bot] ⚠️ Could not find Apple Stores, falling back to Apple Park"
+    location = LOCATION_DATABASE['95014']
     send_text_message('We were unable to locate your nearest Apple Store, so here are the available times at Apple Park.')
+    send_lesson_time_picker(location)
+    update_bot_state('AHH1')
+    reset_retry_count
+  rescue StandardError => e
+    Rails.logger.error "[Bot] ❌ Error in handle_location_response: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+
+    # Fallback on error
+    location = LOCATION_DATABASE['95014']
+    send_text_message('We encountered an error finding stores nearby. Here are the available times at Apple Park.')
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
     reset_retry_count
@@ -585,15 +978,22 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_time_picker_response(_interactive_data)
     # Handle time picker selection
-    selected_timeslot = _interactive_data.dig('data', 'timeslot')
+    # Extract timeslot from event.timeslots array
+    timeslots = _interactive_data.dig('data', 'event', 'timeslots')
+    selected_timeslot = timeslots&.first
+
+    Rails.logger.info "[Bot] handle_time_picker_response - timeslots: #{timeslots.inspect}"
+    Rails.logger.info "[Bot] handle_time_picker_response - selected_timeslot: #{selected_timeslot.inspect}"
 
     if selected_timeslot
+      # Save the full timeslot data including startTime and identifier
       update_conversation_attribute('selected_timeslot', selected_timeslot)
       reset_retry_count
       update_bot_state('AHH2')
       handle_continue_prompt
     else
       # Invalid response, retry
+      Rails.logger.warn "[Bot] No timeslot found in time picker response"
       handle_time_picker_catcher
     end
   end
@@ -617,7 +1017,22 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_continue_response(_interactive_data)
     # AHI1: Route based on continue response
-    selection_identifier = _interactive_data.dig('data', 'reply', 'identifier')
+    Rails.logger.info "[Bot] 🎯 handle_continue_response called"
+
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection_identifier = if _interactive_data['$archiver'] == 'NSKeyedArchiver'
+                             # NSKeyedArchiver format - check for Yes/No in objects
+                             objects = _interactive_data['$objects'] || []
+                             response = objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
+                             response&.downcase == 'yes' ? '111' : '222'
+                           else
+                             # Standard quick reply format - use selectedIndex to determine Yes (0) or No (1)
+                             quick_reply_data = _interactive_data.dig('data', 'quick-reply') || {}
+                             selected_index = quick_reply_data['selectedIndex']
+
+                             # selectedIndex: 0 = Yes (111), 1 = No (222)
+                             selected_index == 0 ? '111' : '222'
+                           end
 
     if selection_identifier == '222' # No
       # Skip to learn more (Phase 4)
@@ -715,6 +1130,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # AHK1: Summary list picker
     send_summary_list_picker
     update_bot_state('AHK2')
+
+    # Wait for list picker to be delivered before sending final message
+    # List picker needs time to be sent and rendered on device
+    sleep(3.0)
     handle_final_message
   end
 
@@ -773,10 +1192,24 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_text_message("Bot stopped. Type 'startover' to restart.")
   end
 
+  def handle_schedule_lesson
+    # Handle schedule/lesson keyword - replay from location request
+    Rails.logger.info '[Bot] 📅 Schedule lesson requested via keyword'
+
+    # Reset any retry counts
+    reset_retry_count
+
+    # Ask for location again
+    guitar = get_conversation_attribute('selected_guitar') || 'guitar'
+    send_text_message("Let's schedule a lesson with your #{guitar}!")
+    handle_location_request
+  end
+
   def handle_list_picker_demo
+    # Demo mode: just show the list picker, don't continue flow
     send_text_message('Here are some amazing guitars:')
     send_guitar_list_picker
-    update_bot_state('AHC1') # Set state to wait for guitar selection
+    # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_time_picker_demo
@@ -784,15 +1217,29 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_apple_pay_demo
-    send_text_message('Apple Pay demo coming soon!')
+    # Demo mode: send Apple Pay request with demo item
+    send_text_message('Here\'s an Apple Pay payment request:')
+
+    result = send_apple_pay_request('Demo Guitar - Fender Stratocaster')
+
+    unless result[:success]
+      send_text_message('Apple Pay is currently unavailable. Please try again later.')
+    end
+    # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_form_demo
-    send_text_message('Form demo coming soon!')
+    # Demo mode: just show the form, don't continue flow
+    send_text_message('Here\'s our guitar information form:')
+    send_guitar_info_form
+    # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_ar_demo
-    send_text_message('AR demo coming soon!')
+    # Demo mode: just show AR content, don't continue flow
+    send_text_message('Check out our AR experience:')
+    send_ar_file
+    # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_menu_selection(_interactive_data)
@@ -800,12 +1247,25 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_learn_more_response(interactive_data)
-    selection = interactive_data.dig('data', 'reply', 'title')
+    Rails.logger.info "[Bot] 📚 handle_learn_more_response called"
 
-    send_text_message('Please connect with your Apple rep for more information.') if selection == 'Yes'
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                  # NSKeyedArchiver format - extract title from $objects array
+                  objects = interactive_data['$objects'] || []
+                  objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
+                else
+                  # Standard quick reply format
+                  quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                  selected_index = quick_reply_data['selectedIndex']
+                  items = quick_reply_data['items'] || []
 
-    # Always show summary regardless of selection
-    send_text_message("We've thrown a handful of Messages for Business features at you today. Check out what you saw.")
+                  items[selected_index]&.fetch('title', nil) if selected_index
+                end
+
+    send_text_message('Please connect with your Apple rep for more information.') if selection&.match?(/yes/i)
+
+    # Go to summary at the end
     update_bot_state('AHK1')
     handle_summary
   end
@@ -813,42 +1273,47 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # === Helper Methods ===
 
   def send_text_message(content)
-    Messages::MessageBuilder.new(
-      bot_user,
-      @conversation,
-      {
-        message_type: :outgoing,
-        content: content
-      }
-    ).perform
+    with_typing_indicator do
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: content
+        )
+      ).perform
+    end
   end
 
   def send_quick_reply(title:, request_id:, items:)
     Rails.logger.info "[Bot] 📤 Sending quick reply: #{title} (request_id: #{request_id})"
     Rails.logger.info "[Bot] 📤 Called from: #{caller[0..3].join("\n")}"
-    # Create outgoing message with quick reply content
-    # NOTE: SendReplyJob will automatically send this to Apple MSP via after_create callback
-    Messages::MessageBuilder.new(
-      bot_user,
-      @conversation,
-      {
-        message_type: :outgoing,
-        content: title,
-        content_type: 'apple_quick_reply',
-        content_attributes: {
-          'request_identifier' => request_id,
-          'summary_text' => title,
-          'received_title' => title,
-          'reply_title' => 'Selected: ${item.title}',
-          'items' => items.map do |item|
-            {
-              'title' => item[:title],
-              'identifier' => request_id
-            }
-          end
-        }
-      }
-    ).perform
+    
+    with_typing_indicator do
+      # Create outgoing message with quick reply content
+      # NOTE: SendReplyJob will automatically send this to Apple MSP via after_create callback
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: title,
+          content_type: 'apple_quick_reply',
+          content_attributes: {
+            'request_identifier' => request_id,
+            'summary_text' => title,
+            'received_title' => title,
+            'reply_title' => 'Selected: ${item.title}',
+            'items' => items.map do |item|
+              {
+                'title' => item[:title],
+                'identifier' => request_id
+              }
+            end
+          }
+        )
+      ).perform
+    end
 
     # Message will be automatically sent by SendReplyJob (after_create callback)
     # No need to manually call SendQuickReplyService
@@ -940,26 +1405,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
 
     # Create outgoing message with list picker content including images
-    message = Messages::MessageBuilder.new(
-      bot_user,
+    # NOTE: Message will be automatically sent via after_commit callback
+    # which routes to SendListPickerService based on content_type
+    Messages::MessageBuilder.new(
+      message_sender,
       @conversation,
-      {
+      bot_message_params(
         message_type: :outgoing,
         content: 'Select a guitar',
         content_type: 'apple_list_picker',
         content_attributes: content_attrs
-      }
-    ).perform
-
-    # Use SendListPickerService to send to Apple MSP
-    channel = @conversation.inbox.channel
-    contact_inbox = @conversation.contact_inbox
-    destination_id = contact_inbox.source_id
-
-    AppleMessagesForBusiness::SendListPickerService.new(
-      channel: channel,
-      destination_id: destination_id,
-      message: message
+      )
     ).perform
   rescue StandardError => e
     Rails.logger.error "[Bot] Failed to send guitar list picker: #{e.message}"
@@ -1005,34 +1461,44 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Use the specific form template by ID
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 343
+      id: 356
     )
 
     unless template
-      Rails.logger.error '[Bot] Guitar Info Form template (ID: 343) not found - falling back to guitar list'
+      Rails.logger.error '[Bot] Guitar Info Form template (ID: 356) not found - falling back to guitar list'
       # Fallback: skip to guitar list if form template doesn't exist
       update_bot_state('AHB3')
       handle_guitar_list_prompt
       return
     end
 
-    Rails.logger.info "[Bot] Sending Guitar Info Form (ID: 343, Name: #{template.name})"
+    Rails.logger.info "[Bot] Sending Guitar Info Form (ID: 356, Name: #{template.name})"
 
-    # Extract content attributes and add request_identifier
-    content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
-    content_attrs['request_identifier'] = 'form_0343' if content_attrs['request_identifier'].blank?
+    # Use BotRendererService to properly render the template
+    renderer = Templates::BotRendererService.new(
+      template_id: 356,
+      parameters: {},
+      channel_type: 'apple_messages_for_business'
+    )
+    
+    rendered = renderer.render_for_bot
+    
+    # Add request_identifier for proper routing
+    rendered[:content_attributes]['request_identifier'] = 'form_0343' if rendered[:content_attributes]['request_identifier'].blank?
 
     # Create outgoing message with form content
-    Messages::MessageBuilder.new(
-      bot_user,
-      @conversation,
-      {
-        message_type: :outgoing,
-        content: template.metadata.dig('apple_message_content', 'title') || 'Guitar Info Form',
-        content_type: 'apple_form',
-        content_attributes: content_attrs
-      }
-    ).perform
+    with_typing_indicator do
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: rendered[:content],
+          content_type: rendered[:content_type],
+          content_attributes: rendered[:content_attributes]
+        )
+      ).perform
+    end
 
     # Form will be automatically sent via SendReplyJob callback
     Rails.logger.info '[Bot] Guitar Info Form sent successfully'
@@ -1045,43 +1511,48 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_summary_list_picker
-    # Get summary list picker template
+    # Get summary list picker template by ID
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      name: 'Summary List Picker'
+      id: 355
     )
 
     unless template
-      Rails.logger.error '[Bot] Summary List Picker template not found'
+      Rails.logger.error '[Bot] Summary List Picker template (ID: 355) not found'
       send_text_message('Summary temporarily unavailable.')
       return
     end
+
+    Rails.logger.info "[Bot] Sending Summary List Picker (ID: 355, Name: #{template.name})"
 
     # Create outgoing message with list picker content
     content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
     # Add request_identifier for proper routing (summary list picker doesn't need a handler)
     content_attrs['request_identifier'] = 'lp_summary_0319' if content_attrs['request_identifier'].blank?
 
-    message = Messages::MessageBuilder.new(
-      bot_user,
+    # Clean up images array - remove invalid keys (size, preview, originalName)
+    if content_attrs['images'].is_a?(Array)
+      content_attrs['images'] = content_attrs['images'].map do |image|
+        # Only keep allowed keys: identifier, data, description
+        {
+          'identifier' => image['identifier'],
+          'data' => image['data'],
+          'description' => image['description']
+        }.compact
+      end
+    end
+
+    # NOTE: Message will be automatically sent via after_commit callback
+    # which routes to SendListPickerService based on content_type
+    Messages::MessageBuilder.new(
+      message_sender,
       @conversation,
-      {
+      bot_message_params(
         message_type: :outgoing,
         content: 'Feature Sheet',
         content_type: 'apple_list_picker',
         content_attributes: content_attrs
-      }
-    ).perform
-
-    # Use SendListPickerService to send to Apple MSP
-    channel = @conversation.inbox.channel
-    contact_inbox = @conversation.contact_inbox
-    destination_id = contact_inbox.source_id
-
-    AppleMessagesForBusiness::SendListPickerService.new(
-      channel: channel,
-      destination_id: destination_id,
-      message: message
+      )
     ).perform
   rescue StandardError => e
     Rails.logger.error "[Bot] Failed to send summary list picker: #{e.message}"
@@ -1089,29 +1560,74 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_ar_file
-    # Send stratocaster.usdz file as attachment
-    # For Phase 2, we'll use a placeholder approach
-    # The actual USDZ file should be stored in ActiveStorage
+    # Use template 344 for AR content
+    template = MessageTemplate.find_by(
+      account_id: @conversation.account_id,
+      id: 344
+    )
 
-    # NOTE: In production, you would:
-    # 1. Store stratocaster.usdz in ActiveStorage
-    # 2. Attach it to a message
-    # 3. Send via SendMessageService with attachments
+    unless template
+      Rails.logger.error '[Bot] AR template (ID: 344) not found - sending placeholder'
+      send_text_message('[AR File: Template 344 not found]')
+      return
+    end
 
-    Rails.logger.info '[Bot] Sending AR file (stratocaster.usdz)'
-    send_text_message('[AR File: stratocaster.usdz would be sent here]')
+    Rails.logger.info "[Bot] 🎸 Sending AR content (ID: 344, Name: #{template.name})"
 
-    # TODO: Implement actual AR file sending via ActiveStorage
-    # Example:
-    # message = Messages::MessageBuilder.new(
-    #   bot_user,
-    #   @conversation,
-    #   {
-    #     message_type: :outgoing,
-    #     content: '',
-    #     attachments: [...]
-    #   }
-    # ).perform
+    # Check if template has AR file attached
+    unless template.attachments.attached?
+      Rails.logger.error '[Bot] AR template has no attachments - sending placeholder'
+      send_text_message('[AR File: No AR file attached to template]')
+      return
+    end
+
+    with_typing_indicator do
+      # Build message params
+      sender = message_sender
+      params = bot_message_params(
+        message_type: :outgoing,
+        content: 'Check out this guitar in AR!',
+        content_type: 'text',
+        account_id: @conversation.account_id,
+        inbox_id: @conversation.inbox_id,
+        conversation_id: @conversation.id
+      )
+      params[:sender] = sender
+
+      # Create message WITHOUT saving (build, not create)
+      message = @conversation.messages.build(params)
+
+      # Copy AR file attachment(s) from template BEFORE saving message
+      template.attachments.each do |template_attachment|
+        # Download the file from template's ActiveStorage
+        file_data = template_attachment.download
+
+        # Create new attachment for the message
+        message_attachment = message.attachments.build(
+          account_id: message.account_id,
+          file_type: :file
+        )
+
+        # Attach the file
+        message_attachment.file.attach(
+          io: StringIO.new(file_data),
+          filename: template_attachment.filename.to_s,
+          content_type: template_attachment.content_type
+        )
+
+        Rails.logger.info "[Bot] 🎸 Attached AR file: #{template_attachment.filename} (#{template_attachment.content_type})"
+      end
+
+      # NOW save the message - this triggers after_commit with attachments already present
+      # The after_commit will see attachments and wait 2 seconds before sending
+      message.save!
+
+      Rails.logger.info "[Bot] 🎸 AR message saved with #{message.attachments.count} attachment(s)"
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send AR file: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    send_text_message('[AR File: Error sending AR content]')
   end
 
   def send_ar_view_question
@@ -1139,37 +1655,44 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_apple_pay_request(guitar_name)
-    # Send Apple Pay request for the selected guitar
-    channel = @conversation.inbox.channel
-    contact_inbox = @conversation.contact_inbox
-    destination_id = contact_inbox.source_id
-
-    payment_data = {
-      'request_identifier' => 'applepay_1018',
-      'merchant_name' => 'Acoustic House',
-      'currency_code' => 'USD',
-      'country_code' => 'US',
-      'line_items' => [
-        {
-          'label' => guitar_name,
+    with_typing_indicator do
+      # Create Apple Pay message
+      # NOTE: Message will be automatically sent via after_commit callback
+      # which routes to SendApplePayService based on content_type
+      payment_data = {
+        'request_identifier' => 'applepay_1018',
+        'merchant_name' => 'Acoustic House',
+        'currency_code' => 'USD',
+        'country_code' => 'US',
+        'line_items' => [
+          {
+            'label' => guitar_name,
+            'amount' => '0.01',
+            'type' => 'final'
+          }
+        ],
+        'total' => {
+          'label' => 'Acoustic House',
           'amount' => '0.01',
           'type' => 'final'
-        }
-      ],
-      'total' => {
-        'label' => 'Acoustic House',
-        'amount' => '0.01',
-        'type' => 'final'
-      },
-      'received_title' => "Buy your new #{guitar_name}",
-      'received_subtitle' => 'test payment'
-    }
+        },
+        'received_title' => "Buy your new #{guitar_name}",
+        'received_subtitle' => 'test payment'
+      }
 
-    AppleMessagesForBusiness::SendApplePayService.new(
-      channel: channel,
-      destination_id: destination_id,
-      payment_data: payment_data
-    ).perform
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: "Buy your new #{guitar_name}",
+          content_type: 'apple_pay',
+          content_attributes: payment_data
+        )
+      ).perform
+
+      { success: true }
+    end
   rescue StandardError => e
     Rails.logger.error "[Bot] Failed to send Apple Pay request: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
@@ -1177,17 +1700,114 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_document(filename)
-    # This will be implemented to send document files
-    # For now, log and return
-    Rails.logger.info "[Bot] Would send document: #{filename}"
-    # TODO: Implement document sending via ActiveStorage
+    # Load document file from public/demo_files/apple_messages/
+    file_path = Rails.root.join('public', 'demo_files', 'apple_messages', filename)
+
+    unless File.exist?(file_path)
+      Rails.logger.error "[Bot] Document not found: #{file_path}"
+      return
+    end
+
+    Rails.logger.info "[Bot] Sending document: #{filename}"
+
+    with_typing_indicator do
+      # Build message params
+      sender = message_sender
+      params = bot_message_params(
+        message_type: :outgoing,
+        content: filename,
+        content_type: 'text',
+        account_id: @conversation.account_id,
+        inbox_id: @conversation.inbox_id,
+        conversation_id: @conversation.id
+      )
+      params[:sender] = sender
+
+      # Create message WITHOUT saving (build, not create)
+      message = @conversation.messages.build(params)
+
+      # Create attachment from the file
+      File.open(file_path, 'rb') do |file|
+        message_attachment = message.attachments.build(
+          account_id: message.account_id,
+          file_type: :file
+        )
+
+        # Attach the file
+        message_attachment.file.attach(
+          io: file,
+          filename: filename,
+          content_type: mime_type_for_filename(filename)
+        )
+
+        Rails.logger.info "[Bot] Attached file: #{filename} (#{File.size(file_path)} bytes)"
+      end
+
+      # NOW save the message - this triggers after_commit with attachments already present
+      message.save!
+
+      Rails.logger.info "[Bot] Document message saved with #{message.attachments.count} attachment(s)"
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send document: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def mime_type_for_filename(filename)
+    case File.extname(filename).downcase
+    when '.pdf'
+      'application/pdf'
+    when '.numbers'
+      'application/vnd.apple.numbers'
+    when '.pages'
+      'application/vnd.apple.pages'
+    when '.key'
+      'application/vnd.apple.keynote'
+    else
+      'application/octet-stream'
+    end
   end
 
   def send_rich_link(url:, image_asset:, title:)
-    # This will be implemented to send rich links
-    # For now, log and return
-    Rails.logger.info "[Bot] Would send rich link: #{url} (#{title})"
-    # TODO: Implement rich link sending
+    # Send a rich link message with URL, image, and title
+    # Image asset is optional (can be nil or a filename)
+    Rails.logger.info "[Bot] Sending rich link: #{url} (#{title})"
+
+    with_typing_indicator do
+      # Create message with rich link content
+      # NOTE: Message will be automatically sent via after_commit callback
+      # which routes to SendRichLinkService based on content_type
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: url,
+          content_type: 'apple_rich_link',
+          content_attributes: {
+            'url' => url,
+            'title' => title,
+            'image_url' => image_url_for_asset(image_asset)
+          }.compact
+        )
+      ).perform
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send rich link: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def image_url_for_asset(image_asset)
+    # Map image asset filename to public URL
+    # For now, return nil if no asset (Apple will fetch og:image from URL)
+    return nil if image_asset.blank?
+
+    # If it's already a full URL, return as-is
+    return image_asset if image_asset.start_with?('http://', 'https://')
+
+    # For demo assets in public directory, construct URL
+    # In production, this should be a CDN URL or use ActionController::Base.helpers.asset_url
+    nil # Let Apple fetch from the target URL's og:image meta tag
   end
 
   def get_conversation_attribute(key)
@@ -1218,8 +1838,138 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     @conversation.save!
   end
 
+  # Helper method to build message params with bot sender
+  def bot_message_params(base_params)
+    agent_bot = bot_user
+    
+    # Only add sender_type and sender_id if we have an AgentBot
+    if agent_bot.present?
+      base_params.merge(
+        sender_type: 'AgentBot',
+        sender_id: agent_bot.id
+      )
+    else
+      # No bot assigned - messages will be sent as the user (agent)
+      base_params
+    end
+  end
+
+  # Helper method to get sender for MessageBuilder
+  def message_sender
+    # Return AgentBot if available, otherwise fall back to first user
+    bot_user.presence || @conversation.account.users.first
+  end
+
   def bot_user
-    @conversation.inbox.channel.try(:bot_user) || @conversation.account.users.first
+    # Return the AgentBot associated with this inbox, or nil
+    @conversation.inbox.agent_bot
+  end
+
+  # Typing indicator methods
+  def apple_messages_channel?
+    @conversation.inbox.channel.is_a?(Channel::AppleMessagesForBusiness)
+  end
+
+  def send_typing_indicator(action)
+    return unless TYPING_INDICATORS_ENABLED
+    return unless apple_messages_channel?
+
+    # Get the Apple Messages source ID from contact's additional attributes
+    apple_source_urn = @conversation.contact&.additional_attributes&.dig('apple_messages_source_id')
+    return unless apple_source_urn # Need destination ID
+
+    # Extract the UUID from the URN format (urn:biz:UUID)
+    destination_id = apple_source_urn.sub(/^urn:biz:/, '')
+
+    service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
+      channel: @conversation.inbox.channel,
+      destination_id: destination_id,
+      action: action
+    )
+
+    result = service.perform
+    Rails.logger.info "[AcousticHouseBot] Typing indicator #{action}: #{result[:success] ? 'success' : result[:error]}"
+  rescue StandardError => e
+    Rails.logger.error "[AcousticHouseBot] Failed to send typing indicator: #{e.message}"
+    # Don't fail the message sending if typing indicator fails
+  end
+
+  # Extract address information from form response
+  # Looks for common address field patterns (street, city, state, zip, address, etc.)
+  def extract_address_from_form(form_data)
+    return nil if form_data.blank?
+
+    address_fields = {}
+
+    # Common address field patterns
+    field_patterns = {
+      street: ['street', 'address', 'addr', 'line 1', 'address line'],
+      city: ['city', 'town'],
+      state: ['state', 'province', 'region'],
+      zip: ['zip', 'postal', 'postcode', 'zip code', 'postal code'],
+      country: ['country']
+    }
+
+    # Search through form sections for address fields
+    form_data.each do |section|
+      title = section['title']&.downcase || ''
+      value = section.dig('items', 0, 'value')
+
+      next unless value.present?
+
+      # Match against patterns
+      field_patterns.each do |field_type, patterns|
+        if patterns.any? { |pattern| title.include?(pattern) }
+          address_fields[field_type] = value
+          break
+        end
+      end
+    end
+
+    # Return nil if no address fields found
+    return nil if address_fields.empty?
+
+    # Return formatted address hash
+    address_fields
+  end
+
+  # Send delivery confirmation message with address
+  def send_delivery_confirmation(address_data, customer_name = nil)
+    return unless address_data.present?
+
+    # Build formatted address string
+    address_parts = []
+    address_parts << address_data[:street] if address_data[:street].present?
+    address_parts << address_data[:city] if address_data[:city].present?
+    address_parts << address_data[:state] if address_data[:state].present?
+    address_parts << address_data[:zip] if address_data[:zip].present?
+    address_parts << address_data[:country] if address_data[:country].present?
+
+    formatted_address = address_parts.join(', ')
+
+    # Build confirmation message
+    if customer_name.present?
+      message = "Perfect #{customer_name}! Your order will be delivered to: #{formatted_address}"
+    else
+      message = "Perfect! Your order will be delivered to: #{formatted_address}"
+    end
+
+    send_text_message(message)
+
+    Rails.logger.info "[Bot] 📦 Sent delivery confirmation for address: #{formatted_address}"
+  end
+
+  def with_typing_indicator(&block)
+    return yield unless TYPING_INDICATORS_ENABLED
+
+    send_typing_indicator(:start)
+    sleep(TYPING_INDICATOR_DELAY)
+    result = yield
+    send_typing_indicator(:end)
+    result
+  rescue StandardError => e
+    send_typing_indicator(:end) # Always end typing indicator
+    raise e
   end
 
   # === Phase 3 Helper Methods ===
@@ -1248,76 +1998,415 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       { 'identifier' => '5', 'start_time' => "#{day2}T19:00#{location[:timezone_offset]}", 'duration' => 3600 }
     ]
 
-    # Create message with time picker content
-    message = Messages::MessageBuilder.new(
-      bot_user,
-      @conversation,
-      {
-        message_type: :outgoing,
-        content: "Schedule a lesson with your #{guitar}",
-        content_type: 'apple_time_picker',
-        content_attributes: {
-          'request_identifier' => 'time_0319',
-          'received_title' => "Schedule a lesson with your #{guitar}",
-          'received_subtitle' => location[:name],
-          'reply_title' => 'Thank you!',
-          'event' => {
-            'identifier' => SecureRandom.uuid,
-            'title' => "Guitar Lesson - #{guitar}",
-            'location' => {
-              'latitude' => location[:latitude],
-              'longitude' => location[:longitude],
-              'radius' => 300.0,
-              'title' => location[:name]
-            },
-            'timeslots' => timeslots
+    with_typing_indicator do
+      # Create message with time picker content
+      # NOTE: Message will be automatically sent via after_commit callback
+      # which routes to SendTimePickerService based on content_type
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: "Schedule a lesson with your #{guitar}",
+          content_type: 'apple_time_picker',
+          content_attributes: {
+            'request_identifier' => 'time_0319',
+            'received_title' => "Schedule a lesson with your #{guitar}",
+            'received_subtitle' => location[:name],
+            'reply_title' => 'Thank you!',
+            'event' => {
+              'identifier' => SecureRandom.uuid,
+              'title' => "Guitar Lesson - #{guitar}",
+              'location' => {
+                'latitude' => location[:latitude],
+                'longitude' => location[:longitude],
+                'radius' => 300.0,
+                'title' => location[:name]
+              },
+              'timeslots' => timeslots
+            }
           }
-        }
-      }
-    ).perform
-
-    # Send via SendTimePickerService
-    channel = @conversation.inbox.channel
-    contact_inbox = @conversation.contact_inbox
-    destination_id = contact_inbox.source_id
-
-    AppleMessagesForBusiness::SendTimePickerService.new(
-      channel: channel,
-      destination_id: destination_id,
-      message: message
-    ).perform
+        )
+      ).perform
+    end
   rescue StandardError => e
     Rails.logger.error "[Bot] Failed to send time picker: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
   end
 
-  def send_apple_messages_rich_link
-    # Create message with rich link
-    message = Messages::MessageBuilder.new(
-      bot_user,
-      @conversation,
+  def send_single_store_rich_link(store, user_coordinates)
+    # Single store found - send as Apple Maps rich link and proceed directly to time picker
+    Rails.logger.info "[Bot] 📍 Single store found: #{store[:name]}"
+
+    # Build Apple Maps URL for the store
+    # Prefer using place ID if available, otherwise use coordinates + name
+    maps_url = if store[:id].present?
+                 # Use Apple Maps place ID for more accurate link
+                 "https://maps.apple.com/place?place-id=#{store[:id]}"
+               else
+                 # Fallback to coordinates + query
+                 "https://maps.apple.com/?ll=#{store[:latitude]},#{store[:longitude]}&q=#{CGI.escape(store[:name])}"
+               end
+
+    Rails.logger.info "[Bot] 📍 Generated Apple Maps URL: #{maps_url}"
+
+    # Send rich link message (Open Graph scraping will handle title/image automatically)
+    send_rich_link(
+      url: maps_url,
+      title: store[:name],
+      image_asset: nil
+    )
+
+    # Automatically select this store and proceed to time picker
+    # Store minimal store data
+    minimal_store = {
+      'name' => store[:name],
+      'latitude' => store[:latitude],
+      'longitude' => store[:longitude],
+      'distance_km' => store[:distance_km]
+    }
+
+    # Calculate timezone
+    timezone_offset = calculate_timezone_offset(store[:longitude])
+
+    # Create location hash for time picker
+    location = {
+      name: store[:name],
+      latitude: store[:latitude],
+      longitude: store[:longitude],
+      timezone_offset: timezone_offset
+    }
+
+    # Store selection
+    update_conversation_attribute('selected_store_name', store[:name])
+
+    # Send confirmation and time picker
+    reset_retry_count
+    send_text_message("Perfect! You're closest to #{store[:name]}. Let's schedule your lesson.")
+    send_lesson_time_picker(location)
+    update_bot_state('AHH1')
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send single store rich link: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def send_store_quick_reply(stores, user_coordinates)
+    # 2-5 stores - send as quick reply buttons
+    Rails.logger.info "[Bot] 🏪 Sending #{stores.length} stores as quick reply"
+
+    # Store minimal stores data
+    minimal_stores = stores.map do |store|
       {
-        message_type: :outgoing,
-        content: 'https://register.apple.com/resources/messages/messaging-documentation/',
-        content_type: 'rich_link',
-        content_attributes: {
-          'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
-          'title' => 'Apple Messages for Business',
-          'image_url' => 'https://register.apple.com/resources/messages/images/hero.png'
-        }
+        'id' => store[:id],
+        'name' => store[:name],
+        'latitude' => store[:latitude],
+        'longitude' => store[:longitude],
+        'distance_km' => store[:distance_km]
       }
-    ).perform
+    end
+    update_conversation_attribute('available_stores', minimal_stores.to_json)
+    update_conversation_attribute('store_search_lat', user_coordinates[:latitude])
+    update_conversation_attribute('store_search_lon', user_coordinates[:longitude])
 
-    # Send via SendRichLinkService
-    channel = @conversation.inbox.channel
-    contact_inbox = @conversation.contact_inbox
-    destination_id = contact_inbox.source_id
+    # Build quick reply items
+    items = stores.map.with_index do |store, index|
+      {
+        title: store[:name],
+        value: index.to_s
+      }
+    end
 
-    AppleMessagesForBusiness::SendRichLinkService.new(
-      channel: channel,
-      destination_id: destination_id,
-      message: message
-    ).perform
+    # Send quick reply
+    send_quick_reply(
+      title: "Select your nearest Apple Store (#{stores.length} found)",
+      request_id: 'qr_store_selection',
+      items: items
+    )
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send store quick reply: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def send_store_selection_list_picker(stores, user_coordinates)
+    return if stores.blank?
+
+    # Build list picker sections with store items
+    items = stores.map.with_index do |store, index|
+      {
+        'identifier' => index.to_s,
+        'title' => store[:name],
+        'subtitle' => "#{store[:distance_km]} km away • #{store[:formatted_address]}",
+        'style' => 'large'
+      }
+    end
+
+    sections = [
+      {
+        'title' => 'Nearby Apple Stores',
+        'multiple_selection' => false,
+        'items' => items
+      }
+    ]
+
+    # Store search coordinates in conversation attributes for later use
+    update_conversation_attribute('store_search_lat', user_coordinates[:latitude])
+    update_conversation_attribute('store_search_lon', user_coordinates[:longitude])
+
+    # Store minimal stores data (without long addresses) to avoid exceeding attribute length limit
+    minimal_stores = stores.map do |store|
+      {
+        'id' => store[:id],
+        'name' => store[:name],
+        'latitude' => store[:latitude],
+        'longitude' => store[:longitude],
+        'distance_km' => store[:distance_km]
+      }
+    end
+    update_conversation_attribute('available_stores', minimal_stores.to_json)
+
+    with_typing_indicator do
+      # Create message with list picker content
+      # NOTE: Message will be automatically sent via after_commit callback
+      # which routes to SendListPickerService based on content_type
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: 'Select an Apple Store',
+          content_type: 'apple_list_picker',
+          content_attributes: {
+            'request_identifier' => 'lp_store_selection',
+            'sections' => sections,
+            'received_title' => 'Select a Store',
+            'received_subtitle' => "Found #{stores.length} stores nearby",
+            'reply_title' => 'Great choice!',
+            'reply_subtitle' => 'Let\'s schedule your lesson'
+          }
+        )
+      ).perform
+    end
+  rescue StandardError => e
+    Rails.logger.error "[Bot] Failed to send store selection list picker: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def handle_store_selection(interactive_data)
+    Rails.logger.info '[Bot] 🏪 handle_store_selection called'
+    Rails.logger.info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
+    Rails.logger.info "[Bot] 🏪 interactive_data keys: #{interactive_data.keys.inspect}"
+
+    # Extract selection from interactive data
+    selected_index = if interactive_data['ldtext'].present?
+                       # Resolved NSKeyedArchiver/IDR format - extract index from ldtext
+                       # The ldtext might contain store name, we need to find the index
+                       store_title = interactive_data['ldtext']
+                       Rails.logger.info "[Bot] 🏪 IDR format store selection (ldtext): #{store_title}"
+
+                       # Get available stores from conversation attributes
+                       stores_json = get_conversation_attribute('available_stores')
+                       if stores_json
+                         stores = JSON.parse(stores_json)
+                         found_store = stores.find { |s| s['name'] == store_title }
+                         stores.index(found_store) if found_store
+                       end
+                     elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
+                       # Raw NSKeyedArchiver format - extract from $objects array
+                       objects = interactive_data['$objects'] || []
+                       # Find the identifier (should be a number string)
+                       objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
+                     elsif interactive_data.dig('data', 'listPicker', 'sections').present?
+                       # List picker format with sections - extract from "You Selected" section
+                       sections = interactive_data.dig('data', 'listPicker', 'sections') || []
+                       selected_section = sections.find { |s| s['title'] == 'You Selected' }
+                       if selected_section
+                         selected_item = selected_section.dig('items', 0)
+                         selected_item&.fetch('identifier', nil)
+                       end
+                     else
+                       # Standard format
+                       interactive_data.dig('data', 'reply', 'identifier')
+                     end
+
+    Rails.logger.info "[Bot] 🏪 Selected store index: #{selected_index}"
+
+    # Get available stores from conversation attributes
+    stores_json = get_conversation_attribute('available_stores')
+    unless stores_json
+      Rails.logger.error '[Bot] 🏪 No available stores found in conversation attributes'
+      send_text_message('Sorry, store selection expired. Please provide your location again.')
+      update_bot_state('AHG1')
+      return
+    end
+
+    stores = JSON.parse(stores_json)
+    selected_store = stores[selected_index.to_i]
+
+    unless selected_store
+      Rails.logger.error "[Bot] 🏪 Invalid store index: #{selected_index}"
+      send_text_message('Sorry, invalid store selection. Please try again.')
+      update_bot_state('AHG1')
+      return
+    end
+
+    # Store selected store details
+    update_conversation_attribute('selected_store_name', selected_store['name'])
+    # Note: We don't store formatted_address anymore (removed for size limits)
+
+    # Build Apple Maps URL for the selected store
+    maps_url = if selected_store['id'].present?
+                 "https://maps.apple.com/place?place-id=#{selected_store['id']}"
+               else
+                 "https://maps.apple.com/?ll=#{selected_store['latitude']},#{selected_store['longitude']}&q=#{CGI.escape(selected_store['name'])}"
+               end
+
+    Rails.logger.info "[Bot] 🏪 Sending rich link for selected store: #{maps_url}"
+
+    # Send confirmation message
+    send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
+
+    # Send rich link to the store (Open Graph scraping will handle title/image automatically)
+    send_rich_link(
+      url: maps_url,
+      title: selected_store['name'],
+      image_asset: nil
+    )
+
+    # Calculate timezone offset based on longitude
+    timezone_offset = calculate_timezone_offset(selected_store['longitude'])
+
+    # Create location hash for time picker
+    location = {
+      name: selected_store['name'],
+      latitude: selected_store['latitude'],
+      longitude: selected_store['longitude'],
+      timezone_offset: timezone_offset
+    }
+
+    reset_retry_count
+
+    # Send time picker
+    send_lesson_time_picker(location)
+    update_bot_state('AHH1')
+  rescue StandardError => e
+    Rails.logger.error "[Bot] 🏪 Error in handle_store_selection: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+
+    # Fallback
+    send_text_message('Sorry, there was an error processing your selection.')
+    update_bot_state('AHG1')
+  end
+
+  def handle_store_selection_qr(interactive_data)
+    # Handle quick reply store selection (2-5 stores case)
+    Rails.logger.info '[Bot] 🏪 handle_store_selection_qr called'
+    Rails.logger.info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
+    Rails.logger.info "[Bot] 🏪 interactive_data keys: #{interactive_data.keys.inspect}"
+
+    # Extract selected index from quick reply
+    selected_index = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                       # NSKeyedArchiver format - extract index from $objects array
+                       objects = interactive_data['$objects'] || []
+                       # Find the index (should be a number string like "0", "1", etc.)
+                       objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
+                     else
+                       # Standard quick reply format
+                       quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                       selected_index_int = quick_reply_data['selectedIndex']
+                       items = quick_reply_data['items'] || []
+
+                       # Get the value from the selected item
+                       items[selected_index_int]&.fetch('title', nil) if selected_index_int
+                     end
+
+    Rails.logger.info "[Bot] 🏪 Selected store index from quick reply: #{selected_index}"
+
+    # Get available stores from conversation attributes
+    stores_json = get_conversation_attribute('available_stores')
+    unless stores_json
+      Rails.logger.error '[Bot] 🏪 No available stores found in conversation attributes'
+      send_text_message('Sorry, store selection expired. Please provide your location again.')
+      update_bot_state('AHG1')
+      return
+    end
+
+    stores = JSON.parse(stores_json)
+    selected_store = stores[selected_index.to_i]
+
+    unless selected_store
+      Rails.logger.error "[Bot] 🏪 Invalid store index: #{selected_index}"
+      send_text_message('Sorry, invalid store selection. Please try again.')
+      update_bot_state('AHG1')
+      return
+    end
+
+    # Store selected store details
+    update_conversation_attribute('selected_store_name', selected_store['name'])
+
+    # Build Apple Maps URL for the selected store
+    maps_url = if selected_store['id'].present?
+                 "https://maps.apple.com/place?place-id=#{selected_store['id']}"
+               else
+                 "https://maps.apple.com/?ll=#{selected_store['latitude']},#{selected_store['longitude']}&q=#{CGI.escape(selected_store['name'])}"
+               end
+
+    Rails.logger.info "[Bot] 🏪 Sending rich link for selected store: #{maps_url}"
+
+    # Send confirmation message
+    send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
+
+    # Send rich link to the store (Open Graph scraping will handle title/image automatically)
+    send_rich_link(
+      url: maps_url,
+      title: selected_store['name'],
+      image_asset: nil
+    )
+
+    # Calculate timezone offset
+    timezone_offset = calculate_timezone_offset(selected_store['longitude'])
+
+    # Create location hash for time picker
+    location = {
+      name: selected_store['name'],
+      latitude: selected_store['latitude'],
+      longitude: selected_store['longitude'],
+      timezone_offset: timezone_offset
+    }
+
+    reset_retry_count
+
+    # Send time picker
+    send_lesson_time_picker(location)
+    update_bot_state('AHH1')
+  rescue StandardError => e
+    Rails.logger.error "[Bot] 🏪 Error in handle_store_selection_qr: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+
+    # Fallback
+    send_text_message('Sorry, there was an error processing your selection.')
+    update_bot_state('AHG1')
+  end
+
+  def send_apple_messages_rich_link
+    with_typing_indicator do
+      # Create message with rich link
+      # NOTE: Message will be automatically sent via after_commit callback
+      # which routes to SendRichLinkService based on content_type
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: 'https://register.apple.com/resources/messages/messaging-documentation/',
+          content_type: 'apple_rich_link',
+          content_attributes: {
+            'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
+            'title' => 'Apple Messages for Business',
+            'image_url' => 'https://register.apple.com/resources/messages/images/hero.png'
+          }
+        )
+      ).perform
+    end
   rescue StandardError => e
     Rails.logger.error "[Bot] Failed to send rich link: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
@@ -1335,6 +2424,41 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       'br'
     else
       'en'
+    end
+  end
+
+  # Calculate timezone offset based on longitude
+  # @param longitude [Float] Longitude coordinate
+  # @return [String] Timezone offset (e.g., '-0800', '+0100')
+  def calculate_timezone_offset(longitude)
+    # Global timezone approximation based on longitude
+    # Returns ISO 8601 timezone offset format
+    if longitude < -120
+      '-0800' # Pacific (US West Coast, parts of Canada/Mexico)
+    elsif longitude < -105
+      '-0700' # Mountain (US Mountain, parts of Mexico)
+    elsif longitude < -90
+      '-0600' # Central (US Central, parts of Mexico)
+    elsif longitude < -60
+      '-0500' # Eastern (US East Coast, parts of Canada/South America)
+    elsif longitude < -30
+      '-0300' # South America (Brazil, Argentina)
+    elsif longitude < 15
+      '+0000' # UK, Western Europe, West Africa
+    elsif longitude < 30
+      '+0100' # Central Europe (France, Germany, Italy)
+    elsif longitude < 45
+      '+0200' # Eastern Europe (Finland, Greece, South Africa)
+    elsif longitude < 75
+      '+0300' # Middle East (Turkey, Israel, UAE)
+    elsif longitude < 105
+      '+0530' # India
+    elsif longitude < 120
+      '+0800' # China, Singapore
+    elsif longitude < 150
+      '+0900' # Japan, Korea
+    else
+      '+1000' # Australia (East)
     end
   end
 

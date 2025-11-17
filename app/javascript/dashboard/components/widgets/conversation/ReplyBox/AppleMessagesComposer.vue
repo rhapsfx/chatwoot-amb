@@ -1112,12 +1112,14 @@ const saveAsTemplate = () => {
 // Handle save from modal
 const handleTemplateSave = () => {
   showSaveAsTemplateModal.value = false;
+  showFormBuilder.value = false;
   pendingTemplateData.value = null;
 };
 
 // Handle save and send from modal
 const handleTemplateSaveAndSend = () => {
   showSaveAsTemplateModal.value = false;
+  showFormBuilder.value = false;
   // Send the message immediately after saving
   sendAppleMessage();
   pendingTemplateData.value = null;
@@ -1126,6 +1128,7 @@ const handleTemplateSaveAndSend = () => {
 // Handle modal close
 const closeTemplateModal = () => {
   showSaveAsTemplateModal.value = false;
+  // Don't close form builder when user cancels - let them continue editing
   pendingTemplateData.value = null;
 };
 
@@ -1135,13 +1138,20 @@ const openFormBuilder = () => {
 };
 
 const handleFormCreated = formData => {
+  console.log('[AMB Form] Form created with data:', formData);
+  
+  // Emit both events to ensure proper handling
   emit('send', formData);
+  emit('sendAppleMessage', formData);
+  
   showFormBuilder.value = false;
 };
 
 const handleFormSaveAsTemplate = templateData => {
-  showFormBuilder.value = false;
-  emit('saveAsTemplate', templateData);
+  // Store the template data and show the Save As Template modal
+  pendingTemplateData.value = templateData;
+  showSaveAsTemplateModal.value = true;
+  // Keep the form builder open in the background
 };
 
 const closeFormBuilder = () => {
