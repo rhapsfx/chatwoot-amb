@@ -104,17 +104,19 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
   def send_apple_pay_message(merchant_session_result)
     message_id = SecureRandom.uuid
 
-    # Build the complete payload
+    # Build the complete payload with REAL merchant session
+    # Note: Test mode affects payment gateway processing, not Apple MSP sending
+    # We always send the payment request to device so user can interact
     payload = build_apple_msp_payload(message_id, merchant_session_result)
 
-    # Send to Apple gateway
-    # Note: Test mode only affects payment processing, not sending the request
-    # The payment will still appear on the device, but the gateway will simulate success
+    # Send to Apple MSP gateway
     response = send_to_apple_gateway(payload, message_id)
 
     if response.success?
-      Rails.logger.info "[AMB ApplePay] Successfully sent Apple Pay request (message_id: #{message_id})"
-      Rails.logger.info "[AMB ApplePay] Test mode: #{test_mode_enabled? ? 'enabled (payment gateway will simulate success)' : 'disabled (will process real payment)'}"
+      Rails.logger.info "[AMB ApplePay] Successfully sent Apple Pay request to device (message_id: #{message_id})"
+      if test_mode_enabled?
+        Rails.logger.info "[AMB ApplePay] Test mode: Payment gateway will simulate success when user completes payment"
+      end
       { success: true, message_id: message_id }
     else
       Rails.logger.error "[AMB ApplePay] Apple MSP returned error: HTTP #{response.code} - #{response.body}"
@@ -138,6 +140,9 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
   # Build the interactiveData structure for Apple Pay
   # This overrides the parent method to create payment-specific structure
   def build_interactive_data(merchant_session_result)
+    # Store the full merchant session result for use in build_apple_pay_config
+    @merchant_session_result = merchant_session_result
+
     # Build base structure with snake_case (will be transformed later)
     payment_structure = {
       'payment_request' => build_payment_request(merchant_session_result[:session_data]),
@@ -150,13 +155,14 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     Rails.logger.info "[AMB ApplePay] Payment structure before transform: #{payment_structure.to_json}"
 
     # Transform payment structure to Apple format (snake_case → camelCase)
+    # NOTE: CaseTransformer returns SYMBOL keys, not string keys
     payment_data = AppleMessagesForBusiness::CaseTransformer.to_apple_format(payment_structure)
 
     Rails.logger.info "[AMB ApplePay] Payment data after transform: #{payment_data.to_json}"
     Rails.logger.info "[AMB ApplePay] Payment data keys: #{payment_data.keys.inspect}"
-    Rails.logger.info "[AMB ApplePay] Merchant ID in applePay config (string key): #{payment_data.dig('paymentRequest', 'applePay',
-                                                                                                      'merchantIdentifier')}"
-    Rails.logger.info "[AMB ApplePay] Merchant ID in merchant session (string key): #{payment_data.dig('merchantSession', 'merchantIdentifier')}"
+    # Access transformed data with SYMBOL keys (not string keys)
+    Rails.logger.info "[AMB ApplePay] Merchant ID in applePay config: #{payment_data.dig(:paymentRequest, :applePay, :merchantIdentifier)}"
+    Rails.logger.info "[AMB ApplePay] Merchant ID in merchant session: #{payment_data.dig(:merchantSession, :merchantIdentifier)}"
 
     default_bid = 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension'
 
@@ -227,11 +233,12 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     # This is different from what you might expect - applePay.merchantIdentifier is the string,
     # merchantSession.merchantIdentifier is the hash.
 
-    # NOTE: Always use real merchant ID, even in test mode
-    # Test mode only affects payment processing, not the payment request itself
+    # Use real merchant ID from settings (even in test mode)
+    # Test mode affects payment processing, not the merchant ID
     merchant_id = merchant_identifier_string
 
     Rails.logger.info "[AMB ApplePay] Merchant identifier (applePay config): #{merchant_id}"
+    Rails.logger.info "[AMB ApplePay] Test mode: #{test_mode_enabled? ? 'enabled' : 'disabled'}"
 
     {
       'merchant_identifier' => merchant_id,

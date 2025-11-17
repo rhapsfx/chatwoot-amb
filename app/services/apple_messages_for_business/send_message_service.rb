@@ -96,12 +96,19 @@ class AppleMessagesForBusiness::SendMessageService
     Rails.logger.info "[AMB Send] 🚀 Sending interactive message - Message ID: #{@message.id}, Apple MSP ID: #{message_id}, Content Type: #{@message.content_type}"
 
     payload = build_apple_msp_payload(message_id)
+    
+    # Log full payload for custom apps to help debug
+    if @message.content_type == 'apple_custom_app'
+      Rails.logger.info "[AMB Send] 📦 Full custom app payload: #{payload.to_json}"
+    end
 
     # Check if this message should request IDR for large responses
     request_idr = should_request_idr?(payload)
 
     response = send_to_apple_gateway(payload, message_id, request_idr: request_idr)
 
+    Rails.logger.info "[AMB Send] Apple MSP Response - Code: #{response.code}, Success: #{response.success?}"
+    
     if response.success?
       Rails.logger.info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
       # Store the payload in the message for debugging
@@ -124,6 +131,7 @@ class AppleMessagesForBusiness::SendMessageService
 
       result
     else
+      Rails.logger.error "[AMB Send] ❌ Apple MSP rejected message - HTTP #{response.code}: #{response.body}"
       { success: false, error: "HTTP #{response.code}: #{response.body}" }
     end
   end
@@ -142,14 +150,27 @@ class AppleMessagesForBusiness::SendMessageService
 
   # Build the interactiveData structure according to Apple MSP spec
   def build_interactive_data
+    # For custom apps, use the BID from content_attributes, otherwise use default
+    bid_value = if @message.content_type == 'apple_custom_app' && content_attributes['bid'].present?
+                  content_attributes['bid']
+                else
+                  'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension'
+                end
+
     base_data = {
-      bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
-      data: {
-        version: '1.0',
-        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid
-      },
-      useLiveLayout: true
+      bid: bid_value,
+      useLiveLayout: content_attributes['use_live_layout'] != false # Default to true unless explicitly false
     }
+    
+    # CRITICAL: Third-party custom apps (apple_custom_app) CANNOT have a "data" object
+    # Apple returns: "400 Bad Request : Third party interactive data disallows use of 'data'"
+    # Only add data object for Apple's own interactive message types
+    unless @message.content_type == 'apple_custom_app'
+      base_data[:data] = {
+        version: content_attributes['version'] || '1.0',
+        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid
+      }
+    end
 
     # Add the specific interactive content based on message type
     case @message.content_type
@@ -169,6 +190,43 @@ class AppleMessagesForBusiness::SendMessageService
       base_data[:data][:dynamic] = build_form_dynamic_data
       base_data[:receivedMessage] = build_received_message
       base_data[:replyMessage] = build_reply_message
+    when 'apple_custom_app'
+      # For custom iMessage apps, per Apple spec (type-interactive.md line 259-274):
+      # appId, appName, URL, and receivedMessage go at TOP LEVEL of interactiveData
+      # CRITICAL: Third-party apps CANNOT have a "data" object (Apple returns 400 error)
+      
+      # Add appId at top level - MUST be integer per Apple spec
+      if content_attributes['app_id'].present?
+        base_data[:appId] = content_attributes['app_id'].to_i
+      end
+      
+      # Add appName at top level
+      base_data[:appName] = content_attributes['app_name'] if content_attributes['app_name'].present?
+      
+      # URL goes at top level - uppercase per Apple working example
+      base_data[:URL] = content_attributes['url'] if content_attributes['url'].present?
+      
+      # receivedMessage is REQUIRED for custom interactive messages per Apple spec
+      # If not provided in content_attributes, create a default one
+      if content_attributes['received_message'].present? || content_attributes['received_title'].present?
+        base_data[:receivedMessage] = build_received_message
+      else
+        # Create default receivedMessage with subtitle (not style) per Apple working example
+        base_data[:receivedMessage] = {
+          title: content_attributes['app_name'] || @message.content || 'Interactive Message',
+          subtitle: content_attributes['received_subtitle'] || 'Tap to view'
+        }
+      end
+      
+      # Add replyMessage if provided (optional but recommended per Apple working example)
+      if content_attributes['reply_message'].present? || content_attributes['reply_title'].present?
+        base_data[:replyMessage] = build_reply_message
+      end
+      
+      # NOTE: Do NOT add app_data to base_data[:data] - third-party apps cannot have "data" object
+      # If you need to pass custom data, it must go in the URL query parameters
+      
+      Rails.logger.info "[AMB Send] Custom app payload - BID: #{base_data[:bid]}, appId: #{base_data[:appId]}, URL: #{base_data[:URL].present? ? 'present' : 'none'}, receivedMessage: #{base_data[:receivedMessage].present?}, replyMessage: #{base_data[:replyMessage].present?}"
     end
 
     # Add images array if present
@@ -428,6 +486,13 @@ class AppleMessagesForBusiness::SendMessageService
 
     identifiers << received_msg['image_identifier'] if received_msg['image_identifier'].present?
     identifiers << reply_msg['image_identifier'] if reply_msg['image_identifier'].present?
+
+    # Collect from top-level images array (sent by frontend)
+    if content_attributes['images'].present?
+      content_attributes['images'].each do |img|
+        identifiers << img['identifier'] if img['identifier'].present?
+      end
+    end
 
     identifiers.compact.uniq
   end

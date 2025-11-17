@@ -96,20 +96,38 @@ AcousticHouseBotService
 
 ## State Flow
 
+### Main Flow (Form Supported)
 ```
 AHA1 (Welcome)
   ↓
 AHA2 (Region Selection)
   ↓
-AHA3 (Form/Name Prompt)
+AHA3 (Form Prompt - if device supports FORM capability)
   ↓
-AHB1 (Process Form)
+AHB1 (Process Form Response - extracts name & stage name)
   ↓
-AHB2 (Name Preference)
+AHB2 (Name Preference - quick reply: "real name or stage name?")
   ↓
 AHB3 (Guitar List)
   ↓
 AHC1 (Guitar Catcher - with retry logic)
+  ↓
+AHC2-AHK1 (Coming in Phase 2-4)
+```
+
+### Alternative Flow (No Form Support)
+```
+AHA1 (Welcome)
+  ↓
+AHA2 (Region Selection)
+  ↓
+AHA3 (Text Prompt - "What's your name?")
+  ↓
+AHB1_2 (Process Text Name Input)
+  ↓
+AHB3 (Guitar List - skip name preference)
+  ↓
+AHC1 (Guitar Catcher)
   ↓
 AHC2-AHK1 (Coming in Phase 2-4)
 ```

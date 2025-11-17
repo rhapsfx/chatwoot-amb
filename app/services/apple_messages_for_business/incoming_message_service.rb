@@ -9,8 +9,17 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   def perform
     Rails.logger.info '[AMB IncomingMessage] Starting message processing'
-    Rails.logger.info "[AMB IncomingMessage] Params: #{@params.inspect}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 WEBHOOK DEBUG - Full params: #{@params.inspect}"
     Rails.logger.info "[AMB IncomingMessage] Headers: #{@headers.inspect}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveDataRef: #{@params['interactiveDataRef'].present?}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveData: #{@params['interactiveData'].present?}"
+
+    # CRITICAL DEBUG: Check if both IDR and direct interactiveData are present (form responses)
+    if @params['interactiveDataRef'].present? && @params['interactiveData'].present?
+      Rails.logger.info '[AMB IncomingMessage] 🔥 BOTH interactiveDataRef AND interactiveData present!'
+      Rails.logger.info "[AMB IncomingMessage] 🔥 Direct interactiveData keys: #{@params['interactiveData'].keys.inspect}"
+      Rails.logger.info "[AMB IncomingMessage] 🔥 Direct interactiveData: #{@params['interactiveData'].inspect[0..1000]}"
+    end
 
     unless valid_message?
       Rails.logger.error '[AMB IncomingMessage] Invalid message - validation failed'
@@ -130,6 +139,31 @@ class AppleMessagesForBusiness::IncomingMessageService
         Rails.logger.info "[AMB IncomingMessage] Duplicate message detected - source_id: #{message_source_id}, existing message_id: #{existing_message.id}"
         @message = existing_message
         return
+      end
+    end
+
+    # Additional deduplication for interactive messages using session identifier
+    # Apple sometimes sends duplicate webhooks with different message IDs but same content
+    if interactive_message? && @params['interactiveData'].present?
+      session_id = @params['interactiveData'].dig('sessionIdentifier')
+      if session_id.present?
+        # Check for recent message with same session ID and content within last 10 seconds
+        recent_cutoff = 10.seconds.ago
+        existing_interactive = @conversation.messages
+                                            .where(message_type: :incoming, content_type: ['text', 'apple_form_response'])
+                                            .where('created_at > ?', recent_cutoff)
+                                            .where(content: message_content)
+                                            .first
+
+        if existing_interactive
+          # Verify it's the same session by checking content_attributes
+          existing_session = existing_interactive.content_attributes&.dig('interactive_data', 'sessionIdentifier')
+          if existing_session == session_id
+            Rails.logger.info "[AMB IncomingMessage] Duplicate interactive message detected - session: #{session_id}, existing message_id: #{existing_interactive.id}"
+            @message = existing_interactive
+            return
+          end
+        end
       end
     end
 
@@ -399,8 +433,37 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def extract_interactive_attributes
-    interactive_data = @params['interactiveData']
+    # CRITICAL: For form responses, Apple sends BOTH interactiveDataRef (display) and interactiveData (selections)
+    # The IDR only contains receivedMessage/replyMessage (display metadata)
+    # The direct interactiveData contains the actual form selections
+    # We MUST use direct interactiveData when both are present
+    interactive_data = if @params['interactiveData'].present?
+                         Rails.logger.info '[AMB IncomingMessage] Using direct interactiveData (contains form selections)'
+                         @params['interactiveData']
+                       else
+                         Rails.logger.info '[AMB IncomingMessage] Using IDR data (no direct interactiveData)'
+                         @idr_data
+                       end
+
     return {} unless interactive_data
+
+    # DEBUG: Log full structure to understand NSKeyedArchiver format
+    Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: interactive_data keys: #{interactive_data.keys.inspect}"
+    Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: interactive_data archiver: #{interactive_data['$archiver']}"
+    if interactive_data['data']
+      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: interactive_data['data'] keys: #{interactive_data['data'].keys.inspect}"
+      if interactive_data['data']['dynamic']
+        Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: dynamic keys: #{interactive_data['data']['dynamic'].keys.inspect}"
+        Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: dynamic template: #{interactive_data['data']['dynamic']['template']}"
+        Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: dynamic selections: #{interactive_data['data']['dynamic']['selections'].inspect}"
+      end
+    end
+    # DEBUG: For NSKeyedArchiver, log $objects array
+    if interactive_data['$archiver'] == 'NSKeyedArchiver'
+      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: NSKeyedArchiver detected"
+      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: $top keys: #{interactive_data['$top'].keys.inspect}" if interactive_data['$top']
+      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: $objects sample: #{interactive_data['$objects']&.first(10).inspect}" if interactive_data['$objects']
+    end
 
     attributes = {
       interactive_type: determine_interactive_type(interactive_data),
@@ -413,6 +476,9 @@ class AppleMessagesForBusiness::IncomingMessageService
        interactive_data['data']['dynamic']['template'] == 'messageForms'
 
       dynamic_data = interactive_data['data']['dynamic']
+      Rails.logger.info "[AMB IncomingMessage] 📝 Extracting form response - selections count: #{(dynamic_data['selections'] || []).length}"
+      Rails.logger.info "[AMB IncomingMessage] 📝 Form selections: #{(dynamic_data['selections'] || []).inspect}"
+
       attributes[:form_response] = {
         template: dynamic_data['template'],
         version: dynamic_data['version'],
@@ -736,23 +802,39 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def determine_content_type_from_data(interactive_data)
-    # Check for NSKeyedArchiver format first (used for forms with attachments)
+    # Check for NSKeyedArchiver format first (used for interactive elements with attachments)
     # NSKeyedArchiver format has "$archiver", "$objects", "$top" keys instead of "data"
     if interactive_data['$archiver'] == 'NSKeyedArchiver'
       Rails.logger.info '[AMB IncomingMessage] 🔍 Detected NSKeyedArchiver format'
 
-      # Check if URL contains form-related parameters (receivedMessage/replyMessage)
-      # NSKeyedArchiver encodes the data in the URL as base64
-      objects = interactive_data['$objects'] || []
-      url_string = objects.find { |obj| obj.is_a?(String) && obj.include?('receivedMessage') }
+      # NSKeyedArchiver is used for both forms AND list pickers with images
+      # We need to check conversation history to determine which one this is
+      last_outgoing = @conversation.messages
+                                   .outgoing
+                                   .where('created_at < ?', Time.current)
+                                   .order(created_at: :desc)
+                                   .first
 
-      if url_string
-        Rails.logger.info '[AMB IncomingMessage] 🔍 Found form-related URL in NSKeyedArchiver'
-        return 'apple_form_response'
+      if last_outgoing
+        Rails.logger.info "[AMB IncomingMessage] 🔍 NSKeyedArchiver - Last outgoing type: #{last_outgoing.content_type}"
+
+        case last_outgoing.content_type
+        when 'apple_form'
+          Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver is form response (last outgoing was form)'
+          return 'apple_form_response'
+        when 'apple_list_picker'
+          Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver is list picker response (last outgoing was list picker)'
+          return 'text' # List picker responses should be processed as interactive responses, not forms
+        when 'apple_time_picker'
+          Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver is time picker response (last outgoing was time picker)'
+          return 'text'
+        else
+          Rails.logger.info "[AMB IncomingMessage] 🔍 NSKeyedArchiver with unknown last outgoing type: #{last_outgoing.content_type}"
+        end
       end
 
-      # Fallback for NSKeyedArchiver without clear form indicators
-      Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver format without form indicators, treating as text'
+      # Fallback for NSKeyedArchiver without clear indicators
+      Rails.logger.info '[AMB IncomingMessage] 🔍 NSKeyedArchiver format without clear indicators, treating as text'
       return 'text'
     end
 
@@ -1169,7 +1251,9 @@ class AppleMessagesForBusiness::IncomingMessageService
       bot_service.process_message
     elsif @idr_data.present? || @params['interactiveData'].present?
       Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
-      interactive_data = @idr_data || @params['interactiveData']
+      # CRITICAL: Prioritize direct interactiveData (contains form selections) over IDR (display only)
+      interactive_data = @params['interactiveData'].presence || @idr_data
+      Rails.logger.info "[Bot] Using #{@params['interactiveData'].present? ? 'direct interactiveData' : 'IDR data'}"
       bot_service.process_interactive_response(interactive_data)
     else
       Rails.logger.info '[Bot] Regular message - using process_message'

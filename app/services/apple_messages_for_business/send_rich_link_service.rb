@@ -52,10 +52,32 @@ class AppleMessagesForBusiness::SendRichLinkService
 
   def build_rich_link_data
     content_attrs = @message.content_attributes
+    url = content_attrs['url'] || @message.content
+
+    # If title or image not provided, try to scrape Open Graph metadata
+    if content_attrs['title'].blank? || content_attrs['image_url'].blank?
+      Rails.logger.info "🔍 Rich Link - Title or image missing, attempting Open Graph scraping for: #{url}"
+      og_data = scrape_open_graph_data(url)
+
+      if og_data[:success]
+        Rails.logger.info "✅ Rich Link - Open Graph scraping successful"
+        Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
+        Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
+
+        # Merge scraped data with provided data (provided data takes precedence)
+        content_attrs = content_attrs.merge({
+          'title' => content_attrs['title'].presence || og_data[:title],
+          'image_url' => content_attrs['image_url'].presence || og_data[:image_url],
+          'description' => content_attrs['description'].presence || og_data[:description]
+        }.compact)
+      else
+        Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
+      end
+    end
 
     {
-      url: content_attrs['url'] || @message.content,
-      title: content_attrs['title'] || extract_title_from_url(content_attrs['url']),
+      url: url,
+      title: content_attrs['title'] || extract_title_from_url(url),
       assets: build_assets(content_attrs)
     }
   end
@@ -88,7 +110,7 @@ class AppleMessagesForBusiness::SendRichLinkService
         # Handle data URLs (base64 embedded)
         base64_data = image_source.split(',')[1]
         mime_type = image_source.match(/data:([^;]+)/)[1] rescue 'image/jpeg'
-        
+
         assets[:image] = {
           data: base64_data,
           mimeType: mime_type
@@ -111,6 +133,23 @@ class AppleMessagesForBusiness::SendRichLinkService
     end
 
     assets
+  end
+
+  def scrape_open_graph_data(url)
+    return { success: false, error: 'No URL provided' } if url.blank?
+
+    Rails.logger.info "🔍 Rich Link - Scraping Open Graph data for: #{url}"
+
+    parser = AppleMessagesForBusiness::OpenGraphParserService.new(url)
+    result = parser.parse
+
+    Rails.logger.info "🔍 Rich Link - Scraping result success: #{result[:success]}"
+
+    result
+  rescue StandardError => e
+    Rails.logger.error "❌ Rich Link - Open Graph parsing error: #{e.message}"
+    Rails.logger.error "❌ Rich Link - Backtrace: #{e.backtrace.first(3).join("\n")}"
+    { success: false, error: e.message }
   end
 
   def detect_image_mime_type(image_url, content_attrs)

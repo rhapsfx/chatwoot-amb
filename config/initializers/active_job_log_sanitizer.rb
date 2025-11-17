@@ -2,12 +2,44 @@
 
 # Suppress verbose job argument logging by wrapping ALL Rails.logger methods
 
+# Wrapper for the log device (IO) to filter out "nil" lines at write level
+class NilFilteringLogDevice
+  def initialize(log_device)
+    @log_device = log_device
+  end
+
+  def write(message)
+    # Filter out standalone "nil" lines completely
+    return if message.is_a?(String) && (message.strip == 'nil' || message == "nil\n")
+    
+    @log_device.write(message)
+  end
+
+  def close
+    @log_device.close
+  end
+
+  def reopen(logdev = nil)
+    @log_device.reopen(logdev) if @log_device.respond_to?(:reopen)
+  end
+
+  # Forward any other methods to the underlying device
+  def method_missing(method, *args, &block)
+    @log_device.send(method, *args, &block)
+  end
+
+  def respond_to_missing?(method, include_private = false)
+    @log_device.respond_to?(method, include_private) || super
+  end
+end
+
 module RailsLoggerJobSuppressor
   def suppress_if_needed(message)
     return message unless message.is_a?(String)
 
-    # Filter out "nil" lines completely (from puts statements)
-    return nil if message.strip == 'nil'
+    # Filter out "nil" lines completely (from puts statements or return values)
+    # Check for standalone "nil" or "nil" with whitespace
+    return '' if message.strip == 'nil' || message == 'nil'
 
     # Check if this is a verbose job log
     if (message.include?('ActionCableBroadcastJob') || message.include?('EventDispatcherJob')) &&
@@ -28,30 +60,44 @@ module RailsLoggerJobSuppressor
   # Override all log level methods
   %w[debug info warn error fatal unknown].each do |level|
     define_method(level) do |message = nil, &block|
-      if block_given?
-        super(suppress_if_needed(block.call))
-      else
-        super(suppress_if_needed(message))
-      end
+      msg = block_given? ? block.call : message
+      suppressed = suppress_if_needed(msg)
+      # Skip logging entirely if message was filtered out
+      return if suppressed == ''
+      super(suppressed)
     end
   end
 
   # Override add (the underlying method all others call)
   def add(severity, message = nil, progname = nil)
-    if block_given?
-      super(severity, suppress_if_needed(yield), progname)
-    else
-      super(severity, suppress_if_needed(message), progname)
-    end
+    msg = block_given? ? yield : message
+    suppressed = suppress_if_needed(msg)
+    # Skip logging entirely if message was filtered out
+    return if suppressed == ''
+    super(severity, suppressed, progname)
   end
 
   # Override << method
   def <<(msg)
-    super(suppress_if_needed(msg))
+    suppressed = suppress_if_needed(msg)
+    # Skip logging entirely if message was filtered out
+    return if suppressed == ''
+    super(suppressed)
   end
 end
 
 Rails.application.config.after_initialize do
+  # Wrap the logger's log device to filter at IO level
+  if Rails.logger.instance_variable_defined?(:@logdev) && Rails.logger.instance_variable_get(:@logdev)
+    logdev = Rails.logger.instance_variable_get(:@logdev)
+    if logdev.instance_variable_defined?(:@dev) && logdev.instance_variable_get(:@dev)
+      original_dev = logdev.instance_variable_get(:@dev)
+      wrapped_dev = NilFilteringLogDevice.new(original_dev)
+      logdev.instance_variable_set(:@dev, wrapped_dev)
+    end
+  end
+  
+  # Also wrap the logger methods for additional filtering
   Rails.logger.singleton_class.prepend(RailsLoggerJobSuppressor)
   Rails.logger.info '[RailsLogger] Job argument suppression active for ActionCableBroadcastJob and EventDispatcherJob'
 end

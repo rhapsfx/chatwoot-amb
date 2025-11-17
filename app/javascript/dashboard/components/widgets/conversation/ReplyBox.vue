@@ -1000,7 +1000,8 @@ export default {
                   content.list_picker || // List picker structure (nested)
                   content.time_picker || // Time picker structure (nested)
                   content.event || // Time picker structure (with event object)
-                  content.form || // Form structure
+                  content.form || // Form structure (legacy nested format)
+                  content.pages || // Form structure (new block editor format)
                   content.apple_pay || // Apple Pay structure
                   (content.sections && content.images) || // List picker structure (direct)
                   (content.timeslots && content.eventTitle) || // Time picker structure (direct)
@@ -1438,7 +1439,7 @@ export default {
             }
           } else if (
             content.form ||
-            (content.pages && content.received_message)
+            (content.pages && (content.received_message || content.receivedMessage))
           ) {
             // Form structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted

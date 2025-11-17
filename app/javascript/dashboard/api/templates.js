@@ -7,12 +7,14 @@ class TemplatesAPI extends ApiClient {
     super('templates', { accountScoped: true });
   }
 
-  get({ searchKey, category, channel, tags } = {}) {
+  get({ searchKey, category, channel, tags, per_page, status } = {}) {
     const params = new URLSearchParams();
     if (searchKey) params.append('search', searchKey);
     if (category) params.append('category', category);
     if (channel) params.append('channel', channel);
     if (tags) params.append('tags', tags);
+    if (per_page) params.append('per_page', per_page);
+    if (status) params.append('status', status);
 
     const url = params.toString()
       ? `${this.url}?${params.toString()}`

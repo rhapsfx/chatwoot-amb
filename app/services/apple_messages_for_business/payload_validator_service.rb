@@ -80,7 +80,18 @@ class AppleMessagesForBusiness::PayloadValidatorService
     # Validate bid
     @errors << 'interactiveData missing bid' unless interactive_data[:bid].present?
 
-    # Validate data structure
+    # CRITICAL: Third-party custom apps (apple_custom_app) CANNOT have a "data" object
+    # Apple returns: "400 Bad Request : Third party interactive data disallows use of 'data'"
+    # Skip data validation for custom apps
+    if @message_type == 'apple_custom_app'
+      # For custom apps, validate required top-level fields instead
+      @errors << 'apple_custom_app missing appId' unless interactive_data[:appId].present?
+      @errors << 'apple_custom_app missing URL' unless interactive_data[:URL].present?
+      @errors << 'apple_custom_app missing receivedMessage' unless interactive_data[:receivedMessage].present?
+      return
+    end
+
+    # For Apple's own interactive message types, data object is required
     unless interactive_data[:data].present?
       @errors << 'interactiveData missing data'
       return

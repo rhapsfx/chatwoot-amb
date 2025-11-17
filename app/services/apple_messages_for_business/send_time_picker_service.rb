@@ -13,7 +13,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
       data: {
         version: '1.0',
-        requestIdentifier: SecureRandom.uuid,
+        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid,
         event: build_time_picker_data
       },
       useLiveLayout: true,
@@ -41,7 +41,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       interactiveData: {
         bid: channel.imessage_extension_bid,
         data: {
-          requestIdentifier: SecureRandom.uuid,
+          requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid,
           mspVersion: '1.0',
           event: build_event_data,
           images: build_images_array

@@ -186,10 +186,33 @@ module Templates
     end
 
     def convert_form_properties
+      # Handle both old 'fields' format and new 'pages' format
+      # The frontend sends 'pages' with 'items', but we need to convert to 'fields' for storage
+      fields = if message_data[:pages].present?
+                 # Convert pages structure to flat fields array
+                 message_data[:pages].flat_map do |page|
+                   (page[:items] || page['items'] || []).map do |item|
+                     {
+                       item_id: item[:item_id] || item['item_id'],
+                       item_type: item[:item_type] || item['item_type'],
+                       title: item[:title] || item['title'],
+                       required: item[:required] || item['required'] || false,
+                       placeholder: item[:placeholder] || item['placeholder'],
+                       keyboard_type: item[:keyboard_type] || item['keyboard_type'],
+                       text_content_type: item[:text_content_type] || item['text_content_type']
+                     }.compact
+                   end
+                 end
+               else
+                 message_data[:fields] || []
+               end
+
       {
         formId: message_data[:form_id] || message_data[:formId] || message_data['formId'],
         title: message_data[:title],
-        fields: message_data[:fields] || [],
+        description: message_data[:description],
+        fields: fields,
+        pages: message_data[:pages] || [],  # Store pages structure as well for reference
         receivedMessage: message_data[:received_message] || message_data[:receivedMessage] || {},
         replyMessage: message_data[:reply_message] || message_data[:replyMessage] || {},
         images: message_data[:images] || []
