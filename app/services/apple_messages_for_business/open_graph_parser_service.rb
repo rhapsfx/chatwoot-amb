@@ -15,9 +15,7 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
     # Special handling for Apple Maps URLs with query parameters
     # Short URLs (maps.apple/p/...) should go through normal OpenGraph parsing
-    if apple_maps_url_with_params?
-      return parse_apple_maps_url
-    end
+    return parse_apple_maps_url if apple_maps_url_with_params?
 
     begin
       doc = fetch_document
@@ -37,6 +35,10 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
   # Check if URL is an Apple Maps URL with query parameters (needs special handling)
   def apple_maps_url_with_params?
+    # Only use parameter extraction for URLs with actual location parameters (name, address, coordinate)
+    # Place ID URLs should go through normal Open Graph HTML scraping to extract og:title and og:image
+    return false if @url.include?('place-id=')
+
     (@url.include?('maps.apple.com') || @url.include?('maps.apple')) && @url.include?('?')
   end
 
@@ -99,7 +101,7 @@ class AppleMessagesForBusiness::OpenGraphParserService
   end
 
   # Generate a static map preview image for Apple Maps
-  def apple_maps_preview_image(coordinate)
+  def apple_maps_preview_image(_coordinate)
     # Return nil for now - could integrate with MapKit or another mapping service
     # For now, Apple Maps rich links will use the Apple favicon
     nil
@@ -365,8 +367,6 @@ class AppleMessagesForBusiness::OpenGraphParserService
       'https://logo.clearbit.com/microsoft.com'
     when 'dropbox.com'
       'https://logo.clearbit.com/dropbox.com'
-    else
-      nil
     end
   end
 end
