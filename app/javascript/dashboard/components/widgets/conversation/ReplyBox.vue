@@ -1439,7 +1439,8 @@ export default {
             }
           } else if (
             content.form ||
-            (content.pages && (content.received_message || content.receivedMessage))
+            (content.pages &&
+              (content.received_message || content.receivedMessage))
           ) {
             // Form structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted

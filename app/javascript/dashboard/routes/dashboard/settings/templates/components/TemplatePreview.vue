@@ -483,12 +483,22 @@ watch(selectedChannel, () => {
             <!-- Form Block -->
             <div v-else-if="block.blockType === 'form'" class="space-y-3">
               <div class="font-medium text-n-slate-12">
-                {{ processProperties(block.properties).title || block.properties.title }}
+                {{
+                  processProperties(block.properties).title ||
+                  block.properties.title
+                }}
               </div>
               <div class="space-y-2">
-                <template v-if="block.properties.pages && block.properties.pages.length > 0">
+                <template
+                  v-if="
+                    block.properties.pages && block.properties.pages.length > 0
+                  "
+                >
                   <div
-                    v-for="(field, i) in block.properties.pages[0].items.slice(0, 4)"
+                    v-for="(field, i) in block.properties.pages[0].items.slice(
+                      0,
+                      4
+                    )"
                     :key="i"
                     class="space-y-1"
                   >
@@ -503,8 +513,12 @@ watch(selectedChannel, () => {
                       class="w-full px-3 py-2 text-sm border border-n-slate-7 rounded bg-n-slate-1"
                     />
                   </div>
-                  <div v-if="block.properties.pages[0].items.length > 4" class="text-xs text-n-slate-11 italic">
-                    +{{ block.properties.pages[0].items.length - 4 }} more fields
+                  <div
+                    v-if="block.properties.pages[0].items.length > 4"
+                    class="text-xs text-n-slate-11 italic"
+                  >
+                    +{{ block.properties.pages[0].items.length - 4 }} more
+                    fields
                   </div>
                 </template>
                 <div v-else class="text-sm text-n-slate-11 italic">

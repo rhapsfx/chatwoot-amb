@@ -42,7 +42,7 @@ const handleItemClick = (section, item) => {
           :alt="receivedTitle"
           class="w-full h-32 rounded-lg object-cover mb-3"
         />
-        
+
         <h3 class="text-sm font-medium text-n-slate-12 mb-1">
           {{ receivedTitle }}
         </h3>

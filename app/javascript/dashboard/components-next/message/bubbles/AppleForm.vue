@@ -22,12 +22,18 @@ const formConfig = computed(() => ({
 
 // Get received message configuration (supports both snake_case and camelCase)
 const receivedMessage = computed(() => {
-  return formData.value.received_message || formData.value.receivedMessage || {};
+  return (
+    formData.value.received_message || formData.value.receivedMessage || {}
+  );
 });
 
 // Get header image identifier
 const headerImageIdentifier = computed(() => {
-  return receivedMessage.value.image_identifier || receivedMessage.value.imageIdentifier || '';
+  return (
+    receivedMessage.value.image_identifier ||
+    receivedMessage.value.imageIdentifier ||
+    ''
+  );
 });
 
 // Get images array
@@ -190,7 +196,7 @@ const getInputType = item => {
         :alt="formConfig.title"
         class="w-full h-40 object-cover"
       />
-      
+
       <div class="flex items-start space-x-3 p-4">
         <!-- Form Icon -->
         <div
