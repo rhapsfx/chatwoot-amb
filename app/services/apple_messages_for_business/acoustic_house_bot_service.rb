@@ -355,7 +355,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     when 'AHI1'
       handle_rich_links
     when 'AHJ1'
-      handle_photo_response
+      # Waiting for photo quick reply response or photo attachment
+      # This state is handled by interactive response handler (qr_photo) or attachment handler
+      send_text_message('Please select Yes or No above, or send us a photo if you said Yes!')
     when 'AHJ2'
       handle_documents_intro
     when 'AHJ3'
@@ -649,7 +651,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   # Raw NSKeyedArchiver format - extract from $objects array
                   objects = interactive_data['$objects'] || []
                   guitar_name = objects.find do |obj|
-                    obj.is_a?(String) && obj.match?(/guitar|stratocaster|les paul|dreadnought|gibson|fender|martin/i)
+                    obj.is_a?(String) && obj.match?(/guitar|stratocaster|les paul|dreadnought|gibson|fender|martin|prs|taylor|r8/i)
                   end
                   log_info "[Bot] 🎸 NSKeyedArchiver guitar selection: #{utf8_encode(guitar_name)}"
                   guitar_name
@@ -659,6 +661,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   log_info "[Bot] 🎸 Standard format guitar selection: #{utf8_encode(guitar_name)}"
                   guitar_name
                 end
+
+    # Fallback if selection is blank - log warning and use default
+    if selection.blank?
+      log_warn "[Bot] 🎸 ⚠️ Guitar selection was blank! interactive_data: #{utf8_encode(interactive_data).inspect}"
+      selection = 'guitar' # Generic fallback
+    end
 
     update_conversation_attribute('selected_guitar', selection)
     reset_retry_count
@@ -675,8 +683,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # === AHC States (AR Introduction & Questions) - Phase 2 ===
 
   def handle_ar_introduction
-    # AHC2: Send AR file
-    send_text_message('Just in. We have this cool Stratocaster. Check it out!!!')
+    # AHC2: Send AR file with introduction message
+    guitar = get_conversation_attribute('selected_guitar') || 'guitar'
+    send_text_message("Just in. We have this cool #{guitar}. Check it out in AR!")
     send_ar_file
     update_bot_state('AHC3')
 
@@ -689,7 +698,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_first_question
     # AHC3: First AR question
-    send_text_message('Did you click on the image and see the 3D augmented reality view of the guitar?')
     send_ar_view_question
     update_bot_state('AHD1')
   end
@@ -1153,11 +1161,34 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   # === AHJ States (Photo Response & Documents) ===
 
-  def handle_photo_response
-    # AHJ1: Photo invitation
-    send_text_message('Awesome! We will hang tight while you send us your fav.')
-    update_bot_state('AHJ2')
-    handle_documents_intro
+  def handle_photo_response(interactive_data)
+    # AHJ1: Handle photo quick reply response
+    log_info '[Bot] 📷 handle_photo_response called'
+
+    # Extract selected option - handle both standard format and NSKeyedArchiver
+    selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                  # NSKeyedArchiver format - extract title from $objects array
+                  objects = interactive_data['$objects'] || []
+                  objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
+                else
+                  # Standard quick reply format
+                  quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                  selected_index = quick_reply_data['selectedIndex']
+                  items = quick_reply_data['items'] || []
+
+                  items[selected_index]&.fetch('title', nil) if selected_index
+                end
+
+    if selection&.match?(/yes/i)
+      # User said Yes - wait for them to send a photo
+      send_text_message('Awesome! We will hang tight while you send us your fav.')
+      # Stay in AHJ1 state - attachment handler will progress to AHJ2 when photo is received
+    else
+      # User said No - skip photo and proceed to documents
+      send_text_message('No problem! Let me show you what else we can do.')
+      update_bot_state('AHJ2')
+      handle_documents_intro
+    end
   end
 
   def handle_documents_intro
@@ -1288,9 +1319,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     result = send_apple_pay_request('Demo Guitar - Fender Stratocaster')
 
-    return if result[:success]
-
-    send_text_message('Apple Pay is currently unavailable. Please try again later.')
+    # Only send error message if payment explicitly failed
+    if result && result[:success]
+      # Payment sent successfully - do nothing more
+      log_info '[Bot] 💳 Apple Pay demo sent successfully'
+    else
+      # Payment failed - show error
+      send_text_message('Apple Pay is currently unavailable. Please try again later.')
+    end
 
     # State will be set to DEMO_MODE by handle_keyword_message
   end
@@ -1905,13 +1941,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         },
         'received_title' => "Buy your new #{guitar_name}",
         'received_subtitle' => 'test payment',
+        'received_style' => 'large',
         'received_image_identifier' => image_identifier,
+        'reply_style' => 'large',
         'reply_image_identifier' => image_identifier
       }
 
       # Call SendApplePayService directly (synchronously) so we can handle errors
       service = AppleMessagesForBusiness::SendApplePayService.new(
-        channel: @inbox.channel,
+        channel: @conversation.inbox.channel,
         destination_id: @conversation.contact_inbox.source_id,
         payment_data: payment_data
       )
@@ -1920,14 +1958,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
       # If service succeeded, create message record without triggering SendReplyJob
       if response[:success]
+        # Clean up payment_data for storage - remove keys that aren't needed in database
+        stored_payment_data = payment_data.except('request_identifier', 'reply_image_identifier')
+
         # Create message directly to avoid double-send via SendReplyJob
         message_params = bot_message_params(
           message_type: :outgoing,
           content: "Buy your new #{guitar_name}",
           content_type: 'apple_pay',
-          content_attributes: payment_data,
+          content_attributes: stored_payment_data,
           source_id: response[:message_id],
-          sender: message_sender
+          sender: message_sender,
+          account_id: @conversation.account_id,
+          inbox_id: @conversation.inbox_id,
+          conversation_id: @conversation.id
         )
 
         @conversation.messages.create!(message_params)
@@ -2051,9 +2095,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # If it's already a full URL, return as-is
     return image_asset if image_asset.start_with?('http://', 'https://')
 
-    # For demo assets in public directory, construct URL
-    # In production, this should be a CDN URL or use ActionController::Base.helpers.asset_url
-    nil # Let Apple fetch from the target URL's og:image meta tag
+    # For demo assets in public directory, construct URL if we have a base URL
+    # Try to get the frontend URL from installation config
+    base_url = ENV.fetch('FRONTEND_URL', nil) || @conversation.inbox&.channel&.webhook_url&.match(%r{^https?://[^/]+})&.to_s
+
+    if base_url.present?
+      # Construct full URL for the asset
+      "#{base_url}/demo_files/apple_messages/#{image_asset}"
+    else
+      # No base URL available - return nil to let Apple fetch from target URL's og:image
+      nil
+    end
   end
 
   def get_conversation_attribute(key)
@@ -2305,22 +2357,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] 📍 Generated Apple Maps URL: #{utf8_encode(maps_url)}"
 
-    # Send rich link message (Open Graph scraping will handle title/image automatically)
-    send_rich_link(
-      url: maps_url,
-      title: store[:name],
-      image_asset: nil
-    )
-
-    # Automatically select this store and proceed to time picker
-    # Store minimal store data
-    {
-      'name' => store[:name],
-      'latitude' => store[:latitude],
-      'longitude' => store[:longitude],
-      'distance_km' => store[:distance_km]
-    }
-
     # Calculate timezone
     timezone_offset = calculate_timezone_offset(store[:longitude])
 
@@ -2335,9 +2371,21 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Store selection
     update_conversation_attribute('selected_store_name', store[:name])
 
-    # Send confirmation and time picker
+    # Send confirmation message first
     reset_retry_count
-    send_text_message("Perfect! You're closest to #{store[:name]}. Let's schedule your lesson.")
+    send_text_message('Please find the store information of your appointment')
+
+    # Then send rich link message (Open Graph scraping will handle title/image automatically)
+    send_rich_link(
+      url: maps_url,
+      title: store[:name],
+      image_asset: nil
+    )
+
+    # Wait for rich link to be fully delivered before sending time picker
+    sleep(2.0)
+
+    # Finally send time picker
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
   rescue StandardError => e
@@ -2529,8 +2577,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] 🏪 Sending rich link for selected store: #{utf8_encode(maps_url)}"
 
-    # Send confirmation message
-    send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
+    # Send confirmation and rich link
+    send_text_message('Please find the store information of your appointment')
 
     # Send rich link to the store (Open Graph scraping will handle title/image automatically)
     send_rich_link(
@@ -2538,6 +2586,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       title: selected_store['name'],
       image_asset: nil
     )
+
+    # Wait for rich link to be fully delivered before sending time picker
+    sleep(2.0)
 
     # Calculate timezone offset based on longitude
     timezone_offset = calculate_timezone_offset(selected_store['longitude'])
@@ -2619,8 +2670,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] 🏪 Sending rich link for selected store: #{utf8_encode(maps_url)}"
 
-    # Send confirmation message
-    send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
+    # Send confirmation and rich link
+    send_text_message('Please find the store information of your appointment')
 
     # Send rich link to the store (Open Graph scraping will handle title/image automatically)
     send_rich_link(
@@ -2628,6 +2679,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       title: selected_store['name'],
       image_asset: nil
     )
+
+    # Wait for rich link to be fully delivered before sending time picker
+    sleep(2.0)
 
     # Calculate timezone offset
     timezone_offset = calculate_timezone_offset(selected_store['longitude'])
@@ -2669,8 +2723,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           content_attributes: {
             'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
             'title' => 'Apple Messages for Business',
-            'image_url' => 'https://register.apple.com/resources/messages/images/hero.png'
-          }
+            'image_url' => image_url_for_asset('heroImage.png')
+          }.compact
         )
       ).perform
     end
