@@ -186,59 +186,62 @@ const getInputType = item => {
     <!-- Collapsed Form Preview -->
     <div
       v-if="!isExpanded"
-      class="apple-form-preview cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden"
+      class="apple-form-preview cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden max-w-md"
       @click="toggleExpanded"
     >
-      <!-- Header Image -->
-      <img
-        v-if="headerImageIdentifier && getImageById(headerImageIdentifier)"
-        :src="getImageById(headerImageIdentifier)"
-        :alt="formConfig.title"
-        class="w-full h-40 object-cover"
-      />
-
-      <div class="flex items-start space-x-3 p-4">
-        <!-- Form Icon -->
-        <div
-          class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0"
-        >
-          <svg
-            class="w-5 h-5 text-white"
-            fill="currentColor"
-            viewBox="0 0 24 24"
+      <div class="flex items-start space-x-2.5 p-3">
+        <!-- Form Icon/Image -->
+        <div class="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden">
+          <img
+            v-if="headerImageIdentifier && getImageById(headerImageIdentifier)"
+            :src="getImageById(headerImageIdentifier)"
+            :alt="formConfig.title"
+            class="w-full h-full object-cover"
+          />
+          <div
+            v-else
+            class="w-full h-full bg-blue-500 flex items-center justify-center"
           >
-            <path
-              d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
-            />
-          </svg>
+            <svg
+              class="w-6 h-6 text-white"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
+              />
+            </svg>
+          </div>
         </div>
 
         <!-- Form Info -->
         <div class="flex-1 min-w-0">
           <h3
-            class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1"
+            class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-0.5"
           >
             {{ formPreview.title }}
           </h3>
           <p
             v-if="formPreview.description"
-            class="text-sm text-slate-600 dark:text-slate-400 mb-2 line-clamp-2"
+            class="text-xs text-slate-600 dark:text-slate-400 mb-1.5 line-clamp-1"
           >
             {{ formPreview.description }}
           </p>
           <div
-            class="flex items-center space-x-4 text-xs text-slate-500 dark:text-slate-400"
+            class="flex items-center space-x-3 text-xs text-slate-500 dark:text-slate-400"
           >
-            <span>{{ formPreview.fieldCount }} fields</span>
-            <span v-if="formPreview.requiredFields > 0">{{ formPreview.requiredFields }} required</span>
-            <span v-if="hasMultiplePages">{{ totalPages }} pages</span>
+            <span>{{ formPreview.fieldCount }}</span>
+            <span v-if="formPreview.requiredFields > 0">{{
+              formPreview.requiredFields
+            }}</span>
+            <span v-if="hasMultiplePages">{{ totalPages }}</span>
           </div>
         </div>
 
         <!-- Expand Arrow -->
         <div class="flex-shrink-0">
           <svg
-            class="w-5 h-5 text-slate-400"
+            class="w-4 h-4 text-slate-400"
             fill="currentColor"
             viewBox="0 0 24 24"
           >
@@ -285,7 +288,7 @@ const getInputType = item => {
             :class="[index <= selectedPage ? 'bg-white' : 'bg-blue-300']"
           />
           <span class="text-blue-100 text-xs ml-2">
-            Page {{ selectedPage + 1 }} of {{ totalPages }}
+            {{ selectedPage + 1 }} / {{ totalPages }}
           </span>
         </div>
       </div>
@@ -361,7 +364,7 @@ const getInputType = item => {
               class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
               @change="updateResponse(item.item_id, $event.target.value)"
             >
-              <option value="">Select an option...</option>
+              <option value="" disabled selected hidden />
               <option
                 v-for="option in item.options"
                 :key="option.value"
@@ -504,7 +507,9 @@ const getInputType = item => {
             class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
             @click="previousPage"
           >
-            ← Previous
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+            </svg>
           </button>
           <div v-else />
 
@@ -523,7 +528,9 @@ const getInputType = item => {
               class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
               @click="nextPage"
             >
-              Next →
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+              </svg>
             </button>
             <button
               v-else
@@ -535,7 +542,6 @@ const getInputType = item => {
                 <div
                   class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
                 />
-                <span>Submitting...</span>
               </span>
               <span v-else>{{ formConfig.submitButton.title }}</span>
             </button>
