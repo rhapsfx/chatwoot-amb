@@ -22,33 +22,54 @@ const getImageById = imageId => {
   return image ? `data:image/jpeg;base64,${image.data}` : null;
 };
 
-const handleItemClick = (section, item) => {
+const handleItemClick = () => {
   // In a real implementation, this would send the selection back to the server
-  console.log('Selected item:', { section: section.title, item: item.title });
 };
 </script>
 
 <template>
   <BaseBubble>
-    <div class="apple-list-picker max-w-sm">
+    <div class="apple-list-picker max-w-md">
       <!-- Header -->
-      <div class="mb-4 p-3 bg-n-alpha-2 rounded-lg">
-        <!-- Header Image -->
-        <img
-          v-if="
-            receivedImageIdentifier && getImageById(receivedImageIdentifier)
-          "
-          :src="getImageById(receivedImageIdentifier)"
-          :alt="receivedTitle"
-          class="w-full h-32 rounded-lg object-cover mb-3"
-        />
+      <div
+        class="mb-3 p-3 bg-n-alpha-2 rounded-lg flex items-start space-x-2.5"
+      >
+        <!-- Header Image/Icon -->
+        <div class="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden">
+          <img
+            v-if="
+              receivedImageIdentifier && getImageById(receivedImageIdentifier)
+            "
+            :src="getImageById(receivedImageIdentifier)"
+            :alt="receivedTitle"
+            class="w-full h-full object-cover"
+          />
+          <div
+            v-else
+            class="w-full h-full bg-blue-500 flex items-center justify-center"
+          >
+            <svg
+              class="w-6 h-6 text-white"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M3,13H15V11H3M3,6V8H21V6M3,18H9V16H3V18Z" />
+            </svg>
+          </div>
+        </div>
 
-        <h3 class="text-sm font-medium text-n-slate-12 mb-1">
-          {{ receivedTitle }}
-        </h3>
-        <p v-if="receivedSubtitle" class="text-xs text-n-slate-11">
-          {{ receivedSubtitle }}
-        </p>
+        <!-- Header Text -->
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-medium text-n-slate-12 mb-0.5">
+            {{ receivedTitle }}
+          </h3>
+          <p
+            v-if="receivedSubtitle"
+            class="text-xs text-n-slate-11 line-clamp-1"
+          >
+            {{ receivedSubtitle }}
+          </p>
+        </div>
       </div>
 
       <!-- Sections -->
@@ -106,13 +127,6 @@ const handleItemClick = (section, item) => {
             </button>
           </div>
         </div>
-      </div>
-
-      <!-- Footer Note -->
-      <div
-        class="mt-4 p-2 text-xs text-n-slate-11 text-center bg-n-alpha-1 rounded"
-      >
-        Tap an option to select
       </div>
     </div>
   </BaseBubble>

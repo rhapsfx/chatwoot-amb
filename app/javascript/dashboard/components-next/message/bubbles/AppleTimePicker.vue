@@ -6,6 +6,17 @@ import BaseBubble from './Base.vue';
 const { contentAttributes } = useMessageContext();
 
 const event = computed(() => contentAttributes.value?.event || {});
+const images = computed(() => contentAttributes.value?.images || []);
+const receivedImageIdentifier = computed(
+  () => contentAttributes.value?.received_image_identifier
+);
+
+const getImageById = imageId => {
+  if (!imageId) return null;
+  const image = images.value.find(img => img.identifier === imageId);
+  return image ? `data:image/jpeg;base64,${image.data}` : null;
+};
+
 const timeslots = computed(() => {
   // Try event.timeslots first (current format), then fall back to top-level timeslots (legacy)
   const rawSlots =
@@ -58,15 +69,49 @@ const handleTimeSlotClick = () => {
 
 <template>
   <BaseBubble>
-    <div class="apple-time-picker max-w-sm">
+    <div class="apple-time-picker max-w-md">
       <!-- Event Header -->
-      <div class="mb-4 p-3 bg-n-alpha-2 rounded-lg">
-        <h3 class="text-sm font-medium text-n-slate-12 mb-1">
-          {{ event.title || 'Schedule Time' }}
-        </h3>
-        <p v-if="event.description" class="text-xs text-n-slate-11">
-          {{ event.description }}
-        </p>
+      <div
+        class="mb-3 p-3 bg-n-alpha-2 rounded-lg flex items-start space-x-2.5"
+      >
+        <!-- Header Image/Icon -->
+        <div class="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden">
+          <img
+            v-if="
+              receivedImageIdentifier && getImageById(receivedImageIdentifier)
+            "
+            :src="getImageById(receivedImageIdentifier)"
+            :alt="event.title || 'Schedule Time'"
+            class="w-full h-full object-cover"
+          />
+          <div
+            v-else
+            class="w-full h-full bg-blue-500 flex items-center justify-center"
+          >
+            <svg
+              class="w-6 h-6 text-white"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Header Text -->
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-medium text-n-slate-12 mb-0.5">
+            {{ event.title || 'Schedule Time' }}
+          </h3>
+          <p
+            v-if="event.description"
+            class="text-xs text-n-slate-11 line-clamp-1"
+          >
+            {{ event.description }}
+          </p>
+        </div>
       </div>
 
       <!-- Time Slots -->
