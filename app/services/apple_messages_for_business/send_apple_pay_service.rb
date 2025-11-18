@@ -114,9 +114,7 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
 
     if response.success?
       Rails.logger.info "[AMB ApplePay] Successfully sent Apple Pay request to device (message_id: #{message_id})"
-      if test_mode_enabled?
-        Rails.logger.info "[AMB ApplePay] Test mode: Payment gateway will simulate success when user completes payment"
-      end
+      Rails.logger.info '[AMB ApplePay] Test mode: Payment gateway will simulate success when user completes payment' if test_mode_enabled?
       { success: true, message_id: message_id }
     else
       Rails.logger.error "[AMB ApplePay] Apple MSP returned error: HTTP #{response.code} - #{response.body}"
@@ -152,28 +150,31 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
       }
     }
 
-    Rails.logger.info "[AMB ApplePay] Payment structure before transform: #{payment_structure.to_json}"
-
     # Transform payment structure to Apple format (snake_case → camelCase)
     # NOTE: CaseTransformer returns SYMBOL keys, not string keys
     payment_data = AppleMessagesForBusiness::CaseTransformer.to_apple_format(payment_structure)
 
-    Rails.logger.info "[AMB ApplePay] Payment data after transform: #{payment_data.to_json}"
-    Rails.logger.info "[AMB ApplePay] Payment data keys: #{payment_data.keys.inspect}"
-    # Access transformed data with SYMBOL keys (not string keys)
-    Rails.logger.info "[AMB ApplePay] Merchant ID in applePay config: #{payment_data.dig(:paymentRequest, :applePay, :merchantIdentifier)}"
-    Rails.logger.info "[AMB ApplePay] Merchant ID in merchant session: #{payment_data.dig(:merchantSession, :merchantIdentifier)}"
-
     default_bid = 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension'
+
+    # Fetch and encode images if image identifiers are provided
+    images = fetch_images
+
+    # Build data object with payment and images
+    data_object = {
+      requestIdentifier: @payment_data['request_identifier'] || SecureRandom.uuid,
+      mspVersion: '1.0',
+      payment: payment_data
+    }
+
+    # CRITICAL: Images must be INSIDE the data object, not at top level
+    # This matches Apple's reference implementation in 16_send_rich_apple_pay_request.py
+    data_object[:images] = images if images.any?
 
     {
       receivedMessage: build_received_message,
+      replyMessage: build_reply_message,
       bid: @channel.imessage_extension_bid || default_bid,
-      data: {
-        requestIdentifier: @payment_data['request_identifier'] || SecureRandom.uuid,
-        mspVersion: '1.0',
-        payment: payment_data
-      }
+      data: data_object
     }
   end
 
@@ -276,6 +277,64 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
 
     # Transform to Apple format with received_message context
     AppleMessagesForBusiness::CaseTransformer.to_apple_format(received_msg, context: :received_message)
+  end
+
+  # Build replyMessage (message bubble shown after payment response)
+  def build_reply_message
+    reply_msg = {
+      'title' => @payment_data['reply_title'] || 'Payment Complete',
+      'subtitle' => @payment_data['reply_subtitle'] || 'Thank you for your purchase',
+      'style' => @payment_data['reply_style'] || 'icon'
+    }
+
+    # Add image if provided, otherwise use received image as fallback
+    reply_image_id = @payment_data['reply_image_identifier'] || @payment_data['received_image_identifier']
+    reply_msg['image_identifier'] = reply_image_id if reply_image_id
+
+    # Transform to Apple format with reply_message context
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(reply_msg, context: :reply_message)
+  end
+
+  # Fetch and encode images from AppleListPickerImage model
+  # Returns array of base64-encoded images for the interactive message
+  def fetch_images
+    # Collect all unique image identifiers from payment_data
+    identifiers = [
+      @payment_data['received_image_identifier'],
+      @payment_data['reply_image_identifier']
+    ].compact.uniq
+
+    return [] if identifiers.empty?
+
+    # Fetch images from database
+    # Get inbox_id from the channel's inbox
+    inbox_id = @channel.inbox&.id
+
+    return [] unless inbox_id
+
+    picker_images = AppleListPickerImage
+                    .where(inbox_id: inbox_id, identifier: identifiers)
+                    .includes(image_attachment: :blob)
+
+    # Convert to base64 array format
+    picker_images.filter_map do |picker_image|
+      next unless picker_image.image.attached?
+
+      begin
+        # Download and encode image as base64
+        image_data = picker_image.image.download
+        base64_data = Base64.strict_encode64(image_data)
+
+        {
+          identifier: picker_image.identifier,
+          data: base64_data,
+          description: picker_image.description || ''
+        }
+      rescue StandardError => e
+        Rails.logger.error "[AMB ApplePay] Failed to encode image #{picker_image.identifier}: #{e.message}"
+        nil
+      end
+    end
   end
 
   # Construct payment gateway URL
