@@ -9,17 +9,6 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   def perform
     Rails.logger.info '[AMB IncomingMessage] Starting message processing'
-    Rails.logger.info "[AMB IncomingMessage] 🔍 WEBHOOK DEBUG - Full params: #{@params.inspect}"
-    Rails.logger.info "[AMB IncomingMessage] Headers: #{@headers.inspect}"
-    Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveDataRef: #{@params['interactiveDataRef'].present?}"
-    Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveData: #{@params['interactiveData'].present?}"
-
-    # CRITICAL DEBUG: Check if both IDR and direct interactiveData are present (form responses)
-    if @params['interactiveDataRef'].present? && @params['interactiveData'].present?
-      Rails.logger.info '[AMB IncomingMessage] 🔥 BOTH interactiveDataRef AND interactiveData present!'
-      Rails.logger.info "[AMB IncomingMessage] 🔥 Direct interactiveData keys: #{@params['interactiveData'].keys.inspect}"
-      Rails.logger.info "[AMB IncomingMessage] 🔥 Direct interactiveData: #{@params['interactiveData'].inspect[0..1000]}"
-    end
 
     unless valid_message?
       Rails.logger.error '[AMB IncomingMessage] Invalid message - validation failed'
@@ -30,12 +19,9 @@ class AppleMessagesForBusiness::IncomingMessageService
 
     # CRITICAL: Process IDR immediately if present, before any database operations
     # IDR URLs expire within seconds, so we must download the data first
-    Rails.logger.info "[AMB IncomingMessage] Checking for IDR: #{@params.keys.inspect}"
     if @params['interactiveDataRef'].present?
       Rails.logger.info '[AMB IncomingMessage] IDR detected - downloading data immediately before any DB operations'
       @idr_data = download_idr_data
-    else
-      Rails.logger.info '[AMB IncomingMessage] No IDR in params'
     end
 
     set_contact
@@ -150,7 +136,7 @@ class AppleMessagesForBusiness::IncomingMessageService
         # Check for recent message with same session ID and content within last 10 seconds
         recent_cutoff = 10.seconds.ago
         existing_interactive = @conversation.messages
-                                            .where(message_type: :incoming, content_type: ['text', 'apple_form_response'])
+                                            .where(message_type: :incoming, content_type: %w[text apple_form_response])
                                             .where('created_at > ?', recent_cutoff)
                                             .where(content: message_content)
                                             .first
@@ -460,9 +446,11 @@ class AppleMessagesForBusiness::IncomingMessageService
     end
     # DEBUG: For NSKeyedArchiver, log $objects array
     if interactive_data['$archiver'] == 'NSKeyedArchiver'
-      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: NSKeyedArchiver detected"
+      Rails.logger.info '[AMB IncomingMessage] 🔍 DEBUG: NSKeyedArchiver detected'
       Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: $top keys: #{interactive_data['$top'].keys.inspect}" if interactive_data['$top']
-      Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: $objects sample: #{interactive_data['$objects']&.first(10).inspect}" if interactive_data['$objects']
+      if interactive_data['$objects']
+        Rails.logger.info "[AMB IncomingMessage] 🔍 DEBUG: $objects sample: #{interactive_data['$objects']&.first(10).inspect}"
+      end
     end
 
     attributes = {
@@ -753,6 +741,12 @@ class AppleMessagesForBusiness::IncomingMessageService
 
       Rails.logger.info '[AMB IncomingMessage] Successfully processed IDR, storing full interactive data'
 
+      # === EXPOSE RAW DECODED IDR DATA ===
+      Rails.logger.info '[AMB IncomingMessage] ========================================='
+      Rails.logger.info '[AMB IncomingMessage] RAW DECODED IDR PAYLOAD:'
+      Rails.logger.info "[AMB IncomingMessage] #{JSON.pretty_generate(full_interactive_data)}"
+      Rails.logger.info '[AMB IncomingMessage] ========================================='
+
       # Extract content from the decrypted interactive data
       extracted_content = extract_content_from_interactive_data(full_interactive_data)
       Rails.logger.info "[AMB IncomingMessage] Extracted content: '#{extracted_content}'"
@@ -914,6 +908,15 @@ class AppleMessagesForBusiness::IncomingMessageService
     # For IDR responses, check if it's a form first
     if @params['interactiveDataRef'].present? && @idr_data.present?
       Rails.logger.info '[AMB IncomingMessage] 🔍 Branch: IDR response detected'
+
+      # CRITICAL: Check if IDR contains form selections (most reliable indicator)
+      if @idr_data.dig('data', 'dynamic', 'selections').present?
+        Rails.logger.info '[AMB IncomingMessage] ✅ Detected form response from IDR data.dynamic.selections'
+        return 'apple_form_response'
+      elsif @idr_data.dig('data', 'dynamic', 'template') == 'messageForms'
+        Rails.logger.info '[AMB IncomingMessage] ✅ Detected form response from IDR data.dynamic.template=messageForms'
+        return 'apple_form_response'
+      end
 
       type_from_idr = determine_content_type_from_data(@idr_data)
       Rails.logger.info "[AMB IncomingMessage] 🔍 Type from IDR data: #{type_from_idr}"

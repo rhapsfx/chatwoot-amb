@@ -124,6 +124,12 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     return unless bot_enabled?
     return unless message.incoming?
 
+    # Don't trigger bot for blocked contacts (users who closed the conversation)
+    if contact_blocked_from_apple_messages?
+      Rails.logger.info '[Apple Messages Bot] Skipping bot - contact is blocked (opted out)'
+      return
+    end
+
     bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
       @conversation,
       message
@@ -145,6 +151,13 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     # Default to true if not set (opt-out model)
     attrs = @conversation.custom_attributes || {}
     attrs.fetch('bot_enabled', true)
+  end
+
+  def contact_blocked_from_apple_messages?
+    # Check if contact has been blocked due to closing the conversation on their device
+    return false unless @conversation.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
+
+    @conversation.contact.additional_attributes&.dig('apple_messages_blocked') == true
   end
 
   def message

@@ -367,9 +367,9 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
       :description,
       :status,
       :version,
-      :metadata,
       :attachment_metadata,
       parameters: {},
+      metadata: {},  # Permit hash parameter for JSONB column
       supported_channels: [],
       tags: [],
       use_cases: []
