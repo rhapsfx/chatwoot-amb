@@ -78,10 +78,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def process_message
-    Rails.logger.info "[Bot] 🔄 process_message - Current state: #{@bot_state}, Message content: #{@message.content&.truncate(50)}"
-    Rails.logger.info "[Bot] 🔄 Message content_type: #{@message.content_type}"
+    log_info "[Bot] 🔄 process_message - Current state: #{@bot_state}, Message content: #{@message.content&.truncate(50)}"
+    log_info "[Bot] 🔄 Message content_type: #{@message.content_type}"
     sanitized_attrs = LogSanitizerService.sanitize_for_log(@message.content_attributes)
-    Rails.logger.info "[Bot] 🔄 Message content_attributes: #{sanitized_attrs.inspect}"
+    log_info "[Bot] 🔄 Message content_attributes: #{utf8_encode(sanitized_attrs).inspect}"
 
     # Check for timeout - restart if idle > 30 minutes
     if conversation_timed_out?
@@ -100,7 +100,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     # Handle form responses by content_type (forms don't have custom identifiers)
     if @message.content_type == 'apple_form_response'
-      Rails.logger.info '[Bot] ✅ Detected form response, calling handle_form_response'
+      log_info '[Bot] ✅ Detected form response, calling handle_form_response'
 
       # Check if this is a large form response (from template 343)
       # We identify it by checking the bot state or form content
@@ -117,8 +117,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def process_interactive_response(interactive_data)
-    Rails.logger.info '[Bot] 🎯 process_interactive_response called'
-    Rails.logger.info "[Bot] 🎯 Interactive data: #{interactive_data.inspect}"
+    log_info '[Bot] 🎯 process_interactive_response called'
+    log_info "[Bot] 🎯 Interactive data: #{utf8_encode(interactive_data).inspect}"
 
     # For quick replies, Apple uses 'selectedIdentifier' (our custom identifier)
     # For other types (list picker, time picker), use 'requestIdentifier'
@@ -127,18 +127,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     request_id = if data['quick-reply']
                    # Quick reply uses selectedIdentifier (the identifier we set on items)
                    selected_id = data.dig('quick-reply', 'selectedIdentifier')
-                   Rails.logger.info "[Bot] 🎯 Quick reply detected - selectedIdentifier: #{selected_id}"
+                   log_info "[Bot] 🎯 Quick reply detected - selectedIdentifier: #{selected_id}"
                    selected_id
                  elsif data['requestIdentifier'].present?
                    # Other interactive types use requestIdentifier
                    req_id = data['requestIdentifier']
-                   Rails.logger.info "[Bot] 🎯 Interactive type detected - requestIdentifier: #{req_id}"
+                   log_info "[Bot] 🎯 Interactive type detected - requestIdentifier: #{req_id}"
                    req_id
                  else
                    # NSKeyedArchiver format doesn't have 'data' key
                    # Infer requestIdentifier from bot state instead of searching old messages
-                   Rails.logger.info '[Bot] 🎯 NSKeyedArchiver format detected - inferring requestIdentifier from bot state'
-                   Rails.logger.info "[Bot] 🎯 Current bot state: #{@bot_state}"
+                   log_info '[Bot] 🎯 NSKeyedArchiver format detected - inferring requestIdentifier from bot state'
+                   log_info "[Bot] 🎯 Current bot state: #{@bot_state}"
 
                    # Map bot states to expected request identifiers
                    req_id = case @bot_state
@@ -147,7 +147,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                             when 'AHB1'
                               # Form response - but this shouldn't come through interactive path
                               # Route it to form handler manually
-                              Rails.logger.info '[Bot] 🎯 Form response detected via NSKeyedArchiver - routing to form handler'
+                              log_info '[Bot] 🎯 Form response detected via NSKeyedArchiver - routing to form handler'
                               handle_form_response
                               return # Exit early, form handler already called
                             when 'AHB2'
@@ -171,29 +171,56 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                             when 'AHF1'
                               'applepay_1018' # Apple Pay
                             else
-                              Rails.logger.warn "[Bot] ⚠️ Unknown bot state for NSKeyedArchiver: #{@bot_state}"
+                              log_warn "[Bot] ⚠️ Unknown bot state for NSKeyedArchiver: #{@bot_state}"
                               nil
                             end
 
-                   Rails.logger.info "[Bot] 🎯 Inferred requestIdentifier from state #{@bot_state}: #{req_id}"
+                   log_info "[Bot] 🎯 Inferred requestIdentifier from state #{@bot_state}: #{req_id}"
                    req_id
                  end
 
-    Rails.logger.info "[Bot] 🎯 Processing interactive response - requestId: #{request_id}"
-    Rails.logger.info "[Bot] 📋 Interactive data keys: #{interactive_data.keys.inspect}"
-    Rails.logger.info "[Bot] 📋 Data keys: #{data.keys.inspect}"
+    log_info "[Bot] 🎯 Processing interactive response - requestId: #{request_id}"
+    log_info "[Bot] 📋 Interactive data keys: #{utf8_encode(interactive_data.keys).inspect}"
+    log_info "[Bot] 📋 Data keys: #{utf8_encode(data.keys).inspect}"
 
     handler_method = INTERACTIVE_HANDLERS[request_id]
     if handler_method
-      Rails.logger.info "[Bot] ✅ Found handler: #{handler_method}"
+      log_info "[Bot] ✅ Found handler: #{handler_method}"
       send(handler_method, interactive_data)
     else
-      Rails.logger.warn "[Bot] ❌ No handler for requestId: #{request_id}"
-      Rails.logger.warn "[Bot] 📝 Available handlers: #{INTERACTIVE_HANDLERS.keys.inspect}"
+      log_warn "[Bot] ❌ No handler for requestId: #{request_id}"
+      log_warn "[Bot] 📝 Available handlers: #{INTERACTIVE_HANDLERS.keys.inspect}"
     end
   end
 
   private
+
+  # Ensure UTF-8 encoding for log output to prevent mojibake
+  def utf8_encode(obj)
+    case obj
+    when String
+      obj.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    when Hash
+      obj.transform_keys { |k| utf8_encode(k) }
+         .transform_values { |v| utf8_encode(v) }
+    when Array
+      obj.map { |item| utf8_encode(item) }
+    when NilClass
+      nil
+    else
+      # For other objects, convert to string and encode
+      obj.to_s.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
+  end
+
+  # Safe logging wrapper that ensures UTF-8 encoding
+  def log_info(message)
+    Rails.logger.info(utf8_encode(message))
+  end
+
+  def log_warn(message)
+    Rails.logger.warn(utf8_encode(message))
+  end
 
   def get_bot_state
     attrs = @conversation.custom_attributes || {}
@@ -259,7 +286,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   # State machine flow
   def process_state
-    Rails.logger.info "[Bot] ⚙️ process_state - Handling state: #{@bot_state}"
+    log_info "[Bot] ⚙️ process_state - Handling state: #{@bot_state}"
 
     # If in demo mode, don't process state - wait for reset keyword
     if @bot_state == 'DEMO_MODE'
@@ -335,7 +362,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       handle_welcome
     else
       # Unknown state - reset
-      Rails.logger.warn "Unknown bot state: #{@bot_state}, resetting to welcome"
+      log_warn "Unknown bot state: #{@bot_state}, resetting to welcome"
       reset_to_welcome
       handle_welcome
     end
@@ -344,7 +371,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # === AHA States (Welcome Flow) ===
 
   def handle_welcome
-    Rails.logger.info "[Bot] 🎯 handle_welcome called - State: #{@bot_state}"
+    log_info "[Bot] 🎯 handle_welcome called - State: #{@bot_state}"
     send_text_message('Thank you for contacting Acoustic Bot Prod.')
     send_text_message("Let's help you find your next guitar 🎸.")
     # Send region prompt immediately, update state in handle_region_prompt
@@ -352,8 +379,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_region_prompt
-    Rails.logger.info "[Bot] 🎯 handle_region_prompt called - State: #{@bot_state}"
-    Rails.logger.info "[Bot] 🎯 Called from: #{caller[0..3].join("\n")}"
+    log_info "[Bot] 🎯 handle_region_prompt called - State: #{@bot_state}"
+    log_info "[Bot] 🎯 Called from: #{caller[0..3].join("\n")}"
     # Update state here instead of in handle_welcome
     update_bot_state('AHA2') if @bot_state == 'AHA1'
 
@@ -370,8 +397,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_region_selection(interactive_data)
-    Rails.logger.info '[Bot] 🌍 handle_region_selection called'
-    Rails.logger.info "[Bot] 🌍 interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🌍 handle_region_selection called'
+    log_info "[Bot] 🌍 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selected option - handle both standard format and NSKeyedArchiver
     selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -380,7 +407,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   # Find the selected region name in the objects array
                   # Look for strings that match region names
                   region_name = objects.find { |obj| obj.is_a?(String) && obj.match?(/Americas|EMEA|Asia Pacific/i) }
-                  Rails.logger.info "[Bot] 🌍 NSKeyedArchiver region selection: #{region_name}"
+                  log_info "[Bot] 🌍 NSKeyedArchiver region selection: #{utf8_encode(region_name)}"
                   region_name
                 else
                   # Standard quick reply format
@@ -389,7 +416,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   items = quick_reply_data['items'] || []
 
                   selected_title = items[selected_index]&.fetch('title', nil) if selected_index
-                  Rails.logger.info "[Bot] 🌍 Standard format region selection: #{selected_title}"
+                  log_info "[Bot] 🌍 Standard format region selection: #{utf8_encode(selected_title)}"
                   selected_title
                 end
 
@@ -406,11 +433,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     supports_forms = capabilities.include?('FORM')
 
     if supports_forms
-      Rails.logger.info '[Bot] Device supports FORM - sending Apple Messages Form'
+      log_info '[Bot] Device supports FORM - sending Apple Messages Form'
       send_guitar_info_form
       update_bot_state('AHB1') # Wait for form response
     else
-      Rails.logger.info '[Bot] Device does not support FORM - asking for name via text'
+      log_info '[Bot] Device does not support FORM - asking for name via text'
       send_text_message("What's your name?")
       # Skip form and ask for text name input
       update_bot_state('AHB1_2') # Wait for text name input
@@ -423,12 +450,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Parse form response from content_attributes
     form_data = @message.content_attributes.dig('form_response', 'selections') || []
 
-    Rails.logger.info "[Bot] 📝 Parsing form response with #{form_data.length} selections"
-    Rails.logger.info "[Bot] 📝 Full form_data structure: #{form_data.inspect}"
+    log_info "[Bot] 📝 Parsing form response with #{form_data.length} selections"
+    log_info "[Bot] 📝 Full form_data structure: #{utf8_encode(form_data).inspect}"
 
     # Log each section to understand the structure
     form_data.each_with_index do |section, index|
-      Rails.logger.info "[Bot] 📝 Section #{index}: #{section.inspect}"
+      log_info "[Bot] 📝 Section #{index}: #{utf8_encode(section).inspect}"
     end
 
     # Extract customer name by matching field title (case-insensitive)
@@ -442,9 +469,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Extract address information
     address_data = extract_address_from_form(form_data)
 
-    Rails.logger.info "[Bot] 📝 Extracted customer_name: #{customer_name.inspect} (from '#{full_name_section&.dig('title')}' field)"
-    Rails.logger.info "[Bot] 📝 Extracted stage_name: #{stage_name.inspect} (from '#{stage_name_section&.dig('title')}' field)"
-    Rails.logger.info "[Bot] 📝 Extracted address: #{address_data.inspect}"
+    log_info "[Bot] 📝 Extracted customer_name: #{utf8_encode(customer_name).inspect} (from '#{utf8_encode(full_name_section&.dig('title'))}' field)"
+    log_info "[Bot] 📝 Extracted stage_name: #{utf8_encode(stage_name).inspect} (from '#{utf8_encode(stage_name_section&.dig('title'))}' field)"
+    log_info "[Bot] 📝 Extracted address: #{utf8_encode(address_data).inspect}"
 
     # Store in conversation attributes
     update_conversation_attribute('customer_name', customer_name) if customer_name.present?
@@ -456,8 +483,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Reload conversation to ensure attributes are fresh
     @conversation.reload
 
-    Rails.logger.info "[Bot] ✅ Form parsed - customer_name: #{customer_name}, stage_name: #{stage_name}, address: #{address_data.present? ? 'Yes' : 'No'}"
-    Rails.logger.info "[Bot] ✅ Stored attributes: #{@conversation.custom_attributes.inspect}"
+    log_info "[Bot] ✅ Form parsed - customer_name: #{utf8_encode(customer_name)}, stage_name: #{utf8_encode(stage_name)}, address: #{address_data.present? ? 'Yes' : 'No'}"
+    log_info "[Bot] ✅ Stored attributes: #{utf8_encode(@conversation.custom_attributes).inspect}"
 
     # Thank user - use generic message if both names present (we'll ask which to use next)
     if customer_name.present? && stage_name.present?
@@ -493,8 +520,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     customer_name = get_conversation_attribute('customer_name')
     stage_name = get_conversation_attribute('stage_name')
 
-    Rails.logger.info "[Bot] 🏷️ handle_name_preference_prompt - customer_name: #{customer_name.inspect}, stage_name: #{stage_name.inspect}"
-    Rails.logger.info "[Bot] 🏷️ All conversation attributes: #{@conversation.custom_attributes.inspect}"
+    log_info "[Bot] 🏷️ handle_name_preference_prompt - customer_name: #{utf8_encode(customer_name).inspect}, stage_name: #{utf8_encode(stage_name).inspect}"
+    log_info "[Bot] 🏷️ All conversation attributes: #{utf8_encode(@conversation.custom_attributes).inspect}"
 
     # If both names are present, ask for preference
     if customer_name.present? && stage_name.present?
@@ -509,15 +536,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       )
     else
       # Only one name available - skip to guitar list
-      Rails.logger.warn "[Bot] ⚠️ Skipping name preference - customer_name: #{customer_name.inspect}, stage_name: #{stage_name.inspect}"
+      log_warn "[Bot] ⚠️ Skipping name preference - customer_name: #{utf8_encode(customer_name).inspect}, stage_name: #{utf8_encode(stage_name).inspect}"
       update_bot_state('AHB3')
       handle_guitar_list_prompt
     end
   end
 
   def handle_name_preference_selection(interactive_data)
-    Rails.logger.info '[Bot] 🏷️ handle_name_preference_selection called'
-    Rails.logger.info "[Bot] 🏷️ interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🏷️ handle_name_preference_selection called'
+    log_info "[Bot] 🏷️ interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selected name - handle both standard format and NSKeyedArchiver
     selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -525,7 +552,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   objects = interactive_data['$objects'] || []
                   # Find the selected name in the objects array (look for strings)
                   name = objects.find { |obj| obj.is_a?(String) && obj.length > 1 && obj != '$null' && !obj.start_with?('NS') }
-                  Rails.logger.info "[Bot] 🏷️ NSKeyedArchiver name selection: #{name}"
+                  log_info "[Bot] 🏷️ NSKeyedArchiver name selection: #{utf8_encode(name)}"
                   name
                 else
                   # Standard quick reply format
@@ -534,7 +561,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   items = quick_reply_data['items'] || []
 
                   selected_title = items[selected_index]&.fetch('title', nil) if selected_index
-                  Rails.logger.info "[Bot] 🏷️ Standard format name selection: #{selected_title}"
+                  log_info "[Bot] 🏷️ Standard format name selection: #{utf8_encode(selected_title)}"
                   selected_title
                 end
 
@@ -559,11 +586,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_guitar_list_prompt
-    Rails.logger.info '[Bot] 🎸 handle_guitar_list_prompt called'
+    log_info '[Bot] 🎸 handle_guitar_list_prompt called'
     send_text_message('Here are some amazing guitars:')
     send_guitar_list_picker
     update_bot_state('AHC1')
-    Rails.logger.info '[Bot] 🎸 Guitar list prompt completed, state updated to AHC1'
+    log_info '[Bot] 🎸 Guitar list prompt completed, state updated to AHC1'
   end
 
   # === AHC States (Guitar Selection & Catcher) ===
@@ -597,15 +624,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_guitar_selection(interactive_data)
-    Rails.logger.info '[Bot] 🎸 handle_guitar_selection called'
-    Rails.logger.info "[Bot] 🎸 interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🎸 handle_guitar_selection called'
+    log_info "[Bot] 🎸 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selection from interactive data
     # For list picker responses from IDR, the selection is in the 'ldtext' field
     selection = if interactive_data['ldtext'].present?
                   # Resolved NSKeyedArchiver/IDR format - selection is in ldtext
                   guitar_name = interactive_data['ldtext']
-                  Rails.logger.info "[Bot] 🎸 IDR format guitar selection (ldtext): #{guitar_name}"
+                  log_info "[Bot] 🎸 IDR format guitar selection (ldtext): #{utf8_encode(guitar_name)}"
                   guitar_name
                 elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
                   # Raw NSKeyedArchiver format - extract from $objects array
@@ -613,12 +640,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   guitar_name = objects.find do |obj|
                     obj.is_a?(String) && obj.match?(/guitar|stratocaster|les paul|dreadnought|gibson|fender|martin/i)
                   end
-                  Rails.logger.info "[Bot] 🎸 NSKeyedArchiver guitar selection: #{guitar_name}"
+                  log_info "[Bot] 🎸 NSKeyedArchiver guitar selection: #{utf8_encode(guitar_name)}"
                   guitar_name
                 else
                   # Standard format
                   guitar_name = interactive_data.dig('data', 'reply', 'title')
-                  Rails.logger.info "[Bot] 🎸 Standard format guitar selection: #{guitar_name}"
+                  log_info "[Bot] 🎸 Standard format guitar selection: #{utf8_encode(guitar_name)}"
                   guitar_name
                 end
 
@@ -662,15 +689,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_view_response(interactive_data)
     # AHD1: AR view response
-    Rails.logger.info '[Bot] 🎨 handle_ar_view_response called'
-    Rails.logger.info "[Bot] 🎨 interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🎨 handle_ar_view_response called'
+    log_info "[Bot] 🎨 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selected option - handle both standard format and NSKeyedArchiver
     selection_value = if interactive_data['$archiver'] == 'NSKeyedArchiver'
                         # NSKeyedArchiver format - check for Yes/No in objects
                         objects = interactive_data['$objects'] || []
                         response = objects.find { |obj| obj.is_a?(String) && obj.match?(/yes|no/i) }
-                        Rails.logger.info "[Bot] 🎨 NSKeyedArchiver AR response: #{response}"
+                        log_info "[Bot] 🎨 NSKeyedArchiver AR response: #{utf8_encode(response)}"
                         response&.downcase == 'yes' ? '111' : '222'
                       else
                         # Standard quick reply format - use selectedIndex to determine Yes (0) or No (1)
@@ -679,7 +706,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
                         # selectedIndex: 0 = Yes (111), 1 = No (222)
                         identifier = selected_index == 0 ? '111' : '222'
-                        Rails.logger.info "[Bot] 🎨 Standard format AR response - selectedIndex: #{selected_index}, mapped to: #{identifier}"
+                        log_info "[Bot] 🎨 Standard format AR response - selectedIndex: #{selected_index}, mapped to: #{identifier}"
                         identifier
                       end
 
@@ -693,7 +720,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_place_response(interactive_data)
     # AHE1: AR place response
-    Rails.logger.info '[Bot] 🎨 handle_ar_place_response called'
+    log_info '[Bot] 🎨 handle_ar_place_response called'
 
     # Extract selected option - handle both standard format and NSKeyedArchiver
     selection_value = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -710,7 +737,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                         selected_index == 0 ? '111' : '222'
                       end
 
-    Rails.logger.info "[Bot] 🎨 AR place response - selection_value: #{selection_value}"
+    log_info "[Bot] 🎨 AR place response - selection_value: #{selection_value}"
 
     send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - they didn't place AR
 
@@ -767,7 +794,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Handle Apple Pay completion
     payment_state = interactive_data.dig('data', 'payment', 'state')
 
-    Rails.logger.info "[Bot] 💳 Apple Pay response - state: #{payment_state}"
+    log_info "[Bot] 💳 Apple Pay response - state: #{payment_state}"
 
     if payment_state == 'paid'
       customer_name = get_conversation_attribute('customer_name') || 'there'
@@ -783,7 +810,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_skip_payment(_interactive_data = nil)
     # Handle skip payment request - can be called from quick reply or keyword
-    Rails.logger.info '[Bot] 💳 Skip payment requested'
+    log_info '[Bot] 💳 Skip payment requested'
 
     # Only allow skip if we're in a payment-related state
     unless %w[AHF1 AHF1_skip AHE2].include?(@bot_state)
@@ -807,7 +834,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                     items[selected_index]&.fetch('title', nil) if selected_index
                   end
 
-      Rails.logger.info "[Bot] 💳 Skip payment selection: #{selection}"
+      log_info "[Bot] 💳 Skip payment selection: #{utf8_encode(selection)}"
 
       # If user selected "Try Again", retry payment
       if selection&.match?(/try|retry/i)
@@ -876,15 +903,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if user_message.include?('maps.apple.com')
       coordinates = maps_service.extract_coordinates_from_url(user_message)
       if coordinates
-        Rails.logger.info "[Bot] 📍 Extracted coordinates from Apple Maps link: #{coordinates.inspect}"
+        log_info "[Bot] 📍 Extracted coordinates from Apple Maps link: #{utf8_encode(coordinates).inspect}"
       else
-        Rails.logger.warn "[Bot] ⚠️ Failed to extract coordinates from Apple Maps URL: #{user_message}"
+        log_warn "[Bot] ⚠️ Failed to extract coordinates from Apple Maps URL: #{utf8_encode(user_message)}"
       end
     end
 
     # If not a maps link or extraction failed, try geocoding as zipcode/address
     if coordinates.nil?
-      Rails.logger.info "[Bot] 📍 Attempting geocoding for: '#{user_message}'"
+      log_info "[Bot] 📍 Attempting geocoding for: '#{utf8_encode(user_message)}'"
       geocode_result = maps_service.geocode(user_message)
 
       if geocode_result
@@ -892,11 +919,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           latitude: geocode_result[:latitude],
           longitude: geocode_result[:longitude]
         }
-        Rails.logger.info "[Bot] 📍 Geocoded '#{user_message}' to: #{coordinates.inspect}"
+        log_info "[Bot] 📍 Geocoded '#{utf8_encode(user_message)}' to: #{utf8_encode(coordinates).inspect}"
       else
         # Geocoding failed - provide helpful message based on region
         region = get_conversation_attribute('region')
-        Rails.logger.warn "[Bot] ⚠️ Geocoding failed for: '#{user_message}'"
+        log_warn "[Bot] ⚠️ Geocoding failed for: '#{utf8_encode(user_message)}'"
 
         if region == 'EMEA'
           send_text_message("I couldn't find that postal code. Please try again with your city and country (e.g., '#{user_message} Paris, France' or '78120 Rambouillet, France').")
@@ -911,7 +938,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     # If we have coordinates, search for nearby Apple Stores
     if coordinates
-      Rails.logger.info "[Bot] 🔍 Searching for Apple Stores near: #{coordinates.inspect}"
+      log_info "[Bot] 🔍 Searching for Apple Stores near: #{utf8_encode(coordinates).inspect}"
       stores = maps_service.search_nearby(
         coordinates[:latitude],
         coordinates[:longitude],
@@ -920,7 +947,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       )
 
       if stores.present?
-        Rails.logger.info "[Bot] 🏪 Found #{stores.length} Apple Stores nearby"
+        log_info "[Bot] 🏪 Found #{stores.length} Apple Stores nearby"
 
         # Route based on number of stores found
         case stores.length
@@ -940,22 +967,22 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         reset_retry_count
         return
       else
-        Rails.logger.warn "[Bot] ⚠️ Search returned 0 stores near: #{coordinates.inspect}"
+        log_warn "[Bot] ⚠️ Search returned 0 stores near: #{utf8_encode(coordinates).inspect}"
       end
     else
-      Rails.logger.warn '[Bot] ⚠️ No coordinates available after URL parsing and geocoding'
+      log_warn '[Bot] ⚠️ No coordinates available after URL parsing and geocoding'
     end
 
     # Fallback: No coordinates or no stores found
-    Rails.logger.warn '[Bot] ⚠️ Could not find Apple Stores, falling back to Apple Park'
+    log_warn '[Bot] ⚠️ Could not find Apple Stores, falling back to Apple Park'
     location = LOCATION_DATABASE['95014']
     send_text_message('We were unable to locate your nearest Apple Store, so here are the available times at Apple Park.')
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
     reset_retry_count
   rescue StandardError => e
-    Rails.logger.error "[Bot] ❌ Error in handle_location_response: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] ❌ Error in handle_location_response: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
 
     # Fallback on error
     location = LOCATION_DATABASE['95014']
@@ -989,23 +1016,40 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_time_picker_response(_interactive_data)
-    # Handle time picker selection
-    # Extract timeslot from event.timeslots array
-    timeslots = _interactive_data.dig('data', 'event', 'timeslots')
-    selected_timeslot = timeslots&.first
+    log_info '[Bot] 🕐 handle_time_picker_response called'
+    log_info "[Bot] 🕐 interactive_data keys: #{utf8_encode(_interactive_data.keys).inspect}"
 
-    Rails.logger.info "[Bot] handle_time_picker_response - timeslots: #{timeslots.inspect}"
-    Rails.logger.info "[Bot] handle_time_picker_response - selected_timeslot: #{selected_timeslot.inspect}"
+    # Handle both direct format and NSKeyedArchiver format
+    selected_time = if _interactive_data['data'].present?
+                      # Direct interactiveData format - extract from data structure
+                      timeslots = _interactive_data.dig('data', 'event', 'timeslots')
+                      log_info "[Bot] 🕐 Direct format - timeslots: #{utf8_encode(timeslots).inspect}"
+                      timeslots&.first
+                    else
+                      # NSKeyedArchiver format - extract from ldtext
+                      time_string = _interactive_data['ldtext']
+                      log_info "[Bot] 🕐 NSKeyedArchiver format - extracted time: #{utf8_encode(time_string)}"
 
-    if selected_timeslot
-      # Save the full timeslot data including startTime and identifier
-      update_conversation_attribute('selected_timeslot', selected_timeslot)
+                      if time_string.present?
+                        # Create a minimal timeslot structure with the selected time
+                        {
+                          'startTime' => time_string,
+                          'formatted_time' => time_string
+                        }
+                      end
+                    end
+
+    log_info "[Bot] 🕐 Selected time: #{utf8_encode(selected_time).inspect}"
+
+    if selected_time
+      # Save the selected time data
+      update_conversation_attribute('selected_timeslot', selected_time)
       reset_retry_count
       update_bot_state('AHH2')
       handle_continue_prompt
     else
       # Invalid response, retry
-      Rails.logger.warn '[Bot] No timeslot found in time picker response'
+      log_warn '[Bot] 🕐 No timeslot found in time picker response'
       handle_time_picker_catcher
     end
   end
@@ -1029,7 +1073,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_continue_response(_interactive_data)
     # AHI1: Route based on continue response
-    Rails.logger.info '[Bot] 🎯 handle_continue_response called'
+    log_info '[Bot] 🎯 handle_continue_response called'
 
     # Extract selected option - handle both standard format and NSKeyedArchiver
     selection_identifier = if _interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -1206,7 +1250,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_schedule_lesson
     # Handle schedule/lesson keyword - replay from location request
-    Rails.logger.info '[Bot] 📅 Schedule lesson requested via keyword'
+    log_info '[Bot] 📅 Schedule lesson requested via keyword'
 
     # Reset any retry counts
     reset_retry_count
@@ -1267,7 +1311,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_learn_more_response(interactive_data)
-    Rails.logger.info '[Bot] 📚 handle_learn_more_response called'
+    log_info '[Bot] 📚 handle_learn_more_response called'
 
     # Extract selected option - handle both standard format and NSKeyedArchiver
     selection = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -1306,8 +1350,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_quick_reply(title:, request_id:, items:)
-    Rails.logger.info "[Bot] 📤 Sending quick reply: #{title} (request_id: #{request_id})"
-    Rails.logger.info "[Bot] 📤 Called from: #{caller[0..3].join("\n")}"
+    log_info "[Bot] 📤 Sending quick reply: #{utf8_encode(title)} (request_id: #{request_id})"
+    log_info "[Bot] 📤 Called from: #{caller[0..3].join("\n")}"
 
     with_typing_indicator do
       # Create outgoing message with quick reply content
@@ -1338,8 +1382,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Message will be automatically sent by SendReplyJob (after_create callback)
     # No need to manually call SendQuickReplyService
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send quick reply: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send quick reply: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def send_guitar_list_picker
@@ -1350,12 +1394,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     )
 
     unless template
-      Rails.logger.error '[Bot] Guitar List Picker template (ID: 321) not found'
+      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template (ID: 321) not found')
       send_text_message('Guitar selection temporarily unavailable.')
       return
     end
 
-    Rails.logger.info "[Bot] Sending Guitar List Picker (ID: 321, Name: #{template.name})"
+    log_info "[Bot] Sending Guitar List Picker (ID: 321, Name: #{utf8_encode(template.name)})"
 
     # Extract list picker data from template
     template_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
@@ -1365,7 +1409,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     reply_message = template_attrs['reply_message'] || {}
 
     if sections.blank?
-      Rails.logger.error '[Bot] Guitar List Picker template has no sections'
+      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template has no sections')
       send_text_message('Guitar selection temporarily unavailable.')
       return
     end
@@ -1386,7 +1430,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       (section['items'] || []).map { |item| item['image_identifier'] }
     end.compact
 
-    Rails.logger.info "[Bot] 🎸 Item image identifiers from template: #{item_image_identifiers.inspect}"
+    log_info "[Bot] 🎸 Item image identifiers from template: #{item_image_identifiers.inspect}"
 
     # Also collect image identifiers from received/reply messages
     received_image_id = received_message['image_identifier']
@@ -1394,12 +1438,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     all_identifiers = (item_image_identifiers + [received_image_id, reply_image_id]).compact.uniq
 
-    Rails.logger.info "[Bot] 🎸 All image identifiers: #{all_identifiers.inspect}"
+    log_info "[Bot] 🎸 All image identifiers: #{all_identifiers.inspect}"
 
     # Fetch and encode images from ActiveStorage
     images = fetch_and_encode_images(all_identifiers)
 
-    Rails.logger.info "[Bot] 🎸 Encoded #{images.length} images"
+    log_info "[Bot] 🎸 Encoded #{images.length} images"
 
     # Build content attributes with all components
     content_attrs = {
@@ -1438,8 +1482,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       )
     ).perform
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send guitar list picker: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send guitar list picker: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def fetch_and_encode_images(identifiers)
@@ -1451,8 +1495,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                     .where(inbox_id: inbox_id, identifier: identifiers)
                     .includes(image_attachment: :blob)
 
-    Rails.logger.info "[Bot] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
-    Rails.logger.info "[Bot] 🖼️ Found #{picker_images.count} images in ActiveStorage: #{picker_images.map(&:identifier).inspect}"
+    log_info "[Bot] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
+    log_info "[Bot] 🖼️ Found #{picker_images.count} images in ActiveStorage: #{picker_images.map(&:identifier).inspect}"
 
     # Convert to base64 array format expected by SendListPickerService
     picker_images.filter_map do |picker_image|
@@ -1463,7 +1507,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         image_data = picker_image.image.download
         base64_data = Base64.strict_encode64(image_data)
 
-        Rails.logger.info "[Bot] 🖼️ Encoded image: #{picker_image.identifier} (#{(base64_data.length / 1024.0).round(2)} KB)"
+        log_info "[Bot] 🖼️ Encoded image: #{utf8_encode(picker_image.identifier)} (#{(base64_data.length / 1024.0).round(2)} KB)"
 
         {
           'identifier' => picker_image.identifier,
@@ -1554,8 +1598,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     rendered = renderer.render_for_bot
 
+    # CRITICAL: Ensure content_type is 'apple_form' so IncomingMessageService can detect form responses
+    rendered[:content_type] = 'apple_form' if rendered[:content_type] != 'apple_form'
+
     # Add request_identifier for proper routing to handle_large_form_response
     rendered[:content_attributes]['request_identifier'] = 'form_large_content' if rendered[:content_attributes]['request_identifier'].blank?
+
+    Rails.logger.info "[Bot] 📋 Form content_type: #{rendered[:content_type]}"
+    Rails.logger.info "[Bot] 📋 Form request_identifier: #{rendered[:content_attributes]['request_identifier']}"
 
     # Create outgoing message with form content
     with_typing_indicator do
