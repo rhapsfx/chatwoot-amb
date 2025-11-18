@@ -32,6 +32,7 @@ const template = ref({
   contentBlocks: [],
   version: 1,
   attachments: [],
+  metadata: {}, // IMPORTANT: Include metadata field so it persists on save
 });
 
 const errors = ref({});
@@ -245,6 +246,7 @@ const resetTemplate = () => {
     contentBlocks: [],
     version: 1,
     attachments: [],
+    metadata: {}, // IMPORTANT: Include metadata field
   };
   errors.value = {};
   activeTab.value = 'basic';

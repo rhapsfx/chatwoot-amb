@@ -26,7 +26,9 @@ class Templates::BotRendererService
   attr_reader :template, :parameters, :channel_type
 
   def initialize(template_id:, parameters:, channel_type:)
-    @template = MessageTemplate.find(template_id)
+    # Force fresh query to bust ALL Rails caching (important for bots using templates)
+    # Use unscoped + uncached to bypass ActiveRecord query cache and associations cache
+    @template = MessageTemplate.uncached { MessageTemplate.unscoped.find(template_id) }
     @parameters = if parameters.is_a?(ActionController::Parameters)
                     parameters.to_unsafe_h
                   else
@@ -84,9 +86,7 @@ class Templates::BotRendererService
       apple_auth
     ]
 
-    if interactive_types_with_images.include?(actual_content_type)
-      transformed_attrs = load_images_from_storage(transformed_attrs)
-    end
+    transformed_attrs = load_images_from_storage(transformed_attrs) if interactive_types_with_images.include?(actual_content_type)
 
     # Merge parameters if provided, but filter out keys that would be invalid at root level
     if parameters.present?

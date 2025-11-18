@@ -6,7 +6,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Typing indicator configuration
   # Set to false during development for faster testing
   # Set to true in production for better user experience
-  TYPING_INDICATORS_ENABLED = true
+  TYPING_INDICATORS_ENABLED = false
   TYPING_INDICATOR_DELAY = 1.5 # seconds
 
   # Keyword message routing
@@ -78,25 +78,29 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def process_message
-    log_info "[Bot] 🔄 process_message - Current state: #{@bot_state}, Message content: #{@message.content&.truncate(50)}"
-    log_info "[Bot] 🔄 Message content_type: #{@message.content_type}"
-    sanitized_attrs = LogSanitizerService.sanitize_for_log(@message.content_attributes)
-    log_info "[Bot] 🔄 Message content_attributes: #{utf8_encode(sanitized_attrs).inspect}"
-
     # Check for timeout - restart if idle > 30 minutes
-    if conversation_timed_out?
+    timed_out = conversation_timed_out?
+    if timed_out
+      log_info '[Bot] ⏰ Conversation timed out, resetting to welcome'
       reset_to_welcome
-      return process_state
+      # Don't process state yet - let keyword handler run first
     end
 
     # Handle attachments (photos, documents)
     if @message.attachments.present?
+      log_info '[Bot] 📎 Message has attachments, routing to handle_received_attachment'
       handle_received_attachment
       return
     end
 
-    # Handle text message keywords
-    return if handle_keyword_message
+    # Handle text message keywords (check BEFORE processing timed-out state)
+    if handle_keyword_message
+      log_info '[Bot] 🔑 Message handled by keyword handler'
+      return
+    end
+
+    # If conversation timed out and no keyword was matched, now process welcome state
+    return process_state if timed_out
 
     # Handle form responses by content_type (forms don't have custom identifiers)
     if @message.content_type == 'apple_form_response'
@@ -105,12 +109,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       # Check if this is a large form response (from template 343)
       # We identify it by checking the bot state or form content
       if @bot_state == 'DEMO_MODE_LARGE_FORM'
+        log_info '[Bot] 📋 State is DEMO_MODE_LARGE_FORM, routing to handle_large_form_response'
         handle_large_form_response(@message.content_attributes)
       else
+        log_info '[Bot] 📋 Routing to standard handle_form_response'
         handle_form_response
       end
       return
     end
+
+    # If we reach here, no specific handler matched - fall through to state-based flow
+    log_info "[Bot] ⚠️  No specific handler matched - falling through to process_state (state: #{@bot_state})"
 
     # Handle state-based flow
     process_state
@@ -170,6 +179,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                               'qr_learn_more' # Learn more question
                             when 'AHF1'
                               'applepay_1018' # Apple Pay
+                            when 'DEMO_MODE_LARGE_FORM'
+                              'form_large_content' # Large content form response
                             else
                               log_warn "[Bot] ⚠️ Unknown bot state for NSKeyedArchiver: #{@bot_state}"
                               nil
@@ -653,8 +664,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     reset_retry_count
 
     send_text_message("Great choice! You selected #{selection}.")
-    update_bot_state('AHE2')
-    handle_apple_pay_prompt
+    update_bot_state('AHC2')
+    handle_ar_introduction
   end
 
   def auto_select_guitar(guitar_name)
@@ -669,10 +680,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     update_bot_state('AHC3')
 
-    # Wait even longer for AR file to upload and be delivered before asking question
-    # AR file has 2s delay in after_commit + network latency
-    # Need minimum 5s to ensure file arrives before question
-    sleep(5.5)
+    # Wait for AR file to fully upload and be delivered before asking question
+    # AR file has 2s delay in after_commit + upload time + network latency + device rendering
+    # Need 9s minimum to ensure file is visible to user before question appears
+    sleep(9.0)
     handle_ar_first_question
   end
 
@@ -741,10 +752,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - they didn't place AR
 
-    # AR is at the end of flow, proceed to summary
-    send_text_message("We've thrown a handful of Messages for Business features at you today. Check out what you saw.")
-    update_bot_state('AHK1')
-    handle_summary
+    # After AR section, proceed to Apple Pay
+    update_bot_state('AHE2')
+    handle_apple_pay_prompt
   end
 
   def handle_apple_pay_prompt
@@ -1515,7 +1525,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           'description' => picker_image.description || ''
         }
       rescue StandardError => e
-        Rails.logger.error "[Bot] Failed to encode image #{picker_image.identifier}: #{e.message}"
+        Rails.logger.error utf8_encode("[Bot] Failed to encode image #{picker_image.identifier}: #{e.message}")
         nil
       end
     end
@@ -1529,14 +1539,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     )
 
     unless template
-      Rails.logger.error '[Bot] Guitar Info Form template (ID: 356) not found - falling back to guitar list'
+      Rails.logger.error utf8_encode('[Bot] Guitar Info Form template (ID: 356) not found - falling back to guitar list')
       # Fallback: skip to guitar list if form template doesn't exist
       update_bot_state('AHB3')
       handle_guitar_list_prompt
       return
     end
 
-    Rails.logger.info "[Bot] Sending Guitar Info Form (ID: 356, Name: #{template.name})"
+    log_info "[Bot] Sending Guitar Info Form (ID: 356, Name: #{utf8_encode(template.name)})"
 
     # Use BotRendererService to properly render the template
     renderer = Templates::BotRendererService.new(
@@ -1565,10 +1575,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
 
     # Form will be automatically sent via SendReplyJob callback
-    Rails.logger.info '[Bot] Guitar Info Form sent successfully'
+    log_info '[Bot] Guitar Info Form sent successfully'
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send guitar info form: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send guitar info form: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
     # Fallback to guitar list on error
     update_bot_state('AHB3')
     handle_guitar_list_prompt
@@ -1576,18 +1586,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_large_content_form
     # Send large content form (template 343)
+    # Force reload to bust any Rails caching
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
       id: 343
-    )
+    )&.reload
 
     unless template
-      Rails.logger.error '[Bot] Large Content Form template (ID: 343) not found'
+      Rails.logger.error utf8_encode('[Bot] Large Content Form template (ID: 343) not found')
       send_text_message('Large content form is not available.')
       return
     end
 
-    Rails.logger.info "[Bot] 📋 Sending Large Content Form (ID: 343, Name: #{template.name})"
+    log_info "[Bot] 📋 Sending Large Content Form (ID: 343, Name: #{utf8_encode(template.name)})"
 
     # Use BotRendererService to properly render the template
     renderer = Templates::BotRendererService.new(
@@ -1604,8 +1615,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Add request_identifier for proper routing to handle_large_form_response
     rendered[:content_attributes]['request_identifier'] = 'form_large_content' if rendered[:content_attributes]['request_identifier'].blank?
 
-    Rails.logger.info "[Bot] 📋 Form content_type: #{rendered[:content_type]}"
-    Rails.logger.info "[Bot] 📋 Form request_identifier: #{rendered[:content_attributes]['request_identifier']}"
+    log_info "[Bot] 📋 Form content_type: #{rendered[:content_type]}"
+    log_info "[Bot] 📋 Form request_identifier: #{utf8_encode(rendered[:content_attributes]['request_identifier'])}"
 
     # Create outgoing message with form content
     with_typing_indicator do
@@ -1622,51 +1633,57 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
 
     # Form will be automatically sent via SendReplyJob callback
-    Rails.logger.info '[Bot] 📋 Large Content Form sent successfully'
+    log_info '[Bot] 📋 Large Content Form sent successfully'
   rescue StandardError => e
-    Rails.logger.error "[Bot] ❌ Failed to send large content form: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] ❌ Failed to send large content form: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def handle_large_form_response(content_attributes)
-    Rails.logger.info '[Bot] 📋 ========================================='
-    Rails.logger.info '[Bot] 📋 LARGE FORM RESPONSE RECEIVED'
-    Rails.logger.info '[Bot] 📋 ========================================='
+    log_info '[Bot] 📋 ========================================='
+    log_info '[Bot] 📋 LARGE FORM RESPONSE RECEIVED'
+    log_info '[Bot] 📋 ========================================='
 
     # Log raw content_attributes
     sanitized_attrs = LogSanitizerService.sanitize_for_log(content_attributes)
-    Rails.logger.info "[Bot] 📋 Raw content_attributes: #{sanitized_attrs.inspect}"
+    log_info "[Bot] 📋 Raw content_attributes: #{utf8_encode(sanitized_attrs).inspect}"
 
-    # Check if IDR (Interactive Data Reference) was already processed by IncomingMessageService
-    # IncomingMessageService decodes IDR and stores it in content_attributes['interactive_response']
+    # Extract form data
+    form_fields = nil
     if content_attributes.is_a?(Hash) && content_attributes['idr_processed'] && content_attributes['interactive_response'].present?
-      Rails.logger.info '[Bot] ✅ IDR already processed by IncomingMessageService'
-      Rails.logger.info '[Bot] 📋 ========================================='
-      Rails.logger.info '[Bot] 📋 DECODED INTERACTIVE DATA:'
-      Rails.logger.info "[Bot] 📋 #{JSON.pretty_generate(content_attributes['interactive_response'])}"
-      Rails.logger.info '[Bot] 📋 ========================================='
+      log_info '[Bot] ✅ IDR already processed by IncomingMessageService'
+      log_info '[Bot] 📋 ========================================='
+      log_info '[Bot] 📋 DECODED INTERACTIVE DATA:'
+      log_info "[Bot] 📋 #{utf8_encode(JSON.pretty_generate(content_attributes['interactive_response']))}"
+      log_info '[Bot] 📋 ========================================='
 
       # Parse form response from decoded interactive data
-      parse_decoded_form_response(content_attributes['interactive_response'])
+      form_fields = parse_decoded_form_response(content_attributes['interactive_response'])
     elsif content_attributes.is_a?(Hash) && content_attributes['form_response'].present?
       # Standard form response format (non-IDR) - direct form data
-      Rails.logger.info '[Bot] 📋 Standard format (non-IDR) - parsing directly'
-      parse_form_response_data(content_attributes)
+      log_info '[Bot] 📋 Standard format (non-IDR) - parsing directly'
+      form_fields = parse_form_response_data(content_attributes)
     else
-      Rails.logger.warn '[Bot] ⚠️  Unexpected form response format'
-      Rails.logger.warn "[Bot] ⚠️  content_attributes keys: #{content_attributes.keys.inspect}"
+      log_warn '[Bot] ⚠️  Unexpected form response format'
+      log_warn "[Bot] ⚠️  content_attributes keys: #{utf8_encode(content_attributes.keys).inspect}"
     end
 
-    # Pause the bot - send confirmation and keep in DEMO_MODE_LARGE_FORM state
-    send_text_message('Thank you! Your large form response has been logged. The bot is now paused.')
+    # Send form values back to user
+    if form_fields.present?
+      send_text_message('Thank you for completing the form! Here are the values you provided:')
+      send_text_message("\n" + format_form_fields(form_fields))
+    else
+      send_text_message('Thank you for your form submission!')
+    end
+
     send_text_message("Type 'startover' to restart the conversation.")
 
-    Rails.logger.info '[Bot] ⏸️  Bot paused after large form response'
-    Rails.logger.info '[Bot] 📋 ========================================='
+    log_info '[Bot] ⏸️  Bot paused after large form response'
+    log_info '[Bot] 📋 ========================================='
   end
 
   def parse_decoded_form_response(decoded_payload)
-    # Parse the decoded form response and log all fields
+    # Parse the decoded form response and return all fields
     # The decoded payload may have different structures depending on the IDR format
 
     # Try different possible paths where form selections might be located
@@ -1676,28 +1693,45 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                 decoded_payload['selections'] ||
                 []
 
-    Rails.logger.info "[Bot] 📝 Form has #{form_data.length} field(s)"
+    log_info "[Bot] 📝 Form has #{form_data.length} field(s)"
 
+    # Extract and return field data
+    fields = []
     form_data.each_with_index do |section, index|
       title = section['title']
       value = section.dig('items', 0, 'value')
 
-      Rails.logger.info "[Bot] 📝 Field #{index + 1}: #{title} = #{value.inspect}"
+      log_info "[Bot] 📝 Field #{index + 1}: #{utf8_encode(title)} = #{utf8_encode(value).inspect}"
+      fields << { title: title, value: value } if title.present?
     end
+
+    fields
   end
 
   def parse_form_response_data(content_attributes)
-    # Parse standard format form response
+    # Parse standard format form response and return all fields
     form_data = content_attributes.dig('form_response', 'selections') || []
 
-    Rails.logger.info "[Bot] 📝 Form has #{form_data.length} field(s)"
+    log_info "[Bot] 📝 Form has #{form_data.length} field(s)"
 
+    # Extract and return field data
+    fields = []
     form_data.each_with_index do |section, index|
       title = section['title']
       value = section.dig('items', 0, 'value')
 
-      Rails.logger.info "[Bot] 📝 Field #{index + 1}: #{title} = #{value.inspect}"
+      log_info "[Bot] 📝 Field #{index + 1}: #{utf8_encode(title)} = #{utf8_encode(value).inspect}"
+      fields << { title: title, value: value } if title.present?
     end
+
+    fields
+  end
+
+  def format_form_fields(fields)
+    # Format the fields as a readable message
+    fields.map do |field|
+      "• #{field[:title]}: #{field[:value] || '(not provided)'}"
+    end.join("\n")
   end
 
   def send_summary_list_picker
@@ -1708,12 +1742,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     )
 
     unless template
-      Rails.logger.error '[Bot] Summary List Picker template (ID: 355) not found'
+      Rails.logger.error utf8_encode('[Bot] Summary List Picker template (ID: 355) not found')
       send_text_message('Summary temporarily unavailable.')
       return
     end
 
-    Rails.logger.info "[Bot] Sending Summary List Picker (ID: 355, Name: #{template.name})"
+    log_info "[Bot] Sending Summary List Picker (ID: 355, Name: #{utf8_encode(template.name)})"
 
     # Create outgoing message with list picker content
     content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
@@ -1745,8 +1779,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       )
     ).perform
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send summary list picker: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send summary list picker: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def send_ar_file
@@ -1757,16 +1791,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     )
 
     unless template
-      Rails.logger.error '[Bot] AR template (ID: 344) not found - sending placeholder'
+      Rails.logger.error utf8_encode('[Bot] AR template (ID: 344) not found - sending placeholder')
       send_text_message('[AR File: Template 344 not found]')
       return
     end
 
-    Rails.logger.info "[Bot] 🎸 Sending AR content (ID: 344, Name: #{template.name})"
+    log_info "[Bot] 🎸 Sending AR content (ID: 344, Name: #{utf8_encode(template.name)})"
 
     # Check if template has AR file attached
     unless template.attachments.attached?
-      Rails.logger.error '[Bot] AR template has no attachments - sending placeholder'
+      Rails.logger.error utf8_encode('[Bot] AR template has no attachments - sending placeholder')
       send_text_message('[AR File: No AR file attached to template]')
       return
     end
@@ -1805,18 +1839,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           content_type: template_attachment.content_type
         )
 
-        Rails.logger.info "[Bot] 🎸 Attached AR file: #{template_attachment.filename} (#{template_attachment.content_type})"
+        log_info "[Bot] 🎸 Attached AR file: #{utf8_encode(template_attachment.filename.to_s)} (#{template_attachment.content_type})"
       end
 
       # NOW save the message - this triggers after_commit with attachments already present
       # The after_commit will see attachments and wait 2 seconds before sending
       message.save!
 
-      Rails.logger.info "[Bot] 🎸 AR message saved with #{message.attachments.count} attachment(s)"
+      log_info "[Bot] 🎸 AR message saved with #{message.attachments.count} attachment(s)"
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send AR file: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send AR file: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
     send_text_message('[AR File: Error sending AR content]')
   end
 
@@ -1846,15 +1880,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_apple_pay_request(guitar_name)
     with_typing_indicator do
-      # Create Apple Pay message
-      # NOTE: Message will be automatically sent via after_commit callback
-      # which routes to SendApplePayService based on content_type
-
       # Get guitar image identifier based on selected guitar
       # Uses guitar_lespaul as fallback for demo mode and unmatched guitars
       image_identifier = get_guitar_image_identifier(guitar_name)
 
-      Rails.logger.info "[Bot] 💳 Apple Pay request for '#{guitar_name}' with image: #{image_identifier}"
+      log_info "[Bot] 💳 Apple Pay request for '#{utf8_encode(guitar_name)}' with image: #{image_identifier}"
 
       payment_data = {
         'request_identifier' => 'applepay_1018',
@@ -1879,22 +1909,39 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         'reply_image_identifier' => image_identifier
       }
 
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
+      # Call SendApplePayService directly (synchronously) so we can handle errors
+      service = AppleMessagesForBusiness::SendApplePayService.new(
+        channel: @inbox.channel,
+        destination_id: @conversation.contact_inbox.source_id,
+        payment_data: payment_data
+      )
+
+      response = service.perform
+
+      # If service succeeded, create message record without triggering SendReplyJob
+      if response[:success]
+        # Create message directly to avoid double-send via SendReplyJob
+        message_params = bot_message_params(
           message_type: :outgoing,
           content: "Buy your new #{guitar_name}",
           content_type: 'apple_pay',
-          content_attributes: payment_data
+          content_attributes: payment_data,
+          source_id: response[:message_id],
+          sender: message_sender
         )
-      ).perform
 
-      { success: true }
+        @conversation.messages.create!(message_params)
+
+        log_info '[Bot] ✅ Apple Pay sent successfully'
+        { success: true }
+      else
+        log_info "[Bot] ❌ Apple Pay failed: #{utf8_encode(response[:error])}"
+        response
+      end
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send Apple Pay request: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send Apple Pay request: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
     { success: false, error: e.message }
   end
 
@@ -1903,11 +1950,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
 
     unless File.exist?(file_path)
-      Rails.logger.error "[Bot] Document not found: #{file_path}"
+      Rails.logger.error utf8_encode("[Bot] Document not found: #{file_path}")
       return
     end
 
-    Rails.logger.info "[Bot] Sending document: #{filename}"
+    log_info "[Bot] Sending document: #{utf8_encode(filename)}"
 
     with_typing_indicator do
       # Build message params
@@ -1940,16 +1987,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         content_type: mime_type_for_filename(filename)
       )
 
-      Rails.logger.info "[Bot] Attached file: #{filename} (#{file_data.size} bytes)"
+      log_info "[Bot] Attached file: #{utf8_encode(filename)} (#{file_data.size} bytes)"
 
       # NOW save the message - this triggers after_commit with attachments already present
       message.save!
 
-      Rails.logger.info "[Bot] Document message saved with #{message.attachments.count} attachment(s)"
+      log_info "[Bot] Document message saved with #{message.attachments.count} attachment(s)"
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send document: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send document: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def mime_type_for_filename(filename)
@@ -1970,7 +2017,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def send_rich_link(url:, image_asset:, title:)
     # Send a rich link message with URL, image, and title
     # Image asset is optional (can be nil or a filename)
-    Rails.logger.info "[Bot] Sending rich link: #{url} (#{title})"
+    log_info "[Bot] Sending rich link: #{utf8_encode(url)} (#{utf8_encode(title)})"
 
     with_typing_indicator do
       # Create message with rich link content
@@ -1992,8 +2039,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       ).perform
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send rich link: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send rich link: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def image_url_for_asset(image_asset)
@@ -2087,9 +2134,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     )
 
     result = service.perform
-    Rails.logger.info "[AcousticHouseBot] Typing indicator #{action}: #{result[:success] ? 'success' : result[:error]}"
+    log_info "[AcousticHouseBot] Typing indicator #{action}: #{result[:success] ? 'success' : utf8_encode(result[:error])}"
   rescue StandardError => e
-    Rails.logger.error "[AcousticHouseBot] Failed to send typing indicator: #{e.message}"
+    Rails.logger.error utf8_encode("[AcousticHouseBot] Failed to send typing indicator: #{e.message}")
     # Don't fail the message sending if typing indicator fails
   end
 
@@ -2155,7 +2202,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_text_message(message)
 
-    Rails.logger.info "[Bot] 📦 Sent delivery confirmation for address: #{formatted_address}"
+    log_info "[Bot] 📦 Sent delivery confirmation for address: #{utf8_encode(formatted_address)}"
   end
 
   def with_typing_indicator
@@ -2238,13 +2285,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       ).perform
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send time picker: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send time picker: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def send_single_store_rich_link(store, _user_coordinates)
     # Single store found - send as Apple Maps rich link and proceed directly to time picker
-    Rails.logger.info "[Bot] 📍 Single store found: #{store[:name]}"
+    log_info "[Bot] 📍 Single store found: #{utf8_encode(store[:name])}"
 
     # Build Apple Maps URL for the store
     # Prefer using place ID if available, otherwise use coordinates + name
@@ -2256,7 +2303,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                  "https://maps.apple.com/?ll=#{store[:latitude]},#{store[:longitude]}&q=#{CGI.escape(store[:name])}"
                end
 
-    Rails.logger.info "[Bot] 📍 Generated Apple Maps URL: #{maps_url}"
+    log_info "[Bot] 📍 Generated Apple Maps URL: #{utf8_encode(maps_url)}"
 
     # Send rich link message (Open Graph scraping will handle title/image automatically)
     send_rich_link(
@@ -2294,13 +2341,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send single store rich link: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send single store rich link: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def send_store_quick_reply(stores, user_coordinates)
     # 2-5 stores - send as quick reply buttons
-    Rails.logger.info "[Bot] 🏪 Sending #{stores.length} stores as quick reply"
+    log_info "[Bot] 🏪 Sending #{stores.length} stores as quick reply"
 
     # Store minimal stores data
     minimal_stores = stores.map do |store|
@@ -2331,8 +2378,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       items: items
     )
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send store quick reply: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send store quick reply: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def send_store_selection_list_picker(stores, user_coordinates)
@@ -2379,7 +2426,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Fetch and encode the Apple Store logo image
     images = fetch_and_encode_images([apple_store_image_id])
 
-    Rails.logger.info "[Bot] 🏪 Encoded #{images.length} images for store selection list picker"
+    log_info "[Bot] 🏪 Encoded #{images.length} images for store selection list picker"
 
     with_typing_indicator do
       # Create message with list picker content
@@ -2407,21 +2454,21 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       ).perform
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send store selection list picker: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send store selection list picker: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def handle_store_selection(interactive_data)
-    Rails.logger.info '[Bot] 🏪 handle_store_selection called'
-    Rails.logger.info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
-    Rails.logger.info "[Bot] 🏪 interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🏪 handle_store_selection called'
+    log_info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
+    log_info "[Bot] 🏪 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selection from interactive data
     selected_index = if interactive_data['ldtext'].present?
                        # Resolved NSKeyedArchiver/IDR format - extract index from ldtext
                        # The ldtext might contain store name, we need to find the index
                        store_title = interactive_data['ldtext']
-                       Rails.logger.info "[Bot] 🏪 IDR format store selection (ldtext): #{store_title}"
+                       log_info "[Bot] 🏪 IDR format store selection (ldtext): #{utf8_encode(store_title)}"
 
                        # Get available stores from conversation attributes
                        stores_json = get_conversation_attribute('available_stores')
@@ -2448,12 +2495,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                        interactive_data.dig('data', 'reply', 'identifier')
                      end
 
-    Rails.logger.info "[Bot] 🏪 Selected store index: #{selected_index}"
+    log_info "[Bot] 🏪 Selected store index: #{selected_index}"
 
     # Get available stores from conversation attributes
     stores_json = get_conversation_attribute('available_stores')
     unless stores_json
-      Rails.logger.error '[Bot] 🏪 No available stores found in conversation attributes'
+      Rails.logger.error utf8_encode('[Bot] 🏪 No available stores found in conversation attributes')
       send_text_message('Sorry, store selection expired. Please provide your location again.')
       update_bot_state('AHG1')
       return
@@ -2463,7 +2510,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     selected_store = stores[selected_index.to_i]
 
     unless selected_store
-      Rails.logger.error "[Bot] 🏪 Invalid store index: #{selected_index}"
+      Rails.logger.error utf8_encode("[Bot] 🏪 Invalid store index: #{selected_index}")
       send_text_message('Sorry, invalid store selection. Please try again.')
       update_bot_state('AHG1')
       return
@@ -2480,7 +2527,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                  "https://maps.apple.com/?ll=#{selected_store['latitude']},#{selected_store['longitude']}&q=#{CGI.escape(selected_store['name'])}"
                end
 
-    Rails.logger.info "[Bot] 🏪 Sending rich link for selected store: #{maps_url}"
+    log_info "[Bot] 🏪 Sending rich link for selected store: #{utf8_encode(maps_url)}"
 
     # Send confirmation message
     send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
@@ -2509,8 +2556,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
   rescue StandardError => e
-    Rails.logger.error "[Bot] 🏪 Error in handle_store_selection: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] 🏪 Error in handle_store_selection: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
 
     # Fallback
     send_text_message('Sorry, there was an error processing your selection.')
@@ -2519,9 +2566,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_store_selection_qr(interactive_data)
     # Handle quick reply store selection (2-5 stores case)
-    Rails.logger.info '[Bot] 🏪 handle_store_selection_qr called'
-    Rails.logger.info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
-    Rails.logger.info "[Bot] 🏪 interactive_data keys: #{interactive_data.keys.inspect}"
+    log_info '[Bot] 🏪 handle_store_selection_qr called'
+    log_info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
+    log_info "[Bot] 🏪 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
     # Extract selected index from quick reply
     selected_index = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -2539,12 +2586,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                        items[selected_index_int]&.fetch('title', nil) if selected_index_int
                      end
 
-    Rails.logger.info "[Bot] 🏪 Selected store index from quick reply: #{selected_index}"
+    log_info "[Bot] 🏪 Selected store index from quick reply: #{selected_index}"
 
     # Get available stores from conversation attributes
     stores_json = get_conversation_attribute('available_stores')
     unless stores_json
-      Rails.logger.error '[Bot] 🏪 No available stores found in conversation attributes'
+      Rails.logger.error utf8_encode('[Bot] 🏪 No available stores found in conversation attributes')
       send_text_message('Sorry, store selection expired. Please provide your location again.')
       update_bot_state('AHG1')
       return
@@ -2554,7 +2601,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     selected_store = stores[selected_index.to_i]
 
     unless selected_store
-      Rails.logger.error "[Bot] 🏪 Invalid store index: #{selected_index}"
+      Rails.logger.error utf8_encode("[Bot] 🏪 Invalid store index: #{selected_index}")
       send_text_message('Sorry, invalid store selection. Please try again.')
       update_bot_state('AHG1')
       return
@@ -2570,7 +2617,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                  "https://maps.apple.com/?ll=#{selected_store['latitude']},#{selected_store['longitude']}&q=#{CGI.escape(selected_store['name'])}"
                end
 
-    Rails.logger.info "[Bot] 🏪 Sending rich link for selected store: #{maps_url}"
+    log_info "[Bot] 🏪 Sending rich link for selected store: #{utf8_encode(maps_url)}"
 
     # Send confirmation message
     send_text_message("Perfect! You selected #{selected_store['name']} (#{selected_store['distance_km']} km away).")
@@ -2599,8 +2646,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_lesson_time_picker(location)
     update_bot_state('AHH1')
   rescue StandardError => e
-    Rails.logger.error "[Bot] 🏪 Error in handle_store_selection_qr: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] 🏪 Error in handle_store_selection_qr: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
 
     # Fallback
     send_text_message('Sorry, there was an error processing your selection.')
@@ -2628,8 +2675,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       ).perform
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] Failed to send rich link: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
+    Rails.logger.error utf8_encode("[Bot] Failed to send rich link: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def detect_language
@@ -2694,8 +2741,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     missing = identifiers - available
 
     if missing.any?
-      Rails.logger.warn "[Bot] Template #{template.id} missing images in inbox #{inbox_id}: #{missing.inspect}"
-      Rails.logger.warn "[Bot] Available images: #{available.inspect}"
+      log_warn "[Bot] Template #{template.id} missing images in inbox #{inbox_id}: #{missing.inspect}"
+      log_warn "[Bot] Available images: #{available.inspect}"
     end
 
     {

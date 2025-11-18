@@ -171,13 +171,14 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     # Headers from Python reference (lines 108-114)
     headers = {
       'Authorization' => "Bearer #{@channel.generate_jwt_token}",
-      'source-id' => @idr_data['bid'],
+      'source-id' => @channel.business_id,  # FIXED: Use business ID, not BID
+      'Content-Type' => 'application/octet-stream',  # Binary data content type
       'accept' => '*/*',
       'accept-encoding' => 'gzip, deflate',
       'bid' => @idr_data['bid']
     }
 
-    Rails.logger.info "[AMB IDR] DecodePayload request for bid: #{@idr_data['bid']}"
+    Rails.logger.info "[AMB IDR] DecodePayload request for bid: #{@idr_data['bid']}, business_id: #{@channel.business_id}"
 
     response = HTTParty.post(
       "#{MSP_GATEWAY_URL}/decodePayload",
@@ -508,12 +509,11 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
       # Combine base and relative into full URL
       # If base is "$null" or nil, just use relative
-      if base.nil? || base == '$null' || base.to_s.empty?
-        return relative.to_s
-      else
-        # Combine base and relative
-        return "#{base}#{relative}"
-      end
+      return relative.to_s if base.nil? || base == '$null' || base.to_s.empty?
+
+      # Combine base and relative
+      return "#{base}#{relative}"
+
     end
 
     result
@@ -543,31 +543,29 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
       param_values = params[param_key]
       param_values.each do |param_value|
-        begin
-          # Try base64 decode first
-          decoded = if param_value.include?('=') || param_value.length % 4 == 0
-                      Base64.decode64(param_value)
-                    else
-                      param_value
-                    end
+        # Try base64 decode first
+        decoded = if param_value.include?('=') || param_value.length % 4 == 0
+                    Base64.decode64(param_value)
+                  else
+                    param_value
+                  end
 
-          # Try to parse as JSON
-          parsed = JSON.parse(decoded)
-          Rails.logger.info "[AMB IDR] 🔍 Decoded #{param_key}: #{parsed.inspect[0..500]}"
+        # Try to parse as JSON
+        parsed = JSON.parse(decoded)
+        Rails.logger.info "[AMB IDR] 🔍 Decoded #{param_key}: #{parsed.inspect[0..500]}"
 
-          # Extract selections if present
-          if parsed.is_a?(Hash)
-            if parsed['selections'].present?
-              form_selections.concat(parsed['selections'])
-            elsif parsed['dynamic'].present? && parsed['dynamic']['selections'].present?
-              form_selections.concat(parsed['dynamic']['selections'])
-            end
-          elsif parsed.is_a?(Array)
-            form_selections.concat(parsed)
+        # Extract selections if present
+        if parsed.is_a?(Hash)
+          if parsed['selections'].present?
+            form_selections.concat(parsed['selections'])
+          elsif parsed['dynamic'].present? && parsed['dynamic']['selections'].present?
+            form_selections.concat(parsed['dynamic']['selections'])
           end
-        rescue JSON::ParserError, ArgumentError => e
-          Rails.logger.warn "[AMB IDR] Failed to parse #{param_key}: #{e.message}"
+        elsif parsed.is_a?(Array)
+          form_selections.concat(parsed)
         end
+      rescue JSON::ParserError, ArgumentError => e
+        Rails.logger.warn "[AMB IDR] Failed to parse #{param_key}: #{e.message}"
       end
     end
 
