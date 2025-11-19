@@ -123,7 +123,7 @@ watch(selectedTemplateId, (newId) => {
 
 1. **Start dev server**:
    ```bash
-   ./dev-server.sh start
+   ./script//dev-server.sh start
    ```
 
 2. **Navigate to templates**:

@@ -51,31 +51,31 @@ class AppleMessagesForBusiness::PaymentGatewayService
     require 'stripe'
 
     Stripe.api_key = @channel.payment_processors.dig('stripe', 'secret_key') ||
-                     ENV['STRIPE_SECRET_KEY']
+                     ENV.fetch('STRIPE_SECRET_KEY', nil)
 
     begin
       # Create a payment intent
       intent = Stripe::PaymentIntent.create({
-        amount: (transaction_data[:total][:amount].to_f * 100).to_i, # Convert to cents
-        currency: transaction_data[:total][:currency_code].downcase,
-        payment_method_types: ['card'],
-        payment_method_data: {
-          type: 'card',
-          card: {
-            token: extract_stripe_token(payment_data)
-          }
-        },
-        confirmation_method: 'manual',
-        confirm: true,
-        description: "Apple Messages payment for #{@channel.name}",
-        metadata: {
-          channel_id: @channel.id,
-          msp_id: @channel.msp_id,
-          apple_pay: 'true'
-        },
-        shipping: format_stripe_shipping(payment_data[:shipping_contact]),
-        receipt_email: payment_data[:billing_contact][:email_address]
-      })
+                                              amount: (transaction_data[:total][:amount].to_f * 100).to_i, # Convert to cents
+                                              currency: transaction_data[:total][:currency_code].downcase,
+                                              payment_method_types: ['card'],
+                                              payment_method_data: {
+                                                type: 'card',
+                                                card: {
+                                                  token: extract_stripe_token(payment_data)
+                                                }
+                                              },
+                                              confirmation_method: 'manual',
+                                              confirm: true,
+                                              description: "Apple Messages payment for #{@channel.name}",
+                                              metadata: {
+                                                channel_id: @channel.id,
+                                                msp_id: @channel.msp_id,
+                                                apple_pay: 'true'
+                                              },
+                                              shipping: format_stripe_shipping(payment_data[:shipping_contact]),
+                                              receipt_email: payment_data[:billing_contact][:email_address]
+                                            })
 
       {
         success: true,
@@ -125,13 +125,13 @@ class AppleMessagesForBusiness::PaymentGatewayService
     require 'stripe'
 
     Stripe.api_key = @channel.payment_processors.dig('stripe', 'secret_key') ||
-                     ENV['STRIPE_SECRET_KEY']
+                     ENV.fetch('STRIPE_SECRET_KEY', nil)
 
     begin
       event = Stripe::Webhook.construct_event(
         webhook_data[:payload],
         webhook_data[:signature],
-        @channel.payment_processors.dig('stripe', 'webhook_secret') || ENV['STRIPE_WEBHOOK_SECRET']
+        @channel.payment_processors.dig('stripe', 'webhook_secret') || ENV.fetch('STRIPE_WEBHOOK_SECRET', nil)
       )
 
       case event.type
@@ -153,7 +153,7 @@ class AppleMessagesForBusiness::PaymentGatewayService
     require 'stripe'
 
     Stripe.api_key = @channel.payment_processors.dig('stripe', 'secret_key') ||
-                     ENV['STRIPE_SECRET_KEY']
+                     ENV.fetch('STRIPE_SECRET_KEY', nil)
 
     begin
       intent = Stripe::PaymentIntent.retrieve(transaction_id)
@@ -176,7 +176,7 @@ class AppleMessagesForBusiness::PaymentGatewayService
 
     client = Squareup::Client.new(
       access_token: @channel.payment_processors.dig('square', 'access_token') ||
-                    ENV['SQUARE_ACCESS_TOKEN'],
+                    ENV.fetch('SQUARE_ACCESS_TOKEN', nil),
       environment: @channel.payment_processors.dig('square', 'environment') || 'sandbox'
     )
 
@@ -251,9 +251,9 @@ class AppleMessagesForBusiness::PaymentGatewayService
     require 'braintree'
 
     Braintree::Configuration.environment = @channel.payment_processors.dig('braintree', 'environment')&.to_sym || :sandbox
-    Braintree::Configuration.merchant_id = @channel.payment_processors.dig('braintree', 'merchant_id') || ENV['BRAINTREE_MERCHANT_ID']
-    Braintree::Configuration.public_key = @channel.payment_processors.dig('braintree', 'public_key') || ENV['BRAINTREE_PUBLIC_KEY']
-    Braintree::Configuration.private_key = @channel.payment_processors.dig('braintree', 'private_key') || ENV['BRAINTREE_PRIVATE_KEY']
+    Braintree::Configuration.merchant_id = @channel.payment_processors.dig('braintree', 'merchant_id') || ENV.fetch('BRAINTREE_MERCHANT_ID', nil)
+    Braintree::Configuration.public_key = @channel.payment_processors.dig('braintree', 'public_key') || ENV.fetch('BRAINTREE_PUBLIC_KEY', nil)
+    Braintree::Configuration.private_key = @channel.payment_processors.dig('braintree', 'private_key') || ENV.fetch('BRAINTREE_PRIVATE_KEY', nil)
 
     begin
       result = Braintree::Transaction.sale(

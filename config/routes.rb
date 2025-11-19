@@ -115,6 +115,18 @@ Rails.application.routes.draw do
               post :send_message
             end
           end
+          # Shared Apple Messages for Business images (account-level)
+          resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do
+            member do
+              post :upload
+              delete :remove_image
+            end
+            collection do
+              get :system_images
+              get :branding_images
+              get :template_images
+            end
+          end
           resources :contact_inboxes, only: [] do
             collection do
               post :filter
@@ -153,6 +165,17 @@ Rails.application.routes.draw do
           resources :apple_messages, only: [] do
             collection do
               post :parse_url
+            end
+          end
+          resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do
+            collection do
+              get :system_images
+              get :branding_images
+              get :template_images
+            end
+            member do
+              post :upload
+              delete :remove_image
             end
           end
           resources :conversations, only: [:index, :create, :show, :update, :destroy] do

@@ -17,7 +17,7 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
       Rails.logger.debug { "[Apple Pay] 🧪 Test payment token: #{payment_token.inspect}" }
 
       # Return simple success response as per Apple Pay specification
-      return render json: { status: 'STATUS_SUCCESS' }, status: 200
+      return render json: { status: 'STATUS_SUCCESS' }, status: :ok
     end
 
     # Production mode requires payment_data

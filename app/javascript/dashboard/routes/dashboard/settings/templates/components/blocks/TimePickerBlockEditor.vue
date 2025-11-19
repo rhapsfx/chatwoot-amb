@@ -17,29 +17,29 @@ const { t } = useI18n();
 // Flag to prevent infinite loop between watchers
 const isUpdatingFromProps = ref(false);
 
-// Initialize with default values matching AMB composer
+// Initialize with default values - backend always returns snake_case via TemplateFacade
 const localProps = ref({
   // Event details
-  eventTitle: '',
-  eventDescription: '',
+  event_title: '',
+  event_description: '',
   timeslots: [],
-  timezoneOffset: 0,
+  timezone_offset: 0,
 
   // Received message
-  receivedTitle: 'Please pick a time',
-  receivedSubtitle: 'Select your preferred time slot',
-  receivedImageIdentifier: '',
-  receivedStyle: 'icon',
+  received_title: 'Please pick a time',
+  received_subtitle: 'Select your preferred time slot',
+  received_image_identifier: '',
+  received_style: 'icon',
 
   // Reply message
-  replyTitle: 'Thank you!',
-  replySubtitle: '',
-  replyImageIdentifier: '',
-  replyStyle: 'icon',
-  replyImageTitle: '',
-  replyImageSubtitle: '',
-  replySecondarySubtitle: '',
-  replyTertiarySubtitle: '',
+  reply_title: 'Thank you!',
+  reply_subtitle: '',
+  reply_image_identifier: '',
+  reply_style: 'icon',
+  reply_image_title: '',
+  reply_image_subtitle: '',
+  reply_secondary_subtitle: '',
+  reply_tertiary_subtitle: '',
 
   // Images
   images: [],
@@ -121,49 +121,27 @@ watch(
       // Handle nested event structure from database
       const event = newProps.event || {};
 
-      // Create a new object to trigger reactivity
+      // Create a new object to trigger reactivity - backend always uses snake_case
       localProps.value = {
         // Event details (may be nested in event object)
-        eventTitle: newProps.eventTitle || event.title || '',
-        eventDescription: newProps.eventDescription || event.description || '',
+        event_title: newProps.event_title || event.title || '',
+        event_description: newProps.event_description || event.description || '',
         timeslots: newProps.timeslots || event.timeslots || [],
-        timezoneOffset: newProps.timezoneOffset || event.timezoneOffset || 0,
+        timezone_offset: newProps.timezone_offset || event.timezone_offset || 0,
 
-        // Message configuration (flat structure)
-        // Handle both camelCase and snake_case
-        receivedTitle:
-          newProps.receivedTitle ||
-          newProps.received_title ||
-          'Please pick a time',
-        receivedSubtitle:
-          newProps.receivedSubtitle ||
-          newProps.received_subtitle ||
-          'Select your preferred time slot',
-        receivedImageIdentifier:
-          newProps.receivedImageIdentifier ||
-          newProps.received_image_identifier ||
-          '',
-        receivedStyle:
-          newProps.receivedStyle || newProps.received_style || 'icon',
-        replyTitle: newProps.replyTitle || newProps.reply_title || 'Thank you!',
-        replySubtitle: newProps.replySubtitle || newProps.reply_subtitle || '',
-        replyImageIdentifier:
-          newProps.replyImageIdentifier ||
-          newProps.reply_image_identifier ||
-          '',
-        replyStyle: newProps.replyStyle || newProps.reply_style || 'icon',
-        replyImageTitle:
-          newProps.replyImageTitle || newProps.reply_image_title || '',
-        replyImageSubtitle:
-          newProps.replyImageSubtitle || newProps.reply_image_subtitle || '',
-        replySecondarySubtitle:
-          newProps.replySecondarySubtitle ||
-          newProps.reply_secondary_subtitle ||
-          '',
-        replyTertiarySubtitle:
-          newProps.replyTertiarySubtitle ||
-          newProps.reply_tertiary_subtitle ||
-          '',
+        // Message configuration (flat structure) - all snake_case
+        received_title: newProps.received_title || 'Please pick a time',
+        received_subtitle: newProps.received_subtitle || 'Select your preferred time slot',
+        received_image_identifier: newProps.received_image_identifier || '',
+        received_style: newProps.received_style || 'icon',
+        reply_title: newProps.reply_title || 'Thank you!',
+        reply_subtitle: newProps.reply_subtitle || '',
+        reply_image_identifier: newProps.reply_image_identifier || '',
+        reply_style: newProps.reply_style || 'icon',
+        reply_image_title: newProps.reply_image_title || '',
+        reply_image_subtitle: newProps.reply_image_subtitle || '',
+        reply_secondary_subtitle: newProps.reply_secondary_subtitle || '',
+        reply_tertiary_subtitle: newProps.reply_tertiary_subtitle || '',
 
         // Images - try multiple possible locations
         images: newProps.images || event.images || [],
@@ -180,8 +158,8 @@ watch(
           preview: img.preview,
         })),
         timeslotsCount: localProps.value.timeslots.length,
-        receivedTitle: localProps.value.receivedTitle,
-        eventTitle: localProps.value.eventTitle,
+        received_title: localProps.value.received_title,
+        event_title: localProps.value.event_title,
         rawImages: newProps.images,
         eventImages: event.images,
       });
@@ -196,10 +174,10 @@ watch(
 
 // Auto-sync reply image with received image
 watch(
-  () => localProps.value.receivedImageIdentifier,
+  () => localProps.value.received_image_identifier,
   newIdentifier => {
-    if (!localProps.value.replyImageIdentifier) {
-      localProps.value.replyImageIdentifier = newIdentifier;
+    if (!localProps.value.reply_image_identifier) {
+      localProps.value.reply_image_identifier = newIdentifier;
     }
   }
 );
@@ -362,11 +340,11 @@ onMounted(() => {
           :key="image.identifier"
           class="relative group border-2 rounded-lg overflow-hidden transition-all duration-200 cursor-pointer aspect-square"
           :class="
-            localProps.receivedImageIdentifier === image.identifier
+            localProps.received_image_identifier === image.identifier
               ? 'border-n-blue-8 ring-2 ring-n-blue-8 dark:border-n-blue-9 dark:ring-n-blue-9'
               : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
           "
-          @click="localProps.receivedImageIdentifier = image.identifier"
+          @click="localProps.received_image_identifier = image.identifier"
         >
           <!-- Image -->
           <img
@@ -378,7 +356,7 @@ onMounted(() => {
 
           <!-- Selected indicator -->
           <div
-            v-if="localProps.receivedImageIdentifier === image.identifier"
+            v-if="localProps.received_image_identifier === image.identifier"
             class="absolute top-2 right-2 bg-n-blue-9 dark:bg-n-blue-10 text-white rounded-full p-1"
           >
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -438,7 +416,7 @@ onMounted(() => {
           Received Title
         </h5>
         <input
-          v-model="localProps.receivedTitle"
+          v-model="localProps.received_title"
           type="text"
           placeholder="Please pick a time"
           class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8 transition-colors"
@@ -452,7 +430,7 @@ onMounted(() => {
           Received Subtitle
         </h5>
         <input
-          v-model="localProps.receivedSubtitle"
+          v-model="localProps.received_subtitle"
           type="text"
           placeholder="Select your preferred time slot"
           class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8 transition-colors"
@@ -472,11 +450,11 @@ onMounted(() => {
             :key="style.value"
             class="border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
             :class="
-              localProps.receivedStyle === style.value
+              localProps.received_style === style.value
                 ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
                 : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
             "
-            @click="localProps.receivedStyle = style.value"
+            @click="localProps.received_style = style.value"
           >
             <div class="text-center">
               <!-- Style Preview -->
@@ -492,10 +470,10 @@ onMounted(() => {
               >
                 <img
                   v-if="
-                    localProps.receivedImageIdentifier &&
-                    getImagePreview(localProps.receivedImageIdentifier)
+                    localProps.received_image_identifier &&
+                    getImagePreview(localProps.received_image_identifier)
                   "
-                  :src="getImagePreview(localProps.receivedImageIdentifier)"
+                  :src="getImagePreview(localProps.received_image_identifier)"
                   class="w-full h-full object-cover rounded"
                   alt="Preview"
                 />
@@ -526,7 +504,7 @@ onMounted(() => {
 
               <!-- Selected indicator -->
               <div
-                v-if="localProps.receivedStyle === style.value"
+                v-if="localProps.received_style === style.value"
                 class="mt-2 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
               >
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -551,7 +529,7 @@ onMounted(() => {
             Reply Title
           </h5>
           <input
-            v-model="localProps.replyTitle"
+            v-model="localProps.reply_title"
             type="text"
             placeholder="Thank you!"
             class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8 transition-colors"
@@ -565,7 +543,7 @@ onMounted(() => {
             Reply Subtitle
           </h5>
           <input
-            v-model="localProps.replySubtitle"
+            v-model="localProps.reply_subtitle"
             type="text"
             placeholder="(Optional)"
             class="w-full px-4 py-2.5 border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7 dark:focus:ring-n-blue-8 transition-colors"
@@ -585,11 +563,11 @@ onMounted(() => {
               :key="style.value"
               class="border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md"
               :class="
-                localProps.replyStyle === style.value
+                localProps.reply_style === style.value
                   ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
                   : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
               "
-              @click="localProps.replyStyle = style.value"
+              @click="localProps.reply_style = style.value"
             >
               <div class="text-center">
                 <!-- Style Preview -->
@@ -605,10 +583,10 @@ onMounted(() => {
                 >
                   <img
                     v-if="
-                      localProps.replyImageIdentifier &&
-                      getImagePreview(localProps.replyImageIdentifier)
+                      localProps.reply_image_identifier &&
+                      getImagePreview(localProps.reply_image_identifier)
                     "
-                    :src="getImagePreview(localProps.replyImageIdentifier)"
+                    :src="getImagePreview(localProps.reply_image_identifier)"
                     class="w-full h-full object-cover rounded"
                     alt="Preview"
                   />
@@ -639,7 +617,7 @@ onMounted(() => {
 
                 <!-- Selected indicator -->
                 <div
-                  v-if="localProps.replyStyle === style.value"
+                  v-if="localProps.reply_style === style.value"
                   class="mt-2 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
                 >
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -692,7 +670,7 @@ onMounted(() => {
               Event Title
             </label>
             <input
-              v-model="localProps.eventTitle"
+              v-model="localProps.event_title"
               type="text"
               placeholder="e.g., Consultation Appointment"
               class="w-full px-3 py-2 text-sm border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
@@ -705,7 +683,7 @@ onMounted(() => {
               Timezone
             </label>
             <select
-              v-model.number="localProps.timezoneOffset"
+              v-model.number="localProps.timezone_offset"
               class="w-full px-3 py-2 text-sm border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
             >
               <option
@@ -725,7 +703,7 @@ onMounted(() => {
             Description
           </label>
           <textarea
-            v-model="localProps.eventDescription"
+            v-model="localProps.event_description"
             rows="2"
             placeholder="Optional description for the appointment"
             class="w-full px-3 py-2 text-sm border border-n-slate-7 dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:outline-none focus:ring-2 focus:ring-n-blue-7"

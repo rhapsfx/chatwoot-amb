@@ -96,11 +96,9 @@ class AppleMessagesForBusiness::SendMessageService
     Rails.logger.info "[AMB Send] 🚀 Sending interactive message - Message ID: #{@message.id}, Apple MSP ID: #{message_id}, Content Type: #{@message.content_type}"
 
     payload = build_apple_msp_payload(message_id)
-    
+
     # Log full payload for custom apps to help debug
-    if @message.content_type == 'apple_custom_app'
-      Rails.logger.info "[AMB Send] 📦 Full custom app payload: #{payload.to_json}"
-    end
+    Rails.logger.info "[AMB Send] 📦 Full custom app payload: #{payload.to_json}" if @message.content_type == 'apple_custom_app'
 
     # Check if this message should request IDR for large responses
     request_idr = should_request_idr?(payload)
@@ -108,7 +106,7 @@ class AppleMessagesForBusiness::SendMessageService
     response = send_to_apple_gateway(payload, message_id, request_idr: request_idr)
 
     Rails.logger.info "[AMB Send] Apple MSP Response - Code: #{response.code}, Success: #{response.success?}"
-    
+
     if response.success?
       Rails.logger.info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
       # Store the payload in the message for debugging
@@ -161,7 +159,7 @@ class AppleMessagesForBusiness::SendMessageService
       bid: bid_value,
       useLiveLayout: content_attributes['use_live_layout'] != false # Default to true unless explicitly false
     }
-    
+
     # CRITICAL: Third-party custom apps (apple_custom_app) CANNOT have a "data" object
     # Apple returns: "400 Bad Request : Third party interactive data disallows use of 'data'"
     # Only add data object for Apple's own interactive message types
@@ -194,38 +192,34 @@ class AppleMessagesForBusiness::SendMessageService
       # For custom iMessage apps, per Apple spec (type-interactive.md line 259-274):
       # appId, appName, URL, and receivedMessage go at TOP LEVEL of interactiveData
       # CRITICAL: Third-party apps CANNOT have a "data" object (Apple returns 400 error)
-      
+
       # Add appId at top level - MUST be integer per Apple spec
-      if content_attributes['app_id'].present?
-        base_data[:appId] = content_attributes['app_id'].to_i
-      end
-      
+      base_data[:appId] = content_attributes['app_id'].to_i if content_attributes['app_id'].present?
+
       # Add appName at top level
       base_data[:appName] = content_attributes['app_name'] if content_attributes['app_name'].present?
-      
+
       # URL goes at top level - uppercase per Apple working example
       base_data[:URL] = content_attributes['url'] if content_attributes['url'].present?
-      
+
       # receivedMessage is REQUIRED for custom interactive messages per Apple spec
       # If not provided in content_attributes, create a default one
-      if content_attributes['received_message'].present? || content_attributes['received_title'].present?
-        base_data[:receivedMessage] = build_received_message
-      else
-        # Create default receivedMessage with subtitle (not style) per Apple working example
-        base_data[:receivedMessage] = {
-          title: content_attributes['app_name'] || @message.content || 'Interactive Message',
-          subtitle: content_attributes['received_subtitle'] || 'Tap to view'
-        }
-      end
-      
+      base_data[:receivedMessage] = if content_attributes['received_message'].present? || content_attributes['received_title'].present?
+                                      build_received_message
+                                    else
+                                      # Create default receivedMessage with subtitle (not style) per Apple working example
+                                      {
+                                        title: content_attributes['app_name'] || @message.content || 'Interactive Message',
+                                        subtitle: content_attributes['received_subtitle'] || 'Tap to view'
+                                      }
+                                    end
+
       # Add replyMessage if provided (optional but recommended per Apple working example)
-      if content_attributes['reply_message'].present? || content_attributes['reply_title'].present?
-        base_data[:replyMessage] = build_reply_message
-      end
-      
+      base_data[:replyMessage] = build_reply_message if content_attributes['reply_message'].present? || content_attributes['reply_title'].present?
+
       # NOTE: Do NOT add app_data to base_data[:data] - third-party apps cannot have "data" object
       # If you need to pass custom data, it must go in the URL query parameters
-      
+
       Rails.logger.info "[AMB Send] Custom app payload - BID: #{base_data[:bid]}, appId: #{base_data[:appId]}, URL: #{base_data[:URL].present? ? 'present' : 'none'}, receivedMessage: #{base_data[:receivedMessage].present?}, replyMessage: #{base_data[:replyMessage].present?}"
     end
 

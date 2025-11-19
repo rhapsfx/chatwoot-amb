@@ -25,7 +25,7 @@ module Templates
         MessageTemplate.where("metadata->>'migration_source' = ?", migration_source).destroy_all
 
         log_info "Rolled back #{count} Canned Response templates"
-        log_info "Original canned_responses table remains untouched"
+        log_info 'Original canned_responses table remains untouched'
         { deleted: count }
       end
 
@@ -171,7 +171,7 @@ module Templates
         ]
       end
 
-      def build_channel_mappings(content, supported_channels)
+      def build_channel_mappings(_content, supported_channels)
         mappings = []
 
         # Text-based channels use simple content mapping

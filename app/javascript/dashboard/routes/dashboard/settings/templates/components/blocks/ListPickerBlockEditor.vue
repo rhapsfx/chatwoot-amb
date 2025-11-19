@@ -18,26 +18,24 @@ const emit = defineEmits(['update:properties']);
 
 const { t } = useI18n();
 
-// Normalize sections to handle both camelCase and snake_case from backend
+// Normalize sections - backend always returns snake_case via TemplateFacade
 const normalizeSections = sections => {
   if (!sections || !Array.isArray(sections)) return [];
 
   return sections.map(section => ({
     title: section.title || 'Options',
-    multipleSelection:
-      section.multipleSelection ?? section.multiple_selection ?? false,
+    multipleSelection: section.multiple_selection ?? false,
     items: (section.items || []).map(item => ({
       title: item.title || '',
       subtitle: item.subtitle || '',
       identifier: item.identifier || '',
       order: item.order ?? 0,
-      // Handle both camelCase (from DB) and snake_case (from editor)
-      image_identifier: item.imageIdentifier || item.image_identifier || '',
+      image_identifier: item.image_identifier || '',
     })),
   }));
 };
 
-// Initialize localProps with complete structure matching AMB composer
+// Initialize localProps - backend always returns snake_case via TemplateFacade
 const localProps = ref({
   sections: normalizeSections(props.properties.sections) || [
     {
@@ -62,47 +60,17 @@ const localProps = ref({
     },
   ],
   images: props.properties.images || [],
-  // Handle both camelCase and snake_case for all fields
-  received_title:
-    props.properties.receivedTitle ||
-    props.properties.received_title ||
-    'Please select an option',
-  received_subtitle:
-    props.properties.receivedSubtitle ||
-    props.properties.received_subtitle ||
-    '',
-  received_image_identifier:
-    props.properties.receivedImageIdentifier ||
-    props.properties.received_image_identifier ||
-    '',
-  received_style:
-    props.properties.receivedStyle || props.properties.received_style || 'icon',
-  reply_title:
-    props.properties.replyTitle ||
-    props.properties.reply_title ||
-    'Selection Made',
-  reply_subtitle:
-    props.properties.replySubtitle ||
-    props.properties.reply_subtitle ||
-    'Your selection',
-  reply_style:
-    props.properties.replyStyle || props.properties.reply_style || 'icon',
-  reply_image_title:
-    props.properties.replyImageTitle ||
-    props.properties.reply_image_title ||
-    '',
-  reply_image_subtitle:
-    props.properties.replyImageSubtitle ||
-    props.properties.reply_image_subtitle ||
-    '',
-  reply_secondary_subtitle:
-    props.properties.replySecondarySubtitle ||
-    props.properties.reply_secondary_subtitle ||
-    '',
-  reply_tertiary_subtitle:
-    props.properties.replyTertiarySubtitle ||
-    props.properties.reply_tertiary_subtitle ||
-    '',
+  received_title: props.properties.received_title || 'Please select an option',
+  received_subtitle: props.properties.received_subtitle || '',
+  received_image_identifier: props.properties.received_image_identifier || '',
+  received_style: props.properties.received_style || 'icon',
+  reply_title: props.properties.reply_title || 'Selection Made',
+  reply_subtitle: props.properties.reply_subtitle || 'Your selection',
+  reply_style: props.properties.reply_style || 'icon',
+  reply_image_title: props.properties.reply_image_title || '',
+  reply_image_subtitle: props.properties.reply_image_subtitle || '',
+  reply_secondary_subtitle: props.properties.reply_secondary_subtitle || '',
+  reply_tertiary_subtitle: props.properties.reply_tertiary_subtitle || '',
 });
 
 // Style options for received and reply messages
@@ -639,78 +607,65 @@ const closeImagePicker = () => {
         </div>
 
         <!-- Section Items -->
-        <div class="space-y-2 mb-3">
+        <div class="space-y-4 mb-3">
           <div
             v-for="(item, itemIndex) in section.items"
             :key="itemIndex"
-            class="space-y-2"
+            class="p-4 border-2 border-n-weak rounded-lg bg-white dark:bg-n-alpha-1 hover:border-n-blue-7 transition-colors"
           >
-            <!-- Item Title and Subtitle -->
-            <div class="grid grid-cols-[1fr_1fr_auto] gap-2">
-              <input
-                v-model="item.title"
-                type="text"
-                placeholder="Option title"
-                class="px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
-              />
-              <input
-                v-model="item.subtitle"
-                type="text"
-                placeholder="Description"
-                class="px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
-              />
-              <Button
-                icon="i-lucide-trash-2"
-                ruby
-                xs
-                @click="removeListItem(sectionIndex, itemIndex)"
-              >
-                Remove
-              </Button>
-            </div>
 
-            <!-- Image Selection Row -->
+            <!-- Image Selection - Moved to top for better visual hierarchy -->
             <div
-              class="flex items-center gap-2 px-3 py-2 bg-n-alpha-1 rounded-lg"
+              class="flex items-center gap-3 mb-4 pb-4 border-b border-n-weak"
             >
-              <span class="text-xs text-n-slate-11 min-w-[80px]">Image:</span>
+              <span class="text-xs font-medium text-n-slate-11 min-w-[60px]">Image:</span>
 
-              <!-- Current image preview -->
+              <!-- Current image preview with larger thumbnail -->
               <div
                 v-if="
                   item.image_identifier &&
                   getImageByIdentifier(item.image_identifier)
                 "
-                class="flex items-center gap-2 flex-1"
+                class="flex items-center gap-3 flex-1"
               >
                 <img
                   :src="getImageByIdentifier(item.image_identifier).preview"
-                  class="w-8 h-8 object-cover rounded border border-n-weak"
+                  class="w-12 h-12 object-cover rounded-lg border-2 border-n-weak shadow-sm"
                   :alt="item.title"
                 />
-                <div class="flex-1 text-xs text-n-slate-11 truncate">
-                  {{
-                    getImageByIdentifier(item.image_identifier).originalName ||
-                    getImageByIdentifier(item.image_identifier).description
-                  }}
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-n-slate-12 truncate">
+                    {{
+                      getImageByIdentifier(item.image_identifier).originalName ||
+                      getImageByIdentifier(item.image_identifier).description
+                    }}
+                  </div>
+                  <div class="text-xs text-n-slate-10">
+                    {{ formatFileSize(getImageByIdentifier(item.image_identifier).size) }}
+                  </div>
                 </div>
                 <button
-                  class="px-2 py-1 text-xs bg-n-slate-3 text-n-slate-11 rounded hover:bg-n-slate-4"
+                  class="px-3 py-1.5 text-xs font-medium bg-n-slate-3 text-n-slate-11 rounded-lg hover:bg-n-slate-4 transition-colors"
                   @click="item.image_identifier = ''"
                 >
                   Clear
                 </button>
               </div>
 
-              <!-- No image selected -->
-              <span v-else class="flex-1 text-xs text-n-slate-10 italic">
-                No image selected
-              </span>
+              <!-- No image selected with icon -->
+              <div v-else class="flex items-center gap-2 flex-1">
+                <div class="w-12 h-12 bg-n-alpha-3 rounded-lg flex items-center justify-center border-2 border-dashed border-n-weak">
+                  <span class="text-xl">📷</span>
+                </div>
+                <span class="text-sm text-n-slate-10 italic">
+                  No image selected
+                </span>
+              </div>
 
-              <!-- Select image button -->
+              <!-- Select/Change image button -->
               <button
                 v-if="localProps.images.length > 0"
-                class="px-2 py-1 text-xs bg-n-blue-9 text-white rounded hover:bg-n-blue-10"
+                class="px-3 py-1.5 text-xs font-medium bg-n-blue-9 text-white rounded-lg hover:bg-n-blue-10 transition-colors whitespace-nowrap"
                 @click="openImagePicker('item', sectionIndex, itemIndex)"
               >
                 {{ item.image_identifier ? 'Change' : 'Select' }}
@@ -719,6 +674,44 @@ const closeImagePicker = () => {
                 Add images first
               </span>
             </div>
+
+            <!-- Item Title and Description - Now clearly grouped below the image -->
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-n-slate-11 mb-1.5">
+                  Title
+                </label>
+                <input
+                  v-model="item.title"
+                  type="text"
+                  placeholder="Option title"
+                  class="w-full px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-n-slate-11 mb-1.5">
+                  Description
+                </label>
+                <input
+                  v-model="item.subtitle"
+                  type="text"
+                  placeholder="Description"
+                  class="w-full px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
+                />
+              </div>
+            </div>
+
+            <!-- Remove button at bottom -->
+            <div class="mt-4 pt-3 border-t border-n-weak flex justify-end">
+              <Button
+                icon="i-lucide-trash-2"
+                ruby
+                xs
+                @click="removeListItem(sectionIndex, itemIndex)"
+              >
+                Remove Item
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -726,7 +719,7 @@ const closeImagePicker = () => {
         <Button
           icon="i-lucide-plus"
           xs
-          slate
+          class="w-full"
           @click="addListItem(sectionIndex)"
         >
           {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.ADD') }}

@@ -19,6 +19,7 @@ require 'json'
 # Helper methods (define first)
 def percentage(part, whole)
   return 0 if whole.zero?
+
   (part.to_f / whole * 100).round(1)
 end
 
@@ -63,10 +64,10 @@ def collect_all_keys(hash, prefix = '')
   keys
 end
 
-puts "=" * 80
-puts "Apple Messages Content Attributes Normalization - DRY RUN"
-puts "=" * 80
-puts ""
+puts '=' * 80
+puts 'Apple Messages Content Attributes Normalization - DRY RUN'
+puts '=' * 80
+puts ''
 
 # Configuration
 APPLE_CONTENT_TYPES = %w[
@@ -89,10 +90,10 @@ messages = Message.where(content_type: APPLE_CONTENT_TYPES)
 total_count = messages.count
 
 puts "Found #{total_count} Apple Messages records"
-puts ""
+puts ''
 
 if total_count.zero?
-  puts "No records to process. Exiting."
+  puts 'No records to process. Exiting.'
   exit 0
 end
 
@@ -111,117 +112,115 @@ stats = {
 samples = []
 max_samples = 5
 
-puts "Analyzing records..."
-puts "-" * 80
+puts 'Analyzing records...'
+puts '-' * 80
 
 messages.find_each.with_index do |message, index|
-  begin
-    # Skip empty
-    if message.content_attributes.blank?
-      stats[:empty] += 1
-      next
-    end
-
-    # Normalize
-    original = message.content_attributes
-    normalized = AppleMessagesForBusiness::CaseTransformer.from_apple_format(original)
-
-    # Check if changes needed
-    if normalized == original
-      stats[:already_normalized] += 1
-    else
-      stats[:needs_normalization] += 1
-      stats[:changes_by_type][message.content_type] += 1
-
-      # Track which fields changed
-      changes = find_changed_fields(original, normalized)
-      changes.each { |field| stats[:affected_fields][field] += 1 }
-
-      # Collect samples
-      if samples.length < max_samples
-        samples << {
-          id: message.id,
-          content_type: message.content_type,
-          original: original,
-          normalized: normalized,
-          changes: changes
-        }
-      end
-    end
-
-    # Progress
-    if VERBOSE && (index + 1) % 100 == 0
-      progress = ((index + 1).to_f / total_count * 100).round(1)
-      puts "  Analyzed #{index + 1}/#{total_count} (#{progress}%)"
-    end
-
-  rescue StandardError => e
-    stats[:errors] += 1
-    puts "  ERROR analyzing message #{message.id}: #{e.message}"
-    puts "  Backtrace: #{e.backtrace.first(3).join("\n  ")}" if VERBOSE
+  # Skip empty
+  if message.content_attributes.blank?
+    stats[:empty] += 1
+    next
   end
+
+  # Normalize
+  original = message.content_attributes
+  normalized = AppleMessagesForBusiness::CaseTransformer.from_apple_format(original)
+
+  # Check if changes needed
+  if normalized == original
+    stats[:already_normalized] += 1
+  else
+    stats[:needs_normalization] += 1
+    stats[:changes_by_type][message.content_type] += 1
+
+    # Track which fields changed
+    changes = find_changed_fields(original, normalized)
+    changes.each { |field| stats[:affected_fields][field] += 1 }
+
+    # Collect samples
+    if samples.length < max_samples
+      samples << {
+        id: message.id,
+        content_type: message.content_type,
+        original: original,
+        normalized: normalized,
+        changes: changes
+      }
+    end
+  end
+
+  # Progress
+  if VERBOSE && (index + 1) % 100 == 0
+    progress = ((index + 1).to_f / total_count * 100).round(1)
+    puts "  Analyzed #{index + 1}/#{total_count} (#{progress}%)"
+  end
+
+rescue StandardError => e
+  stats[:errors] += 1
+  puts "  ERROR analyzing message #{message.id}: #{e.message}"
+  puts "  Backtrace: #{e.backtrace.first(3).join("\n  ")}" if VERBOSE
 end
 
-puts ""
-puts "=" * 80
-puts "DRY RUN RESULTS"
-puts "=" * 80
-puts ""
+puts ''
+puts '=' * 80
+puts 'DRY RUN RESULTS'
+puts '=' * 80
+puts ''
 
 # Summary statistics
-puts "Summary:"
+puts 'Summary:'
 puts "  Total records:             #{stats[:total]}"
 puts "  Need normalization:        #{stats[:needs_normalization]} (#{percentage(stats[:needs_normalization], stats[:total])}%)"
 puts "  Already normalized:        #{stats[:already_normalized]} (#{percentage(stats[:already_normalized], stats[:total])}%)"
 puts "  Empty (skipped):           #{stats[:empty]}"
 puts "  Errors:                    #{stats[:errors]}"
-puts ""
+puts ''
 
 # Changes by content type
 if stats[:needs_normalization] > 0
-  puts "Changes by content type:"
+  puts 'Changes by content type:'
   stats[:changes_by_type].sort_by { |_, count| -count }.each do |type, count|
     puts "  #{type.ljust(25)} #{count} records"
   end
-  puts ""
+  puts ''
 
   # Most affected fields
-  puts "Most affected fields (top 10):"
+  puts 'Most affected fields (top 10):'
   stats[:affected_fields].sort_by { |_, count| -count }.first(10).each do |field, count|
     puts "  #{field.ljust(35)} #{count} occurrences"
   end
-  puts ""
+  puts ''
 end
 
 # Sample changes
 if samples.any?
-  puts "=" * 80
+  puts '=' * 80
   puts "SAMPLE CHANGES (first #{samples.length} records)"
-  puts "=" * 80
-  puts ""
+  puts '=' * 80
+  puts ''
 
   samples.each_with_index do |sample, index|
     puts "Sample #{index + 1}: Message ##{sample[:id]} (#{sample[:content_type]})"
-    puts "-" * 80
+    puts '-' * 80
     puts "Changed fields: #{sample[:changes].join(', ')}"
-    puts ""
+    puts ''
 
-    if VERBOSE
-      puts "Before:"
-      puts JSON.pretty_generate(sample[:original].slice(*sample[:changes]))
-      puts ""
-      puts "After:"
-      puts JSON.pretty_generate(sample[:normalized].slice(*sample[:changes]))
-      puts ""
-    end
+    next unless VERBOSE
+
+    puts 'Before:'
+    puts JSON.pretty_generate(sample[:original].slice(*sample[:changes]))
+    puts ''
+    puts 'After:'
+    puts JSON.pretty_generate(sample[:normalized].slice(*sample[:changes]))
+    puts ''
   end
 end
 
 # Safety checks
-puts "=" * 80
-puts "SAFETY CHECKS"
-puts "=" * 80
-puts ""
+puts '=' * 80
+puts 'SAFETY CHECKS'
+puts '=' * 80
+puts ''
 
 # Check 1: No data loss
 data_loss = false
@@ -229,21 +228,21 @@ samples.each do |sample|
   original_keys = collect_all_keys(sample[:original])
   normalized_keys = collect_all_keys(sample[:normalized])
 
-  if original_keys.length != normalized_keys.length
-    data_loss = true
-    puts "⚠️  WARNING: Key count mismatch in message #{sample[:id]}"
-    puts "   Original: #{original_keys.length} keys"
-    puts "   Normalized: #{normalized_keys.length} keys"
-  end
+  next unless original_keys.length != normalized_keys.length
+
+  data_loss = true
+  puts "⚠️  WARNING: Key count mismatch in message #{sample[:id]}"
+  puts "   Original: #{original_keys.length} keys"
+  puts "   Normalized: #{normalized_keys.length} keys"
 end
 
 if data_loss
-  puts ""
-  puts "❌ DATA LOSS DETECTED - Review warnings above before proceeding"
+  puts ''
+  puts '❌ DATA LOSS DETECTED - Review warnings above before proceeding'
 else
-  puts "✅ No data loss detected"
+  puts '✅ No data loss detected'
 end
-puts ""
+puts ''
 
 # Check 2: Round-trip validation
 round_trip_ok = true
@@ -261,40 +260,40 @@ samples.first(3).each do |sample|
 end
 
 if round_trip_ok
-  puts "✅ Round-trip transformation validated"
+  puts '✅ Round-trip transformation validated'
 else
-  puts "❌ ROUND-TRIP VALIDATION FAILED - Review warnings above"
+  puts '❌ ROUND-TRIP VALIDATION FAILED - Review warnings above'
 end
-puts ""
+puts ''
 
 # Recommendations
-puts "=" * 80
-puts "RECOMMENDATIONS"
-puts "=" * 80
-puts ""
+puts '=' * 80
+puts 'RECOMMENDATIONS'
+puts '=' * 80
+puts ''
 
 if stats[:needs_normalization] == 0
-  puts "✅ All records are already normalized. No migration needed."
+  puts '✅ All records are already normalized. No migration needed.'
 elsif stats[:errors] > 0
-  puts "⚠️  Errors detected during analysis. Review errors before migrating."
-  puts "   Run with VERBOSE=true for detailed error information."
+  puts '⚠️  Errors detected during analysis. Review errors before migrating.'
+  puts '   Run with VERBOSE=true for detailed error information.'
 elsif data_loss || !round_trip_ok
-  puts "❌ MIGRATION NOT SAFE - Fix issues before proceeding"
+  puts '❌ MIGRATION NOT SAFE - Fix issues before proceeding'
 else
-  puts "✅ Migration appears safe to proceed"
-  puts ""
-  puts "Next steps:"
-  puts "  1. Review sample changes above"
-  puts "  2. Create database backup:"
-  puts "     pg_dump chatwoot_development > backup_before_normalization.sql"
-  puts "  3. Run migration in staging first:"
-  puts "     DRY_RUN=true rails db:migrate"
-  puts "  4. Test application thoroughly in staging"
-  puts "  5. Run migration in production:"
-  puts "     rails db:migrate"
-  puts ""
-  puts "Rollback option available if needed:"
-  puts "  rails runner docs/apple-messages/scripts/rollback_normalization.rb"
+  puts '✅ Migration appears safe to proceed'
+  puts ''
+  puts 'Next steps:'
+  puts '  1. Review sample changes above'
+  puts '  2. Create database backup:'
+  puts '     pg_dump chatwoot_development > backup_before_normalization.sql'
+  puts '  3. Run migration in staging first:'
+  puts '     DRY_RUN=true rails db:migrate'
+  puts '  4. Test application thoroughly in staging'
+  puts '  5. Run migration in production:'
+  puts '     rails db:migrate'
+  puts ''
+  puts 'Rollback option available if needed:'
+  puts '  rails runner docs/apple-messages/scripts/rollback_normalization.rb'
 end
 
-puts "=" * 80
+puts '=' * 80

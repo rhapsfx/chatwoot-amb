@@ -22,13 +22,13 @@ end
 
 puts "Found inbox: #{inbox.name} (ID: #{inbox_id})"
 puts "Channel type: #{inbox.channel_type}"
-puts ""
+puts ''
 
 # Get all conversations for this inbox
 conversations = Conversation.where(inbox_id: inbox_id)
 
 puts "Found #{conversations.count} conversations in this inbox"
-puts ""
+puts ''
 
 enabled_count = 0
 conversations.find_each do |conversation|
@@ -39,5 +39,5 @@ conversations.find_each do |conversation|
   puts "  ✅ Enabled bot for conversation #{conversation.id}"
 end
 
-puts ""
+puts ''
 puts "🎉 Bot enabled for #{enabled_count} conversations in inbox #{inbox_id}"

@@ -11,7 +11,7 @@ class NilFilteringLogDevice
   def write(message)
     # Filter out standalone "nil" lines completely
     return if message.is_a?(String) && (message.strip == 'nil' || message == "nil\n")
-    
+
     @log_device.write(message)
   end
 
@@ -24,8 +24,8 @@ class NilFilteringLogDevice
   end
 
   # Forward any other methods to the underlying device
-  def method_missing(method, *args, &block)
-    @log_device.send(method, *args, &block)
+  def method_missing(method, *, &)
+    @log_device.send(method, *, &)
   end
 
   def respond_to_missing?(method, include_private = false)
@@ -64,6 +64,7 @@ module RailsLoggerJobSuppressor
       suppressed = suppress_if_needed(msg)
       # Skip logging entirely if message was filtered out
       return if suppressed == ''
+
       super(suppressed)
     end
   end
@@ -74,6 +75,7 @@ module RailsLoggerJobSuppressor
     suppressed = suppress_if_needed(msg)
     # Skip logging entirely if message was filtered out
     return if suppressed == ''
+
     super(severity, suppressed, progname)
   end
 
@@ -82,6 +84,7 @@ module RailsLoggerJobSuppressor
     suppressed = suppress_if_needed(msg)
     # Skip logging entirely if message was filtered out
     return if suppressed == ''
+
     super(suppressed)
   end
 end
@@ -96,7 +99,7 @@ Rails.application.config.after_initialize do
       logdev.instance_variable_set(:@dev, wrapped_dev)
     end
   end
-  
+
   # Also wrap the logger methods for additional filtering
   Rails.logger.singleton_class.prepend(RailsLoggerJobSuppressor)
   Rails.logger.info '[RailsLogger] Job argument suppression active for ActionCableBroadcastJob and EventDispatcherJob'

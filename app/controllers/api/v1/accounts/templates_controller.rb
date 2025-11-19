@@ -99,6 +99,11 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
       # Create channel mappings if provided
       create_channel_mappings(params[:channel_mappings]) if params[:channel_mappings].present?
 
+      # UNIFIED TEMPLATE APPROACH: Optimize storage format based on complexity
+      # New templates automatically use optimal storage strategy
+      migrator = AppleMessagesForBusiness::TemplateMigrator.new(@template)
+      migrator.migrate_if_needed!
+
       render json: @template.detailed_json(include_content_blocks: true), status: :created
     else
       render json: { error: 'Failed to create template', errors: @template.errors.full_messages },
@@ -124,6 +129,11 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
         @template.channel_mappings.destroy_all
         create_channel_mappings(params[:channel_mappings])
       end
+
+      # UNIFIED TEMPLATE APPROACH: Automatically migrate to optimal storage if needed
+      # This happens transparently after template update
+      migrator = AppleMessagesForBusiness::TemplateMigrator.new(@template)
+      migrator.migrate_if_needed!
 
       render json: @template.detailed_json(include_content_blocks: true)
     else

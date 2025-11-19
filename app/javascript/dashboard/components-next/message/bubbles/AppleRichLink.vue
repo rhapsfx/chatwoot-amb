@@ -77,7 +77,6 @@ const imageSource = computed(() => {
 const onImageLoad = () => {
   imageLoaded.value = true;
   imageError.value = false;
-  console.log('✅ Image loaded successfully');
 };
 
 const onImageError = event => {
@@ -91,7 +90,6 @@ const onImageError = event => {
 const onFaviconLoad = () => {
   faviconLoaded.value = true;
   faviconError.value = false;
-  console.log('✅ Favicon loaded successfully');
 };
 
 const onFaviconError = event => {

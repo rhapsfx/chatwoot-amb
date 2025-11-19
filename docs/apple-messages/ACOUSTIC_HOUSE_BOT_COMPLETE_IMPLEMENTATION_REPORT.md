@@ -558,7 +558,7 @@ conversation.custom_attributes = {
 3. **Test Manually**:
    ```bash
    # Start dev server
-   ./dev-server.sh start
+   ./script/dev-server.sh start
 
    # Test via iPhone Messages app
    # Follow testing guides in docs/apple-messages/

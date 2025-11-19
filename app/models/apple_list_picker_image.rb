@@ -2,20 +2,22 @@
 #
 # Table name: apple_list_picker_images
 #
-#  id            :bigint           not null, primary key
-#  description   :string
-#  identifier    :string           not null
-#  original_name :string
-#  created_at    :datetime         not null
-#  updated_at    :datetime         not null
-#  account_id    :bigint           not null
-#  inbox_id      :bigint           not null
+#  id              :bigint           not null, primary key
+#  description     :string
+#  identifier      :string           not null
+#  original_name   :string
+#  shared_override :boolean          default(FALSE), not null
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#  account_id      :bigint           not null
+#  inbox_id        :bigint           not null
 #
 # Indexes
 #
-#  index_apple_list_picker_images_on_account_id               (account_id)
-#  index_apple_list_picker_images_on_inbox_id                 (inbox_id)
-#  index_apple_list_picker_images_on_inbox_id_and_identifier  (inbox_id,identifier) UNIQUE
+#  index_apple_list_picker_images_on_account_id                    (account_id)
+#  index_apple_list_picker_images_on_inbox_id                      (inbox_id)
+#  index_apple_list_picker_images_on_inbox_id_and_identifier       (inbox_id,identifier) UNIQUE
+#  index_apple_list_picker_images_on_inbox_id_and_shared_override  (inbox_id,shared_override)
 #
 # Foreign Keys
 #
@@ -30,9 +32,12 @@ class AppleListPickerImage < ApplicationRecord
 
   validates :identifier, presence: true, uniqueness: { scope: :inbox_id }
   validates :image, presence: true
+  validates :shared_override, inclusion: { in: [true, false] }
 
   # Get all images for an inbox, ordered by most recent
   scope :for_inbox, ->(inbox_id) { where(inbox_id: inbox_id).order(created_at: :desc) }
+  scope :local_only, -> { where(shared_override: false) }
+  scope :shared_overrides, -> { where(shared_override: true) }
 
   # Find by identifier within an inbox
   def self.find_by_identifier(inbox_id, identifier)

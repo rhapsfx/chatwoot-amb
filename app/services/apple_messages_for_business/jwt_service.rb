@@ -6,7 +6,7 @@ class AppleMessagesForBusiness::JwtService
         aud: msp_id,
         iat: Time.current.to_i
       }
-      
+
       JWT.encode(
         payload,
         Base64.decode64(secret),
@@ -20,7 +20,7 @@ class AppleMessagesForBusiness::JwtService
         token,
         Base64.decode64(secret),
         true,
-        { 
+        {
           algorithm: 'HS256',
           aud: msp_id,
           verify_aud: true

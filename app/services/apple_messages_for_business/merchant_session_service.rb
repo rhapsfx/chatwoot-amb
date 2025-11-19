@@ -210,7 +210,7 @@ class AppleMessagesForBusiness::MerchantSessionService
 
   def test_mode_enabled?
     test_mode_from_channel = @channel.payment_settings&.dig('test_mode')
-    test_mode_from_env = ENV['APPLE_PAY_TEST_MODE']
+    test_mode_from_env = ENV.fetch('APPLE_PAY_TEST_MODE', nil)
 
     Rails.logger.info "[Apple Pay] Test mode check - Channel payment_settings: #{@channel.payment_settings.inspect}"
     Rails.logger.info "[Apple Pay] Test mode check - test_mode value: #{test_mode_from_channel.inspect}"

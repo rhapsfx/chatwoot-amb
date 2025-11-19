@@ -19,7 +19,7 @@ INSTALLATION_TYPE=enterprise
 
 Then restart the server:
 ```bash
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ### Option 2: Modify Routes to Allow Self-Hosted (Development Only)
@@ -110,7 +110,7 @@ echo "INSTALLATION_TYPE=enterprise" >> .env
 rails runner "puts Account.first.feature_enabled?('captain_integration')"
 
 # 3. Restart server
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ## Verification

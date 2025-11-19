@@ -335,22 +335,22 @@ class MessageTemplate < ApplicationRecord
           identifiers << properties['reply_message']['imageIdentifier'] if properties['reply_message']['imageIdentifier'].present?
         end
 
-        if properties['receivedMessage'].is_a?(Hash)
-          identifiers << properties['receivedMessage']['imageIdentifier'] if properties['receivedMessage']['imageIdentifier'].present?
+        if properties['receivedMessage'].is_a?(Hash) && properties['receivedMessage']['imageIdentifier'].present?
+          identifiers << properties['receivedMessage']['imageIdentifier']
         end
 
-        if properties['replyMessage'].is_a?(Hash)
-          identifiers << properties['replyMessage']['imageIdentifier'] if properties['replyMessage']['imageIdentifier'].present?
+        if properties['replyMessage'].is_a?(Hash) && properties['replyMessage']['imageIdentifier'].present?
+          identifiers << properties['replyMessage']['imageIdentifier']
         end
 
         # Extract from nested form structure
         if properties['form'].is_a?(Hash)
           form = properties['form']
-          if form['received_message'].is_a?(Hash)
-            identifiers << form['received_message']['image_identifier'] if form['received_message']['image_identifier'].present?
+          if form['received_message'].is_a?(Hash) && form['received_message']['image_identifier'].present?
+            identifiers << form['received_message']['image_identifier']
           end
-          if form['reply_message'].is_a?(Hash)
-            identifiers << form['reply_message']['image_identifier'] if form['reply_message']['image_identifier'].present?
+          if form['reply_message'].is_a?(Hash) && form['reply_message']['image_identifier'].present?
+            identifiers << form['reply_message']['image_identifier']
           end
         end
 
@@ -391,7 +391,26 @@ class MessageTemplate < ApplicationRecord
 
   # Build content from metadata or content blocks
   def build_content
-    # If metadata has apple_message_content, use that (for Apple Messages templates)
+    # UNIFIED TEMPLATE APPROACH: Use TemplateFacade for ALL Apple Messages templates
+    # This ensures data is always returned in unified format (flat structure, snake_case)
+    # regardless of whether it's stored in metadata or content_blocks
+    if apple_messages_template?
+      # Determine block type from either content_blocks or metadata
+      block_type = if content_blocks.any?
+                     content_blocks.first.block_type
+                   elsif metadata.present? && metadata['apple_message_content'].present?
+                     # Detect block type from metadata structure
+                     detect_block_type_from_metadata
+                   else
+                     'list_picker' # default
+                   end
+
+      facade = AppleMessagesForBusiness::TemplateFacade.new(self)
+      return { content_attributes: facade.load_data(block_type) }
+    end
+
+    # For non-Apple Messages templates:
+    # If metadata has apple_message_content, use that (legacy path)
     return metadata['apple_message_content'] if metadata.present? && metadata['apple_message_content'].present?
 
     # Otherwise, try to build from content blocks
@@ -407,6 +426,34 @@ class MessageTemplate < ApplicationRecord
 
     # For complex templates, return an array of blocks
     content_blocks.order(:order_index).map(&:properties)
+  end
+
+  # Detect block type from metadata structure
+  def detect_block_type_from_metadata
+    return 'list_picker' unless metadata.present? && metadata['apple_message_content'].present?
+
+    content = metadata['apple_message_content']
+    attrs = content['content_attributes'] || content || {}
+
+    # Check for list_picker indicators
+    return 'list_picker' if attrs['sections'].present?
+    return 'list_picker' if attrs['list_picker'].present?
+
+    # Check for time_picker indicators
+    return 'time_picker' if attrs['event'].present? && attrs.dig('event', 'timeslots').present?
+    return 'time_picker' if attrs['time_picker'].present?
+
+    # Check for form indicators
+    return 'form' if attrs['pages'].present?
+    return 'form' if attrs['form'].present?
+
+    # Default to list_picker
+    'list_picker'
+  end
+
+  # Check if this template is for Apple Messages for Business
+  def apple_messages_template?
+    supported_channels&.include?('apple_messages_for_business')
   end
 
   # Attachment Management Methods

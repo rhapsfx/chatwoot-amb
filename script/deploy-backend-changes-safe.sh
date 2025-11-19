@@ -9,6 +9,7 @@ echo "  ✓ Bot API endpoints (agent_bots, bot_templates controllers)"
 echo "  ✓ Bot services (bot_messaging_service, bot_renderer_service)"
 echo "  ✓ Template adapters (apple_messages_template_adapter, etc.)"
 echo "  ✓ Bot models (agent_bot, message_template)"
+echo "  ✓ Apple Messages image architecture (shared_apple_image, image_fetch_service)"
 echo "  ✓ Custom roles feature (auto-enabled for all accounts)"
 echo "  ✓ All other Rails backend code"
 echo ""
@@ -78,9 +79,9 @@ if [ -z "$WEB_CONTAINER" ]; then
 fi
 
 echo "Copying backend code to web container..."
-echo "  → Models (agent_bot, message_template, etc.)"
+echo "  → Models (agent_bot, message_template, shared_apple_image, etc.)"
 echo "  → Controllers (agent_bots, bot_templates APIs)"
-echo "  → Services (bot_messaging, bot_renderer, template adapters)"
+echo "  → Services (bot_messaging, bot_renderer, template adapters, image_fetch)"
 docker cp app/. $WEB_CONTAINER:/app/app/
 docker cp enterprise/. $WEB_CONTAINER:/app/enterprise/ 2>/dev/null || echo "No enterprise directory to copy"
 docker cp db/migrate/. $WEB_CONTAINER:/app/db/migrate/
@@ -189,6 +190,7 @@ echo ""
 echo "=== Deployment Summary ==="
 echo "✅ Models, controllers, services deployed"
 echo "✅ Bot API endpoints and services deployed"
+echo "✅ Apple Messages image architecture deployed (Phase 1: foundation)"
 echo "✅ Routes and configuration updated"
 echo "✅ Database migrations executed"
 echo "✅ Custom roles feature enabled for all accounts"

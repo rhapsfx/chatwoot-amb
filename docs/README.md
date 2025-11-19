@@ -186,8 +186,8 @@ See: [`guides/UNIFIED_TEMPLATE_SYSTEM_ARCHITECTURE.md`](guides/UNIFIED_TEMPLATE_
 bundle install && pnpm install
 
 # Development Server
-./dev-server.sh start          # localhost only
-./dev-server.sh start-public   # with public access
+./script//dev-server.sh start          # localhost only
+./script//dev-server.sh start-public   # with public access
 
 # Linting
 pnpm eslint:fix               # JavaScript/Vue

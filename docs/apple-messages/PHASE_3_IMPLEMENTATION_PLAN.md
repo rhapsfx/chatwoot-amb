@@ -589,7 +589,7 @@ If using MessageTemplate model instead of inline:
 
 1. **Test locally**:
    ```bash
-   ./dev-server.sh start
+   ./script//dev-server.sh start
    ```
 
 2. **Verify services**:

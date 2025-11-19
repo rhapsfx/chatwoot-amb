@@ -3,8 +3,8 @@
 
 channel = Channel::AppleMessagesForBusiness.find(3)
 
-puts "📊 Apple Pay Configuration Status:"
-puts ""
+puts '📊 Apple Pay Configuration Status:'
+puts ''
 puts "Certificate present: #{!channel.payment_settings.dig('apple_pay', 'merchant_identity_certificate').nil?}"
 puts "Private key present: #{!channel.payment_settings.dig('apple_pay', 'merchant_identity_private_key').nil?}"
 puts "Merchant ID: #{channel.payment_settings.dig('apple_pay', 'merchant_identifier')}"

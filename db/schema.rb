@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_07_141219) do
+ActiveRecord::Schema[7.1].define(version: 2025_11_19_122704) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -151,8 +151,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_07_141219) do
     t.string "original_name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "shared_override", default: false, null: false
     t.index ["account_id"], name: "index_apple_list_picker_images_on_account_id"
     t.index ["inbox_id", "identifier"], name: "index_apple_list_picker_images_on_inbox_id_and_identifier", unique: true
+    t.index ["inbox_id", "shared_override"], name: "index_apple_list_picker_images_on_inbox_id_and_shared_override"
     t.index ["inbox_id"], name: "index_apple_list_picker_images_on_inbox_id"
   end
 
@@ -1175,6 +1177,20 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_07_141219) do
     t.index ["user_id"], name: "index_reporting_events_on_user_id"
   end
 
+  create_table "shared_apple_images", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "identifier", null: false
+    t.string "image_type", default: "system", null: false
+    t.text "description"
+    t.string "original_name"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "identifier"], name: "index_shared_apple_images_on_account_id_and_identifier", unique: true
+    t.index ["account_id"], name: "index_shared_apple_images_on_account_id"
+    t.index ["image_type"], name: "index_shared_apple_images_on_image_type"
+  end
+
   create_table "sla_events", force: :cascade do |t|
     t.bigint "applied_sla_id", null: false
     t.bigint "conversation_id", null: false
@@ -1370,6 +1386,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_07_141219) do
   add_foreign_key "apple_list_picker_images", "inboxes"
   add_foreign_key "inboxes", "portals"
   add_foreign_key "message_templates", "accounts", on_delete: :cascade
+  add_foreign_key "shared_apple_images", "accounts"
   add_foreign_key "template_channel_mappings", "message_templates", on_delete: :cascade
   add_foreign_key "template_content_blocks", "message_templates", on_delete: :cascade
   add_foreign_key "template_usage_logs", "accounts", on_delete: :cascade

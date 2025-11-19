@@ -180,7 +180,7 @@ If issues arise, remove lines 145-168 from `incoming_message_service.rb`:
 ```bash
 git diff HEAD~1 app/services/apple_messages_for_business/incoming_message_service.rb
 git checkout HEAD~1 -- app/services/apple_messages_for_business/incoming_message_service.rb
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ## Status
@@ -200,7 +200,7 @@ git checkout HEAD~1 -- app/services/apple_messages_for_business/incoming_message
 
 ```bash
 # Restart server to apply changes
-./dev-server.sh restart
+./script//dev-server.sh restart
 
 # Monitor logs during testing
 tail -f log/development.log | grep -E "Duplicate interactive|process_interactive_response"

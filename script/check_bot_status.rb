@@ -16,6 +16,20 @@ end
 puts "✅ Found AMB inbox: #{inbox.name} (ID: #{inbox.id})"
 puts ''
 
+# Check AgentBot assignment
+bot = inbox.agent_bot
+if bot
+  puts '🤖 AgentBot Status: ✅ ASSIGNED'
+  puts "   Name: #{bot.name}"
+  puts "   ID: #{bot.id}"
+  puts '   Messages will appear as the bot'
+else
+  puts '🤖 AgentBot Status: ❌ NOT ASSIGNED'
+  puts '   Messages will appear as the current user'
+  puts '   💡 Fix it by running: rails runner script/setup_acoustic_house_bot.rb'
+end
+puts ''
+
 # Find recent conversations
 recent_convos = inbox.conversations.order(created_at: :desc).limit(5)
 

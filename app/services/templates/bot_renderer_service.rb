@@ -43,37 +43,35 @@ class Templates::BotRendererService
     validate_parameters!
     validate_channel_compatibility!
 
-    # Check if template has apple_message_content in metadata (migrated bot templates)
-    return render_from_metadata if template.metadata.present? && template.metadata['apple_message_content'].present?
-
-    processed_content = process_template_variables
-    channel_content = adapt_for_channel(processed_content)
-
-    {
-      template_id: template.id,
-      template_name: template.name,
-      content_type: channel_content[:content_type],
-      content: channel_content[:content],
-      content_attributes: channel_content[:content_attributes],
-      attachments: load_template_attachments,
-      webhook_data: generate_webhook_data
-    }
+    # UNIFIED TEMPLATE APPROACH: Use TemplateFacade for Apple Messages templates
+    # For other channels, use content_blocks (they don't use metadata storage)
+    if apple_messages_template?
+      render_apple_messages_template
+    else
+      render_content_blocks_template
+    end
   end
 
   private
 
-  # Render template directly from metadata (for migrated bot templates)
-  def render_from_metadata
-    apple_content = template.metadata['apple_message_content']
+  # Check if this template is for Apple Messages for Business
+  def apple_messages_template?
+    normalize_channel_type(channel_type) == 'apple_messages_for_business'
+  end
 
-    # Get content attributes
-    content_attrs = apple_content['content_attributes'] || {}
+  # Render Apple Messages template using TemplateFacade (UNIFIED APPROACH)
+  def render_apple_messages_template
+    # Use TemplateFacade for unified data access
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
 
-    # Detect actual content type from structure
-    actual_content_type = detect_content_type_from_attributes(content_attrs)
+    # Detect block type from template structure
+    block_type = detect_block_type_from_facade(facade)
 
-    # Transform old bot format to Chatwoot format
-    transformed_attrs = transform_bot_format_to_chatwoot(content_attrs, actual_content_type)
+    # Load data using facade (guaranteed snake_case)
+    content_attrs = facade.load_data(block_type)
+
+    # Determine content type from block type
+    actual_content_type = map_block_type_to_content_type(block_type)
 
     # Load images from ActiveStorage if template references them
     # All interactive Apple Messages types can have images
@@ -86,7 +84,7 @@ class Templates::BotRendererService
       apple_auth
     ]
 
-    transformed_attrs = load_images_from_storage(transformed_attrs) if interactive_types_with_images.include?(actual_content_type)
+    content_attrs = load_images_from_storage(content_attrs) if interactive_types_with_images.include?(actual_content_type)
 
     # Merge parameters if provided, but filter out keys that would be invalid at root level
     if parameters.present?
@@ -102,25 +100,25 @@ class Templates::BotRendererService
          parameters[:available_slots].blank?
 
         # Check if parameters contain an event that would clear timeslots
-        if filtered_params['event'].present? && transformed_attrs['event'].present?
+        if filtered_params['event'].present? && content_attrs['event'].present?
           # Preserve template timeslots if parameter event has empty/nil timeslots
-          template_timeslots = transformed_attrs.dig('event', 'timeslots')
+          template_timeslots = content_attrs.dig('event', 'timeslots')
           param_timeslots = filtered_params.dig('event', 'timeslots')
 
           if template_timeslots.present? && (param_timeslots.nil? || param_timeslots.empty?)
             # Save template timeslots, merge other event fields, then restore timeslots
             saved_timeslots = template_timeslots
-            transformed_attrs = transformed_attrs.deep_merge(filtered_params)
-            transformed_attrs['event']['timeslots'] = saved_timeslots
+            content_attrs = content_attrs.deep_merge(filtered_params)
+            content_attrs['event']['timeslots'] = saved_timeslots
             Rails.logger.info "[BotRendererService] Preserved #{saved_timeslots.length} template timeslots"
           else
-            transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+            content_attrs = content_attrs.deep_merge(filtered_params)
           end
         else
-          transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+          content_attrs = content_attrs.deep_merge(filtered_params)
         end
       else
-        transformed_attrs = transformed_attrs.deep_merge(filtered_params)
+        content_attrs = content_attrs.deep_merge(filtered_params)
       end
     end
 
@@ -131,8 +129,8 @@ class Templates::BotRendererService
       if available_slots.present?
         # Convert available_slots to proper event.timeslots structure
         formatted_timeslots = format_timeslots_for_bot(available_slots)
-        transformed_attrs['event'] ||= {}
-        transformed_attrs['event']['timeslots'] = formatted_timeslots
+        content_attrs['event'] ||= {}
+        content_attrs['event']['timeslots'] = formatted_timeslots
         Rails.logger.info "[BotRendererService] Converted #{available_slots.length} available_slots to timeslots"
       end
     end
@@ -141,11 +139,87 @@ class Templates::BotRendererService
       template_id: template.id,
       template_name: template.name,
       content_type: actual_content_type,
-      content: apple_content['content'] || '',
-      content_attributes: transformed_attrs,
+      content: derive_content_from_attributes(content_attrs, actual_content_type),
+      content_attributes: content_attrs,
       attachments: load_template_attachments,
       webhook_data: generate_webhook_data
     }
+  end
+
+  # Render content_blocks template for non-Apple Messages channels
+  def render_content_blocks_template
+    processed_content = process_template_variables
+    channel_content = adapt_for_channel(processed_content)
+
+    {
+      template_id: template.id,
+      template_name: template.name,
+      content_type: channel_content[:content_type],
+      content: channel_content[:content],
+      content_attributes: channel_content[:content_attributes],
+      attachments: load_template_attachments,
+      webhook_data: generate_webhook_data
+    }
+  end
+
+  # Detect block type from TemplateFacade
+  def detect_block_type_from_facade(_facade)
+    # Try to determine block type from template structure
+    # Check for explicit block types in content_blocks
+    if template.content_blocks.exists?
+      primary_block = template.content_blocks.order(:order_index).first
+      return primary_block.block_type if primary_block
+    end
+
+    # Fallback: check metadata structure if content_blocks don't exist
+    if template.metadata['apple_message_content'].present?
+      content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
+      # Detect type from structure
+      return 'list_picker' if content_attrs['sections'].present?
+      return 'time_picker' if content_attrs['event'].present? && content_attrs.dig('event', 'timeslots').present?
+      return 'form' if content_attrs['pages'].present?
+    end
+
+    # Default to list_picker
+    'list_picker'
+  end
+
+  # Map block type to content type
+  def map_block_type_to_content_type(block_type)
+    case block_type
+    when 'list_picker'
+      'apple_list_picker'
+    when 'time_picker'
+      'apple_time_picker'
+    when 'form'
+      'apple_form'
+    when 'quick_reply'
+      'apple_quick_reply'
+    when 'rich_link'
+      'apple_rich_link'
+    when 'apple_pay', 'pay'
+      'apple_pay'
+    when 'authentication', 'oauth'
+      'apple_authentication'
+    else
+      "apple_#{block_type}"
+    end
+  end
+
+  # Derive content text from content attributes
+  def derive_content_from_attributes(attrs, content_type)
+    case content_type
+    when 'apple_list_picker'
+      attrs['received_title'] || 'List Picker Message'
+    when 'apple_time_picker'
+      attrs.dig('event', 'title') || 'Time Picker Message'
+    when 'apple_form'
+      attrs['title'] || attrs.dig('pages', 0, 'title') || 'Form Message'
+    when 'apple_quick_reply'
+      attrs['summary_text'] || 'Quick Reply Message'
+    else
+      'Apple Messages'
+    end
   end
 
   # Load images from ActiveStorage and add them to content_attributes

@@ -145,7 +145,7 @@ If geocoding fails OR no stores found:
 
 1. Start development server:
    ```bash
-   ./dev-server.sh start-public
+   ./script//dev-server.sh start-public
    ```
 
 2. Connect via Apple Messages for Business

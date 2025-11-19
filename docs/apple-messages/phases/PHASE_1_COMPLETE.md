@@ -122,7 +122,7 @@ Expected output: All 7 tests pass ✅
 
 1. **Start dev server**:
    ```bash
-   ./dev-server.sh start
+   ./script//dev-server.sh start
    ```
 
 2. **Send a message from frontend** (Vue will send camelCase):

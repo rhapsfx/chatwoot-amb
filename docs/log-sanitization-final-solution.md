@@ -67,7 +67,7 @@ end
 ## Restart Required
 
 ```bash
-./dev-server.sh restart
+./script/dev-server.sh restart
 ```
 
 ## Verification

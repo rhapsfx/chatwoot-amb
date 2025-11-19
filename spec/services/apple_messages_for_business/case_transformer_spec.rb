@@ -17,12 +17,12 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input)
 
         expect(result).to eq({
-          imageIdentifier: 'img_123',
-          multipleSelection: true,
-          timezoneOffset: -480,
-          startTime: '2025-10-26T10:00+0000',
-          summaryText: 'Quick Reply'
-        })
+                               imageIdentifier: 'img_123',
+                               multipleSelection: true,
+                               timezoneOffset: -480,
+                               startTime: '2025-10-26T10:00+0000',
+                               summaryText: 'Quick Reply'
+                             })
       end
 
       it 'skips nil values' do
@@ -35,9 +35,9 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input)
 
         expect(result).to eq({
-          imageIdentifier: 'img_123',
-          timezoneOffset: -480
-        })
+                               imageIdentifier: 'img_123',
+                               timezoneOffset: -480
+                             })
       end
 
       it 'preserves standard Apple MSP keys' do
@@ -52,12 +52,12 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input)
 
         expect(result).to eq({
-          identifier: 'item_1',
-          title: 'Option 1',
-          subtitle: 'Description',
-          style: 'icon',
-          order: 0
-        })
+                               identifier: 'item_1',
+                               title: 'Option 1',
+                               subtitle: 'Description',
+                               style: 'icon',
+                               order: 0
+                             })
       end
     end
 
@@ -73,11 +73,11 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input, context: :received_message)
 
         expect(result).to eq({
-          title: 'Select an option',
-          subtitle: 'Please choose',
-          imageIdentifier: 'img_456',
-          style: 'large'
-        })
+                               title: 'Select an option',
+                               subtitle: 'Please choose',
+                               imageIdentifier: 'img_456',
+                               style: 'large'
+                             })
       end
 
       it 'handles mixed context and standard fields' do
@@ -90,10 +90,10 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input, context: :received_message)
 
         expect(result).to eq({
-          title: 'Title',
-          identifier: 'msg_123',
-          version: '1.0'
-        })
+                               title: 'Title',
+                               identifier: 'msg_123',
+                               version: '1.0'
+                             })
       end
     end
 
@@ -113,15 +113,15 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input, context: :reply_message)
 
         expect(result).to eq({
-          title: 'Selected',
-          subtitle: 'Your choice',
-          imageIdentifier: 'img_789',
-          style: 'icon',
-          imageTitle: 'Image Title',
-          imageSubtitle: 'Image Subtitle',
-          secondarySubtitle: 'Secondary',
-          tertiarySubtitle: 'Tertiary'
-        })
+                               title: 'Selected',
+                               subtitle: 'Your choice',
+                               imageIdentifier: 'img_789',
+                               style: 'icon',
+                               imageTitle: 'Image Title',
+                               imageSubtitle: 'Image Subtitle',
+                               secondarySubtitle: 'Secondary',
+                               tertiarySubtitle: 'Tertiary'
+                             })
       end
     end
 
@@ -141,15 +141,15 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.to_apple_format(input)
 
         expect(result).to eq({
-          receivedMessage: {
-            title: 'Select',
-            imageIdentifier: 'img_123'
-          },
-          replyMessage: {
-            title: 'Selected',
-            imageIdentifier: 'img_456'
-          }
-        })
+                               receivedMessage: {
+                                 title: 'Select',
+                                 imageIdentifier: 'img_123'
+                               },
+                               replyMessage: {
+                                 title: 'Selected',
+                                 imageIdentifier: 'img_456'
+                               }
+                             })
       end
 
       it 'auto-detects nested context from key patterns' do
@@ -354,12 +354,12 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.from_apple_format(input)
 
         expect(result).to eq({
-          'image_identifier' => 'img_123',
-          'multiple_selection' => true,
-          'timezone_offset' => -480,
-          'start_time' => '2025-10-26T10:00+0000',
-          'summary_text' => 'Quick Reply'
-        })
+                               'image_identifier' => 'img_123',
+                               'multiple_selection' => true,
+                               'timezone_offset' => -480,
+                               'start_time' => '2025-10-26T10:00+0000',
+                               'summary_text' => 'Quick Reply'
+                             })
       end
 
       it 'skips nil values' do
@@ -372,9 +372,9 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.from_apple_format(input)
 
         expect(result).to eq({
-          'image_identifier' => 'img_123',
-          'timezone_offset' => -480
-        })
+                               'image_identifier' => 'img_123',
+                               'timezone_offset' => -480
+                             })
       end
 
       it 'preserves standard Apple MSP keys' do
@@ -389,12 +389,12 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.from_apple_format(input)
 
         expect(result).to eq({
-          'identifier' => 'item_1',
-          'title' => 'Option 1',
-          'subtitle' => 'Description',
-          'style' => 'icon',
-          'order' => 0
-        })
+                               'identifier' => 'item_1',
+                               'title' => 'Option 1',
+                               'subtitle' => 'Description',
+                               'style' => 'icon',
+                               'order' => 0
+                             })
       end
     end
 
@@ -414,15 +414,15 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         result = described_class.from_apple_format(input)
 
         expect(result).to eq({
-          'received_message' => {
-            'title' => 'Select',
-            'image_identifier' => 'img_123'
-          },
-          'reply_message' => {
-            'title' => 'Selected',
-            'image_identifier' => 'img_456'
-          }
-        })
+                               'received_message' => {
+                                 'title' => 'Select',
+                                 'image_identifier' => 'img_123'
+                               },
+                               'reply_message' => {
+                                 'title' => 'Selected',
+                                 'image_identifier' => 'img_456'
+                               }
+                             })
       end
 
       it 'transforms deeply nested structures' do
@@ -511,9 +511,9 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
       result = described_class.normalize_content_attributes(input)
 
       expect(result).to eq({
-        'image_identifier' => 'img_123',
-        'multiple_selection' => true
-      })
+                             'image_identifier' => 'img_123',
+                             'multiple_selection' => true
+                           })
     end
   end
 

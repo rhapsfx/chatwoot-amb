@@ -2,8 +2,8 @@
 # frozen_string_literal: true
 
 # Test script for Apple Messages for Business typing indicator functionality
-puts "Testing Apple Messages for Business Typing Indicator Integration"
-puts "=" * 60
+puts 'Testing Apple Messages for Business Typing Indicator Integration'
+puts '=' * 60
 
 # Load Rails environment
 require_relative 'config/environment'
@@ -12,8 +12,8 @@ require_relative 'config/environment'
 apple_channel = Channel::AppleMessagesForBusiness.first
 
 unless apple_channel
-  puts "❌ No Apple Messages for Business channels found"
-  puts "Please create an Apple Messages channel first"
+  puts '❌ No Apple Messages for Business channels found'
+  puts 'Please create an Apple Messages channel first'
   exit 1
 end
 
@@ -23,8 +23,8 @@ puts "✅ Found Apple Messages channel: #{apple_channel.business_id}"
 conversation = apple_channel.inbox.conversations.first
 
 unless conversation
-  puts "❌ No conversations found for this Apple Messages channel"
-  puts "Please create a conversation first"
+  puts '❌ No conversations found for this Apple Messages channel'
+  puts 'Please create a conversation first'
   exit 1
 end
 
@@ -47,7 +47,7 @@ puts "✅ Contact has Apple Messages destination_id: #{apple_source_id} (from UR
 puts "\n🧪 Testing typing indicator service..."
 
 # Test typing start
-puts "  → Testing typing_start..."
+puts '  → Testing typing_start...'
 start_service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
   channel: apple_channel,
   destination_id: apple_source_id,
@@ -56,7 +56,7 @@ start_service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
 
 start_result = start_service.perform
 if start_result[:success]
-  puts "  ✅ typing_start sent successfully"
+  puts '  ✅ typing_start sent successfully'
   puts "     Message ID: #{start_result[:message_id]}"
 else
   puts "  ❌ typing_start failed: #{start_result[:error]}"
@@ -66,7 +66,7 @@ end
 sleep 2
 
 # Test typing end
-puts "  → Testing typing_end..."
+puts '  → Testing typing_end...'
 end_service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
   channel: apple_channel,
   destination_id: apple_source_id,
@@ -75,7 +75,7 @@ end_service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
 
 end_result = end_service.perform
 if end_result[:success]
-  puts "  ✅ typing_end sent successfully"
+  puts '  ✅ typing_end sent successfully'
   puts "     Message ID: #{end_result[:message_id]}"
 else
   puts "  ❌ typing_end failed: #{end_result[:error]}"
@@ -87,7 +87,7 @@ puts "\n🔗 Testing integration with typing status manager..."
 # Create a mock user for testing
 account_user = conversation.account.account_users.first
 unless account_user
-  puts "❌ No account users found"
+  puts '❌ No account users found'
   exit 1
 end
 
@@ -105,7 +105,7 @@ typing_manager = Conversations::TypingStatusManager.new(
 begin
   typing_manager.toggle_typing_status
   puts "  ✅ Typing 'on' integration successful"
-rescue => e
+rescue StandardError => e
   puts "  ❌ Typing 'on' integration failed: #{e.message}"
 end
 
@@ -123,10 +123,10 @@ typing_manager = Conversations::TypingStatusManager.new(
 begin
   typing_manager.toggle_typing_status
   puts "  ✅ Typing 'off' integration successful"
-rescue => e
+rescue StandardError => e
   puts "  ❌ Typing 'off' integration failed: #{e.message}"
 end
 
-puts "\n" + "=" * 60
-puts "✅ Apple Messages for Business typing indicator test completed!"
-puts "Check your Apple Messages app to see the typing indicators"
+puts "\n" + ('=' * 60)
+puts '✅ Apple Messages for Business typing indicator test completed!'
+puts 'Check your Apple Messages app to see the typing indicators'

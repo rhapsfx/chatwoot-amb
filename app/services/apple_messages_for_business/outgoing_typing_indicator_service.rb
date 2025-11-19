@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class AppleMessagesForBusiness::OutgoingTypingIndicatorService
-  AMB_SERVER = 'https://mspgw.push.apple.com/v1'.freeze
+  AMB_SERVER = 'https://mspgw.push.apple.com/v1'
 
   def initialize(channel:, destination_id:, action:)
     @channel = channel

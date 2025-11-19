@@ -70,7 +70,7 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
       base_data[:data][:images] = build_images_array
       Rails.logger.info "[AMB ListPicker] Added #{base_data[:data][:images].length} formatted images to payload"
       # Debug: log image identifiers being sent
-      Rails.logger.info "[AMB ListPicker] Image identifiers: #{base_data[:data][:images].map { |img| img[:identifier] }.join(', ')}"
+      Rails.logger.info "[AMB ListPicker] Image identifiers: #{base_data[:data][:images].pluck(:identifier).join(', ')}"
       # Debug: log first 100 chars of first image data
       if base_data[:data][:images].first
         first_img = base_data[:data][:images].first
@@ -88,7 +88,7 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
     # Performance Optimization: Batch fetch all existing images to avoid N+1 queries
     # This replaces multiple find_by_identifier calls with a single WHERE IN query
-    image_identifiers = images.map { |img| img['identifier'] }.compact.uniq
+    image_identifiers = images.filter_map { |img| img['identifier'] }.uniq
     existing_images = AppleListPickerImage
                       .where(inbox_id: message.inbox_id, identifier: image_identifiers)
                       .includes(image_attachment: :blob)
@@ -289,37 +289,15 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
   def fetch_and_encode_images(identifiers)
     return [] if identifiers.empty?
 
-    # Get inbox_id from message
-    inbox_id = message.inbox_id
-
-    # Fetch images from database
-    picker_images = AppleListPickerImage
-                    .where(inbox_id: inbox_id, identifier: identifiers)
-                    .includes(image_attachment: :blob)
-
-    Rails.logger.info "[AMB ListPicker] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
-    Rails.logger.info "[AMB ListPicker] 🖼️ Found #{picker_images.count} images in ActiveStorage"
-
-    # Encode images as base64
-    picker_images.map do |picker_image|
-      if picker_image.image.attached?
-        blob = picker_image.image.blob
-        image_data = blob.download
-
-        {
-          identifier: picker_image.identifier,
-          data: Base64.strict_encode64(image_data),
-          description: picker_image.description || picker_image.identifier
-        }
-      else
-        Rails.logger.warn "[AMB ListPicker] ⚠️ Image not attached for identifier: #{picker_image.identifier}"
-        nil
-      end
-    end.compact
-  rescue StandardError => e
-    Rails.logger.error "[AMB ListPicker] ❌ Error fetching images: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
-    []
+    # Use ImageFetchService with three-tier fallback:
+    # 1. Inbox-specific images (AppleListPickerImage)
+    # 2. Account-wide shared images (SharedAppleImage) - future
+    # 3. Embedded images (content_attributes['images'])
+    AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: message.account_id,
+      inbox_id: message.inbox_id,
+      embedded_images: content_attributes['images']
+    ).fetch_and_encode(identifiers)
   end
 
   def build_received_message

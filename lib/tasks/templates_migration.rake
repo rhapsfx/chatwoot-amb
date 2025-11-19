@@ -30,8 +30,8 @@ namespace :templates do
       }
 
       # Run all migrations in sequence
-      ['whatsapp', 'twilio', 'apple_messages', 'canned_responses'].each do |source|
-        puts "\n" + '-' * 80
+      %w[whatsapp twilio apple_messages canned_responses].each do |source|
+        puts "\n" + ('-' * 80)
         puts "Migrating #{source.titleize} Templates"
         puts '-' * 80
 
@@ -99,7 +99,7 @@ namespace :templates do
       total_deleted = 0
 
       # Delete templates with migration metadata
-      migration_sources = ['whatsapp_migration', 'twilio_migration', 'apple_messages_migration', 'canned_response_migration']
+      migration_sources = %w[whatsapp_migration twilio_migration apple_messages_migration canned_response_migration]
 
       migration_sources.each do |source|
         count = MessageTemplate.where("metadata->>'migration_source' = ?", source).count
@@ -160,10 +160,10 @@ namespace :templates do
       puts "  Status: #{result[:status]}"
 
       if result[:errors].any?
-        puts "  ❌ Errors:"
+        puts '  ❌ Errors:'
         result[:errors].each { |error| puts "    - #{error}" }
       else
-        puts "  ✓ All templates migrated successfully"
+        puts '  ✓ All templates migrated successfully'
       end
     end
 
@@ -183,8 +183,8 @@ namespace :templates do
 
     # Count by migration source
     migration_sources = MessageTemplate.where("metadata->>'migration_source' IS NOT NULL")
-                                      .group("metadata->>'migration_source'")
-                                      .count
+                                       .group("metadata->>'migration_source'")
+                                       .count
 
     puts 'Templates by Migration Source:'
     migration_sources.each do |source, count|

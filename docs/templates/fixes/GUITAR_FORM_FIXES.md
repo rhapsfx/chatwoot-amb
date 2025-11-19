@@ -218,7 +218,7 @@ metadata: {
 
 ### 1. Restart Rails Server
 ```bash
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ### 2. Create Fresh Template (optional)

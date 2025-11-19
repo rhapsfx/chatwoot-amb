@@ -160,7 +160,7 @@ User: "10019" (New York)
 
 ```bash
 # Start development server
-./dev-server.sh start-public
+./script//dev-server.sh start-public
 
 # Connect via Apple Messages for Business
 

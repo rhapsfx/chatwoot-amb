@@ -60,7 +60,7 @@ class AppleMessagesForBusiness::SendRichLinkService
       og_data = scrape_open_graph_data(url)
 
       if og_data[:success]
-        Rails.logger.info "✅ Rich Link - Open Graph scraping successful"
+        Rails.logger.info '✅ Rich Link - Open Graph scraping successful'
         Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
         Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
 
@@ -109,7 +109,11 @@ class AppleMessagesForBusiness::SendRichLinkService
       elsif image_source.start_with?('data:image')
         # Handle data URLs (base64 embedded)
         base64_data = image_source.split(',')[1]
-        mime_type = image_source.match(/data:([^;]+)/)[1] rescue 'image/jpeg'
+        mime_type = begin
+          image_source.match(/data:([^;]+)/)[1]
+        rescue StandardError
+          'image/jpeg'
+        end
 
         assets[:image] = {
           data: base64_data,
@@ -155,13 +159,13 @@ class AppleMessagesForBusiness::SendRichLinkService
   def detect_image_mime_type(image_url, content_attrs)
     # Use provided mime type if available
     return content_attrs['image_mime_type'] if content_attrs['image_mime_type'].present?
-    
+
     # Detect from URL extension or source
     case image_url
     when /\.png$/i
       'image/png'
     when /\.gif$/i
-      'image/gif'  
+      'image/gif'
     when /\.webp$/i
       'image/webp'
     when /\.svg$/i

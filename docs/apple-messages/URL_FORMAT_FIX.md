@@ -130,7 +130,7 @@ Bot: [Shows time picker for selected store]
 **Action Required:** Restart development server to pick up changes
 
 ```bash
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ## Log Examples

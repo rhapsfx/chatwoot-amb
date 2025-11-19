@@ -1,42 +1,42 @@
 #!/usr/bin/env ruby
 
-puts "🔍 Comparing Time Picker Formats"
-puts "=" * 50
+puts '🔍 Comparing Time Picker Formats'
+puts '=' * 50
 
 # Apple Sample Format (from 10_send_time_picker_with_user_timezone.py)
 apple_sample = {
-  "type" => "interactive",
-  "interactiveData" => {
-    "bid" => "IMESSAGE_EXTENSION_BID",
-    "data" => {
-      "mspVersion" => "1.0",
-      "requestIdentifier" => "request_id",
-      "event" => {
-        "identifier" => "1",
-        "title" => "",
-        "timeslots" => [
+  'type' => 'interactive',
+  'interactiveData' => {
+    'bid' => 'IMESSAGE_EXTENSION_BID',
+    'data' => {
+      'mspVersion' => '1.0',
+      'requestIdentifier' => 'request_id',
+      'event' => {
+        'identifier' => '1',
+        'title' => '',
+        'timeslots' => [
           {
-            "duration" => 3600,
-            "startTime" => "2022-07-10T17:00+0000",
-            "identifier" => "0"
+            'duration' => 3600,
+            'startTime' => '2022-07-10T17:00+0000',
+            'identifier' => '0'
           }
         ]
       }
     },
-    "receivedMessage" => {
-      "style" => "icon",
-      "title" => "Please pick a time",
-      "subtitle" => "This should be 10:00am for GMT-7h users"
+    'receivedMessage' => {
+      'style' => 'icon',
+      'title' => 'Please pick a time',
+      'subtitle' => 'This should be 10:00am for GMT-7h users'
     },
-    "replyMessage" => {
-      "style" => "icon",
-      "title" => "Thank you!"
+    'replyMessage' => {
+      'style' => 'icon',
+      'title' => 'Thank you!'
     }
   },
-  "sourceId" => "BIZ_ID",
-  "destinationId" => "destination_id",
-  "v" => 1,
-  "id" => "message_id"
+  'sourceId' => 'BIZ_ID',
+  'destinationId' => 'destination_id',
+  'v' => 1,
+  'id' => 'message_id'
 }
 
 puts "\n📋 Apple Sample Time Picker Structure:"
@@ -64,7 +64,7 @@ message = Message.create!(
   conversation: conversation,
   message_type: 'outgoing',
   content_type: 'apple_time_picker',
-  content: "Test Time Picker",
+  content: 'Test Time Picker',
   content_attributes: {
     'event' => {
       'identifier' => '1',
@@ -95,10 +95,10 @@ puts "\n📋 Our Current Time Picker Structure:"
 puts JSON.pretty_generate(our_payload)
 
 puts "\n🔍 Key Differences Analysis:"
-puts "-" * 30
+puts '-' * 30
 
 # Compare structures
-apple_data = apple_sample["interactiveData"]["data"]
+apple_data = apple_sample['interactiveData']['data']
 our_data = our_payload[:interactiveData][:data]
 
 puts "✅ Apple Sample - data.mspVersion: #{apple_data['mspVersion']}"
@@ -113,7 +113,7 @@ puts "✅ Our Format - data.event.title: '#{our_data[:event]['title']}'"
 puts "✅ Apple Sample - data.event.timeslots count: #{apple_data['event']['timeslots'].length}"
 puts "✅ Our Format - data.event.timeslots count: #{our_data[:event]['timeslots'].length}"
 
-apple_received = apple_sample["interactiveData"]["receivedMessage"]
+apple_received = apple_sample['interactiveData']['receivedMessage']
 our_received = our_payload[:interactiveData][:receivedMessage]
 
 puts "✅ Apple Sample - receivedMessage.style: #{apple_received['style']}"
@@ -122,7 +122,7 @@ puts "✅ Our Format - receivedMessage.style: #{our_received[:style]}"
 puts "✅ Apple Sample - receivedMessage.title: '#{apple_received['title']}'"
 puts "✅ Our Format - receivedMessage.title: '#{our_received[:title]}'"
 
-apple_reply = apple_sample["interactiveData"]["replyMessage"]
+apple_reply = apple_sample['interactiveData']['replyMessage']
 our_reply = our_payload[:interactiveData][:replyMessage]
 
 puts "✅ Apple Sample - replyMessage.style: #{apple_reply['style']}"
@@ -132,5 +132,5 @@ puts "✅ Apple Sample - replyMessage.title: '#{apple_reply['title']}'"
 puts "✅ Our Format - replyMessage.title: '#{our_reply[:title]}'"
 
 puts "\n🎯 Conclusion:"
-puts "The structures appear to match the Apple sample format!"
-puts "If there are still issues, they might be in field types or subtle differences."
+puts 'The structures appear to match the Apple sample format!'
+puts 'If there are still issues, they might be in field types or subtle differences.'

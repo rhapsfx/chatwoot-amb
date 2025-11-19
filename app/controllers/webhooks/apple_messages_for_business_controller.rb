@@ -134,7 +134,7 @@ class Webhooks::AppleMessagesForBusinessController < ActionController::API
     max_decompressed_size = 10 * 1024 * 1024
 
     gz = Zlib::GzipReader.new(StringIO.new(data))
-    decompressed = String.new
+    decompressed = ''
 
     # Read in chunks to enforce size limit
     while (chunk = gz.read(1024 * 1024)) # 1MB chunks

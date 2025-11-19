@@ -174,7 +174,7 @@ puts '⚠️  IMPORTANT: You MUST restart your Rails server for changes to take 
 puts '   The initializer changes only load on server startup.'
 puts
 puts 'To restart:'
-puts '  ./dev-server.sh restart'
+puts '  ./script//dev-server.sh restart'
 puts
 puts 'After restart, check logs for:'
 puts '  [Sidekiq] Log sanitizer middleware installed'

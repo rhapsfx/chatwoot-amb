@@ -457,7 +457,7 @@ All Phase 3 code follows CaseTransformer best practices:
 
 ```bash
 # 1. Test locally
-./dev-server.sh start
+./script//dev-server.sh start
 
 # 2. Lint code
 bundle exec rubocop -a app/services/apple_messages_for_business/acoustic_house_bot_service.rb
