@@ -613,7 +613,6 @@ const closeImagePicker = () => {
             :key="itemIndex"
             class="p-4 border-2 border-n-weak rounded-lg bg-white dark:bg-n-alpha-1 hover:border-n-blue-7 transition-colors"
           >
-
             <!-- Image Selection - Moved to top for better visual hierarchy -->
             <div
               class="flex items-center gap-3 mb-4 pb-4 border-b border-n-weak"
@@ -636,12 +635,17 @@ const closeImagePicker = () => {
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium text-n-slate-12 truncate">
                     {{
-                      getImageByIdentifier(item.image_identifier).originalName ||
+                      getImageByIdentifier(item.image_identifier)
+                        .originalName ||
                       getImageByIdentifier(item.image_identifier).description
                     }}
                   </div>
                   <div class="text-xs text-n-slate-10">
-                    {{ formatFileSize(getImageByIdentifier(item.image_identifier).size) }}
+                    {{
+                      formatFileSize(
+                        getImageByIdentifier(item.image_identifier).size
+                      )
+                    }}
                   </div>
                 </div>
                 <button
@@ -654,7 +658,9 @@ const closeImagePicker = () => {
 
               <!-- No image selected with icon -->
               <div v-else class="flex items-center gap-2 flex-1">
-                <div class="w-12 h-12 bg-n-alpha-3 rounded-lg flex items-center justify-center border-2 border-dashed border-n-weak">
+                <div
+                  class="w-12 h-12 bg-n-alpha-3 rounded-lg flex items-center justify-center border-2 border-dashed border-n-weak"
+                >
                   <span class="text-xl">📷</span>
                 </div>
                 <span class="text-sm text-n-slate-10 italic">

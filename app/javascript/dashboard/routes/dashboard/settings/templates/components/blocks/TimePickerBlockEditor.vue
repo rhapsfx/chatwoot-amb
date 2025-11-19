@@ -125,13 +125,15 @@ watch(
       localProps.value = {
         // Event details (may be nested in event object)
         event_title: newProps.event_title || event.title || '',
-        event_description: newProps.event_description || event.description || '',
+        event_description:
+          newProps.event_description || event.description || '',
         timeslots: newProps.timeslots || event.timeslots || [],
         timezone_offset: newProps.timezone_offset || event.timezone_offset || 0,
 
         // Message configuration (flat structure) - all snake_case
         received_title: newProps.received_title || 'Please pick a time',
-        received_subtitle: newProps.received_subtitle || 'Select your preferred time slot',
+        received_subtitle:
+          newProps.received_subtitle || 'Select your preferred time slot',
         received_image_identifier: newProps.received_image_identifier || '',
         received_style: newProps.received_style || 'icon',
         reply_title: newProps.reply_title || 'Thank you!',
