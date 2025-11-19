@@ -304,7 +304,7 @@ end
 
 ```bash
 # Restart server to apply changes
-./dev-server.sh restart
+./script//dev-server.sh restart
 
 # Test with store selection flow
 # Monitor logs for scraping activity

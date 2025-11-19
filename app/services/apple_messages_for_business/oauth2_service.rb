@@ -96,18 +96,18 @@ class AppleMessagesForBusiness::Oauth2Service
     case @provider
     when 'google'
       base_params.merge(
-        client_id: ENV['GOOGLE_OAUTH_CLIENT_ID'],
-        client_secret: ENV['GOOGLE_OAUTH_CLIENT_SECRET']
+        client_id: ENV.fetch('GOOGLE_OAUTH_CLIENT_ID', nil),
+        client_secret: ENV.fetch('GOOGLE_OAUTH_CLIENT_SECRET', nil)
       )
     when 'linkedin'
       base_params.merge(
-        client_id: ENV['LINKEDIN_OAUTH_CLIENT_ID'],
-        client_secret: ENV['LINKEDIN_OAUTH_CLIENT_SECRET']
+        client_id: ENV.fetch('LINKEDIN_OAUTH_CLIENT_ID', nil),
+        client_secret: ENV.fetch('LINKEDIN_OAUTH_CLIENT_SECRET', nil)
       )
     when 'facebook'
       base_params.merge(
-        client_id: ENV['FACEBOOK_OAUTH_CLIENT_ID'],
-        client_secret: ENV['FACEBOOK_OAUTH_CLIENT_SECRET']
+        client_id: ENV.fetch('FACEBOOK_OAUTH_CLIENT_ID', nil),
+        client_secret: ENV.fetch('FACEBOOK_OAUTH_CLIENT_SECRET', nil)
       )
     end
   end
@@ -121,13 +121,13 @@ class AppleMessagesForBusiness::Oauth2Service
     case @provider
     when 'google'
       base_params.merge(
-        client_id: ENV['GOOGLE_OAUTH_CLIENT_ID'],
-        client_secret: ENV['GOOGLE_OAUTH_CLIENT_SECRET']
+        client_id: ENV.fetch('GOOGLE_OAUTH_CLIENT_ID', nil),
+        client_secret: ENV.fetch('GOOGLE_OAUTH_CLIENT_SECRET', nil)
       )
     when 'linkedin'
       base_params.merge(
-        client_id: ENV['LINKEDIN_OAUTH_CLIENT_ID'],
-        client_secret: ENV['LINKEDIN_OAUTH_CLIENT_SECRET']
+        client_id: ENV.fetch('LINKEDIN_OAUTH_CLIENT_ID', nil),
+        client_secret: ENV.fetch('LINKEDIN_OAUTH_CLIENT_SECRET', nil)
       )
     end
   end

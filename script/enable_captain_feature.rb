@@ -44,7 +44,7 @@ end
 puts '✨ Done! Captain feature has been enabled.'
 puts ''
 puts '📝 Next steps:'
-puts '   1. Restart your Rails server (./dev-server.sh restart)'
+puts '   1. Restart your Rails server (./script//dev-server.sh restart)'
 puts '   2. Refresh your browser'
 puts '   3. Look for Captain in the navigation menu'
 puts ''

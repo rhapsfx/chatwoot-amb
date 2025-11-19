@@ -3,8 +3,8 @@
 ## Build / Test / Lint
 
 - **Setup**: `bundle install && pnpm install`
-- **Run Dev**: `./dev-server.sh start` (localhost only) or `./dev-server.sh start-public` (with public access)
-- **Server Management**: `./dev-server.sh {start|start-public|stop|restart|status|help}`
+- **Run Dev**: `./script/dev-server.sh start` (localhost only) or `./script/dev-server.sh start-public` (with public access)
+- **Server Management**: `./script/dev-server.sh {start|start-public|stop|restart|status|help}`
 - **Public Access Options**: Custom domain, Tailscale Funnel, or ngrok (configured in dev-server.sh)
 - **Lint JS/Vue**: `pnpm eslint` / `pnpm eslint:fix`
 - **Lint Ruby**: `bundle exec rubocop -a`

@@ -60,7 +60,7 @@ Performing ActionCableBroadcastJob ... with arguments: ["[STRING: 24B]", "[STRIN
 ##  Restart Required
 
 ```bash
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 After restart, verify both middlewares loaded:

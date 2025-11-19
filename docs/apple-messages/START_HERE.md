@@ -131,7 +131,7 @@ rails runner "puts AppleMessagesForBusiness::AcousticHouseBotService.name"
 ### **3. Test Manually** (30-60 minutes)
 ```bash
 # Start dev server
-./dev-server.sh start
+./script//dev-server.sh start
 
 # Find a test conversation
 rails runner "puts Conversation.joins(:inbox).where(inboxes: { channel_type: 'Channel::AppleMessagesForBusiness' }).last.id"

@@ -17,15 +17,15 @@ class AppleMessagesForBusiness::AttachmentsController < ApplicationController
       response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
       response.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept'
       response.headers['Cache-Control'] = 'public, max-age=3600'
-      
+
       # Additional headers for browser compatibility
       response.headers['X-Content-Type-Options'] = 'nosniff'
       response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
-      
+
       # Critical: Add headers to prevent ngrok browser warning when accessed from frontend
       response.headers['X-Frame-Options'] = 'SAMEORIGIN'
       response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-      
+
       # Handle HEAD requests properly
       if request.head?
         response.headers['Content-Type'] = @attachment.file.content_type
@@ -50,7 +50,7 @@ class AppleMessagesForBusiness::AttachmentsController < ApplicationController
       # Set headers to bypass ngrok browser warning
       response.headers['ngrok-skip-browser-warning'] = 'true'
       response.headers['User-Agent'] = 'Chatwoot-Apple-Messages-For-Business'
-      
+
       send_data @attachment.file.download,
                 filename: @attachment.file.filename.to_s,
                 type: @attachment.file.content_type,
@@ -64,22 +64,22 @@ class AppleMessagesForBusiness::AttachmentsController < ApplicationController
 
   def set_attachment
     @attachment = Attachment.find(params[:id])
-    
+
     # Ensure this attachment belongs to an Apple Messages for Business channel
-    unless @attachment.message&.inbox&.channel_type == 'Channel::AppleMessagesForBusiness'
-      head :forbidden
-      return
-    end
+    return if @attachment.message&.inbox&.channel_type == 'Channel::AppleMessagesForBusiness'
+
+    head :forbidden
+    return
   end
 
   def verify_access_token
     # Use a simple token-based authentication for ngrok bypass
     token = params[:token] || request.headers['X-Access-Token']
     expected_token = generate_attachment_token(@attachment.id)
-    
-    unless token == expected_token
-      head :forbidden
-    end
+
+    return if token == expected_token
+
+    head :forbidden
   end
 
   def generate_attachment_token(attachment_id)

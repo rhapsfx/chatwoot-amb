@@ -216,21 +216,6 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   def build_images_array
     Rails.logger.info '[AMB TimePicker] build_images_array called'
 
-    images_data = content_attributes['images'] || []
-    all_images = []
-
-    # First, include any images provided directly with base64 data
-    if images_data.any? && images_data.first['data'].present?
-      Rails.logger.info "[AMB TimePicker] Using #{images_data.length} images from content_attributes"
-      all_images = images_data.map do |image|
-        {
-          identifier: image['identifier'],
-          data: image['data'], # Base64 encoded image data
-          description: image['description']
-        }
-      end
-    end
-
     # Collect all image identifiers referenced in event, received_message, and reply_message
     # All data is now normalized to snake_case
     image_identifiers = []
@@ -243,34 +228,19 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
 
     Rails.logger.info "[AMB TimePicker] Collected image identifiers: #{image_identifiers.inspect}"
 
-    # Find which identifiers are NOT already in all_images (need to be fetched from database)
-    existing_identifiers = all_images.map { |img| img[:identifier] }
-    missing_identifiers = image_identifiers - existing_identifiers
+    # Use ImageFetchService with three-tier fallback
+    fetch_and_encode_images(image_identifiers)
+  end
 
-    # Fetch missing images from database
-    if missing_identifiers.any?
-      Rails.logger.info "[AMB TimePicker] Fetching #{missing_identifiers.length} images from database: #{missing_identifiers.inspect}"
+  def fetch_and_encode_images(identifiers)
+    return [] if identifiers.empty?
 
-      # Performance Optimization: Batch fetch with single WHERE IN query (avoids N+1)
-      fetched_images = AppleListPickerImage.where(
-        inbox_id: message.inbox_id,
-        identifier: missing_identifiers
-      ).map do |picker_image|
-        next unless picker_image.image.attached?
-
-        Rails.logger.info "[AMB TimePicker] Found image: #{picker_image.identifier}"
-        {
-          identifier: picker_image.identifier,
-          data: Base64.strict_encode64(picker_image.image.download),
-          description: picker_image.description
-        }
-      end.compact
-
-      all_images.concat(fetched_images)
-      Rails.logger.info "[AMB TimePicker] Total images after database fetch: #{all_images.length}"
-    end
-
-    all_images
+    # Use ImageFetchService with three-tier fallback
+    AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: message.account_id,
+      inbox_id: message.inbox_id,
+      embedded_images: content_attributes['images']
+    ).fetch_and_encode(identifiers)
   end
 
   def build_received_message

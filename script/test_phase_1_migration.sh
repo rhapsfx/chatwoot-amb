@@ -273,7 +273,7 @@ if [ $SUCCESS -eq $TOTAL ]; then
     echo "   cd app/javascript && pnpm eslint --fix"
     echo ""
     echo "2. Test endpoints manually:"
-    echo "   - Start dev server: ./dev-server.sh start"
+    echo "   - Start dev server: ./script//dev-server.sh start"
     echo "   - Old endpoint should log deprecation warnings"
     echo "   - New endpoint should work identically"
     echo ""

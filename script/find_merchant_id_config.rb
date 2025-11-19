@@ -5,8 +5,8 @@
 merchant_id_to_find = 'com.apple.apple-pay-matthieu'
 
 puts "Searching for merchant ID: #{merchant_id_to_find}"
-puts "=" * 80
-puts ""
+puts '=' * 80
+puts ''
 
 Channel::AppleMessagesForBusiness.all.each do |channel|
   full_merchant_id = channel.payment_settings.dig('apple_pay', 'merchant_identifier')
@@ -30,17 +30,15 @@ Channel::AppleMessagesForBusiness.all.each do |channel|
   puts "  Test mode: #{channel.payment_settings['test_mode']}"
 
   if inboxes.any?
-    puts "  Inboxes using this channel:"
+    puts '  Inboxes using this channel:'
     inboxes.each do |inbox|
       puts "    - Inbox #{inbox.id}: #{inbox.name}"
     end
   else
-    puts "  No inboxes using this channel"
+    puts '  No inboxes using this channel'
   end
 
-  if merchant_id == merchant_id_to_find
-    puts "  ✅ MATCHES the merchant ID we're looking for!"
-  end
+  puts "  ✅ MATCHES the merchant ID we're looking for!" if merchant_id == merchant_id_to_find
 
-  puts ""
+  puts ''
 end

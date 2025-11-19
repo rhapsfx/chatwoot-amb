@@ -82,9 +82,9 @@ class AppleMessagesForBusiness::RoutingAutomationService
   def create_billing_routing_rule
     # Route conversations with group="billing" to specialized agent
     billing_agent = @account.users.joins(:account_users)
-                           .where(account_users: { role: ['administrator', 'agent'] })
-                           .where("users.name ILIKE ?", '%billing%')
-                           .first
+                            .where(account_users: { role: %w[administrator agent] })
+                            .where('users.name ILIKE ?', '%billing%')
+                            .first
 
     return unless billing_agent
 
@@ -192,7 +192,8 @@ class AppleMessagesForBusiness::RoutingAutomationService
     AutomationRule.create!(
       account: account,
       name: rule_name,
-      description: "Custom Apple Messages routing rule for #{[group ? "group=#{group}" : nil, intent ? "intent=#{intent}" : nil].compact.join(' and ')}",
+      description: "Custom Apple Messages routing rule for #{[group ? "group=#{group}" : nil,
+                                                              intent ? "intent=#{intent}" : nil].compact.join(' and ')}",
       event_name: 'conversation_created',
       conditions: conditions,
       actions: actions

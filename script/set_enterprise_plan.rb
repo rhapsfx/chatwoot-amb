@@ -14,7 +14,7 @@ if config.save
   puts "✅ Successfully set INSTALLATION_PRICING_PLAN to 'enterprise'"
   puts "   Current value: #{InstallationConfig.find_by(name: 'INSTALLATION_PRICING_PLAN')&.value}"
   puts "\n⚠️  IMPORTANT: You must restart your Rails server for this change to take effect!"
-  puts '   Run: ./dev-server.sh restart'
+  puts '   Run: ./script//dev-server.sh restart'
 else
   puts '❌ Failed to set INSTALLATION_PRICING_PLAN'
   puts "   Errors: #{config.errors.full_messages.join(', ')}"

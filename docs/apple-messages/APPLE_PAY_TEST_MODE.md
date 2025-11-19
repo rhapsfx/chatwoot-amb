@@ -57,7 +57,7 @@ Add to `.env` or export before starting server:
 
 ```bash
 export APPLE_PAY_TEST_MODE=true
-./dev-server.sh start-public
+./script//dev-server.sh start-public
 ```
 
 ### Option 2: Channel Setting (Per-Inbox)

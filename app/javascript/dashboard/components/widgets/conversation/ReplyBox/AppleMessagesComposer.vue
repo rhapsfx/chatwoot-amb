@@ -1434,20 +1434,20 @@ const loadListPickerTemplate = block => {
     }));
   }
 
-  // Load received message config
-  listPickerData.value.received_title = config.receivedTitle || config.received_title || 'Please select an option';
-  listPickerData.value.received_subtitle = config.receivedSubtitle || config.received_subtitle || '';
-  listPickerData.value.received_image_identifier = config.receivedImageIdentifier || config.received_image_identifier || '';
-  listPickerData.value.received_style = config.receivedStyle || config.received_style || 'icon';
+  // Load received message config - backend always returns snake_case via TemplateFacade
+  listPickerData.value.received_title = config.received_title || 'Please select an option';
+  listPickerData.value.received_subtitle = config.received_subtitle || '';
+  listPickerData.value.received_image_identifier = config.received_image_identifier || '';
+  listPickerData.value.received_style = config.received_style || 'icon';
 
   // Load reply message config
-  listPickerData.value.reply_title = config.replyTitle || config.reply_title || 'Selection Made';
-  listPickerData.value.reply_subtitle = config.replySubtitle || config.reply_subtitle || '';
-  listPickerData.value.reply_style = config.replyStyle || config.reply_style || 'icon';
-  listPickerData.value.reply_image_title = config.replyImageTitle || config.reply_image_title || '';
-  listPickerData.value.reply_image_subtitle = config.replyImageSubtitle || config.reply_image_subtitle || '';
-  listPickerData.value.reply_secondary_subtitle = config.replySecondarySubtitle || config.reply_secondary_subtitle || '';
-  listPickerData.value.reply_tertiary_subtitle = config.replyTertiarySubtitle || config.reply_tertiary_subtitle || '';
+  listPickerData.value.reply_title = config.reply_title || 'Selection Made';
+  listPickerData.value.reply_subtitle = config.reply_subtitle || '';
+  listPickerData.value.reply_style = config.reply_style || 'icon';
+  listPickerData.value.reply_image_title = config.reply_image_title || '';
+  listPickerData.value.reply_image_subtitle = config.reply_image_subtitle || '';
+  listPickerData.value.reply_secondary_subtitle = config.reply_secondary_subtitle || '';
+  listPickerData.value.reply_tertiary_subtitle = config.reply_tertiary_subtitle || '';
 
   console.log('[AMB Templates] Loaded list picker:', listPickerData.value);
 };
@@ -1455,31 +1455,31 @@ const loadListPickerTemplate = block => {
 const loadTimePickerTemplate = block => {
   const config = block.blockConfig || block.block_config || {};
 
-  // Load event details
+  // Load event details - backend always returns snake_case via TemplateFacade
   timePickerData.value.event = {
-    title: config.eventTitle || config.event?.title || 'Schedule Appointment',
-    description: config.eventDescription || config.event?.description || 'Select a time slot',
+    title: config.event_title || config.event?.title || 'Schedule Appointment',
+    description: config.event_description || config.event?.description || 'Select a time slot',
     timeslots: config.timeslots || config.event?.timeslots || [],
   };
 
-  // Load timezone
-  timePickerData.value.timezone_offset = config.timezoneOffset || config.timezone_offset || -480;
+  // Load timezone - backend always returns snake_case via TemplateFacade
+  timePickerData.value.timezone_offset = config.timezone_offset || -480;
 
   // Load received message config
-  timePickerData.value.received_title = config.receivedTitle || config.received_title || 'Please pick a time';
-  timePickerData.value.received_subtitle = config.receivedSubtitle || config.received_subtitle || 'Select your preferred time slot';
-  timePickerData.value.receivedImageIdentifier = config.receivedImageIdentifier || config.received_image_identifier || '';
-  timePickerData.value.received_style = config.receivedStyle || config.received_style || 'icon';
+  timePickerData.value.received_title = config.received_title || 'Please pick a time';
+  timePickerData.value.received_subtitle = config.received_subtitle || 'Select your preferred time slot';
+  timePickerData.value.receivedImageIdentifier = config.received_image_identifier || '';
+  timePickerData.value.received_style = config.received_style || 'icon';
 
   // Load reply message config
-  timePickerData.value.reply_title = config.replyTitle || config.reply_title || 'Thank you!';
-  timePickerData.value.reply_subtitle = config.replySubtitle || config.reply_subtitle || '';
-  timePickerData.value.replyImageIdentifier = config.replyImageIdentifier || config.reply_image_identifier || '';
-  timePickerData.value.reply_style = config.replyStyle || config.reply_style || 'icon';
-  timePickerData.value.reply_image_title = config.replyImageTitle || config.reply_image_title || '';
-  timePickerData.value.reply_image_subtitle = config.replyImageSubtitle || config.reply_image_subtitle || '';
-  timePickerData.value.reply_secondary_subtitle = config.replySecondarySubtitle || config.reply_secondary_subtitle || '';
-  timePickerData.value.reply_tertiary_subtitle = config.replyTertiarySubtitle || config.reply_tertiary_subtitle || '';
+  timePickerData.value.reply_title = config.reply_title || 'Thank you!';
+  timePickerData.value.reply_subtitle = config.reply_subtitle || '';
+  timePickerData.value.replyImageIdentifier = config.reply_image_identifier || '';
+  timePickerData.value.reply_style = config.reply_style || 'icon';
+  timePickerData.value.reply_image_title = config.reply_image_title || '';
+  timePickerData.value.reply_image_subtitle = config.reply_image_subtitle || '';
+  timePickerData.value.reply_secondary_subtitle = config.reply_secondary_subtitle || '';
+  timePickerData.value.reply_tertiary_subtitle = config.reply_tertiary_subtitle || '';
 
   // Load images if present
   if (config.images && Array.isArray(config.images)) {

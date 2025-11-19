@@ -310,7 +310,7 @@ class AppleMessagesForBusiness::FormService
       items = page['items'] || []
       items.each do |item|
         # Check for select items with image options
-        next unless ['singleSelect', 'multiSelect'].include?(item['item_type'])
+        next unless %w[singleSelect multiSelect].include?(item['item_type'])
 
         options = item['options'] || []
         options.each do |option|
@@ -327,37 +327,17 @@ class AppleMessagesForBusiness::FormService
   def fetch_and_encode_images(identifiers)
     return [] if identifiers.empty?
 
-    # Get inbox_id from channel
-    inbox_id = @channel.inbox_id
+    # Use ImageFetchService with three-tier fallback
+    AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @channel.account_id,
+      inbox_id: @channel.inbox_id,
+      embedded_images: embedded_images_from_form_config
+    ).fetch_and_encode(identifiers)
+  end
 
-    # Fetch images from database
-    picker_images = AppleListPickerImage
-                      .where(inbox_id: inbox_id, identifier: identifiers)
-                      .includes(image_attachment: :blob)
-
-    Rails.logger.info "[AMB FormService] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
-    Rails.logger.info "[AMB FormService] 🖼️ Found #{picker_images.count} images in ActiveStorage"
-
-    # Encode images as base64
-    picker_images.map do |picker_image|
-      if picker_image.image.attached?
-        blob = picker_image.image.blob
-        image_data = blob.download
-
-        {
-          identifier: picker_image.identifier,
-          data: Base64.strict_encode64(image_data),
-          description: picker_image.description || picker_image.identifier
-        }
-      else
-        Rails.logger.warn "[AMB FormService] ⚠️ Image not attached for identifier: #{picker_image.identifier}"
-        nil
-      end
-    end.compact
-  rescue StandardError => e
-    Rails.logger.error "[AMB FormService] ❌ Error fetching images: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
-    []
+  def embedded_images_from_form_config
+    # Extract embedded images from form config if present
+    @form_config['images'] || []
   end
 
   def send_to_apple_gateway(payload, message_id)

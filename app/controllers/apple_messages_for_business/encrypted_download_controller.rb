@@ -26,9 +26,7 @@ class AppleMessagesForBusiness::EncryptedDownloadController < ApplicationControl
     cipher_service = AppleMessagesForBusiness::AttachmentCipherService.new
     token_validation = cipher_service.validate_download_token(token)
 
-    unless token_validation[:valid]
-      return render_error(token_validation[:error])
-    end
+    return render_error(token_validation[:error]) unless token_validation[:valid]
 
     @attachment = token_validation[:attachment]
     @channel = Channel::AppleMessagesForBusiness.find(token_validation[:channel_id]) if token_validation[:channel_id]

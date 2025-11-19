@@ -422,7 +422,7 @@ After deploying these changes:
 
 ```bash
 # Restart development server
-./dev-server.sh restart
+./script//dev-server.sh restart
 
 # Or restart production (if using systemd)
 sudo systemctl restart chatwoot

@@ -32,9 +32,9 @@ class NormalizeAppleMessagesContentAttributes < ActiveRecord::Migration[7.0]
     # Check if running in dry-run mode
     dry_run = ENV['DRY_RUN'] == 'true'
 
-    say "Starting Apple Messages content_attributes normalization"
+    say 'Starting Apple Messages content_attributes normalization'
     say "Mode: #{dry_run ? 'DRY RUN' : 'LIVE'}"
-    say "=" * 80
+    say '=' * 80
 
     # Count total messages needing normalization
     total_count = Message.where(content_type: APPLE_CONTENT_TYPES)
@@ -58,12 +58,11 @@ class NormalizeAppleMessagesContentAttributes < ActiveRecord::Migration[7.0]
     batch_count = (total_count.to_f / batch_size).ceil
 
     say "Processing in #{batch_count} batches of #{batch_size}"
-    say "-" * 80
+    say '-' * 80
 
     Message.where(content_type: APPLE_CONTENT_TYPES)
            .where.not(content_attributes: nil)
            .find_in_batches(batch_size: batch_size).with_index do |batch, batch_index|
-
       say "Processing batch #{batch_index + 1}/#{batch_count}..."
 
       batch.each do |message|
@@ -95,9 +94,7 @@ class NormalizeAppleMessagesContentAttributes < ActiveRecord::Migration[7.0]
           end
 
           # Update the message (unless dry-run)
-          unless dry_run
-            message.update_column(:content_attributes, normalized)
-          end
+          message.update_column(:content_attributes, normalized) unless dry_run
 
           stats[:normalized] += 1
 
@@ -116,34 +113,34 @@ class NormalizeAppleMessagesContentAttributes < ActiveRecord::Migration[7.0]
     end
 
     # Print final statistics
-    say "=" * 80
+    say '=' * 80
     say "Migration #{dry_run ? 'dry-run' : 'complete'}!"
-    say ""
-    say "Statistics:"
+    say ''
+    say 'Statistics:'
     say "  Total processed:      #{stats[:processed]}"
     say "  Normalized:           #{stats[:normalized]}"
     say "  Already normalized:   #{stats[:already_normalized]}"
     say "  Skipped (empty):      #{stats[:skipped]}"
     say "  Errors:               #{stats[:errors]}"
-    say ""
+    say ''
 
     if dry_run
-      say "=" * 80
-      say "DRY RUN COMPLETE - No changes were made"
-      say "Run without DRY_RUN=true to apply changes"
-      say "=" * 80
+      say '=' * 80
+      say 'DRY RUN COMPLETE - No changes were made'
+      say 'Run without DRY_RUN=true to apply changes'
+      say '=' * 80
     else
-      say "=" * 80
-      say "MIGRATION COMPLETE - Changes applied to database"
-      say "=" * 80
+      say '=' * 80
+      say 'MIGRATION COMPLETE - Changes applied to database'
+      say '=' * 80
     end
   end
 
   def down
-    say "Rollback not needed - transformation is idempotent"
-    say "Original data can be restored from backup if necessary"
-    say ""
-    say "To reverse the normalization (convert snake_case back to camelCase),"
-    say "use the provided rollback script in docs/apple-messages/scripts/"
+    say 'Rollback not needed - transformation is idempotent'
+    say 'Original data can be restored from backup if necessary'
+    say ''
+    say 'To reverse the normalization (convert snake_case back to camelCase),'
+    say 'use the provided rollback script in docs/apple-messages/scripts/'
   end
 end

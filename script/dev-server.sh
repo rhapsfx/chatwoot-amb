@@ -608,7 +608,7 @@ check_tailscale_funnel_status() {
         detailed_status="URL saved: $funnel_url (use 'tailscale funnel status' to check if active)"
     else
         funnel_status="${YELLOW}STATUS UNKNOWN${NC}"
-        detailed_status="Run './dev-server.sh tailscale-status' in your terminal to check"
+        detailed_status="Run './script//dev-server.sh tailscale-status' in your terminal to check"
     fi
 
     echo "$funnel_status|$funnel_url|$detailed_status"

@@ -136,8 +136,8 @@ AppleMessagesForBusiness::
 bundle install && pnpm install
 
 # Development Server
-./dev-server.sh start          # localhost only
-./dev-server.sh start-public   # with public access (Tailscale/ngrok)
+./script//dev-server.sh start          # localhost only
+./script//dev-server.sh start-public   # with public access (Tailscale/ngrok)
 
 # Linting
 pnpm eslint:fix               # JavaScript/Vue

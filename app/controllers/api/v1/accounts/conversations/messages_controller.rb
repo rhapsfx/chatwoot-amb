@@ -264,16 +264,19 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     return unless apple_messages_content_type?
 
     Rails.logger.info '[API] Normalizing Apple Messages content_attributes from camelCase to snake_case'
-    sanitized_before = LogSanitizerService.sanitize_for_log(params[:content_attributes])
-    Rails.logger.info "[API] Before normalization: #{sanitized_before.inspect}"
+
+    # Log structure only, not the actual data
+    before_keys = params[:content_attributes].keys
+    Rails.logger.info "[API] Before normalization - Keys: #{before_keys.join(', ')}"
 
     # Convert from frontend camelCase to internal snake_case
     params[:content_attributes] = AppleMessagesForBusiness::CaseTransformer.from_apple_format(
       params[:content_attributes].to_unsafe_h
     )
 
-    sanitized_after = LogSanitizerService.sanitize_for_log(params[:content_attributes])
-    Rails.logger.info "[API] After normalization: #{sanitized_after.inspect}"
+    # Log structure only, not the actual data
+    after_keys = params[:content_attributes].keys
+    Rails.logger.info "[API] After normalization - Keys: #{after_keys.join(', ')}"
   end
 
   def apple_messages_content_type?

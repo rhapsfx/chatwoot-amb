@@ -194,7 +194,7 @@ Performing ActionCableBroadcastJob ... with arguments: [SANITIZED]
 ⚠️ **CRITICAL**: Initializer changes only load on server startup
 
 ```bash
-./dev-server.sh restart
+./script//dev-server.sh restart
 ```
 
 ## Previous Failed Approaches (For Reference)

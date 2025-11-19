@@ -68,7 +68,9 @@ module Templates
         templates = MessageTemplate.where("metadata->>'migration_source' = ?", 'apple_messages_migration')
         templates.each do |template|
           errors << "Template #{template.id} missing content blocks" if template.content_blocks.empty?
-          errors << "Template #{template.id} missing Apple Messages channel mapping" unless template.channel_mappings.exists?(channel_type: 'apple_messages_for_business')
+          unless template.channel_mappings.exists?(channel_type: 'apple_messages_for_business')
+            errors << "Template #{template.id} missing Apple Messages channel mapping"
+          end
         end
 
         {

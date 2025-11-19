@@ -41,7 +41,7 @@ end
 puts '✨ Done! Custom Roles feature has been enabled.'
 puts ''
 puts '📝 Next steps:'
-puts '   1. Restart your Rails server (./dev-server.sh restart)'
+puts '   1. Restart your Rails server (./script//dev-server.sh restart)'
 puts '   2. Refresh your browser'
 puts '   3. Navigate to: /app/accounts/1/settings/custom-roles/list'
 puts '   4. You should now see the Custom Roles settings page'

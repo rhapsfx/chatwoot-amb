@@ -59,15 +59,15 @@ class AppleMessagesForBusiness::PaymentCompleteJob < ApplicationJob
     transaction_id = payment_result['transaction_id']
 
     "Payment completed successfully!\n" \
-    "Amount: #{format_currency(amount, currency)}\n" \
-    "Transaction ID: #{transaction_id}"
+      "Amount: #{format_currency(amount, currency)}\n" \
+      "Transaction ID: #{transaction_id}"
   end
 
   def format_currency(amount, currency)
     "#{currency} #{amount}"
   end
 
-  def process_successful_payment(channel, payment_result)
+  def process_successful_payment(_channel, payment_result)
     # Store payment record or trigger other business logic
     # This could integrate with order management systems, etc.
     Rails.logger.info "[AMB Payment] Processing successful payment: #{payment_result['transaction_id']}"

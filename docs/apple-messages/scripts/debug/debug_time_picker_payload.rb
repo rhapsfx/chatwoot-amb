@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
-puts "🔧 Debugging Time Picker Payload Structure"
-puts "==========================================="
+puts '🔧 Debugging Time Picker Payload Structure'
+puts '==========================================='
 
 # Create a time picker message with the corrected structure
 conversation = Conversation.find(4)
@@ -19,7 +19,7 @@ time_message = Message.create!(
           'duration' => 3600
         },
         {
-          'startTime' => '2025-12-16T14:00+0000', 
+          'startTime' => '2025-12-16T14:00+0000',
           'duration' => 3600
         }
       ]
@@ -55,7 +55,7 @@ puts "\n📱 Generated Apple MSP Payload:"
 puts JSON.pretty_generate(payload)
 
 puts "\n🔍 Time Picker Specific Analysis:"
-puts "================================="
+puts '================================='
 
 event_data = payload[:interactiveData][:data][:event]
 puts "• Event present: #{event_data.present?}"
@@ -74,49 +74,49 @@ if event_data&.dig('timeslots')
 end
 
 puts "\n📋 Apple Sample Comparison:"
-puts "============================"
+puts '============================'
 
 apple_sample = {
-  "type" => "interactive",
-  "interactiveData" => {
-    "bid" => "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension",
-    "data" => {
-      "mspVersion" => "1.0",
-      "requestIdentifier" => "request_id",
-      "event" => {
-        "identifier" => "1",
-        "title" => "",
-        "timeslots" => [
+  'type' => 'interactive',
+  'interactiveData' => {
+    'bid' => 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
+    'data' => {
+      'mspVersion' => '1.0',
+      'requestIdentifier' => 'request_id',
+      'event' => {
+        'identifier' => '1',
+        'title' => '',
+        'timeslots' => [
           {
-            "duration" => 3600,
-            "startTime" => "2022-07-10T17:00+0000",
-            "identifier" => "0"
+            'duration' => 3600,
+            'startTime' => '2022-07-10T17:00+0000',
+            'identifier' => '0'
           }
         ]
       }
     },
-    "receivedMessage" => {
-      "style" => "icon",
-      "title" => "Please pick a time",
-      "subtitle" => "This should be 10:00am for GMT-7h users"
+    'receivedMessage' => {
+      'style' => 'icon',
+      'title' => 'Please pick a time',
+      'subtitle' => 'This should be 10:00am for GMT-7h users'
     },
-    "replyMessage" => {
-      "style" => "icon", 
-      "title" => "Thank you!"
+    'replyMessage' => {
+      'style' => 'icon',
+      'title' => 'Thank you!'
     }
   }
 }
 
-puts "Apple Sample Event Structure:"
-puts JSON.pretty_generate(apple_sample["interactiveData"]["data"]["event"])
+puts 'Apple Sample Event Structure:'
+puts JSON.pretty_generate(apple_sample['interactiveData']['data']['event'])
 
 puts "\nOur Generated Event Structure:"
 puts JSON.pretty_generate(event_data)
 
 puts "\n🎯 Key Differences Analysis:"
-puts "============================="
+puts '============================='
 
-apple_event = apple_sample["interactiveData"]["data"]["event"]
+apple_event = apple_sample['interactiveData']['data']['event']
 our_event = event_data
 
 puts "• Event identifier - Apple: #{apple_event['identifier']}, Ours: #{our_event&.dig('identifier')}"
@@ -126,7 +126,7 @@ puts "• Timeslots structure match: #{apple_event['timeslots'].class == our_eve
 if our_event&.dig('timeslots')
   apple_slot = apple_event['timeslots'][0]
   our_slot = our_event['timeslots'][0]
-  
+
   puts "\nFirst Timeslot Comparison:"
   puts "• Duration - Apple: #{apple_slot['duration']}, Ours: #{our_slot['duration']}"
   puts "• StartTime - Apple: #{apple_slot['startTime']}, Ours: #{our_slot['startTime']}"

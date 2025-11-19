@@ -44,10 +44,6 @@ const handleError = event => {
       class="object-cover w-full h-full skip-context-menu"
       :src="props.attachment.dataUrl"
       @error="handleError"
-      @load="
-        () =>
-          console.log('Image loaded successfully:', props.attachment.dataUrl)
-      "
     />
   </div>
   <GalleryView

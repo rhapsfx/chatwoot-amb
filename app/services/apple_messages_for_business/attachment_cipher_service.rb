@@ -20,7 +20,7 @@ class AppleMessagesForBusiness::AttachmentCipherService
       encrypted_data = cipher.update(data) + cipher.final
 
       # Return encrypted data and hex-encoded key with 00 prefix (as per Apple MSP spec)
-      hex_key = "00" + key.unpack1('H*')
+      hex_key = '00' + key.unpack1('H*')
       [encrypted_data, hex_key]
     end
 
@@ -76,10 +76,10 @@ class AppleMessagesForBusiness::AttachmentCipherService
 
       # Store encryption metadata
       update_attachment_encryption(attachment, {
-        encryption_key: Base64.encode64(encryption_key),
-        file_hash: file_hash,
-        algorithm: AES_256_CTR
-      })
+                                     encryption_key: Base64.encode64(encryption_key),
+                                     file_hash: file_hash,
+                                     algorithm: AES_256_CTR
+                                   })
 
       # Store encrypted content
       store_encrypted_file(attachment, Base64.encode64(encrypted_content))
@@ -119,9 +119,7 @@ class AppleMessagesForBusiness::AttachmentCipherService
       # Verify hash if available
       if attachment.file_hash
         actual_hash = Digest::SHA256.hexdigest(decrypted_content)
-        unless actual_hash == attachment.file_hash
-          return { error: 'File integrity check failed: hash mismatch' }
-        end
+        return { error: 'File integrity check failed: hash mismatch' } unless actual_hash == attachment.file_hash
       end
 
       {

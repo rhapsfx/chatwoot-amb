@@ -56,19 +56,17 @@ class AppleMessagesForBusiness::AppInvocationService
   private
 
   def validate_channel!
-    unless @channel.is_a?(Channel::AppleMessagesForBusiness)
-      raise ArgumentError, 'Channel must be Apple Messages for Business'
-    end
+    return if @channel.is_a?(Channel::AppleMessagesForBusiness)
+
+    raise ArgumentError, 'Channel must be Apple Messages for Business'
   end
 
   def validate_message_content!
-    unless @message.content_type == 'apple_custom_app'
-      raise ArgumentError, 'Message must have apple_custom_app content type'
-    end
+    raise ArgumentError, 'Message must have apple_custom_app content type' unless @message.content_type == 'apple_custom_app'
 
-    unless @message.content_attributes.present?
-      raise ArgumentError, 'Message must have content attributes for app configuration'
-    end
+    return if @message.content_attributes.present?
+
+    raise ArgumentError, 'Message must have content attributes for app configuration'
   end
 
   def extract_app_config
@@ -87,9 +85,7 @@ class AppleMessagesForBusiness::AppInvocationService
     }
 
     # Add any additional parameters from the message content
-    if attributes['parameters'].present?
-      config['app_data'].merge!(attributes['parameters'])
-    end
+    config['app_data'].merge!(attributes['parameters']) if attributes['parameters'].present?
 
     config
   end

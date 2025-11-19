@@ -10,7 +10,7 @@
 
 ```bash
 cd /Users/rhaps/LocalGit/chatwoot
-./dev-server.sh start
+./script//dev-server.sh start
 ```
 
 ### 2. Verify Code Syntax
@@ -540,7 +540,7 @@ rails runner "
 
 ```bash
 # Start server
-./dev-server.sh start
+./script//dev-server.sh start
 
 # Check syntax
 bundle exec rubocop app/services/apple_messages_for_business/acoustic_house_bot_service.rb

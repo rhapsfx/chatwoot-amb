@@ -787,7 +787,7 @@ puts "Test mode enabled: #{channel.payment_settings['test_mode']}"
 
 **Easiest testing method**:
 
-1. Start development server: `./dev-server.sh start`
+1. Start development server: `./script//dev-server.sh start`
 2. Open Chatwoot dashboard in browser
 3. Navigate to an Apple Messages for Business conversation
 4. Click the compose area to open AppleMessagesComposer

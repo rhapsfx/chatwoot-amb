@@ -13,34 +13,34 @@
 
 require 'json'
 
-puts "=" * 80
-puts "Apple Messages Content Attributes Normalization - ROLLBACK"
-puts "=" * 80
-puts ""
+puts '=' * 80
+puts 'Apple Messages Content Attributes Normalization - ROLLBACK'
+puts '=' * 80
+puts ''
 
 # Check if running in dry-run mode
 dry_run = ENV['DRY_RUN'] == 'true'
 
 puts "Mode: #{dry_run ? 'DRY RUN' : 'LIVE ROLLBACK'}"
-puts ""
+puts ''
 
-if !dry_run
-  puts "⚠️  WARNING: This will convert all content_attributes back to camelCase"
-  puts ""
+unless dry_run
+  puts '⚠️  WARNING: This will convert all content_attributes back to camelCase'
+  puts ''
   puts "Are you sure you want to proceed? (Type 'yes' to continue)"
 
   # In script mode, check environment variable for confirmation
-  confirmation = ENV['CONFIRM_ROLLBACK']
+  confirmation = ENV.fetch('CONFIRM_ROLLBACK', nil)
 
   unless confirmation == 'yes'
-    puts ""
-    puts "❌ Rollback cancelled"
-    puts "   To proceed, set CONFIRM_ROLLBACK=yes"
+    puts ''
+    puts '❌ Rollback cancelled'
+    puts '   To proceed, set CONFIRM_ROLLBACK=yes'
     exit 1
   end
 end
 
-puts "-" * 80
+puts '-' * 80
 
 # Configuration
 APPLE_CONTENT_TYPES = %w[
@@ -60,10 +60,10 @@ total_count = Message.where(content_type: APPLE_CONTENT_TYPES)
                      .count
 
 puts "Found #{total_count} Apple Messages records to rollback"
-puts ""
+puts ''
 
 if total_count.zero?
-  puts "No records to process. Exiting."
+  puts 'No records to process. Exiting.'
   exit 0
 end
 
@@ -81,12 +81,11 @@ batch_size = 100
 batch_count = (total_count.to_f / batch_size).ceil
 
 puts "Processing in #{batch_count} batches of #{batch_size}"
-puts "-" * 80
+puts '-' * 80
 
 Message.where(content_type: APPLE_CONTENT_TYPES)
        .where.not(content_attributes: nil)
        .find_in_batches(batch_size: batch_size).with_index do |batch, batch_index|
-
   puts "Processing batch #{batch_index + 1}/#{batch_count}..."
 
   batch.each do |message|
@@ -117,9 +116,7 @@ Message.where(content_type: APPLE_CONTENT_TYPES)
       end
 
       # Update the message (unless dry-run)
-      unless dry_run
-        message.update_column(:content_attributes, camelized)
-      end
+      message.update_column(:content_attributes, camelized) unless dry_run
 
       stats[:rolled_back] += 1
 
@@ -138,29 +135,29 @@ Message.where(content_type: APPLE_CONTENT_TYPES)
 end
 
 # Print final statistics
-puts "=" * 80
+puts '=' * 80
 puts "Rollback #{dry_run ? 'dry-run' : 'complete'}!"
-puts ""
-puts "Statistics:"
+puts ''
+puts 'Statistics:'
 puts "  Total processed:        #{stats[:processed]}"
 puts "  Rolled back:            #{stats[:rolled_back]}"
 puts "  Already camelCase:      #{stats[:already_camelcase]}"
 puts "  Skipped (empty):        #{stats[:skipped]}"
 puts "  Errors:                 #{stats[:errors]}"
-puts ""
+puts ''
 
 if dry_run
-  puts "=" * 80
-  puts "DRY RUN COMPLETE - No changes were made"
-  puts "Run without DRY_RUN=true to apply rollback"
-  puts "=" * 80
+  puts '=' * 80
+  puts 'DRY RUN COMPLETE - No changes were made'
+  puts 'Run without DRY_RUN=true to apply rollback'
+  puts '=' * 80
 else
-  puts "=" * 80
-  puts "ROLLBACK COMPLETE - Content attributes converted back to camelCase"
-  puts ""
-  puts "⚠️  WARNING: Services expect snake_case internally"
-  puts "   You may need to revert code changes as well"
-  puts "=" * 80
+  puts '=' * 80
+  puts 'ROLLBACK COMPLETE - Content attributes converted back to camelCase'
+  puts ''
+  puts '⚠️  WARNING: Services expect snake_case internally'
+  puts '   You may need to revert code changes as well'
+  puts '=' * 80
 end
 
 # Helper method to convert snake_case to camelCase

@@ -351,7 +351,7 @@ bundle exec rubocop app/services/apple_messages_for_business/acoustic_house_bot_
 
 ### Immediate (Testing Phase)
 
-1. **Start dev server**: `./dev-server.sh start`
+1. **Start dev server**: `./script//dev-server.sh start`
 2. **Test flow manually**: Follow PHASE_2_TESTING_GUIDE.md
 3. **Verify state transitions**: Check logs and database
 4. **Test error scenarios**: Apple Pay failure, missing data

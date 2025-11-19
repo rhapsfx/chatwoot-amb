@@ -317,7 +317,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     when 'AHB1_2'
       handle_text_name_input
     when 'AHB2'
-      handle_name_preference_selection
+      handle_name_preference_catcher
     when 'AHB3'
       handle_guitar_list_prompt
     when 'AHC1'
@@ -327,9 +327,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     when 'AHC3'
       handle_ar_first_question
     when 'AHD1'
-      handle_ar_second_question
+      handle_ar_view_catcher
     when 'AHE1'
-      handle_ar_place_response
+      handle_ar_place_catcher
     when 'AHE2'
       handle_apple_pay_prompt
     when 'AHF1'
@@ -364,6 +364,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       handle_pdf_document
     when 'AHJ4'
       handle_learn_more_prompt
+    when 'AHK0'
+      # Waiting for learn more quick reply response
+      # Interactive handler will process the response
+      send_text_message('Please select Yes or No from the options above.')
     when 'AHK1'
       handle_summary
     when 'AHK2'
@@ -598,6 +602,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     handle_guitar_list_prompt
   end
 
+  # Defensive catcher for text input when Quick Reply is expected (AHB2)
+  def handle_name_preference_catcher
+    log_info '[Bot] 🛡️ handle_name_preference_catcher called - user sent text instead of selecting Quick Reply'
+    send_text_message('Please select either your full name or stage name from the options above.')
+  end
+
   def handle_guitar_list_prompt
     log_info '[Bot] 🎸 handle_guitar_list_prompt called'
     send_text_message('Here are some amazing guitars:')
@@ -702,8 +712,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     update_bot_state('AHD1')
   end
 
-  def handle_ar_second_question
-    # This is now handled by handle_ar_view_response (AHD1)
+  # Defensive catcher for text input when Quick Reply is expected (AHD1)
+  def handle_ar_view_catcher
+    log_info '[Bot] 🛡️ handle_ar_view_catcher called - user sent text instead of selecting Quick Reply'
+    send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you saw the AR view.")
   end
 
   def handle_ar_view_response(interactive_data)
@@ -763,6 +775,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # After AR section, proceed to Apple Pay
     update_bot_state('AHE2')
     handle_apple_pay_prompt
+    # Defensive catcher for text input when Quick Reply is expected (AHE1)
+    def handle_ar_place_catcher
+      log_info '[Bot] 🛡️ handle_ar_place_catcher called - user sent text instead of selecting Quick Reply'
+      send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you'd like to place the guitar in AR.")
+    end
   end
 
   def handle_apple_pay_prompt
@@ -774,20 +791,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if result[:success]
       update_bot_state('AHF1')
     else
-      send_text_message('We are experiencing some technical difficulties with our Apple Pay service. We apologize for this inconvenience and we are working on a fix.')
-      send_text_message('You can skip the payment for now and continue with the demo.')
+      # Log the actual error for debugging
+      log_warn "[Bot] 💳 Apple Pay not sent: #{result[:error]}" if result[:error]
 
-      # Offer skip option via quick reply
-      send_quick_reply(
-        title: 'Skip Payment?',
-        request_id: 'qr_skip_payment',
-        items: [
-          { title: 'Skip Payment', value: 'skip' },
-          { title: 'Try Again', value: 'retry' }
-        ]
-      )
+      # Skip Apple Pay gracefully without claiming technical difficulties
+      send_text_message("For this demo, we'll skip the payment step.")
 
-      update_bot_state('AHF1_skip')
+      # Continue directly to lesson introduction
+      reset_retry_count
+      update_bot_state('AHF2')
+      handle_lesson_introduction
     end
   end
 
@@ -1109,9 +1122,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                            end
 
     if selection_identifier == '222' # No
-      # Skip to learn more (Phase 4)
-      update_bot_state('AHK1')
-      handle_summary
+      # Skip rich links and photos, go directly to learn more prompt
+      update_bot_state('AHJ4')
+      handle_learn_more_prompt
     else
       # Continue to rich links (AHI2)
       send_text_message('There\'s so much more you can do like sharing beautiful links to your website:')
@@ -1218,7 +1231,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         { title: 'No', value: 'no' }
       ]
     )
-    update_bot_state('AHK1')
+    update_bot_state('AHK0')
   end
 
   # === AHK States (Summary & Final Rich Link) ===
@@ -1260,14 +1273,28 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Check if attachment is received during AHJ states
     return unless @bot_state.start_with?('AHI', 'AHJ')
 
+    log_info "[Bot] 📎 handle_received_attachment called - bot_state: #{@bot_state}"
+    log_info "[Bot] 📎 message.content_type: #{@message.content_type}"
+    log_info "[Bot] 📎 attachments count: #{@message.attachments.count}"
+
     content_type = @message.content_type
 
-    if content_type&.start_with?('image/')
+    # Check if ANY attachment is an image (Apple Messages might set content_type to 'text' or 'incoming')
+    has_image_attachment = @message.attachments.any? do |attachment|
+      file_content_type = attachment.file&.content_type
+      log_info "[Bot] 📎 attachment content_type: #{file_content_type}"
+      file_content_type&.start_with?('image/')
+    end
+
+    if content_type&.start_with?('image/') || has_image_attachment
+      log_info '[Bot] 📎 Image attachment detected!'
       send_text_message('Awesome photo! #photooftheday #instadaily')
       update_bot_state('AHJ2')
       handle_documents_intro
     elsif content_type == 'application/vnd.apple.numbers'
       send_text_message('Thank you for the spreadsheet.')
+    else
+      log_info "[Bot] 📎 No image found - content_type: #{content_type}, has_image: #{has_image_attachment}"
     end
   end
 
@@ -1275,7 +1302,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_menu
     send_text_message('🎸 Acoustic House Bot Menu')
-    send_text_message('Commands: startover, summary, guitar, time picker, apple pay, form, ar')
+    send_menu_list_picker
+    # Set demo mode state to prevent flow continuation after menu selection
+    update_bot_state('DEMO_MODE')
   end
 
   def handle_start_over
@@ -1352,8 +1381,106 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
-  def handle_menu_selection(_interactive_data)
-    # TODO: Implement menu selection
+  def handle_menu_selection(interactive_data)
+    log_info '[Bot] 📋 handle_menu_selection called'
+    log_info "[Bot] 📋 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
+
+    # Extract selection from interactive data
+    # For list picker responses from IDR, the selection is in the 'ldtext' field
+    selection_identifier = if interactive_data['ldtext'].present?
+                             # Resolved NSKeyedArchiver/IDR format - selection is in ldtext
+                             # Need to map title back to identifier
+                             item_title = interactive_data['ldtext']
+                             log_info "[Bot] 📋 IDR format menu selection (ldtext): #{utf8_encode(item_title)}"
+
+                             # Map menu item titles to identifiers
+                             menu_map = {
+                               '1. Introduction with Intent ID' => '1',
+                               '2. Send a List Picker' => '2',
+                               '3. Receive an AR Image' => '3',
+                               '4. Apple Pay' => '4',
+                               '5. Schedule a Guitar Lesson' => '5',
+                               '6. Fill in a Form' => '6',
+                               '7. Send an Image' => '7',
+                               '8. Send Documents' => '8',
+                               '9. Authentication' => '10',
+                               '10. iMessage App' => '11',
+                               '11. Apple Wallet' => '12',
+                               '12. Rich Link Locator' => '13'
+                             }
+                             menu_map[item_title]
+                           elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
+                             # Raw NSKeyedArchiver format - extract from $objects array
+                             objects = interactive_data['$objects'] || []
+                             # Find the identifier (should be a number string)
+                             objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
+                           else
+                             # Standard format
+                             interactive_data.dig('data', 'reply', 'identifier')
+                           end
+
+    log_info "[Bot] 📋 Selected menu identifier: #{selection_identifier}"
+
+    # Route to appropriate handler based on selection
+    case selection_identifier
+    when '1'
+      # Introduction with Intent ID - restart flow
+      send_text_message('Let\'s start from the beginning!')
+      handle_start_over
+    when '2'
+      # Send a List Picker
+      send_text_message('Here\'s the guitar list picker:')
+      handle_list_picker_demo
+    when '3'
+      # Receive an AR Image
+      send_text_message('Here\'s the AR experience:')
+      handle_ar_demo
+    when '4'
+      # Apple Pay
+      send_text_message('Here\'s an Apple Pay demo:')
+      handle_apple_pay_demo
+    when '5'
+      # Schedule a Guitar Lesson
+      send_text_message('Let\'s schedule a guitar lesson:')
+      handle_schedule_lesson
+    when '6'
+      # Fill in a Form
+      send_text_message('Here\'s a form to fill in:')
+      handle_form_demo
+    when '7'
+      # Send an Image
+      send_text_message('Photo sharing demo:')
+      send_text_message('You can send us a photo anytime! Just attach it to your message.')
+      update_bot_state('DEMO_MODE')
+    when '8'
+      # Send Documents
+      send_text_message('Document sharing demo:')
+      handle_documents_intro
+    when '10'
+      # Authentication
+      send_text_message('Authentication demo is not yet implemented.')
+      send_text_message('Type \'menu\' to see other options.')
+      update_bot_state('DEMO_MODE')
+    when '11'
+      # iMessage App
+      send_text_message('iMessage App demo is not yet implemented.')
+      send_text_message('Type \'menu\' to see other options.')
+      update_bot_state('DEMO_MODE')
+    when '12'
+      # Apple Wallet
+      send_text_message('Apple Wallet demo is not yet implemented.')
+      send_text_message('Type \'menu\' to see other options.')
+      update_bot_state('DEMO_MODE')
+    when '13'
+      # Rich Link Locator
+      send_text_message('Here\'s a rich link demo:')
+      send_apple_messages_rich_link
+      update_bot_state('DEMO_MODE')
+    else
+      log_warn "[Bot] ❌ Unknown menu selection: #{selection_identifier}"
+      send_text_message('Invalid selection. Type \'menu\' to try again.')
+      update_bot_state('DEMO_MODE')
+    end
   end
 
   def handle_learn_more_response(interactive_data)
@@ -1447,12 +1574,22 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] Sending Guitar List Picker (ID: 321, Name: #{utf8_encode(template.name)})"
 
-    # Extract list picker data from template
-    template_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
-    list_picker_data = template_attrs['list_picker'] || {}
-    sections = list_picker_data['sections']
-    received_message = template_attrs['received_message'] || {}
-    reply_message = template_attrs['reply_message'] || {}
+    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    data = facade.load_data('list_picker')
+
+    log_info "[Bot] 🎸 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+
+    # All data is now in consistent snake_case format
+    sections = data['sections'] || []
+    received_image_id = data['received_image_identifier']
+    reply_image_id = data['reply_image_identifier']
+    received_title = data['received_title']
+    received_subtitle = data['received_subtitle']
+    received_style = data['received_style']
+    reply_title = data['reply_title']
+    reply_subtitle = data['reply_subtitle']
+    reply_style = data['reply_style']
 
     if sections.blank?
       Rails.logger.error utf8_encode('[Bot] Guitar List Picker template has no sections')
@@ -1472,16 +1609,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
 
     # Collect all image identifiers used in the sections and messages
+    # Facade ensures all data is in snake_case format
     item_image_identifiers = sections.flat_map do |section|
       (section['items'] || []).map { |item| item['image_identifier'] }
     end.compact
 
     log_info "[Bot] 🎸 Item image identifiers from template: #{item_image_identifiers.inspect}"
 
-    # Also collect image identifiers from received/reply messages
-    received_image_id = received_message['image_identifier']
-    reply_image_id = reply_message['image_identifier']
-
+    # Use the extracted image identifiers from above (already handled both formats)
     all_identifiers = (item_image_identifiers + [received_image_id, reply_image_id]).compact.uniq
 
     log_info "[Bot] 🎸 All image identifiers: #{all_identifiers.inspect}"
@@ -1498,20 +1633,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       'request_identifier' => 'lp_guitar_0319'
     }
 
-    # Add received_message fields (flattened with received_ prefix)
-    if received_message.present?
-      content_attrs['received_title'] = received_message['title']
-      content_attrs['received_subtitle'] = received_message['subtitle']
-      content_attrs['received_image_identifier'] = received_message['image_identifier']
-      content_attrs['received_style'] = received_message['style']
+    # Add received_message fields (from extracted variables above)
+    if received_title.present?
+      content_attrs['received_title'] = received_title
+      content_attrs['received_subtitle'] = received_subtitle
+      content_attrs['received_image_identifier'] = received_image_id
+      content_attrs['received_style'] = received_style
     end
 
-    # Add reply_message fields (flattened with reply_ prefix)
-    if reply_message.present?
-      content_attrs['reply_title'] = reply_message['title']
-      content_attrs['reply_subtitle'] = reply_message['subtitle']
-      content_attrs['reply_image_identifier'] = reply_message['image_identifier']
-      content_attrs['reply_style'] = reply_message['style']
+    # Add reply_message fields (from extracted variables above)
+    if reply_title.present?
+      content_attrs['reply_title'] = reply_title
+      content_attrs['reply_subtitle'] = reply_subtitle
+      content_attrs['reply_image_identifier'] = reply_image_id
+      content_attrs['reply_style'] = reply_style
     end
 
     # Create outgoing message with list picker content including images
@@ -1535,35 +1670,24 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def fetch_and_encode_images(identifiers)
     return [] if identifiers.empty?
 
-    # Fetch AppleListPickerImage records for these identifiers
-    inbox_id = @conversation.inbox_id
-    picker_images = AppleListPickerImage
-                    .where(inbox_id: inbox_id, identifier: identifiers)
-                    .includes(image_attachment: :blob)
+    # Use ImageFetchService with three-tier fallback
+    # Bot doesn't use embedded images - all images come from storage
+    images = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @conversation.account_id,
+      inbox_id: @conversation.inbox_id,
+      embedded_images: [] # Bot doesn't use embedded images
+    ).fetch_and_encode(identifiers)
 
     log_info "[Bot] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
-    log_info "[Bot] 🖼️ Found #{picker_images.count} images in ActiveStorage: #{picker_images.map(&:identifier).inspect}"
+    log_info "[Bot] 🖼️ Found #{images.count}/#{identifiers.count} images"
 
-    # Convert to base64 array format expected by SendListPickerService
-    picker_images.filter_map do |picker_image|
-      next unless picker_image.image.attached?
-
-      begin
-        # Download and encode image as base64
-        image_data = picker_image.image.download
-        base64_data = Base64.strict_encode64(image_data)
-
-        log_info "[Bot] 🖼️ Encoded image: #{utf8_encode(picker_image.identifier)} (#{(base64_data.length / 1024.0).round(2)} KB)"
-
-        {
-          'identifier' => picker_image.identifier,
-          'data' => base64_data,
-          'description' => picker_image.description || ''
-        }
-      rescue StandardError => e
-        Rails.logger.error utf8_encode("[Bot] Failed to encode image #{picker_image.identifier}: #{e.message}")
-        nil
-      end
+    # Convert from ImageFetchService format (symbol keys) to SendListPickerService format (string keys)
+    images.map do |image|
+      {
+        'identifier' => image[:identifier],
+        'data' => image[:data],
+        'description' => image[:description] || ''
+      }
     end
   end
 
@@ -1785,15 +1909,57 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] Sending Summary List Picker (ID: 355, Name: #{utf8_encode(template.name)})"
 
-    # Create outgoing message with list picker content
-    content_attrs = template.metadata.dig('apple_message_content', 'content_attributes') || {}
-    # Add request_identifier for proper routing (summary list picker doesn't need a handler)
-    content_attrs['request_identifier'] = 'lp_summary_0319' if content_attrs['request_identifier'].blank?
+    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    data = facade.load_data('list_picker')
 
-    # Clean up images array - remove invalid keys (size, preview, originalName)
-    if content_attrs['images'].is_a?(Array)
-      content_attrs['images'] = content_attrs['images'].map do |image|
-        # Only keep allowed keys: identifier, data, description
+    log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+
+    # All data is now in consistent snake_case format
+    sections = data['sections'] || []
+    received_image_id = data['received_image_identifier']
+    reply_image_id = data['reply_image_identifier']
+    received_title = data['received_title']
+    received_subtitle = data['received_subtitle']
+    received_style = data['received_style']
+    reply_title = data['reply_title']
+    reply_subtitle = data['reply_subtitle']
+    reply_style = data['reply_style']
+    images_array = data['images']
+
+    log_info "[Bot] 📋 Sections present: #{sections.present?}, count: #{sections&.length || 0}"
+
+    if sections.blank?
+      Rails.logger.error utf8_encode('[Bot] Summary List Picker template has no sections')
+      send_text_message('Summary temporarily unavailable.')
+      return
+    end
+
+    # Build content_attrs from extracted variables
+    content_attrs = {
+      'sections' => sections,
+      'request_identifier' => 'lp_summary_0319'
+    }
+
+    # Add received_message fields if present
+    if received_title.present?
+      content_attrs['received_title'] = received_title
+      content_attrs['received_subtitle'] = received_subtitle
+      content_attrs['received_image_identifier'] = received_image_id
+      content_attrs['received_style'] = received_style
+    end
+
+    # Add reply_message fields if present
+    if reply_title.present?
+      content_attrs['reply_title'] = reply_title
+      content_attrs['reply_subtitle'] = reply_subtitle
+      content_attrs['reply_image_identifier'] = reply_image_id
+      content_attrs['reply_style'] = reply_style
+    end
+
+    # Clean up images array - only keep allowed keys
+    if images_array.is_a?(Array)
+      content_attrs['images'] = images_array.map do |image|
         {
           'identifier' => image['identifier'],
           'data' => image['data'],
@@ -1816,6 +1982,125 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     ).perform
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send summary list picker: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+  end
+
+  def send_menu_list_picker
+    # Get menu list picker template by ID
+    log_info "[Bot] 🔍 Looking for menu template 366 in account: #{@conversation.account_id}"
+
+    template = MessageTemplate.find_by(
+      account_id: @conversation.account_id,
+      id: 366
+    )
+
+    unless template
+      # Debug: Check if template exists globally (different account)
+      global_template = MessageTemplate.find_by(id: 366)
+      if global_template
+        Rails.logger.error utf8_encode("[Bot] ⚠️  Menu template 366 EXISTS but in account #{global_template.account_id}, not #{@conversation.account_id}")
+        Rails.logger.error utf8_encode("[Bot] 💡 Inbox: #{@conversation.inbox_id}, Conversation: #{@conversation.id}")
+      else
+        Rails.logger.error utf8_encode('[Bot] ❌ Menu List Picker template (ID: 366) not found in ANY account')
+      end
+      send_text_message('Menu temporarily unavailable.')
+      return
+    end
+
+    log_info "📋 [Bot] Sending Menu List Picker (ID: 366, Name: #{utf8_encode(template.name)})"
+
+    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    data = facade.load_data('list_picker')
+
+    log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+
+    # All data is now in consistent snake_case format
+    sections = data['sections'] || []
+    received_image_id = data['received_image_identifier']
+    reply_image_id = data['reply_image_identifier']
+    received_title = data['received_title']
+    received_subtitle = data['received_subtitle']
+    received_style = data['received_style']
+    reply_title = data['reply_title']
+    reply_subtitle = data['reply_subtitle']
+    reply_style = data['reply_style']
+
+    log_info "[Bot] 📋 Sections present: #{sections.present?}, count: #{sections&.length || 0}"
+
+    if sections.blank?
+      Rails.logger.error utf8_encode('[Bot] ❌ Menu List Picker template has no sections')
+      send_text_message('Menu temporarily unavailable.')
+      return
+    end
+
+    # Fix invalid style values - change "default" to "large"
+    sections = sections.map do |section|
+      section_copy = section.deep_dup
+      if section_copy['items'].present?
+        section_copy['items'].each do |item|
+          item['style'] = 'large' if item['style'] == 'default' || item['style'].blank?
+        end
+      end
+      section_copy
+    end
+
+    # Collect all image identifiers used in the sections and messages
+    # Facade ensures all data is in snake_case format
+    item_image_identifiers = sections.flat_map do |section|
+      (section['items'] || []).map { |item| item['image_identifier'] }
+    end.compact
+
+    log_info "[Bot] 📋 Item image identifiers from template: #{item_image_identifiers.inspect}"
+
+    # Use the extracted image identifiers from above (already handled both formats)
+    all_identifiers = (item_image_identifiers + [received_image_id, reply_image_id]).compact.uniq
+
+    log_info "[Bot] 📋 All image identifiers: #{all_identifiers.inspect}"
+
+    # Fetch and encode images from ActiveStorage
+    images = fetch_and_encode_images(all_identifiers)
+
+    log_info "[Bot] 📋 Encoded #{images.length} images"
+
+    # Build content attributes with all components
+    content_attrs = {
+      'sections' => sections,
+      'images' => images,
+      'request_identifier' => 'lp_menu_0319'
+    }
+
+    # Add received_message fields (from extracted variables above)
+    if received_title.present?
+      content_attrs['received_title'] = received_title
+      content_attrs['received_subtitle'] = received_subtitle
+      content_attrs['received_image_identifier'] = received_image_id
+      content_attrs['received_style'] = received_style
+    end
+
+    # Add reply_message fields (from extracted variables above)
+    if reply_title.present?
+      content_attrs['reply_title'] = reply_title
+      content_attrs['reply_subtitle'] = reply_subtitle
+      content_attrs['reply_image_identifier'] = reply_image_id
+      content_attrs['reply_style'] = reply_style
+    end
+
+    # Create outgoing message with list picker content including images
+    # NOTE: Message will be automatically sent via after_commit callback
+    # which routes to SendListPickerService based on content_type
+    Messages::MessageBuilder.new(
+      message_sender,
+      @conversation,
+      bot_message_params(
+        message_type: :outgoing,
+        content: 'Select an option',
+        content_type: 'apple_list_picker',
+        content_attributes: content_attrs
+      )
+    ).perform
+  rescue StandardError => e
+    Rails.logger.error utf8_encode("[Bot] Failed to send menu list picker: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 

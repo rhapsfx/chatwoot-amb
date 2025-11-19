@@ -323,8 +323,6 @@ module AppleMessagesForBusiness
           :received_message
         elsif keys.any? { |k| k.start_with?('reply_') }
           :reply_message
-        else
-          nil
         end
       end
     end

@@ -74,13 +74,13 @@ class AppleMessagesForBusiness::AuthenticationService
   def oauth2_scopes_for_provider(provider)
     case provider.downcase
     when 'google'
-      ['openid', 'profile', 'email']
+      %w[openid profile email]
     when 'linkedin'
-      ['r_liteprofile', 'r_emailaddress']
+      %w[r_liteprofile r_emailaddress]
     when 'facebook'
-      ['public_profile', 'email']
+      %w[public_profile email]
     else
-      ['profile', 'email']
+      %w[profile email]
     end
   end
 
@@ -156,7 +156,7 @@ class AppleMessagesForBusiness::AuthenticationService
 
   def build_google_oauth_url(auth_request, redirect_uri)
     params = {
-      client_id: ENV['GOOGLE_OAUTH_CLIENT_ID'],
+      client_id: ENV.fetch('GOOGLE_OAUTH_CLIENT_ID', nil),
       response_type: 'code',
       scope: auth_request[:oauth2][:scope].join(' '),
       redirect_uri: redirect_uri,
@@ -170,7 +170,7 @@ class AppleMessagesForBusiness::AuthenticationService
 
   def build_linkedin_oauth_url(auth_request, redirect_uri)
     params = {
-      client_id: ENV['LINKEDIN_OAUTH_CLIENT_ID'],
+      client_id: ENV.fetch('LINKEDIN_OAUTH_CLIENT_ID', nil),
       response_type: 'code',
       scope: auth_request[:oauth2][:scope].join(' '),
       redirect_uri: redirect_uri,
@@ -182,7 +182,7 @@ class AppleMessagesForBusiness::AuthenticationService
 
   def build_facebook_oauth_url(auth_request, redirect_uri)
     params = {
-      client_id: ENV['FACEBOOK_OAUTH_CLIENT_ID'],
+      client_id: ENV.fetch('FACEBOOK_OAUTH_CLIENT_ID', nil),
       response_type: 'code',
       scope: auth_request[:oauth2][:scope].join(','),
       redirect_uri: redirect_uri,

@@ -72,7 +72,7 @@ class AppleMessagesForBusiness::AppleMapsService
 
     a = (Math.sin(delta_lat / 2)**2) +
         (Math.cos(lat1_rad) * Math.cos(lat2_rad) *
-         Math.sin(delta_lon / 2)**2)
+         (Math.sin(delta_lon / 2)**2))
 
     c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
@@ -157,21 +157,18 @@ class AppleMessagesForBusiness::AppleMapsService
       timeout: 10
     )
 
-    if response.code == 200
-      access_token_data = response.parsed_response
-      access_token_data['accessToken']
-    else
-      raise AuthenticationError, "Failed to get access token: #{response.code} - #{response.body}"
-    end
+    raise AuthenticationError, "Failed to get access token: #{response.code} - #{response.body}" unless response.code == 200
+
+    access_token_data = response.parsed_response
+    access_token_data['accessToken']
+
   rescue StandardError => e
     raise AuthenticationError, "Failed to get access token: #{e.message}"
   end
 
   def parse_private_key(key_content)
     # Convert literal \n to actual newlines if needed
-    if key_content.include?('\n')
-      key_content = key_content.gsub('\n', "\n")
-    end
+    key_content = key_content.gsub('\n', "\n") if key_content.include?('\n')
 
     # If key doesn't have PEM headers, add them
     unless key_content.include?('BEGIN PRIVATE KEY')
@@ -187,7 +184,7 @@ class AppleMessagesForBusiness::AppleMapsService
 
     # Parse using PKey.read (recommended for ES256 keys)
     OpenSSL::PKey.read(key_content)
-  rescue StandardError => e
+  rescue StandardError
     # Fallback: try EC.new
     OpenSSL::PKey::EC.new(key_content)
   end
