@@ -952,6 +952,16 @@ export default {
         // eslint-disable-next-line no-console
         console.log('🎯 ContentAttrs:', contentAttrs);
         // eslint-disable-next-line no-console
+        console.log('🔍 Debug form/pages checks:');
+        // eslint-disable-next-line no-console
+        console.log('  - contentAttrs?.pages exists:', !!contentAttrs?.pages);
+        // eslint-disable-next-line no-console
+        console.log('  - contentAttrs?.form exists:', !!contentAttrs?.form);
+        // eslint-disable-next-line no-console
+        console.log('  - content.pages exists:', !!content?.pages);
+        // eslint-disable-next-line no-console
+        console.log('  - content.form exists:', !!content?.form);
+        // eslint-disable-next-line no-console
         console.log('🎯 Supported channels:', fullTemplate.supportedChannels);
         // eslint-disable-next-line no-console
         console.log(
@@ -1004,11 +1014,14 @@ export default {
                   content.pages || // Form structure (new block editor format)
                   content.apple_pay || // Apple Pay structure
                   (content.sections && content.images) || // List picker structure (direct)
-                  (content.timeslots && content.eventTitle) || // Time picker structure (direct)
+                  (content.timeslots && content.timeslots.length > 0) || // Time picker structure (direct)
                   (contentAttrs?.sections && contentAttrs?.images) || // List picker in content_attributes
-                  (contentAttrs?.timeslots && contentAttrs?.eventTitle) || // Time picker in content_attributes
-                  contentAttrs?.event)))
-          ) // Time picker with event in content_attributes
+                  (contentAttrs?.timeslots &&
+                    contentAttrs.timeslots.length > 0) || // Time picker in content_attributes
+                  contentAttrs?.event || // Time picker with event in content_attributes
+                  contentAttrs?.pages || // Forms with pages in content_attributes
+                  contentAttrs?.form)))
+          ) // Forms with form in content_attributes
         );
 
         // eslint-disable-next-line no-console
@@ -1342,8 +1355,8 @@ export default {
             content.time_picker ||
             content.timePicker ||
             content.event || // Time picker with event object
-            (content.timeslots && content.eventTitle) ||
-            (contentAttrs?.timeslots && contentAttrs?.eventTitle) ||
+            (content.timeslots && content.timeslots.length > 0) ||
+            (contentAttrs?.timeslots && contentAttrs.timeslots.length > 0) ||
             contentAttrs?.event // Time picker with event in content_attributes
           ) {
             // ALWAYS use render API for time pickers to ensure proper formatting
@@ -1440,10 +1453,23 @@ export default {
           } else if (
             content.form ||
             (content.pages &&
-              (content.received_message || content.receivedMessage))
+              (content.received_message || content.receivedMessage)) ||
+            contentAttrs?.form ||
+            (contentAttrs?.pages &&
+              (contentAttrs?.received_message || contentAttrs?.receivedMessage))
           ) {
             // Form structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted
+            // eslint-disable-next-line no-console
+            console.log('📝 Form detected! Details:');
+            // eslint-disable-next-line no-console
+            console.log('  - content.form:', !!content.form);
+            // eslint-disable-next-line no-console
+            console.log('  - content.pages:', !!content.pages);
+            // eslint-disable-next-line no-console
+            console.log('  - contentAttrs.form:', !!contentAttrs?.form);
+            // eslint-disable-next-line no-console
+            console.log('  - contentAttrs.pages:', !!contentAttrs?.pages);
             // eslint-disable-next-line no-console
             console.log('📝 Calling render API for form template');
 
@@ -1547,6 +1573,20 @@ export default {
 
           // Include template_id so backend can attach template files if present
           messageData.template_id = fullTemplate.id;
+
+          // For time pickers, remove images from content_attributes
+          // Images are loaded by backend via template_id attachments
+          // Time picker validator doesn't allow images in content_attributes
+          if (
+            messageData.type === 'time_picker' &&
+            messageData.content_attributes?.images
+          ) {
+            // eslint-disable-next-line no-console
+            console.log(
+              '⏰ Removing images from time picker content_attributes (handled via template_id)'
+            );
+            delete messageData.content_attributes.images;
+          }
 
           // eslint-disable-next-line no-console
           console.log(

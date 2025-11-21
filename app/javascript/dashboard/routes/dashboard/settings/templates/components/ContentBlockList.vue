@@ -45,8 +45,10 @@ const getBlockProperties = block => {
   const properties = { ...block.properties };
 
   // For time_picker and form blocks, inject images from referenced images
+  // ONLY if no inline images exist (backward compatibility)
   if (['time_picker', 'form'].includes(block.blockType)) {
-    if (imagesFromTemplate.value.length > 0) {
+    const hasInlineImages = properties.images && properties.images.length > 0;
+    if (imagesFromTemplate.value.length > 0 && !hasInlineImages) {
       properties.images = imagesFromTemplate.value;
     }
   }
