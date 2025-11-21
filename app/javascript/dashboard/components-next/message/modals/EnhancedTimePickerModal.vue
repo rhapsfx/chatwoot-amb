@@ -9,6 +9,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'vuex';
 import {
   format,
   addMinutes,
@@ -28,6 +29,7 @@ import {
   isSameMonth,
 } from 'date-fns';
 import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
 
 const props = defineProps({
   show: {
@@ -66,6 +68,16 @@ const props = defineProps({
     type: Number,
     default: 60, // minutes
   },
+  inboxId: {
+    type: Number,
+    required: false,
+    default: null,
+  },
+  accountId: {
+    type: Number,
+    required: false,
+    default: null,
+  },
 });
 
 const emit = defineEmits([
@@ -74,15 +86,29 @@ const emit = defineEmits([
   'preview',
   'saveAndSend',
   'uploadImage',
-  'save-as-template',
+  'saveAsTemplate',
 ]);
 
 const { t } = useI18n();
+const store = useStore();
 
 // Modal state
 const modalRef = ref(null);
 const isVisible = ref(false);
 const isAnimating = ref(false);
+
+// Image source toggles
+const receivedImageSource = ref('inline'); // 'inline' or 'shared'
+const replyImageSource = ref('inline'); // 'inline' or 'shared'
+
+// Computed properties
+const currentAccountId = computed(() => {
+  return props.accountId || store.getters.getCurrentAccountId;
+});
+
+const currentInboxId = computed(() => {
+  return props.inboxId;
+});
 
 // Watch for modal open to reset state if needed
 watch(
@@ -663,21 +689,8 @@ const saveAndSendTimePickerData = () => {
     formData.value.replyImageIdentifier,
   ].filter(Boolean);
 
-  console.log('DEBUG saveAndSendTimePickerData:');
-  console.log(
-    'receivedImageIdentifier:',
-    formData.value.receivedImageIdentifier
-  );
-  console.log('replyImageIdentifier:', formData.value.replyImageIdentifier);
-  console.log('usedImageIdentifiers:', usedImageIdentifiers);
-
   const usedImages = props.availableImages.filter(img =>
     usedImageIdentifiers.includes(img.identifier)
-  );
-
-  console.log(
-    'usedImages:',
-    usedImages.map(img => img.identifier)
   );
 
   const timePickerData = {
@@ -698,11 +711,6 @@ const saveAndSendTimePickerData = () => {
     reply_style: formData.value.replyStyle,
     images: usedImages, // Include the actual images being used
   };
-
-  console.log(
-    'timePickerData being sent:',
-    JSON.stringify(timePickerData, null, 2)
-  );
 
   emit('saveAndSend', timePickerData);
   closeModal();
@@ -752,7 +760,7 @@ const saveAsTemplate = () => {
     images: formData.value.images || [],
   };
 
-  emit('save-as-template', {
+  emit('saveAsTemplate', {
     messageType: 'time_picker',
     messageData: timePickerData,
   });
@@ -814,6 +822,26 @@ const triggerImageUpload = () => {
     }
   };
   input.click();
+};
+
+// Handle shared image selection for received message
+const handleReceivedImageSelected = imageData => {
+  if (imageData) {
+    // Image identifier is already set via v-model
+    // Optionally update preview or perform additional actions
+  } else {
+    formData.value.receivedImageIdentifier = '';
+  }
+};
+
+// Handle shared image selection for reply message
+const handleReplyImageSelected = imageData => {
+  if (imageData) {
+    // Image identifier is already set via v-model
+    // Optionally update preview or perform additional actions
+  } else {
+    formData.value.replyImageIdentifier = '';
+  }
 };
 
 // Lifecycle
@@ -1065,43 +1093,87 @@ onUnmounted(() => {
                       class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
                     >
                       Received Image
-                      <span
+                    </label>
+
+                    <!-- Toggle: Inline vs Shared -->
+                    <div
+                      class="flex items-center gap-2 mb-3 p-2 bg-n-alpha-1 dark:bg-n-alpha-2 rounded-lg"
+                    >
+                      <button
+                        type="button"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+                        :class="
+                          receivedImageSource === 'inline'
+                            ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                            : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+                        "
+                        @click="receivedImageSource = 'inline'"
+                      >
+                        Upload New
+                      </button>
+                      <button
+                        type="button"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+                        :class="
+                          receivedImageSource === 'shared'
+                            ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                            : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+                        "
+                        @click="receivedImageSource = 'shared'"
+                      >
+                        Use Shared
+                      </button>
+                    </div>
+
+                    <!-- Inline Image Upload -->
+                    <div v-if="receivedImageSource === 'inline'">
+                      <div class="flex items-center gap-2">
+                        <select
+                          v-model="formData.receivedImageIdentifier"
+                          :disabled="!hasAvailableImages"
+                          class="flex-1 px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">No image</option>
+                          <option
+                            v-for="image in availableImages"
+                            :key="image.identifier"
+                            :value="image.identifier"
+                          >
+                            {{
+                              image.originalName ||
+                              image.original_name ||
+                              image.description ||
+                              image.identifier
+                            }}
+                          </option>
+                        </select>
+                        <img
+                          v-if="
+                            formData.receivedImageIdentifier &&
+                            getImagePreviewUrl(formData.receivedImageIdentifier)
+                          "
+                          :src="
+                            getImagePreviewUrl(formData.receivedImageIdentifier)
+                          "
+                          class="w-12 h-12 object-cover rounded border border-n-weak dark:border-n-slate-6 flex-shrink-0"
+                          alt="Preview"
+                        />
+                      </div>
+                      <p
                         v-if="!hasAvailableImages"
-                        class="text-xs text-n-slate-10 dark:text-n-slate-9 font-normal ml-2"
+                        class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1"
                       >
                         (Upload in List Picker first)
-                      </span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                      <select
+                      </p>
+                    </div>
+
+                    <!-- Shared Image Selector -->
+                    <div v-else-if="receivedImageSource === 'shared'">
+                      <SharedImageSelector
                         v-model="formData.receivedImageIdentifier"
-                        :disabled="!hasAvailableImages"
-                        class="flex-1 px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">No image</option>
-                        <option
-                          v-for="image in availableImages"
-                          :key="image.identifier"
-                          :value="image.identifier"
-                        >
-                          {{
-                            image.originalName ||
-                            image.original_name ||
-                            image.description ||
-                            image.identifier
-                          }}
-                        </option>
-                      </select>
-                      <img
-                        v-if="
-                          formData.receivedImageIdentifier &&
-                          getImagePreviewUrl(formData.receivedImageIdentifier)
-                        "
-                        :src="
-                          getImagePreviewUrl(formData.receivedImageIdentifier)
-                        "
-                        class="w-12 h-12 object-cover rounded border border-n-weak dark:border-n-slate-6 flex-shrink-0"
-                        alt="Preview"
+                        :account-id="currentAccountId"
+                        image-type="system"
+                        @image-selected="handleReceivedImageSelected"
                       />
                     </div>
                   </div>
@@ -1153,41 +1225,87 @@ onUnmounted(() => {
                       class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
                     >
                       Reply Image
-                      <span
+                    </label>
+
+                    <!-- Toggle: Inline vs Shared -->
+                    <div
+                      class="flex items-center gap-2 mb-3 p-2 bg-n-alpha-1 dark:bg-n-alpha-2 rounded-lg"
+                    >
+                      <button
+                        type="button"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+                        :class="
+                          replyImageSource === 'inline'
+                            ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                            : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+                        "
+                        @click="replyImageSource = 'inline'"
+                      >
+                        Upload New
+                      </button>
+                      <button
+                        type="button"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+                        :class="
+                          replyImageSource === 'shared'
+                            ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                            : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+                        "
+                        @click="replyImageSource = 'shared'"
+                      >
+                        Use Shared
+                      </button>
+                    </div>
+
+                    <!-- Inline Image Upload -->
+                    <div v-if="replyImageSource === 'inline'">
+                      <div class="flex items-center gap-2">
+                        <select
+                          v-model="formData.replyImageIdentifier"
+                          :disabled="!hasAvailableImages"
+                          class="flex-1 px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">No image</option>
+                          <option
+                            v-for="image in availableImages"
+                            :key="image.identifier"
+                            :value="image.identifier"
+                          >
+                            {{
+                              image.originalName ||
+                              image.original_name ||
+                              image.description ||
+                              image.identifier
+                            }}
+                          </option>
+                        </select>
+                        <img
+                          v-if="
+                            formData.replyImageIdentifier &&
+                            getImagePreviewUrl(formData.replyImageIdentifier)
+                          "
+                          :src="
+                            getImagePreviewUrl(formData.replyImageIdentifier)
+                          "
+                          class="w-12 h-12 object-cover rounded border border-n-weak dark:border-n-slate-6 flex-shrink-0"
+                          alt="Preview"
+                        />
+                      </div>
+                      <p
                         v-if="!hasAvailableImages"
-                        class="text-xs text-n-slate-10 dark:text-n-slate-9 font-normal ml-2"
+                        class="text-xs text-n-slate-10 dark:text-n-slate-9 mt-1"
                       >
                         (Upload in List Picker first)
-                      </span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                      <select
+                      </p>
+                    </div>
+
+                    <!-- Shared Image Selector -->
+                    <div v-else-if="replyImageSource === 'shared'">
+                      <SharedImageSelector
                         v-model="formData.replyImageIdentifier"
-                        :disabled="!hasAvailableImages"
-                        class="flex-1 px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-white dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">No image</option>
-                        <option
-                          v-for="image in availableImages"
-                          :key="image.identifier"
-                          :value="image.identifier"
-                        >
-                          {{
-                            image.originalName ||
-                            image.original_name ||
-                            image.description ||
-                            image.identifier
-                          }}
-                        </option>
-                      </select>
-                      <img
-                        v-if="
-                          formData.replyImageIdentifier &&
-                          getImagePreviewUrl(formData.replyImageIdentifier)
-                        "
-                        :src="getImagePreviewUrl(formData.replyImageIdentifier)"
-                        class="w-12 h-12 object-cover rounded border border-n-weak dark:border-n-slate-6 flex-shrink-0"
-                        alt="Preview"
+                        :account-id="currentAccountId"
+                        image-type="system"
+                        @image-selected="handleReplyImageSelected"
                       />
                     </div>
                   </div>
