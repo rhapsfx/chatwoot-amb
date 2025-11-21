@@ -10,12 +10,43 @@ class AppleMessagesForBusiness::SendMessageService
   end
 
   def perform
-    # CRITICAL: Check if user has opted out (Apple MSP requirement)
-    if user_opted_out?
-      Rails.logger.warn "[AMB Send] Cannot send message - user #{@destination_id} has opted out"
-      return { success: false, error: 'User has opted out of receiving messages', error_code: 'USER_OPTED_OUT' }
+    # Idempotency guard: prevent duplicate sends of the same message
+    return idempotency_response if already_sent?
+
+    # Acquire lock to prevent concurrent sends
+    lock_key = "amb:send_lock:#{@message.id}"
+    lock_acquired = Redis::Alfred.set(lock_key, '1', ex: 30, nx: true)
+
+    unless lock_acquired
+      Rails.logger.warn "[AMB Send] Message #{@message.id} is already being sent (lock exists)"
+      return { success: false, error: 'Message send already in progress', error_code: 'SEND_IN_PROGRESS' }
     end
 
+    begin
+      # CRITICAL: Check if user has opted out (Apple MSP requirement)
+      if user_opted_out?
+        Rails.logger.warn "[AMB Send] Cannot send message - user #{@destination_id} has opted out"
+        return { success: false, error: 'User has opted out of receiving messages', error_code: 'USER_OPTED_OUT' }
+      end
+
+      result = perform_send
+
+      # Mark as sent if successful
+      mark_as_sent if result[:success]
+
+      result
+    ensure
+      # Always release the lock
+      Redis::Alfred.delete(lock_key)
+    end
+  rescue StandardError => e
+    Rails.logger.error "Apple Messages send failed: #{e.message}"
+    { success: false, error: e.message }
+  end
+
+  private
+
+  def perform_send
     case @message.content_type
     when 'text'
       send_text_message
@@ -36,12 +67,27 @@ class AppleMessagesForBusiness::SendMessageService
     else
       send_text_message # fallback
     end
-  rescue StandardError => e
-    Rails.logger.error "Apple Messages send failed: #{e.message}"
-    { success: false, error: e.message }
   end
 
-  private
+  def already_sent?
+    # Check if message has already been successfully sent to Apple MSP
+    # We use external_source_id_apple_messages to track if a message was sent
+    @message.external_source_id_apple_messages.present?
+  end
+
+  def mark_as_sent
+    # Mark message as sent by setting external_source_id_apple_messages
+    # This prevents duplicate sends even if the job is retried
+    return if @message.external_source_id_apple_messages.present?
+
+    @message.update_column(:external_source_ids,
+                           @message.external_source_ids.merge('apple_messages' => SecureRandom.uuid))
+  end
+
+  def idempotency_response
+    Rails.logger.info "[AMB Send] Message #{@message.id} already sent (external_source_id: #{@message.external_source_id_apple_messages}), skipping"
+    { success: true, message_id: @message.external_source_id_apple_messages, skipped: true }
+  end
 
   def send_text_message
     message_id = SecureRandom.uuid
@@ -236,38 +282,44 @@ class AppleMessagesForBusiness::SendMessageService
     base_data
   end
 
-  # Enrich images array with base64 data from database
+  # Enrich images array with base64 data using three-tier fallback
   def enrich_images_with_data(images_array)
     return [] if images_array.blank?
 
     # Get all identifiers
     identifiers = images_array.filter_map { |img| img['identifier'] }
+    return images_array if identifiers.empty?
 
-    # Performance Optimization: Batch fetch images with eager loading to avoid N+1 queries
-    # The .includes ensures ActiveStorage attachments and blobs are preloaded
-    stored_images = AppleListPickerImage.where(
+    # Use ImageFetchService for three-tier fallback (inbox → shared → embedded)
+    fetched_images = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @channel.account_id,
       inbox_id: @channel.inbox.id,
-      identifier: identifiers
-    ).includes(image_attachment: :blob).index_by(&:identifier)
+      embedded_images: images_array # Pass existing images as tier-3 fallback
+    ).fetch_and_encode(identifiers)
 
-    # Enrich each image with data from database
+    # Build index of fetched images
+    fetched_by_id = fetched_images.index_by { |img| img[:identifier] }
+
+    # Enrich each image with fetched data
     images_array.filter_map do |img|
       identifier = img['identifier']
-      stored_image = stored_images[identifier]
+      fetched = fetched_by_id[identifier]
 
-      if stored_image
-        # Image found in database, use its data
+      if fetched
+        # Image found via ImageFetchService (any tier)
         {
           identifier: identifier,
-          data: stored_image.image_data_base64, # Base64 encoded image
-          description: img['description'] || stored_image.description || identifier
+          data: fetched[:data],
+          description: img['description'] || fetched[:description] || identifier
         }
-      else
-        # Image not found in database, return as-is (might already have data)
-        Rails.logger.warn "[AMB Send] Image #{identifier} not found in database for inbox #{@channel.inbox.id}"
+      elsif img['data'].present?
+        # Not found in any tier - return as-is if it has data
         img
+      else
+        Rails.logger.warn "[AMB Send] Image #{identifier} not found in any tier (inbox/shared/embedded)"
+        nil
       end
-    end
+    end.compact
   end
 
   # Override these methods in subclasses for specific message types
@@ -430,17 +482,34 @@ class AppleMessagesForBusiness::SendMessageService
     # Apple MSP Form specification requires specific dynamic structure
     form_data = content_attributes || {}
 
+    Rails.logger.info '[SendMessageService build_form_dynamic_data] Starting'
+    Rails.logger.info "[SendMessageService] content_attributes keys: #{content_attributes.keys.inspect}"
+    Rails.logger.info "[SendMessageService] form_data keys: #{form_data.keys.inspect}"
+    Rails.logger.info "[SendMessageService] form_data['pages'].present?: #{form_data['pages'].present?}"
+
+    # DEBUG: Log the first page's first item's options to see if image_identifier is present
+    if form_data['pages'].present? && form_data['pages'].first && form_data['pages'].first['items'].present?
+      first_item = form_data['pages'].first['items'].first
+      Rails.logger.info "[SendMessageService] First item: #{first_item.inspect}"
+      Rails.logger.info "[SendMessageService] First option: #{first_item['options'].first.inspect}" if first_item['options'].present?
+    end
+
     # Check if we have pages from the form builder (new format)
     if form_data['pages'].present?
+      Rails.logger.info "[SendMessageService] Found pages at root level: #{form_data['pages'].length} pages"
       # Convert pages with items to Apple MSP format
       pages = convert_form_builder_pages_to_msp(form_data['pages'])
       # Set startPageIdentifier to the first page's ID
       start_page_id = pages.first&.dig(:pageIdentifier) || '0'
 
       # Collect image identifiers from form pages and load images
+      Rails.logger.info '[SendMessageService] Calling collect_form_image_identifiers'
       image_identifiers = collect_form_image_identifiers(form_data['pages'])
+      Rails.logger.info "[SendMessageService] collect_form_image_identifiers returned #{image_identifiers.length} identifiers: #{image_identifiers.inspect}"
       load_form_images(image_identifiers) if image_identifiers.any?
+      Rails.logger.info "[SendMessageService] After load_form_images, @form_images count: #{@form_images&.length || 0}"
     else
+      Rails.logger.warn '[SendMessageService] No pages found, using legacy fields format'
       # Legacy: Convert flat fields array to MSP format
       pages = convert_legacy_fields_to_msp(form_data['fields'] || [])
       start_page_id = '0'
@@ -461,15 +530,26 @@ class AppleMessagesForBusiness::SendMessageService
   def collect_form_image_identifiers(pages)
     identifiers = []
 
+    Rails.logger.info "[collect_form_image_identifiers] Pages count: #{pages&.length || 0}"
+    Rails.logger.info "[collect_form_image_identifiers] Pages structure: #{pages&.first&.keys&.inspect}"
+
     # Collect from page items (singleSelect/multiSelect options)
-    pages.each do |page|
+    pages.each_with_index do |page, idx|
       items = page['items'] || []
+      Rails.logger.info "[collect_form_image_identifiers] Page #{idx} items count: #{items.length}"
+
       items.each do |item|
+        Rails.logger.info "[collect_form_image_identifiers] Item type: #{item['item_type']}"
         next unless item['item_type'] == 'singleSelect' || item['item_type'] == 'multiSelect'
 
         options = item['options'] || []
+        Rails.logger.info "[collect_form_image_identifiers] Options count: #{options.length}"
+
         options.each do |option|
-          identifiers << option['imageIdentifier'] if option['imageIdentifier'].present?
+          # Support both camelCase and snake_case (API normalizes to snake_case)
+          image_id = option['imageIdentifier'] || option['image_identifier']
+          Rails.logger.info "[collect_form_image_identifiers] Option image_id: #{image_id.inspect}"
+          identifiers << image_id if image_id.present?
         end
       end
     end
@@ -488,37 +568,29 @@ class AppleMessagesForBusiness::SendMessageService
       end
     end
 
+    Rails.logger.info "[collect_form_image_identifiers] Final identifiers: #{identifiers.inspect}"
     identifiers.compact.uniq
   end
 
-  # Load form images and add them to the base_data[:data][:images] array
+  # Load form images using three-tier fallback and add them to @form_images
   def load_form_images(identifiers)
     return if identifiers.empty?
 
-    # Fetch images from database
-    stored_images = AppleListPickerImage.where(
+    # Use ImageFetchService for three-tier fallback (inbox → shared → embedded)
+    images_array = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @channel.account_id,
       inbox_id: @channel.inbox.id,
-      identifier: identifiers
-    ).includes(image_attachment: :blob).index_by(&:identifier)
-
-    # Build images array for payload
-    images_array = identifiers.filter_map do |identifier|
-      stored_image = stored_images[identifier]
-
-      if stored_image&.image&.attached?
-        {
-          identifier: identifier,
-          data: stored_image.image_data_base64,
-          description: stored_image.description || identifier
-        }
-      else
-        Rails.logger.warn "[AMB Send] Form image #{identifier} not found in database for inbox #{@channel.inbox.id}"
-        nil
-      end
-    end
+      embedded_images: content_attributes['images'] || [] # Pass embedded images from form
+    ).fetch_and_encode(identifiers)
 
     # Add to the payload (this will be accessed by build_interactive_data)
     @form_images = images_array unless images_array.empty?
+
+    # Log warnings for missing images
+    missing = identifiers - images_array.map { |img| img[:identifier] }
+    missing.each do |identifier|
+      Rails.logger.warn "[AMB Send] Form image #{identifier} not found in any tier"
+    end
   end
 
   def convert_form_builder_pages_to_msp(builder_pages)

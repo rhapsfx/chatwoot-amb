@@ -1,4 +1,15 @@
 class Api::V1::Accounts::Inboxes::AppleListPickerImagesController < Api::V1::Accounts::BaseController
+  # DEPRECATED: This controller is deprecated as of November 2025
+  # Use SharedAppleImagesController for account-wide image management
+  #
+  # New endpoint: /api/v1/accounts/:account_id/shared_apple_images
+  #
+  # This controller remains for backwards compatibility with existing integrations.
+  # Will be removed in: Q2 2026
+  #
+  # Migration guide: docs/apple-messages/DEPRECATION_TIMELINE.md
+  # Architecture docs: docs/apple-messages/IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md
+
   include LogSanitizable
 
   before_action :fetch_inbox

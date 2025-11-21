@@ -1,9 +1,10 @@
 class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness::SendMessageService
-  def perform
+  # Override to add image saving before sending
+  def perform_send
     # Save images before sending
     save_images_to_storage
 
-    # Call parent perform
+    # Call parent perform_send
     super
   end
 

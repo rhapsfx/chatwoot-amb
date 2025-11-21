@@ -123,7 +123,7 @@ class Message < ApplicationRecord
                                          :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
                                          :reply_secondary_subtitle, :reply_tertiary_subtitle], coder: JSON
 
-  store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
+  store :external_source_ids, accessors: [:slack, :apple_messages], coder: JSON, prefix: :external_source_id
 
   scope :created_since, ->(datetime) { where('created_at > ?', datetime) }
   scope :chat, -> { where.not(message_type: :activity).where(private: false) }

@@ -61,6 +61,7 @@ class Account < ApplicationRecord
   has_many :agent_bots, dependent: :destroy_async
   has_many :api_channels, dependent: :destroy_async, class_name: '::Channel::Api'
   has_many :apple_messages_for_business_channels, dependent: :destroy_async, class_name: '::Channel::AppleMessagesForBusiness'
+  has_many :shared_apple_images, dependent: :destroy_async
   has_many :articles, dependent: :destroy_async, class_name: '::Article'
   has_many :assignment_policies, dependent: :destroy_async
   has_many :automation_rules, dependent: :destroy_async

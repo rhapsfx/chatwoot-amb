@@ -208,7 +208,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                                   # Text/TextArea/Email/Phone fields
                                   :max_length, :keyboard_type, :text_content_type,
                                   # Select fields (singleSelect/multiSelect)
-                                  { :options => [:value, :title, :description] },
+                                  { :options => [:id, :value, :title, :description, :image_identifier, :imageIdentifier] },
                                   # DateTime fields
                                   :date_format, :min_date, :max_date,
                                   # Toggle fields

@@ -742,10 +742,10 @@ class AppleMessagesForBusiness::IncomingMessageService
       Rails.logger.info '[AMB IncomingMessage] Successfully processed IDR, storing full interactive data'
 
       # === EXPOSE RAW DECODED IDR DATA ===
-      Rails.logger.info '[AMB IncomingMessage] ========================================='
-      Rails.logger.info '[AMB IncomingMessage] RAW DECODED IDR PAYLOAD:'
-      Rails.logger.info "[AMB IncomingMessage] #{JSON.pretty_generate(full_interactive_data)}"
-      Rails.logger.info '[AMB IncomingMessage] ========================================='
+      # Rails.logger.info '[AMB IncomingMessage] ========================================='
+      # Rails.logger.info '[AMB IncomingMessage] RAW DECODED IDR PAYLOAD:'
+      # Rails.logger.info "[AMB IncomingMessage] #{JSON.pretty_generate(full_interactive_data)}"
+      # Rails.logger.info '[AMB IncomingMessage] ========================================='
 
       # Extract content from the decrypted interactive data
       extracted_content = extract_content_from_interactive_data(full_interactive_data)

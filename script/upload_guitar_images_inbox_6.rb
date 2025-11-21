@@ -1,6 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# DEPRECATED: This script is deprecated as of November 2025
+# Use SharedAppleImage model for account-wide images instead
+#
+# New approach:
+#   SharedAppleImage.create!(
+#     account_id: 1,
+#     identifier: 'guitar_stratocaster',
+#     image_type: 'template',
+#     description: 'Fender American Elite Stratocaster',
+#     image: File.open('_apple/Acoustic-House-Bot-origin/acoustichouse/images/Strat.jpg')
+#   )
+#
+# Or use the migration scripts:
+#   rails runner script/migrate_branding_images_to_shared.rb --execute
+#
+# This script remains for backwards compatibility only.
+# Will be removed in: Q2 2026
+#
+# See: docs/apple-messages/DEPRECATION_TIMELINE.md
+
 # Script to upload all guitar images to inbox 6 specifically
 # Usage: rails runner script/upload_guitar_images_inbox_6.rb
 

@@ -13,39 +13,76 @@ class AppleMessagesForBusiness::SendRichLinkService
   end
 
   def perform
-    message_id = SecureRandom.uuid
+    # Idempotency guard: prevent duplicate sends of the same message
+    return idempotency_response if already_sent?
 
-    rich_link_data = build_rich_link_data
+    # Acquire lock to prevent concurrent sends
+    lock_key = "amb:send_lock:#{@message.id}"
+    lock_acquired = Redis::Alfred.set(lock_key, '1', ex: 30, nx: true)
 
-    payload = {
-      id: message_id,
-      type: 'richLink',
-      sourceId: @channel.business_id,
-      destinationId: @destination_id,
-      v: 1,
-      body: rich_link_data[:url],
-      richLinkData: rich_link_data
-    }
-
-    # Log sanitized payload (truncate base64 data)
-    sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
-    Rails.logger.info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
-    Rails.logger.info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
-    if rich_link_data[:assets]&.key?(:image)
-      Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
-      Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
+    unless lock_acquired
+      Rails.logger.warn "[AMB RichLink] Message #{@message.id} is already being sent (lock exists)"
+      return { success: false, error: 'Message send already in progress', error_code: 'SEND_IN_PROGRESS' }
     end
 
-    response = send_to_apple_gateway(payload, message_id)
+    begin
+      message_id = SecureRandom.uuid
 
-    if response.success?
-      { success: true, message_id: message_id }
-    else
-      { success: false, error: "HTTP #{response.code}: #{response.body}" }
+      rich_link_data = build_rich_link_data
+
+      payload = {
+        id: message_id,
+        type: 'richLink',
+        sourceId: @channel.business_id,
+        destinationId: @destination_id,
+        v: 1,
+        body: rich_link_data[:url],
+        richLinkData: rich_link_data
+      }
+
+      # Log sanitized payload (truncate base64 data)
+      sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
+      Rails.logger.info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
+      Rails.logger.info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
+      if rich_link_data[:assets]&.key?(:image)
+        Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
+        Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
+      end
+
+      response = send_to_apple_gateway(payload, message_id)
+
+      if response.success?
+        # Mark as sent if successful
+        mark_as_sent
+        { success: true, message_id: message_id }
+      else
+        { success: false, error: "HTTP #{response.code}: #{response.body}" }
+      end
+    ensure
+      # Always release the lock
+      Redis::Alfred.delete(lock_key)
     end
   rescue StandardError => e
     Rails.logger.error "Rich link send failed: #{e.message}"
     { success: false, error: e.message }
+  end
+
+  def already_sent?
+    # Check if message has already been successfully sent to Apple MSP
+    @message.external_source_id_apple_messages.present?
+  end
+
+  def mark_as_sent
+    # Mark message as sent by setting external_source_id_apple_messages
+    return if @message.external_source_id_apple_messages.present?
+
+    @message.update_column(:external_source_ids,
+                           @message.external_source_ids.merge('apple_messages' => SecureRandom.uuid))
+  end
+
+  def idempotency_response
+    Rails.logger.info "[AMB RichLink] Message #{@message.id} already sent (external_source_id: #{@message.external_source_id_apple_messages}), skipping"
+    { success: true, message_id: @message.external_source_id_apple_messages, skipped: true }
   end
 
   private

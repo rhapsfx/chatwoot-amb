@@ -127,7 +127,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def process_interactive_response(interactive_data)
     log_info '[Bot] 🎯 process_interactive_response called'
-    log_info "[Bot] 🎯 Interactive data: #{utf8_encode(interactive_data).inspect}"
+
+    # Sanitize interactive data to remove base64 image content from logs
+    sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(interactive_data, max_length: 20)
+    log_info "[Bot] 🎯 Interactive data: #{utf8_encode(sanitized_data).inspect}"
 
     # For quick replies, Apple uses 'selectedIdentifier' (our custom identifier)
     # For other types (list picker, time picker), use 'requestIdentifier'
@@ -515,7 +518,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Send delivery confirmation if address was provided
     send_delivery_confirmation(address_data, customer_name) if address_data.present?
 
-    # Ask for name preference via quick reply
+    # Check if we're in demo mode - if so, stop here
+    if @bot_state == 'DEMO_MODE'
+      log_info '[Bot] 📝 In DEMO_MODE - stopping after form response'
+      send_text_message("Type 'startover' to restart the conversation.")
+      return
+    end
+
+    # Normal flow: Ask for name preference via quick reply
     update_bot_state('AHB2')
     handle_name_preference_prompt
   end
@@ -682,6 +692,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     reset_retry_count
 
     send_text_message("Great choice! You selected #{selection}.")
+
+    # Check if we're in demo mode - if so, stop here
+    if @bot_state == 'DEMO_MODE'
+      log_info '[Bot] 🎸 In DEMO_MODE - stopping after guitar selection, not sending AR'
+      # Stay in DEMO_MODE, don't continue to AR
+      return
+    end
+
+    # Normal flow: continue to AR introduction
     update_bot_state('AHC2')
     handle_ar_introduction
   end
@@ -788,11 +807,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     result = send_apple_pay_request(guitar_name)
 
-    if result[:success]
+    # Log the result for debugging
+    log_info "[Bot] 💳 Apple Pay prompt result: #{result.inspect}"
+
+    # Check for success: result must be a hash with success: true
+    if result.is_a?(Hash) && result[:success] == true
+      log_info '[Bot] 💳 Apple Pay sent successfully - waiting for user response'
       update_bot_state('AHF1')
     else
       # Log the actual error for debugging
-      log_warn "[Bot] 💳 Apple Pay not sent: #{result[:error]}" if result[:error]
+      error_msg = result.is_a?(Hash) && result[:error] ? result[:error] : 'unknown error'
+      log_warn "[Bot] 💳 Apple Pay not sent (#{error_msg}) - skipping payment"
 
       # Skip Apple Pay gracefully without claiming technical difficulties
       send_text_message("For this demo, we'll skip the payment step.")
@@ -834,6 +859,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       send_text_message('Payment was not completed. Let\'s continue with the demo.')
     end
 
+    # Check if we're in demo mode - if so, stop here
+    if @bot_state == 'DEMO_MODE'
+      log_info '[Bot] 💳 In DEMO_MODE - stopping after Apple Pay response'
+      send_text_message("Type 'startover' to restart the conversation.")
+      return
+    end
+
+    # Normal flow: continue to lesson introduction
     reset_retry_count
     update_bot_state('AHF2')
     handle_lesson_introduction
@@ -1076,6 +1109,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       # Save the selected time data
       update_conversation_attribute('selected_timeslot', selected_time)
       reset_retry_count
+
+      # Check if we're in demo mode - if so, stop here
+      if @bot_state == 'DEMO_MODE'
+        log_info '[Bot] 🕐 In DEMO_MODE - stopping after time picker response'
+        send_text_message("Great! You selected #{selected_time['formatted_time'] || selected_time['startTime']}.")
+        send_text_message("Type 'startover' to restart the conversation.")
+        return
+      end
+
+      # Normal flow: continue to continue prompt
       update_bot_state('AHH2')
       handle_continue_prompt
     else
@@ -1208,6 +1251,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # AHJ2: Send metrics.numbers
     send_text_message('In Messages for Business, we can also share documents like these forms.')
     send_document('metrics.numbers')
+
+    # Check if we're in demo mode - if so, send PDF and stop
+    if @bot_state == 'DEMO_MODE'
+      send_document('document.pdf')
+
+      # Wait for documents to be delivered before sending restart message
+      sleep(2.0)
+
+      log_info '[Bot] 📄 In DEMO_MODE - stopping after documents sent'
+      #send_text_message("Type 'startover' to restart the conversation.")
+      return
+    end
+
+    # Normal flow: continue to next state
     update_bot_state('AHJ3')
     handle_pdf_document
   end
@@ -1301,7 +1358,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # === Keyword Handlers ===
 
   def handle_menu
-    send_text_message('🎸 Acoustic House Bot Menu')
+    # send_text_message('🎸 Acoustic House Bot Menu')
     send_menu_list_picker
     # Set demo mode state to prevent flow continuation after menu selection
     update_bot_state('DEMO_MODE')
@@ -1348,12 +1405,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     result = send_apple_pay_request('Demo Guitar - Fender Stratocaster')
 
+    # Log the result for debugging
+    log_info "[Bot] 💳 Apple Pay demo result: #{result.inspect}"
+
     # Only send error message if payment explicitly failed
-    if result && result[:success]
+    # Check for success: result must be a hash with success: true
+    if result.is_a?(Hash) && result[:success] == true
       # Payment sent successfully - do nothing more
-      log_info '[Bot] 💳 Apple Pay demo sent successfully'
+      log_info '[Bot] 💳 Apple Pay demo sent successfully - no error message'
     else
       # Payment failed - show error
+      error_msg = result.is_a?(Hash) && result[:error] ? result[:error] : 'unknown error'
+      log_warn "[Bot] 💳 Apple Pay demo failed (#{error_msg}) - showing error message"
       send_text_message('Apple Pay is currently unavailable. Please try again later.')
     end
 
@@ -1384,100 +1447,267 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_menu_selection(interactive_data)
     log_info '[Bot] 📋 handle_menu_selection called'
     log_info "[Bot] 📋 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
+    log_info "[Bot] 📋 Has ldtext? #{interactive_data['ldtext'].present?}"
+    log_info "[Bot] 📋 Has $archiver? #{interactive_data['$archiver'].present?}"
+    log_info "[Bot] 📋 Has data.listPicker? #{interactive_data.dig('data', 'listPicker').present?}"
+
+    # Idempotency guard: prevent processing the same menu selection twice
+    # Use conversation ID + timestamp + selection data as the unique key
+    # This prevents duplicate processing even if multiple message objects are created
+    selection_data = interactive_data['ldtext'] || interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
+    selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
+    selection_key = "menu_selection:#{selection_hash}"
+
+    if Redis::Alfred.get(selection_key).present?
+      log_info "[Bot] 📋 Menu selection already processed (hash: #{selection_hash}), skipping"
+      return
+    end
+
+    # Mark as processed (expires after 2 minutes - enough time to prevent duplicates but not too long)
+    Redis::Alfred.setex(selection_key, '1', 2.minutes.to_i)
+    log_info "[Bot] 📋 Menu selection marked as processed (hash: #{selection_hash})"
 
     # Extract selection from interactive data
-    # For list picker responses from IDR, the selection is in the 'ldtext' field
-    selection_identifier = if interactive_data['ldtext'].present?
-                             # Resolved NSKeyedArchiver/IDR format - selection is in ldtext
-                             # Need to map title back to identifier
-                             item_title = interactive_data['ldtext']
-                             log_info "[Bot] 📋 IDR format menu selection (ldtext): #{utf8_encode(item_title)}"
+    # The selection is in the listPicker sections under data
+    selection_identifier = nil
+    selected_item_title = nil  # Track the title for remapping if needed
 
-                             # Map menu item titles to identifiers
-                             menu_map = {
-                               '1. Introduction with Intent ID' => '1',
-                               '2. Send a List Picker' => '2',
-                               '3. Receive an AR Image' => '3',
-                               '4. Apple Pay' => '4',
-                               '5. Schedule a Guitar Lesson' => '5',
-                               '6. Fill in a Form' => '6',
-                               '7. Send an Image' => '7',
-                               '8. Send Documents' => '8',
-                               '9. Authentication' => '10',
-                               '10. iMessage App' => '11',
-                               '11. Apple Wallet' => '12',
-                               '12. Rich Link Locator' => '13'
-                             }
-                             menu_map[item_title]
-                           elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
-                             # Raw NSKeyedArchiver format - extract from $objects array
-                             objects = interactive_data['$objects'] || []
-                             # Find the identifier (should be a number string)
-                             objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
-                           else
-                             # Standard format
-                             interactive_data.dig('data', 'reply', 'identifier')
-                           end
+    if interactive_data['ldtext'].present?
+      # Resolved NSKeyedArchiver/IDR format - selection is in ldtext
+      item_title = interactive_data['ldtext']
+      log_info "[Bot] 📋 IDR format menu selection (ldtext): #{utf8_encode(item_title)}"
+      log_info "[Bot] 📋 ldtext class: #{item_title.class}, length: #{item_title.length}, bytes: #{item_title.bytes.inspect[0..100]}"
 
-    log_info "[Bot] 📋 Selected menu identifier: #{selection_identifier}"
+      # Map menu item titles to identifiers (case-insensitive, flexible matching)
+      menu_map = {
+        '1. Introduction with Intent ID' => '1',
+        '2. Send a List Picker' => '2',
+        '3. Receive an AR Image' => '3',
+        '4. Apple Pay' => '4',
+        '5. Schedule a Guitar Lesson' => '5',
+        '6. Fill in a Form' => '6',
+        '7. Send an Image' => '7',
+        '8. Send Documents' => '8',
+        '9. Large Form' => '9',
+        '10. Authentication' => '10',
+        '11. iMessage App' => '11',
+        '12. Apple Wallet' => '12',
+        '13. Rich Link Locator' => '13'
+      }
+
+      log_info '[Bot] 📋 Attempting exact match against menu_map keys...'
+      # Try exact match first
+      selection_identifier = menu_map[item_title]
+      log_info "[Bot] 📋 Exact match result: #{selection_identifier.inspect}"
+
+      # If no exact match, try case-insensitive match
+      if selection_identifier.nil?
+        log_info '[Bot] 📋 No exact match, trying case-insensitive...'
+        menu_map.each do |key, value|
+          next unless key.downcase == item_title.downcase
+
+          selection_identifier = value
+          log_info "[Bot] 📋 Found case-insensitive match: '#{utf8_encode(key)}' => '#{value}'"
+          break
+        end
+      end
+
+      # If still no match, try partial match (for cases where template has slight variations)
+      if selection_identifier.nil?
+        log_info '[Bot] 📋 No case-insensitive match, trying partial match...'
+        menu_map.each do |key, value|
+          # Extract just the menu text after the number (e.g., "Fill in a Form" from "6. Fill in a Form")
+          key_text = key.sub(/^\d+\.\s*/, '')
+          item_text = item_title.sub(/^\d+\.\s*/, '')
+
+          log_info "[Bot] 📋 Comparing key_text='#{utf8_encode(key_text)}' with item_text='#{utf8_encode(item_text)}'"
+
+          next unless key_text.downcase == item_text.downcase
+
+          selection_identifier = value
+          log_info "[Bot] 📋 Found partial match: '#{utf8_encode(key_text)}' matches '#{utf8_encode(item_text)}' => '#{value}'"
+          break
+        end
+      end
+
+      log_info "[Bot] 📋 After menu_map lookup, selection_identifier: #{selection_identifier.inspect}"
+    elsif interactive_data['$archiver'] == 'NSKeyedArchiver'
+      # Raw NSKeyedArchiver format - extract from $objects array
+      objects = interactive_data['$objects'] || []
+      # Find the identifier (should be a number string)
+      selection_identifier = objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
+    else
+      # Standard format - extract from listPicker sections
+      data = interactive_data['data'] || {}
+      list_picker = data['listPicker'] || {}
+      sections = list_picker['sections'] || []
+
+      # Find the selected item across all sections
+      sections.each do |section|
+        items = section['items'] || []
+        selected_item = items.find { |item| item['identifier'].present? }
+        next unless selected_item
+
+        # Capture title for potential remapping
+        selected_item_title = selected_item['title']
+        # Extract the identifier (may be "option_2" or "176347360869701")
+        selection_identifier = selected_item['identifier'].to_s
+        log_info "[Bot] 📋 Found selected item: #{utf8_encode(selected_item_title)} (identifier: #{selection_identifier})"
+        break
+      end
+    end
+
+    log_info "[Bot] 📋 Final selected menu identifier: #{selection_identifier.inspect}"
+
+    # Verify selection is valid before routing
+    if selection_identifier.nil? || selection_identifier.empty?
+      log_warn '[Bot] ❌ Menu selection is nil or empty!'
+      log_warn "[Bot] 📋 interactive_data structure: #{utf8_encode(interactive_data.keys).inspect}"
+      log_warn "[Bot] 📋 Has ldtext: #{interactive_data['ldtext'].present?} (value: #{utf8_encode(interactive_data['ldtext']).inspect})"
+      log_warn "[Bot] 📋 Has $archiver: #{interactive_data['$archiver'].present?}"
+      log_warn "[Bot] 📋 Has data.listPicker: #{interactive_data.dig('data', 'listPicker').present?}"
+      log_warn "[Bot] 📋 Full interactive_data: #{utf8_encode(interactive_data).inspect}"
+      send_text_message('Invalid selection. Type \'menu\' to try again.')
+      update_bot_state('DEMO_MODE')
+      return
+    end
+
+    # If we got a large template-generated identifier, try to extract ldtext instead
+    unless /^\d{1,2}$/.match?(selection_identifier)  # Not a 1-2 digit number
+      log_warn "[Bot] 📋 Got non-standard identifier: #{selection_identifier}, attempting title mapping..."
+
+      # Get the title from ldtext or the captured title
+      item_title = interactive_data['ldtext'] || selected_item_title
+
+      if item_title.present?
+        log_info "[Bot] 📋 Found title for mapping: #{utf8_encode(item_title)}"
+
+        # Map title to identifier
+        title_to_id = {
+          '1. Introduction with Intent ID' => '1',
+          '2. Send a List Picker' => '2',
+          '3. Receive an AR Image' => '3',
+          '4. Apple Pay' => '4',
+          '5. Schedule a Guitar Lesson' => '5',
+          '6. Fill in a Form' => '6',
+          '7. Send an Image' => '7',
+          '8. Send Documents' => '8',
+          '9. Large Form' => '9',
+          '10. Authentication' => '10',
+          '11. iMessage App' => '11',
+          '12. Apple Wallet' => '12',
+          '13. Rich Link Locator' => '13'
+        }
+
+        # Try exact match
+        mapped_id = title_to_id[item_title]
+
+        # Try case-insensitive
+        if mapped_id.nil?
+          title_to_id.each do |key, value|
+            if key.downcase == item_title.downcase
+              mapped_id = value
+              break
+            end
+          end
+        end
+
+        # Try partial match (strip number prefix)
+        if mapped_id.nil?
+          item_text = item_title.sub(/^\d+\.\s*/, '')
+          title_to_id.each do |key, value|
+            key_text = key.sub(/^\d+\.\s*/, '')
+            next unless key_text.downcase == item_text.downcase
+
+            mapped_id = value
+            log_info "[Bot] 📋 Mapped via partial match: '#{item_text}' => '#{value}'"
+            break
+          end
+        end
+
+        if mapped_id
+          log_info "[Bot] 📋 Remapped identifier from #{selection_identifier} to #{mapped_id}"
+          selection_identifier = mapped_id
+        else
+          log_warn "[Bot] 📋 Could not map title '#{utf8_encode(item_title)}' to known identifier"
+        end
+      else
+        log_warn '[Bot] 📋 No title available for remapping (ldtext and selected_item_title both empty)'
+      end
+    end
 
     # Route to appropriate handler based on selection
+    log_info "[Bot] 📋 Routing menu selection '#{selection_identifier}' to handler"
+
     case selection_identifier
     when '1'
-      # Introduction with Intent ID - restart flow
+      # 1. Introduction with Intent ID - restart flow
+      log_info '[Bot] 📋 Menu: Introduction with Intent ID'
       send_text_message('Let\'s start from the beginning!')
       handle_start_over
     when '2'
-      # Send a List Picker
-      send_text_message('Here\'s the guitar list picker:')
+      # 2. Send a List Picker
+      log_info '[Bot] 📋 Menu: Send a List Picker'
       handle_list_picker_demo
     when '3'
-      # Receive an AR Image
-      send_text_message('Here\'s the AR experience:')
+      # 3. Receive an AR Image
+      log_info '[Bot] 📋 Menu: Receive an AR Image'
       handle_ar_demo
     when '4'
-      # Apple Pay
-      send_text_message('Here\'s an Apple Pay demo:')
+      # 4. Apple Pay
+      log_info '[Bot] 📋 Menu: Apple Pay'
       handle_apple_pay_demo
     when '5'
-      # Schedule a Guitar Lesson
-      send_text_message('Let\'s schedule a guitar lesson:')
+      # 5. Schedule a Guitar Lesson
+      log_info '[Bot] 📋 Menu: Schedule a Guitar Lesson'
       handle_schedule_lesson
     when '6'
-      # Fill in a Form
-      send_text_message('Here\'s a form to fill in:')
+      # 6. Fill in a Form
+      log_info '[Bot] 📋 Menu: Fill in a Form'
       handle_form_demo
     when '7'
-      # Send an Image
-      send_text_message('Photo sharing demo:')
-      send_text_message('You can send us a photo anytime! Just attach it to your message.')
+      # 7. Send an Image
+      log_info '[Bot] 📋 Menu: Send an Image'
+      send_text_message("Photo sharing demo:\n\nYou can send us a photo anytime! Just attach it to your message.")
       update_bot_state('DEMO_MODE')
     when '8'
-      # Send Documents
+      # 8. Send Documents
+      log_info '[Bot] 📋 Menu: Send Documents'
       send_text_message('Document sharing demo:')
       handle_documents_intro
+    when '9'
+      # 9. Large Form
+      log_info '[Bot] 📋 Menu: Large Form'
+      handle_large_form_demo
     when '10'
-      # Authentication
-      send_text_message('Authentication demo is not yet implemented.')
-      send_text_message('Type \'menu\' to see other options.')
+      # 10. Authentication - TODO: Implement authentication demo
+      log_info '[Bot] 📋 Menu: Authentication (not implemented)'
+      send_text_message('🔐 Authentication Demo')
+      send_text_message('This feature demonstrates OAuth authentication flow with Apple Messages for Business.')
+      send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
       update_bot_state('DEMO_MODE')
     when '11'
-      # iMessage App
-      send_text_message('iMessage App demo is not yet implemented.')
-      send_text_message('Type \'menu\' to see other options.')
+      # 11. iMessage App - TODO: Implement custom iMessage app demo
+      log_info '[Bot] 📋 Menu: iMessage App (not implemented)'
+      send_text_message('📱 iMessage App Demo')
+      send_text_message('This feature demonstrates custom iMessage app extensions.')
+      send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
       update_bot_state('DEMO_MODE')
     when '12'
-      # Apple Wallet
+      # 12. Apple Wallet
+      log_info '[Bot] 📋 Menu: Apple Wallet (not implemented)'
       send_text_message('Apple Wallet demo is not yet implemented.')
       send_text_message('Type \'menu\' to see other options.')
       update_bot_state('DEMO_MODE')
     when '13'
-      # Rich Link Locator
+      # 13. Rich Link Locator
+      log_info '[Bot] 📋 Menu: Rich Link Locator'
       send_text_message('Here\'s a rich link demo:')
       send_apple_messages_rich_link
       update_bot_state('DEMO_MODE')
     else
-      log_warn "[Bot] ❌ Unknown menu selection: #{selection_identifier}"
+      log_warn "[Bot] ❌ Unknown menu selection identifier: '#{selection_identifier}'"
+      log_warn "[Bot] ❌ This should be a number 1-13, got: #{selection_identifier.class} with value #{utf8_encode(selection_identifier).inspect}"
       send_text_message('Invalid selection. Type \'menu\' to try again.')
       update_bot_state('DEMO_MODE')
     end
@@ -1574,14 +1804,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "[Bot] Sending Guitar List Picker (ID: 321, Name: #{utf8_encode(template.name)})"
 
-    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
+    # Use TemplateFacade with image loading (latest implementation)
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
-    data = facade.load_data('list_picker')
+
+    # Load data WITH images using the new method (replaces manual fetch_and_encode_images)
+    data = facade.load_data_with_images('list_picker')
 
     log_info "[Bot] 🎸 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+    log_info "[Bot] 🎸 Loaded template with #{data['images']&.length || 0} images"
 
-    # All data is now in consistent snake_case format
+    # All data is in snake_case format with images included
     sections = data['sections'] || []
+    images = data['images'] || []
     received_image_id = data['received_image_identifier']
     reply_image_id = data['reply_image_identifier']
     received_title = data['received_title']
@@ -1597,43 +1831,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       return
     end
 
-    # Fix invalid style values - change "default" to "large"
-    sections = sections.map do |section|
-      section_copy = section.deep_dup
-      if section_copy['items'].present?
-        section_copy['items'].each do |item|
-          item['style'] = 'large' if item['style'] == 'default' || item['style'].blank?
-        end
-      end
-      section_copy
-    end
-
-    # Collect all image identifiers used in the sections and messages
-    # Facade ensures all data is in snake_case format
-    item_image_identifiers = sections.flat_map do |section|
-      (section['items'] || []).map { |item| item['image_identifier'] }
-    end.compact
-
-    log_info "[Bot] 🎸 Item image identifiers from template: #{item_image_identifiers.inspect}"
-
-    # Use the extracted image identifiers from above (already handled both formats)
-    all_identifiers = (item_image_identifiers + [received_image_id, reply_image_id]).compact.uniq
-
-    log_info "[Bot] 🎸 All image identifiers: #{all_identifiers.inspect}"
-
-    # Fetch and encode images from ActiveStorage
-    images = fetch_and_encode_images(all_identifiers)
-
-    log_info "[Bot] 🎸 Encoded #{images.length} images"
-
-    # Build content attributes with all components
+    # Build content attributes with all components (images already loaded by facade)
     content_attrs = {
       'sections' => sections,
       'images' => images,
       'request_identifier' => 'lp_guitar_0319'
     }
 
-    # Add received_message fields (from extracted variables above)
+    # Add received_message fields
     if received_title.present?
       content_attrs['received_title'] = received_title
       content_attrs['received_subtitle'] = received_subtitle
@@ -1641,7 +1846,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       content_attrs['received_style'] = received_style
     end
 
-    # Add reply_message fields (from extracted variables above)
+    # Add reply_message fields
     if reply_title.present?
       content_attrs['reply_title'] = reply_title
       content_attrs['reply_subtitle'] = reply_subtitle
@@ -1662,6 +1867,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         content_attributes: content_attrs
       )
     ).perform
+
+    log_info '[Bot] Guitar List Picker sent successfully'
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send guitar list picker: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
@@ -2009,14 +2216,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     log_info "📋 [Bot] Sending Menu List Picker (ID: 366, Name: #{utf8_encode(template.name)})"
 
-    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
+    # Use TemplateFacade with image loading (latest implementation)
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
-    data = facade.load_data('list_picker')
+
+    # Load data WITH images using the new method (replaces manual fetch_and_encode_images)
+    data = facade.load_data_with_images('list_picker')
 
     log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+    log_info "[Bot] 📋 Loaded template with #{data['images']&.length || 0} images"
 
-    # All data is now in consistent snake_case format
+    # All data is in snake_case format with images included
     sections = data['sections'] || []
+    images = data['images'] || []
     received_image_id = data['received_image_identifier']
     reply_image_id = data['reply_image_identifier']
     received_title = data['received_title']
@@ -2034,43 +2245,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       return
     end
 
-    # Fix invalid style values - change "default" to "large"
-    sections = sections.map do |section|
-      section_copy = section.deep_dup
-      if section_copy['items'].present?
-        section_copy['items'].each do |item|
-          item['style'] = 'large' if item['style'] == 'default' || item['style'].blank?
-        end
-      end
-      section_copy
-    end
-
-    # Collect all image identifiers used in the sections and messages
-    # Facade ensures all data is in snake_case format
-    item_image_identifiers = sections.flat_map do |section|
-      (section['items'] || []).map { |item| item['image_identifier'] }
-    end.compact
-
-    log_info "[Bot] 📋 Item image identifiers from template: #{item_image_identifiers.inspect}"
-
-    # Use the extracted image identifiers from above (already handled both formats)
-    all_identifiers = (item_image_identifiers + [received_image_id, reply_image_id]).compact.uniq
-
-    log_info "[Bot] 📋 All image identifiers: #{all_identifiers.inspect}"
-
-    # Fetch and encode images from ActiveStorage
-    images = fetch_and_encode_images(all_identifiers)
-
-    log_info "[Bot] 📋 Encoded #{images.length} images"
-
-    # Build content attributes with all components
+    # Build content attributes with all components (images already loaded by facade)
     content_attrs = {
       'sections' => sections,
       'images' => images,
       'request_identifier' => 'lp_menu_0319'
     }
 
-    # Add received_message fields (from extracted variables above)
+    # Add received_message fields
     if received_title.present?
       content_attrs['received_title'] = received_title
       content_attrs['received_subtitle'] = received_subtitle
@@ -2078,7 +2260,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       content_attrs['received_style'] = received_style
     end
 
-    # Add reply_message fields (from extracted variables above)
+    # Add reply_message fields
     if reply_title.present?
       content_attrs['reply_title'] = reply_title
       content_attrs['reply_subtitle'] = reply_subtitle
@@ -2099,6 +2281,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         content_attributes: content_attrs
       )
     ).perform
+
+    log_info '[Bot] Menu List Picker sent successfully'
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send menu list picker: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
@@ -2239,7 +2423,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         payment_data: payment_data
       )
 
+      log_info '[Bot] 💳 Calling SendApplePayService.perform...'
       response = service.perform
+      log_info "[Bot] 💳 SendApplePayService returned: #{response.inspect}"
+      log_info "[Bot] 💳 Response is Hash: #{response.is_a?(Hash)}"
+      log_info "[Bot] 💳 Response[:success]: #{response[:success].inspect}"
+      log_info "[Bot] 💳 Response[:success] == true: #{response[:success] == true}"
 
       # If service succeeded, create message record without triggering SendReplyJob
       if response[:success]
@@ -2259,19 +2448,32 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           conversation_id: @conversation.id
         )
 
-        @conversation.messages.create!(message_params)
+        # Use create without ! to avoid exception if message already exists
+        message = @conversation.messages.create(message_params)
 
-        log_info '[Bot] ✅ Apple Pay sent successfully'
-        { success: true }
+        if message.persisted?
+          log_info '[Bot] ✅ Apple Pay message created successfully'
+        else
+          log_warn "[Bot] ⚠️ Apple Pay message creation failed: #{message.errors.full_messages.join(', ')}"
+          log_warn '[Bot] ⚠️ Payment was delivered to device, continuing anyway...'
+        end
+
+        log_info '[Bot] ✅ Apple Pay sent successfully - returning { success: true }'
+        return_value = { success: true }
+        log_info "[Bot] 💳 About to return: #{return_value.inspect}"
+        return_value
       else
         log_info "[Bot] ❌ Apple Pay failed: #{utf8_encode(response[:error])}"
+        log_info "[Bot] 💳 About to return response: #{response.inspect}"
         response
       end
     end
   rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send Apple Pay request: #{e.message}")
+    Rails.logger.error utf8_encode("[Bot] 💳 Exception in send_apple_pay_request: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-    { success: false, error: e.message }
+    error_return = { success: false, error: e.message }
+    log_info "[Bot] 💳 Returning error: #{error_return.inspect}"
+    error_return
   end
 
   def send_document(filename)
@@ -2290,7 +2492,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       sender = message_sender
       params = bot_message_params(
         message_type: :outgoing,
-        content: filename,
+        content: '',  # Empty content - attachment will display filename
         content_type: 'text',
         account_id: @conversation.account_id,
         inbox_id: @conversation.inbox_id,
@@ -3068,7 +3270,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
   end
 
-  # Check if template images are available in current inbox
+  # Check if template images are available using three-tier fallback
   # Returns hash with missing and available identifiers
   def check_template_images_available(template, inbox_id = nil)
     inbox_id ||= @conversation.inbox_id
@@ -3076,11 +3278,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     return { available: [], missing: [], all_available: true } if identifiers.empty?
 
-    available = AppleListPickerImage.where(inbox_id: inbox_id, identifier: identifiers).pluck(:identifier)
+    # Use ImageFetchService to check all three tiers (inbox → shared → embedded)
+    service = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: template.account_id,
+      inbox_id: inbox_id,
+      embedded_images: []
+    )
+
+    # Fetch images (will return only those found in any tier)
+    found_images = service.fetch_and_encode(identifiers)
+    available = found_images.map { |img| img[:identifier] }
     missing = identifiers - available
 
     if missing.any?
-      log_warn "[Bot] Template #{template.id} missing images in inbox #{inbox_id}: #{missing.inspect}"
+      log_warn "[Bot] Template #{template.id} missing images: #{missing.inspect}"
       log_warn "[Bot] Available images: #{available.inspect}"
     end
 

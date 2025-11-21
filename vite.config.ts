@@ -44,6 +44,8 @@ if (isLibraryMode) {
 
 export default defineConfig({
   plugins: plugins,
+  logLevel: 'warn', // Only show warnings and errors, suppress info logs
+  clearScreen: false, // Don't clear the screen on rebuild
   css: {
     preprocessorOptions: {
       scss: {

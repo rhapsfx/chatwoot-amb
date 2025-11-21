@@ -237,6 +237,122 @@ reload_nginx() {
     fi
 }
 
+# Function to archive old log files and clean up old archives
+archive_and_cleanup_logs() {
+    print_status "Archiving and cleaning up log files..."
+    
+    # Create log directory if it doesn't exist
+    mkdir -p log
+    
+    # First, clean up any zero-byte .gz files (failed compressions)
+    local zero_byte_count=0
+    for gz_file in log/*.gz; do
+        [ -e "$gz_file" ] || continue
+        if [ ! -s "$gz_file" ]; then
+            rm -f "$gz_file"
+            zero_byte_count=$((zero_byte_count + 1))
+        fi
+    done
+    
+    if [ $zero_byte_count -gt 0 ]; then
+        print_success "Removed $zero_byte_count zero-byte archive(s)"
+    fi
+    
+    # Archive .log files (except the current ones that will be used)
+    local archived_count=0
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    
+    # List of log files to archive (exclude current session logs)
+    for log_file in log/*.log; do
+        # Skip if file doesn't exist (glob didn't match)
+        [ -e "$log_file" ] || continue
+        
+        # Get the base name without extension
+        local base_name=$(basename "$log_file" .log)
+        
+        # Only archive if file has content (not empty)
+        if [ -s "$log_file" ]; then
+            # Get file size to verify it's worth archiving (at least 1 byte)
+            local file_size=$(wc -c < "$log_file" 2>/dev/null || echo "0")
+            
+            if [ "$file_size" -gt 0 ]; then
+                # Compress the log file
+                local archive_path="log/${base_name}_${timestamp}.log.gz"
+                if gzip -c "$log_file" > "$archive_path" 2>/dev/null; then
+                    # Verify the archive was created and is not empty
+                    if [ -s "$archive_path" ]; then
+                        # Clear the original log file instead of deleting it
+                        > "$log_file"
+                        archived_count=$((archived_count + 1))
+                    else
+                        # Remove failed/empty archive
+                        rm -f "$archive_path"
+                    fi
+                fi
+            fi
+        fi
+    done
+    
+    # Also archive numbered log files (e.g., development.log.0, development.log.1)
+    for log_file in log/*.log.[0-9]*; do
+        [ -e "$log_file" ] || continue
+        
+        # Only archive if file has content
+        if [ -s "$log_file" ]; then
+            local file_size=$(wc -c < "$log_file" 2>/dev/null || echo "0")
+            
+            if [ "$file_size" -gt 0 ]; then
+                local base_name=$(basename "$log_file")
+                local archive_path="log/${base_name}_${timestamp}.gz"
+                
+                if gzip -c "$log_file" > "$archive_path" 2>/dev/null; then
+                    # Verify the archive was created and is not empty
+                    if [ -s "$archive_path" ]; then
+                        rm -f "$log_file"
+                        archived_count=$((archived_count + 1))
+                    else
+                        # Remove failed/empty archive
+                        rm -f "$archive_path"
+                    fi
+                fi
+            fi
+        fi
+    done
+    
+    if [ $archived_count -gt 0 ]; then
+        print_success "Archived $archived_count log file(s)"
+    fi
+    
+    # Clean up .gz archives older than 5 days
+    local deleted_count=0
+    local cutoff_date=$(date -v-5d +%s 2>/dev/null || date -d '5 days ago' +%s 2>/dev/null)
+    
+    if [ -n "$cutoff_date" ]; then
+        for gz_file in log/*.gz; do
+            [ -e "$gz_file" ] || continue
+            
+            # Skip if file is empty (shouldn't happen after cleanup above, but just in case)
+            [ -s "$gz_file" ] || continue
+            
+            # Get file modification time
+            local file_time=$(stat -f %m "$gz_file" 2>/dev/null || stat -c %Y "$gz_file" 2>/dev/null)
+            
+            if [ -n "$file_time" ] && [ "$file_time" -lt "$cutoff_date" ]; then
+                rm -f "$gz_file"
+                deleted_count=$((deleted_count + 1))
+            fi
+        done
+        
+        if [ $deleted_count -gt 0 ]; then
+            print_success "Deleted $deleted_count old archive(s) (>5 days)"
+        fi
+    else
+        print_warning "Could not determine date for cleanup (date command compatibility issue)"
+    fi
+    
+    print_success "Log archiving and cleanup completed"
+}
+
 # Function to start the Rails server
 start_rails() {
     if is_running "$RAILS_PID_FILE"; then
@@ -1000,6 +1116,7 @@ case "$1" in
     start)
         print_status "Starting Chatwoot development server (localhost only)..."
         cleanup_stale_processes
+        archive_and_cleanup_logs
         start_rails
         start_sidekiq
         show_status
@@ -1012,6 +1129,7 @@ case "$1" in
         ;;
     restart)
         cleanup_stale_processes
+        archive_and_cleanup_logs
         restart_services
         ;;
     status)

@@ -391,7 +391,7 @@ class AppleMessagesForBusiness::FormService
   end
 
   def self.create_form_response_message(conversation, form_response)
-    message = conversation.messages.create!(
+    message = conversation.messages.new(
       account: conversation.account,
       inbox: conversation.inbox,
       message_type: 'incoming',
@@ -404,9 +404,10 @@ class AppleMessagesForBusiness::FormService
         submitted_at: form_response[:submitted_at],
         apple_message_id: form_response[:apple_message_id]
       },
-      external_source_id: form_response[:apple_message_id],
       sender: conversation.contact
     )
+    message.external_source_id_apple_messages = form_response[:apple_message_id]
+    message.save!
 
     # Trigger conversation updated event
     Rails.application.event_store.publish(
