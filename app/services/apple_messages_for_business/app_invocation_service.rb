@@ -91,10 +91,9 @@ class AppleMessagesForBusiness::AppInvocationService
   end
 
   def update_message_with_result(result)
-    @message.update!(
-      external_source_id: result[:message_id],
-      status: 'sent'
-    )
+    @message.external_source_id_apple_messages = result[:message_id]
+    @message.status = 'sent'
+    @message.save!
 
     # Store the full payload for debugging and tracking
     @message.content_attributes['sent_payload'] = result[:payload]
@@ -139,7 +138,7 @@ class AppleMessagesForBusiness::AppInvocationService
   end
 
   def self.create_app_response_message(conversation, app_response)
-    message = conversation.messages.create!(
+    message = conversation.messages.new(
       account: conversation.account,
       inbox: conversation.inbox,
       message_type: 'incoming',
@@ -151,9 +150,10 @@ class AppleMessagesForBusiness::AppInvocationService
         apple_message_id: app_response[:apple_message_id],
         received_at: app_response[:received_at]
       },
-      external_source_id: app_response[:apple_message_id],
       sender: conversation.contact
     )
+    message.external_source_id_apple_messages = app_response[:apple_message_id]
+    message.save!
 
     # Trigger conversation updated event
     Rails.application.event_store.publish(

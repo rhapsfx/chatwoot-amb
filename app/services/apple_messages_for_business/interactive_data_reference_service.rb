@@ -9,8 +9,8 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
   end
 
   def retrieve_and_decrypt
-    Rails.logger.info '[AMB IDR] Starting Interactive Data Reference processing'
-    Rails.logger.info "[AMB IDR] IDR Data: #{@idr_data.inspect}"
+    # Rails.logger.info '[AMB IDR] Starting Interactive Data Reference processing'
+    # Rails.logger.info "[AMB IDR] IDR Data: #{@idr_data.inspect}"
 
     validate_idr_data!
 
@@ -18,12 +18,11 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     encrypted_data = download_encrypted_data
 
     # Step 2: Decrypt and decode the data using Apple's /decodePayload endpoint
-    interactive_data = decrypt_data(encrypted_data)
+    decrypt_data(encrypted_data)
 
-    Rails.logger.info '[AMB IDR] Successfully processed Interactive Data Reference'
-    Rails.logger.info "[AMB IDR] Final data keys: #{interactive_data.keys.inspect}"
+    # Rails.logger.info '[AMB IDR] Successfully processed Interactive Data Reference'
+    # Rails.logger.info "[AMB IDR] Final data keys: #{interactive_data.keys.inspect}"
 
-    interactive_data
   rescue StandardError => e
     Rails.logger.error "[AMB IDR] Failed to process Interactive Data Reference: #{e.message}"
     Rails.logger.error "[AMB IDR] Backtrace: #{e.backtrace.join("\n")}"
@@ -39,16 +38,16 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     raise ArgumentError, "Missing required IDR fields: #{missing_fields.join(', ')}" if missing_fields.any?
 
     # Check for decryption key (either 'key' or 'dataRefSig')
-    unless @idr_data['key'].present? || @idr_data['dataRefSig'].present?
-      raise ArgumentError, 'Missing decryption key: neither "key" nor "dataRefSig" found'
-    end
+    return if @idr_data['key'].present? || @idr_data['dataRefSig'].present?
 
-    Rails.logger.info '[AMB IDR] IDR data validation passed'
+    raise ArgumentError, 'Missing decryption key: neither "key" nor "dataRefSig" found'
+
+    # Rails.logger.info '[AMB IDR] IDR data validation passed'
   end
 
   def download_encrypted_data
-    Rails.logger.info '[AMB IDR] Starting IDR download process'
-    Rails.logger.info "[AMB IDR] Original iCloud URL: #{@idr_data['url']}"
+    # Rails.logger.info '[AMB IDR] Starting IDR download process'
+    # Rails.logger.info "[AMB IDR] Original iCloud URL: #{@idr_data['url']}"
 
     # Step 1: Call /preDownload to get temporary download URL
     download_url = call_pre_download
@@ -67,7 +66,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
   end
 
   def call_pre_download
-    Rails.logger.info '[AMB IDR] Calling /preDownload to get temporary URL'
+    # Rails.logger.info '[AMB IDR] Calling /preDownload to get temporary URL'
 
     # Convert hex signature to base64 as required by Apple MSP
     # Python reference: signature = base64.b16decode(hex_encoded_signature)
@@ -85,7 +84,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       'mmcs-owner' => @idr_data['owner']
     }
 
-    Rails.logger.info "[AMB IDR] PreDownload request headers: #{headers.except('authorization').inspect}"
+    # Rails.logger.info "[AMB IDR] PreDownload request headers: #{headers.except('authorization').inspect}"
 
     # Use GET, not POST (per Python reference implementation)
     response = HTTParty.get(
@@ -106,12 +105,12 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
     raise 'PreDownload response missing download-url' unless download_url.present?
 
-    Rails.logger.info "[AMB IDR] Received temporary download URL: #{download_url}"
+    # Rails.logger.info "[AMB IDR] Received temporary download URL: #{download_url}"
     download_url
   end
 
   def download_from_url(url)
-    Rails.logger.info '[AMB IDR] Downloading from temporary URL'
+    # Rails.logger.info '[AMB IDR] Downloading from temporary URL'
 
     # Simple GET request to the temporary URL (no authentication headers)
     response = HTTParty.get(
@@ -125,21 +124,19 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       raise "Download from temporary URL failed: #{response.code} #{response.message}"
     end
 
-    encrypted_data = response.body
-    Rails.logger.info "[AMB IDR] Downloaded #{encrypted_data.bytesize} bytes of encrypted data"
-
-    encrypted_data
+    response.body
+    # Rails.logger.info "[AMB IDR] Downloaded #{encrypted_data.bytesize} bytes of encrypted data"
   end
 
   def decrypt_data(encrypted_data)
-    Rails.logger.info '[AMB IDR] Decrypting Interactive Data Reference'
+    # Rails.logger.info '[AMB IDR] Decrypting Interactive Data Reference'
 
     # The decryption key can be in either 'dataRefSig' or 'key' field
     decryption_key = @idr_data['dataRefSig'] || @idr_data['key']
 
     raise 'Missing decryption key for IDR decryption' unless decryption_key.present?
 
-    Rails.logger.info "[AMB IDR] Using decryption key from field: #{@idr_data['dataRefSig'].present? ? 'dataRefSig' : 'key'}"
+    # Rails.logger.info "[AMB IDR] Using decryption key from field: #{@idr_data['dataRefSig'].present? ? 'dataRefSig' : 'key'}"
 
     # Use the existing attachment cipher service for decryption
     # The IDR uses the same AES-256-CTR encryption as attachments
@@ -148,14 +145,14 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       decryption_key
     )
 
-    Rails.logger.info "[AMB IDR] Decrypted #{decrypted_data.bytesize} bytes of data"
+    # Rails.logger.info "[AMB IDR] Decrypted #{decrypted_data.bytesize} bytes of data"
 
     # Try /decodePayload first (Python reference approach)
     # If it fails with 403, fall back to manual decompression
     begin
-      decoded_data = call_decode_payload(decrypted_data)
-      Rails.logger.info '[AMB IDR] Successfully decoded via /decodePayload'
-      decoded_data
+      call_decode_payload(decrypted_data)
+      # Rails.logger.info '[AMB IDR] Successfully decoded via /decodePayload'
+
     rescue StandardError => e
       raise e unless e.message.include?('403') || e.message.include?('Forbidden')
 
@@ -165,8 +162,8 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
   end
 
   def call_decode_payload(decrypted_data)
-    Rails.logger.info '[AMB IDR] Calling /decodePayload to parse interactive data'
-    Rails.logger.info "[AMB IDR] Decrypted data size: #{decrypted_data.bytesize} bytes"
+    # Rails.logger.info '[AMB IDR] Calling /decodePayload to parse interactive data'
+    # Rails.logger.info "[AMB IDR] Decrypted data size: #{decrypted_data.bytesize} bytes"
 
     # Headers from Python reference (lines 108-114)
     headers = {
@@ -178,7 +175,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       'bid' => @idr_data['bid']
     }
 
-    Rails.logger.info "[AMB IDR] DecodePayload request for bid: #{@idr_data['bid']}, business_id: #{@channel.business_id}"
+    # Rails.logger.info "[AMB IDR] DecodePayload request for bid: #{@idr_data['bid']}, business_id: #{@channel.business_id}"
 
     response = HTTParty.post(
       "#{MSP_GATEWAY_URL}/decodePayload",
@@ -195,11 +192,11 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
     # Parse the response - it should be JSON
     interactive_data = JSON.parse(response.body)
-    Rails.logger.info '[AMB IDR] Successfully decoded interactive data via /decodePayload'
-    Rails.logger.info "[AMB IDR] Decoded data keys: #{interactive_data.keys.inspect}"
+    # Rails.logger.info '[AMB IDR] Successfully decoded interactive data via /decodePayload'
+    # Rails.logger.info "[AMB IDR] Decoded data keys: #{interactive_data.keys.inspect}"
 
     # COMPREHENSIVE DEBUG: Log the entire structure
-    log_interactive_data_structure(interactive_data, 'decodePayload response')
+    # log_interactive_data_structure(interactive_data, 'decodePayload response')
 
     # Remove image bitmaps to keep payload manageable (per Python reference line 159)
     interactive_data.delete('images') if interactive_data.key?('images')
@@ -212,43 +209,43 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
   end
 
   def manual_decompress_and_parse(decrypted_data)
-    Rails.logger.info '[AMB IDR] Manually decompressing gzipped data'
-    Rails.logger.info "[AMB IDR] Encrypted data size: #{decrypted_data.bytesize} bytes"
+    # Rails.logger.info '[AMB IDR] Manually decompressing gzipped data'
+    # Rails.logger.info "[AMB IDR] Encrypted data size: #{decrypted_data.bytesize} bytes"
 
     # The decrypted data is gzip compressed, decompress it
     begin
       gz = Zlib::GzipReader.new(StringIO.new(decrypted_data))
       decompressed_data = gz.read
       gz.close
-      Rails.logger.info "[AMB IDR] Decompressed #{decompressed_data.bytesize} bytes of data"
+      # Rails.logger.info "[AMB IDR] Decompressed #{decompressed_data.bytesize} bytes of data"
     rescue Zlib::GzipFile::Error => e
       Rails.logger.warn "[AMB IDR] Data is not gzipped: #{e.message}, using as-is"
       decompressed_data = decrypted_data
     end
 
     # Log first bytes to identify format
-    Rails.logger.info "[AMB IDR] First 20 bytes: #{decompressed_data[0..19].inspect}"
+    # Rails.logger.info "[AMB IDR] First 20 bytes: #{decompressed_data[0..19].inspect}"
 
     # The decompressed data should be binary plist or JSON
     begin
       # Check if it's a binary plist (starts with 'bplist')
-      if decompressed_data.start_with?('bplist')
-        Rails.logger.info '[AMB IDR] Data is binary plist format, converting using plutil'
-        interactive_data = convert_binary_plist_to_hash(decompressed_data)
-        Rails.logger.info '[AMB IDR] Successfully parsed binary plist'
-      else
-        # Try parsing as JSON
-        interactive_data = JSON.parse(decompressed_data)
-        Rails.logger.info '[AMB IDR] Successfully parsed JSON'
-      end
+      interactive_data = if decompressed_data.start_with?('bplist')
+                           # Rails.logger.info '[AMB IDR] Data is binary plist format, converting using plutil'
+                           convert_binary_plist_to_hash(decompressed_data)
+                         # Rails.logger.info '[AMB IDR] Successfully parsed binary plist'
+                         else
+                           # Try parsing as JSON
+                           JSON.parse(decompressed_data)
+                           # Rails.logger.info '[AMB IDR] Successfully parsed JSON'
+                         end
 
       # Remove image bitmaps to keep payload manageable
       interactive_data.delete('images') if interactive_data.key?('images')
 
-      Rails.logger.info "[AMB IDR] Parsed data keys: #{interactive_data.keys.inspect}"
+      # Rails.logger.info "[AMB IDR] Parsed data keys: #{interactive_data.keys.inspect}"
 
       # COMPREHENSIVE DEBUG: Log the entire structure
-      log_interactive_data_structure(interactive_data, 'manual parse')
+      # log_interactive_data_structure(interactive_data, 'manual parse')
 
       interactive_data
     rescue JSON::ParserError => e
@@ -305,13 +302,13 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       end
     end
 
-    Rails.logger.info "[AMB IDR] Extracted plist keys: #{result.keys.inspect}"
+    # Rails.logger.info "[AMB IDR] Extracted plist keys: #{result.keys.inspect}"
 
     # For NSKeyedArchiver format, decode the structure to extract form data
     if result['$archiver'] == 'NSKeyedArchiver' && result['$objects'] && result['$top']
-      Rails.logger.info '[AMB IDR] Decoding NSKeyedArchiver structure for form data'
+      # Rails.logger.info '[AMB IDR] Decoding NSKeyedArchiver structure for form data'
       decoded = decode_nskeyedarchiver(result)
-      Rails.logger.info "[AMB IDR] Decoded NSKeyedArchiver keys: #{decoded.keys.inspect}"
+      # Rails.logger.info "[AMB IDR] Decoded NSKeyedArchiver keys: #{decoded.keys.inspect}"
       return decoded
     end
 
@@ -366,25 +363,25 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
     root_obj = resolve_uid(root_uid['CF$UID'], objects)
 
-    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object type: #{root_obj.class.name}"
-    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object keys: #{root_obj.keys.inspect}" if root_obj.is_a?(Hash)
-    Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object sample: #{root_obj.inspect[0..500]}"
+    # Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object type: #{root_obj.class.name}"
+    # Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object keys: #{root_obj.keys.inspect}" if root_obj.is_a?(Hash)
+    # Rails.logger.info "[AMB IDR] 🔍 DEBUG: Root object sample: #{root_obj.inspect[0..500]}"
 
     # Try to find NS.keys and NS.objects (NSKeyedArchiver dict format)
     if root_obj.is_a?(Hash) && root_obj['NS.keys'].is_a?(Array) && root_obj['NS.objects'].is_a?(Array)
-      Rails.logger.info '[AMB IDR] Found NS.keys/NS.objects structure, resolving dictionary'
+      # Rails.logger.info '[AMB IDR] Found NS.keys/NS.objects structure, resolving dictionary'
       resolved_dict = resolve_ns_dictionary(root_obj, objects)
-      Rails.logger.info "[AMB IDR] Resolved dictionary keys: #{resolved_dict.keys.inspect}"
+      # Rails.logger.info "[AMB IDR] Resolved dictionary keys: #{resolved_dict.keys.inspect}"
 
       # Fully resolve all nested CF$UID references in the dictionary
       fully_resolved = resolve_object_recursive(resolved_dict, objects, max_depth: 5)
-      Rails.logger.info "[AMB IDR] 🔍 DEBUG: Fully resolved dictionary keys: #{fully_resolved.keys.inspect}"
+      # Rails.logger.info "[AMB IDR] 🔍 DEBUG: Fully resolved dictionary keys: #{fully_resolved.keys.inspect}"
 
       # Check if URL field contains form data
       if fully_resolved.key?('URL')
         url_value = fully_resolved['URL']
-        Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value type: #{url_value.class.name}"
-        Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value: #{url_value.inspect[0..500]}"
+        # Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value type: #{url_value.class.name}"
+        # Rails.logger.info "[AMB IDR] 🔍 DEBUG: URL value: #{url_value.inspect[0..500]}"
 
         # Handle both string and dict formats
         url_string = if url_value.is_a?(String)
@@ -411,8 +408,8 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
       # Check if data field contains form data
       if fully_resolved.key?('data')
         data_value = fully_resolved['data']
-        Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value type: #{data_value.class.name}"
-        Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value: #{data_value.inspect[0..200]}"
+        # Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value type: #{data_value.class.name}"
+        # Rails.logger.info "[AMB IDR] 🔍 DEBUG: data value: #{data_value.inspect[0..200]}"
 
         if data_value.is_a?(String) && data_value.include?('?')
           # Data is a URL string - parse it for form data
@@ -526,13 +523,13 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     require 'base64'
     require 'json'
 
-    Rails.logger.info "[AMB IDR] 🔍 Parsing URL for form data: #{url_string[0..200]}"
+    # Rails.logger.info "[AMB IDR] 🔍 Parsing URL for form data: #{url_string[0..200]}"
 
     # Extract query parameters
     params = CGI.parse(url_string.sub(/^[^?]*\?/, ''))
 
-    Rails.logger.info "[AMB IDR] 🔍 URL params keys: #{params.keys.inspect}"
-    Rails.logger.info "[AMB IDR] 🔍 URL params: #{params.inspect[0..500]}"
+    # Rails.logger.info "[AMB IDR] 🔍 URL params keys: #{params.keys.inspect}"
+    # Rails.logger.info "[AMB IDR] 🔍 URL params: #{params.inspect[0..500]}"
 
     # Look for form data in various possible parameters
     form_selections = []
@@ -552,7 +549,7 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
 
         # Try to parse as JSON
         parsed = JSON.parse(decoded)
-        Rails.logger.info "[AMB IDR] 🔍 Decoded #{param_key}: #{parsed.inspect[0..500]}"
+        # Rails.logger.info "[AMB IDR] 🔍 Decoded #{param_key}: #{parsed.inspect[0..500]}"
 
         # Extract selections if present
         if parsed.is_a?(Hash)
@@ -570,8 +567,8 @@ class AppleMessagesForBusiness::InteractiveDataReferenceService
     end
 
     if form_selections.any?
-      Rails.logger.info "[AMB IDR] ✅ Extracted #{form_selections.length} form selections from URL"
-      Rails.logger.info "[AMB IDR] 🔍 Form selections: #{form_selections.inspect}"
+      # Rails.logger.info "[AMB IDR] ✅ Extracted #{form_selections.length} form selections from URL"
+      # Rails.logger.info "[AMB IDR] 🔍 Form selections: #{form_selections.inspect}"
 
       # Return form data in the expected format
       {

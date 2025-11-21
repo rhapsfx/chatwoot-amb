@@ -1,6 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# DEPRECATED: This script is deprecated as of November 2025
+# Use SharedAppleImage model for account-wide images instead
+#
+# New approach:
+#   SharedAppleImage.create!(
+#     account_id: 1,
+#     identifier: 'apple_store_logo',
+#     image_type: 'branding',
+#     description: 'Apple Store logo for store selection',
+#     image: File.open('_apple/Acoustic-House-Bot-origin/acoustichouse/images/apple.jpg')
+#   )
+#
+# Or use the migration scripts:
+#   rails runner script/migrate_branding_images_to_shared.rb --execute
+#
+# This script remains for backwards compatibility only.
+# Will be removed in: Q2 2026
+#
+# See: docs/apple-messages/DEPRECATION_TIMELINE.md
+
 # Script to upload Apple Store logo to all Apple Messages for Business inboxes
 # This adds the 'apple_store_logo' image identifier used in store selection list picker
 

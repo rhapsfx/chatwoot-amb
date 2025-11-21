@@ -1,6 +1,29 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# DEPRECATED: This script is deprecated as of November 2025
+# Use SharedAppleImage model for account-wide images instead
+#
+# New approach:
+#   SharedAppleImage.create!(
+#     account_id: 1,
+#     identifier: '0',
+#     image_type: 'template',
+#     description: 'Guitar image',
+#     image: File.open('path/to/image.jpg')
+#   )
+#
+# SharedAppleImage is automatically available to ALL inboxes,
+# so no need to manually copy images between inboxes.
+#
+# Or use the migration scripts:
+#   rails runner script/migrate_branding_images_to_shared.rb --execute
+#
+# This script remains for backwards compatibility only.
+# Will be removed in: Q2 2026
+#
+# See: docs/apple-messages/DEPRECATION_TIMELINE.md
+
 # Script to copy missing image identifier "0" from inbox 5 to inbox 4
 # Usage: rails runner script/copy_missing_guitar_image.rb
 

@@ -2,6 +2,39 @@
 
 This directory contains all documentation, scripts, and data files related to the Apple Messages for Business (AMB) integration in Chatwoot.
 
+## IMPORTANT: Image Architecture Migration (November 2025)
+
+**NEW ARCHITECTURE**: Chatwoot now supports a two-tier image architecture:
+- **SharedAppleImage** - Account-wide images (system, branding, template)
+- **AppleListPickerImage** - Inbox-specific images (custom, overrides)
+
+**OLD SCRIPTS DEPRECATED**: Scripts that hardcode `inbox_id` for system/branding images are deprecated and will be removed in Q2 2026.
+
+**Migration Path**:
+- See `DEPRECATION_TIMELINE.md` for deprecation schedule
+- See `IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md` for technical details
+- Use `SharedAppleImage.create!` for new image uploads
+- Run migration scripts: `migrate_system_images_to_shared.rb`, `migrate_branding_images_to_shared.rb`
+
+**Quick Example**:
+```ruby
+# OLD (DEPRECATED)
+AppleListPickerImage.create!(
+  inbox_id: 5,  # Hardcoded - BAD!
+  identifier: 'messages_png',
+  image: File.open('Messages.png')
+)
+
+# NEW (RECOMMENDED)
+SharedAppleImage.create!(
+  account_id: 1,
+  identifier: 'messages_png',
+  image_type: 'system',
+  description: 'Messages app icon',
+  image: File.open('Messages.png')
+)
+```
+
 ## Directory Structure
 
 ```

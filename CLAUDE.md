@@ -230,6 +230,202 @@ ruby test_case_transformer.rb
 
 ---
 
+### Template Data Access & Image Loading Architecture
+
+**Status**: ✅ **Active** (Deployed Jan 2025)
+
+#### TemplateFacade - Unified Template Interface
+
+**Purpose**: Single entry point for all template data access, automatically routing to optimal storage strategy.
+
+**Location**: `app/services/apple_messages_for_business/template_facade.rb`
+
+**Key Concept**: Templates can store data in two ways:
+- **Metadata storage**: For simple templates (≤2 blocks) - stored in `message_templates.metadata`
+- **Content blocks storage**: For complex templates (>2 blocks) - stored in separate `content_blocks` table
+
+**Critical Methods**:
+
+```ruby
+# Initialize facade for a template
+facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+
+# Load template data (snake_case, NO images)
+data = facade.load_data(block_type)
+
+# Load template data WITH images (for bot sends) ✅ RECOMMENDED FOR BOTS
+data_with_images = facade.load_data_with_images(block_type)
+
+# Save template data
+facade.save_data(block_type, properties)
+
+# Get all blocks
+all_blocks = facade.all_blocks
+
+# Get image identifiers
+identifiers = facade.image_identifiers
+```
+
+**When to Use Each Method**:
+
+- **`load_data`**: Template editing, UI display (images loaded separately)
+- **`load_data_with_images`**: Bot sends, automated messages (images embedded in response)
+
+**Example - Bot Service Using Facade**:
+
+```ruby
+class AcousticHouseBotService
+  def send_list_picker_to_customer
+    # Load template with images automatically included
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    data = facade.load_data_with_images('list_picker')
+
+    # Data now contains 'images' array with base64-encoded images
+    # Ready to send to Apple MSP
+    send_to_apple_msp(data)
+  end
+end
+```
+
+**Storage Strategy Selection** (automatic):
+1. Check explicit preference: `template.metadata['storage_strategy']`
+2. Check existing data: Use format where data exists
+3. Default: Metadata for new templates
+
+#### ImageFetchService - Three-Tier Image Resolution
+
+**Purpose**: Fetch images with automatic fallback across three storage tiers.
+
+**Location**: `app/services/apple_messages_for_business/image_fetch_service.rb`
+
+**Three-Tier Fallback Priority**:
+1. **Tier 1**: Inbox-specific images (AppleListPickerImage) - Highest priority
+2. **Tier 2**: Account-wide shared images (SharedAppleImage) - Fallback
+3. **Tier 3**: Embedded template images (content_attributes['images']) - Final fallback
+
+**Usage Pattern**:
+
+```ruby
+# Initialize service
+service = AppleMessagesForBusiness::ImageFetchService.new(
+  account_id: account.id,
+  inbox_id: inbox.id,           # Can be nil for bot sends
+  embedded_images: template_images  # Optional: images from template
+)
+
+# Fetch and encode images
+identifiers = ['messages_png', 'menu_icon', 'custom_logo']
+images = service.fetch_and_encode(identifiers)
+
+# Returns array of hashes:
+# [
+#   { identifier: 'messages_png', data: 'base64...', description: '...', source: 'shared_system' },
+#   { identifier: 'menu_icon', data: 'base64...', description: '...', source: 'inbox' },
+#   { identifier: 'custom_logo', data: 'base64...', description: '...', source: 'embedded' }
+# ]
+```
+
+**Bot Service Pattern** (No Specific Inbox):
+
+```ruby
+# Bot sends to any inbox - use nil for inbox_id
+service = AppleMessagesForBusiness::ImageFetchService.new(
+  account_id: template.account_id,
+  inbox_id: nil,                    # Bot doesn't target specific inbox
+  embedded_images: []
+)
+
+# Service automatically falls back to shared images
+images = service.fetch_and_encode(['messages_png', 'menu_icon'])
+# Will find images in SharedAppleImage (account-wide)
+```
+
+**Integration Points**:
+
+✅ Used by TemplateFacade's `load_data_with_images` method
+✅ Used by SendListPickerService
+✅ Used by SendTimePickerService
+✅ Used by FormService
+✅ Used by AcousticHouseBotService
+
+**Logging**:
+
+ImageFetchService provides comprehensive logging:
+- `[ImageFetch] Looking for N images` - Start of fetch
+- `[ImageFetch] ✅ Found in inbox/shared/embedded` - Success per tier
+- `[ImageFetch] ⚠️ Image not found: identifier` - Missing image warning
+- `[ImageFetch] Found N/M images` - Final summary
+
+**Best Practices**:
+
+1. **For User Sends** (known inbox):
+   ```ruby
+   ImageFetchService.new(
+     account_id: message.account_id,
+     inbox_id: message.inbox_id,
+     embedded_images: content_attributes['images']
+   )
+   ```
+
+2. **For Bot Sends** (any inbox):
+   ```ruby
+   ImageFetchService.new(
+     account_id: template.account_id,
+     inbox_id: nil,  # No specific inbox
+     embedded_images: []
+   )
+   ```
+
+3. **Always provide embedded_images** from template/message if available:
+   ```ruby
+   embedded_images: content_attributes['images'] || []
+   ```
+
+**Error Handling**:
+
+- Missing images are logged but don't raise errors
+- Returns empty array if no images found
+- Continues processing remaining images if one fails
+
+#### Architecture Integration
+
+**Complete Data Flow for Bot Sends**:
+
+```
+1. Bot Trigger
+   ↓
+2. TemplateFacade.new(template)
+   ↓
+3. facade.load_data_with_images('list_picker')
+   ↓
+4. ImageFetchService.new(account_id, nil, [])
+   ↓
+5. Three-tier fallback: inbox(nil) → shared(✅) → embedded
+   ↓
+6. Images base64-encoded and added to data
+   ↓
+7. CaseTransformer.to_apple_format(data)
+   ↓
+8. Send to Apple MSP
+```
+
+**Key Architectural Benefits**:
+
+- ✅ **Single entry point**: TemplateFacade for all template access
+- ✅ **Automatic storage**: Facades routes to optimal storage
+- ✅ **Automatic images**: Bot services get images without explicit code
+- ✅ **Flexible fallback**: Works with or without specific inbox
+- ✅ **Clean separation**: Template storage vs image storage vs case conversion
+
+**Documentation**:
+
+- Complete architecture: `docs/apple-messages/IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md`
+- Migration guide: `docs/apple-messages/IMAGE_MIGRATION_GUIDE.md`
+- TemplateFacade code: `app/services/apple_messages_for_business/template_facade.rb` (lines 1-148)
+- ImageFetchService code: Referenced in IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md (lines 386-497)
+
+---
+
 ### List Picker with Images
 
 **Current Implementation**: Uses CaseTransformer for all case conversions.
@@ -317,6 +513,162 @@ end
 - Service: `app/services/apple_messages_for_business/form_service.rb`
 - Frontend Modal: `app/javascript/dashboard/components-next/message/modals/AppleFormBuilder.vue`
 - Frontend Composer: `app/javascript/dashboard/components/widgets/conversation/ReplyBox/AppleMessagesComposer.vue`
+
+### Image Architecture
+
+See **Apple Messages Image Architecture - Two-Tier System** section below for complete documentation on the hybrid image storage system.
+
+## Apple Messages Image Architecture - Two-Tier System
+
+**Status**: ✅ **Phase 5 Complete** (Deployed Jan 2025)
+
+### System Overview
+
+The Apple Messages image system uses a **two-tier hybrid architecture** to solve the inbox-scoping issue where shared images must be manually replicated across inboxes.
+
+**Architecture**:
+```
+TIER 1: Inbox-Specific Images (AppleListPickerImage)
+  ├── Local images uploaded for specific inbox
+  └── Can override shared images
+
+TIER 2: Account-Wide Shared Images (SharedAppleImage)
+  ├── system: System icons (messages_png, calendar icons)
+  ├── branding: Company branding (logos, store icons)
+  └── template: Reusable template images
+```
+
+### Three-Tier Fallback
+
+When fetching images, the system follows this priority:
+
+1. **Inbox-specific** (AppleListPickerImage) - Highest priority
+2. **Account-wide shared** (SharedAppleImage) - Fallback
+3. **Embedded template** (content_attributes['images']) - Final fallback
+
+**Implementation**: `AppleMessagesForBusiness::ImageFetchService`
+
+### Models
+
+**SharedAppleImage** (Account-scoped):
+- `account_id` - Belongs to Account
+- `identifier` - Unique identifier (snake_case)
+- `image_type` - 'system', 'branding', or 'template'
+- `description` - Human-readable description
+- `original_name` - Original filename
+- `metadata` - JSONB for additional data
+- `image` - ActiveStorage attachment
+
+**AppleListPickerImage** (Inbox-scoped):
+- Existing model, now with `shared_override` boolean
+- `shared_override: true` - Indicates inbox-specific override of shared image
+- `shared_override: false/nil` - Truly inbox-specific image
+
+### API Endpoints
+
+**Base URL**: `/api/v1/accounts/:account_id/shared_apple_images`
+
+**Endpoints**:
+- `GET /` - List all shared images (paginated)
+- `GET /system_images` - Filter by system type
+- `GET /branding_images` - Filter by branding type
+- `GET /template_images` - Filter by template type
+- `POST /` - Create new shared image
+- `GET /:id` - Show specific image
+- `PATCH /:id` - Update image
+- `DELETE /:id` - Delete image
+- `POST /:id/upload` - Upload image file
+- `DELETE /:id/remove_image` - Remove image attachment
+
+### Frontend Integration
+
+**Components**:
+- `SharedImageSelector.vue` - Reusable image selector component
+- `useSharedAppleImages.js` - Composable for API integration
+
+**Integrated Into**:
+- ✅ List Picker Editor (ListPickerBlockEditor.vue)
+- ✅ Time Picker Modal (EnhancedTimePickerModal.vue)
+- ✅ Forms Editor (AppleFormBuilder.vue)
+
+**Usage Pattern**:
+```vue
+<SharedImageSelector
+  v-model="imageIdentifier"
+  :account-id="currentAccountId"
+  image-type="system"
+  @image-selected="handleImageSelected"
+/>
+```
+
+### Migration Scripts
+
+**Available Scripts** (in `script/` directory):
+- `audit_image_usage.rb` - Analyze current image usage
+- `migrate_system_images_to_shared.rb` - Migrate system images (messages_png, etc.)
+- `migrate_branding_images_to_shared.rb` - Migrate branding images
+- `verify_image_migration.rb` - Verify migration success
+
+**Usage**:
+```bash
+# Dry run (default)
+rails runner script/migrate_system_images_to_shared.rb
+
+# Execute migration
+rails runner script/migrate_system_images_to_shared.rb --execute
+
+# Verify
+rails runner script/verify_image_migration.rb
+```
+
+### Best Practices
+
+**When to Use Shared Images**:
+- ✅ System icons (messages app icon, calendar icons)
+- ✅ Company branding (logos, store identifiers)
+- ✅ Reusable template images (form headers, menu icons)
+
+**When to Use Inbox-Specific Images**:
+- ✅ Custom inbox branding
+- ✅ Temporary campaign images
+- ✅ Inbox-specific overrides of shared images
+
+**Storage Recommendations**:
+1. Upload system images once per account → `image_type: 'system'`
+2. Upload company branding once per account → `image_type: 'branding'`
+3. Use inbox-specific only for true customization
+
+### Case Convention
+
+**Critical**: All image identifiers are stored in **snake_case** internally.
+
+**Data Flow**:
+```
+Frontend (camelCase)
+  → API Controller (auto-normalizes to snake_case)
+  → Database (snake_case storage)
+  → ImageFetchService (queries snake_case)
+  → CaseTransformer (converts to camelCase for Apple MSP)
+  → Apple MSP API (camelCase)
+```
+
+### Documentation
+
+**Complete Documentation**:
+- `docs/apple-messages/IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md` - Complete architecture plan
+- `docs/apple-messages/IMAGE_MIGRATION_GUIDE.md` - Migration guide for existing installations
+- `docs/apple-messages/SHARED_IMAGES_USAGE.md` - User guide for shared images
+- `docs/api/shared_apple_images_api.md` - API documentation
+
+### Deployment
+
+The image architecture is deployed via standard deployment scripts:
+- `./script/deploy-backend-changes-safe.sh` - Deploys models, services, controllers
+- Frontend assets deployed via Vite build
+
+**Database Migrations**:
+- `20251119122654_create_shared_apple_images.rb` - Creates SharedAppleImage table
+- `20251119122704_add_shared_override_to_apple_list_picker_images.rb` - Adds shared_override column
 
 ## Database Access - CRITICAL
 

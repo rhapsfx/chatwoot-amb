@@ -1,6 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# DEPRECATED: This script is deprecated as of November 2025
+# Use SharedAppleImage model for account-wide images instead
+#
+# New approach:
+#   SharedAppleImage.create!(
+#     account_id: 1,
+#     identifier: 'time_picker_lesson',
+#     image_type: 'template',
+#     description: 'Time Picker - Guitar Lesson Scheduling',
+#     image: File.open('_apple/Acoustic-House-Bot-origin/acoustichouse/images/time_picker.png')
+#   )
+#
+# Or use the migration scripts:
+#   rails runner script/migrate_branding_images_to_shared.rb --execute
+#
+# This script remains for backwards compatibility only.
+# Will be removed in: Q2 2026
+#
+# See: docs/apple-messages/DEPRECATION_TIMELINE.md
+
 # Script to upload time_picker.png to ActiveStorage for Apple Messages for Business
 # Usage: rails runner script/upload_time_picker_image.rb
 

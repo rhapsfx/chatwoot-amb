@@ -438,3 +438,21 @@ en:
       subject: 'Finish setting up %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Custom domain is not configured'
+  apple_messages:
+    shared_images:
+      tabs:
+        system: 'System'
+        branding: 'Branding'
+        template: 'Template'
+      upload: 'Upload Image'
+      search_placeholder: 'Search by identifier or description...'
+      loading: 'Loading images...'
+      error: 'Failed to load images'
+      retry: 'Retry'
+      empty_state: 'No images available'
+      empty_state_hint: 'Upload images to get started'
+      delete: 'Delete'
+      confirm_delete: 'Are you sure you want to delete this image?'
+      image_count: '%{count} images'
+      errors:
+        file_too_large: 'Image file size must be less than 5MB'

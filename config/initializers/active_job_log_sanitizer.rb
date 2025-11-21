@@ -9,8 +9,19 @@ class NilFilteringLogDevice
   end
 
   def write(message)
+    return unless message.is_a?(String)
+
     # Filter out standalone "nil" lines completely
-    return if message.is_a?(String) && (message.strip == 'nil' || message == "nil\n")
+    return if message.strip == 'nil' || message == "nil\n"
+
+    # Filter out Vue compiler warnings about ::v-deep deprecation
+    # Check for the warning text with or without ANSI color codes
+    return if message.include?('::v-deep usage as a combinator has been deprecated')
+
+    # Also filter lines that only contain ANSI color codes and whitespace
+    # (leftover formatting from filtered messages)
+    clean_msg = message.gsub(/\e\[[0-9;]*m/, '').strip
+    return if clean_msg.empty?
 
     @log_device.write(message)
   end
@@ -35,11 +46,25 @@ end
 
 module RailsLoggerJobSuppressor
   def suppress_if_needed(message)
+    # CRITICAL: Filter out nil values BEFORE they get formatted
+    # This prevents "nil" from appearing in logs
+    return nil if message.nil?
+
     return message unless message.is_a?(String)
+
+    # Ensure UTF-8 encoding to prevent mojibake (garbled text)
+    # This fixes emoji and special characters in log messages
+    message = message.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
 
     # Filter out "nil" lines completely (from puts statements or return values)
     # Check for standalone "nil" or "nil" with whitespace
-    return '' if message.strip == 'nil' || message == 'nil'
+    return nil if message.strip == 'nil' || message == 'nil'
+
+    # Filter out Vue compiler warnings about ::v-deep deprecation
+    # These are repetitive warnings that clutter the logs
+    if (message.include?('[@vue/compiler-sfc]') || message.include?('@vue/compiler-sfc')) && message.include?('::v-deep usage as a combinator has been deprecated')
+      return nil
+    end
 
     # Check if this is a verbose job log
     if (message.include?('ActionCableBroadcastJob') || message.include?('EventDispatcherJob')) &&
@@ -48,10 +73,23 @@ module RailsLoggerJobSuppressor
       return message.split('with arguments:').first + 'with arguments: [SUPPRESSED]'
     end
 
-    # Check if this is ContentAttributeValidator with base64 data
+    # Sanitize base64 data in various contexts
+    # Pattern 1: ContentAttributeValidator with base64 data
     if message.include?('ContentAttributeValidator') && message.include?('"data"=>')
-      # Truncate base64 data in the message
       message = message.gsub(/"data"=>"[^"]{100,}"/, '"data"=>"[BASE64 TRUNCATED]"')
+    end
+
+    # Pattern 2: Parameters with base64 data (more aggressive)
+    # This handles cases like: "data"=>"[BASE64 DATA FILTERED - 499.32 KB - preview: iVBORw0K...]"
+    if message.include?('Parameters:') || message.include?('"data"=>')
+      # Remove long base64 strings (anything that looks like base64 data > 100 chars)
+      message = message.gsub(/("data"=>"[^"]{100,}")/, '"data"=>"[BASE64 TRUNCATED]"')
+
+      # Also handle the preview field with base64
+      message = message.gsub(%r{("preview"=>"data:image/[^;]+;base64,[^"]{50,}")}, '"preview"=>"[BASE64 IMAGE]"')
+
+      # Handle already filtered base64 with preview
+      message = message.gsub(/\[BASE64 DATA FILTERED - [\d.]+ [KMG]B - preview: [^\]]{50,}\]/, '[BASE64 DATA FILTERED]')
     end
 
     message
@@ -62,8 +100,8 @@ module RailsLoggerJobSuppressor
     define_method(level) do |message = nil, &block|
       msg = block_given? ? block.call : message
       suppressed = suppress_if_needed(msg)
-      # Skip logging entirely if message was filtered out
-      return if suppressed == ''
+      # Skip logging entirely if message was filtered out (nil or empty)
+      return if suppressed.nil?
 
       super(suppressed)
     end
@@ -73,8 +111,8 @@ module RailsLoggerJobSuppressor
   def add(severity, message = nil, progname = nil)
     msg = block_given? ? yield : message
     suppressed = suppress_if_needed(msg)
-    # Skip logging entirely if message was filtered out
-    return if suppressed == ''
+    # Skip logging entirely if message was filtered out (nil or empty)
+    return if suppressed.nil?
 
     super(severity, suppressed, progname)
   end
@@ -82,8 +120,8 @@ module RailsLoggerJobSuppressor
   # Override << method
   def <<(msg)
     suppressed = suppress_if_needed(msg)
-    # Skip logging entirely if message was filtered out
-    return if suppressed == ''
+    # Skip logging entirely if message was filtered out (nil or empty)
+    return if suppressed.nil?
 
     super(suppressed)
   end

@@ -1,9 +1,10 @@
 class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness::SendMessageService
-  def perform
+  # Override to add image saving before sending
+  def perform_send
     # Save images before sending
     save_images_to_storage
 
-    # Call parent perform
+    # Call parent perform_send
     super
   end
 
@@ -89,12 +90,25 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
     # Performance Optimization: Batch fetch all existing images to avoid N+1 queries
     # This replaces multiple find_by_identifier calls with a single WHERE IN query
     image_identifiers = images.filter_map { |img| img['identifier'] }.uniq
+
+    # Check SharedAppleImage first - don't create inbox-specific duplicates
+    shared_images = SharedAppleImage
+                    .where(account_id: message.account_id, identifier: image_identifiers)
+                    .pluck(:identifier)
+
+    if shared_images.any?
+      Rails.logger.info "[AMB ListPicker] Found #{shared_images.length} images in SharedAppleImage - skipping inbox-specific storage"
+      Rails.logger.info "[AMB ListPicker] Shared identifiers: #{shared_images.join(', ')}"
+    end
+
+    # Only fetch inbox-specific images for identifiers NOT in SharedAppleImage
+    inbox_only_identifiers = image_identifiers - shared_images
     existing_images = AppleListPickerImage
-                      .where(inbox_id: message.inbox_id, identifier: image_identifiers)
+                      .where(inbox_id: message.inbox_id, identifier: inbox_only_identifiers)
                       .includes(image_attachment: :blob)
                       .index_by(&:identifier)
 
-    Rails.logger.info "[AMB ListPicker] Batch loaded #{existing_images.size} existing images (avoiding N+1 queries)"
+    Rails.logger.info "[AMB ListPicker] Batch loaded #{existing_images.size} existing inbox-specific images (avoiding N+1 queries)"
 
     # Performance Optimization: Process images in batches to control memory usage
     # and provide better progress tracking for large image sets
@@ -113,6 +127,13 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
         # Skip invalid images
         unless image_data['identifier'].present? && image_data['data'].present?
           Rails.logger.warn '[AMB ListPicker] Skipping image with missing identifier or data'
+          skipped_count += 1
+          next
+        end
+
+        # Skip images that exist in SharedAppleImage - they'll be fetched from there
+        if shared_images.include?(image_data['identifier'])
+          Rails.logger.info "[AMB ListPicker] Image #{image_data['identifier']} exists in SharedAppleImage, skipping inbox-specific storage"
           skipped_count += 1
           next
         end

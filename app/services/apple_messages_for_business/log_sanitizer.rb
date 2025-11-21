@@ -39,22 +39,26 @@ module AppleMessagesForBusiness
     def self.looks_like_base64?(value, key)
       return false if value.length < 200 # Short strings are probably not base64 images
 
-      # Check if key suggests it's data
-      data_key = key.to_s.match?(/data|image|base64/i)
+      # Check if key suggests it's data (including just "data" which is common in images arrays)
+      data_key = key.to_s.match?(/\A(data|image|base64)\z/i) || key.to_s.match?(/data|image|base64/i)
 
       # Check if value looks like base64 (only contains base64 chars and is long)
+      # Base64 typically starts with common image headers like iVBOR (PNG), /9j/ (JPEG), R0lGOD (GIF)
       base64_pattern = value.length > 200 && value.match?(%r{\A[A-Za-z0-9+/]+=*\z})
 
-      data_key && base64_pattern
+      # Extra check: if it starts with common image base64 prefixes
+      image_prefix = value.match?(%r{\A(iVBORw0KGgo|/9j/|R0lGOD|UklGR)})
+
+      (data_key && base64_pattern) || image_prefix
     end
 
     # Truncate base64 string with indication of original length
     # @param value [String] The base64 string to truncate
     # @param max_length [Integer] Maximum length to show
     # @return [String] Truncated string with metadata
-    def self.truncate_base64(value, max_length)
+    def self.truncate_base64(value, _max_length)
       original_kb = (value.length / 1024.0).round(2)
-      "#{value[0...max_length]}... [base64 data truncated, original: #{original_kb} KB]"
+      "[BASE64 #{original_kb}KB]"
     end
   end
 end

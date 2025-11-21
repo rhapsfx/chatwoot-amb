@@ -45,9 +45,14 @@ module ParameterFilterHelper
       # Recurse into array items
       value.map do |item|
         if item.is_a?(Hash)
+          # Process each key-value pair in the hash
           item.each_with_object({}) do |(nested_key, nested_value), result|
             result[nested_key] = filter_value(nested_key, nested_value)
           end
+        elsif item.is_a?(String)
+          # Check if the array item itself should be truncated
+          # This handles cases where the key applies to array items
+          should_truncate?(key, item) ? truncate(key, item) : item
         else
           item
         end
@@ -62,5 +67,24 @@ end
 
 # Apply recursive filtering for nested data structures
 Rails.application.config.filter_parameters << lambda do |key, value|
-  ParameterFilterHelper.filter_value(key, value)
+  if value.is_a?(Hash)
+    value.each do |nested_key, nested_value|
+      value[nested_key] = ParameterFilterHelper.filter_value(nested_key, nested_value)
+    end
+  elsif value.is_a?(Array)
+    value.map! do |item|
+      if item.is_a?(Hash)
+        item.each do |nested_key, nested_value|
+          item[nested_key] = ParameterFilterHelper.filter_value(nested_key, nested_value)
+        end
+        item
+      elsif item.is_a?(String)
+        ParameterFilterHelper.should_truncate?(key, item) ? ParameterFilterHelper.truncate(key, item) : item
+      else
+        item
+      end
+    end
+  elsif value.is_a?(String) && ParameterFilterHelper.should_truncate?(key, value)
+    value.replace(ParameterFilterHelper.truncate(key, value))
+  end
 end

@@ -1,5 +1,28 @@
 # frozen_string_literal: true
 
+# DEPRECATED: This script is deprecated as of November 2025
+# Use SharedAppleImage model for account-wide images instead
+#
+# New approach:
+#   SharedAppleImage.create!(
+#     account_id: 1,
+#     identifier: 'messages_png',
+#     image_type: 'system',
+#     description: 'Messages app icon',
+#     image: File.open('path/to/Messages.png')
+#   )
+#
+# SharedAppleImage is automatically available to ALL inboxes,
+# so no need to manually replicate images.
+#
+# Or use the migration scripts:
+#   rails runner script/migrate_system_images_to_shared.rb --execute
+#
+# This script remains for backwards compatibility only.
+# Will be removed in: Q2 2026
+#
+# See: docs/apple-messages/DEPRECATION_TIMELINE.md
+
 # Ensure shared images (like messages_png) exist in ALL active Apple Messages inboxes
 # Run with: rails runner script/ensure_shared_images_in_all_inboxes.rb
 

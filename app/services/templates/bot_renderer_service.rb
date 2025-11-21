@@ -224,51 +224,52 @@ class Templates::BotRendererService
 
   # Load images from ActiveStorage and add them to content_attributes
   def load_images_from_storage(attrs)
+    Rails.logger.info "[BotRenderer load_images_from_storage] Starting - Template ID: #{template.id}"
+    Rails.logger.debug { "[BotRenderer load_images_from_storage] Attrs keys: #{attrs.keys.inspect}" }
+    Rails.logger.debug { "[BotRenderer load_images_from_storage] Has pages: #{attrs['pages'].present?}" }
+    Rails.logger.debug { "[BotRenderer load_images_from_storage] Pages count: #{attrs['pages']&.length || 0}" }
+
     # Collect all image identifiers referenced in the template
     image_identifiers = collect_image_identifiers(attrs)
-    return attrs if image_identifiers.empty?
+    Rails.logger.info "[BotRenderer load_images_from_storage] Collected #{image_identifiers.length} identifiers: #{image_identifiers.inspect}"
 
-    # Load images from ActiveStorage (use distinct to avoid duplicates)
-    images = AppleListPickerImage
-             .where(account_id: template.account_id, identifier: image_identifiers)
-             .includes(image_attachment: :blob)
-             .group_by(&:identifier)
-             .transform_values(&:first) # Take first record for each identifier
-
-    return attrs if images.empty?
-
-    # Convert images to base64 format, maintaining order of identifiers
-    images_array = image_identifiers.filter_map do |identifier|
-      img = images[identifier]
-      next unless img&.image&.attached?
-
-      begin
-        # Read the image data and encode to base64
-        image_data = img.image.download
-        base64_data = Base64.strict_encode64(image_data)
-
-        {
-          'identifier' => img.identifier,
-          'data' => base64_data,
-          'description' => img.description
-        }.compact
-      rescue StandardError => e
-        Rails.logger.error "[BotRendererService] Failed to load image #{img.identifier}: #{e.message}"
-        nil
-      end
+    if image_identifiers.empty?
+      Rails.logger.warn '[BotRenderer load_images_from_storage] No image identifiers found, returning attrs unchanged'
+      return attrs
     end
 
-    # Add images to content_attributes
-    attrs['images'] = images_array unless images_array.empty?
+    # Use ImageFetchService for three-tier fallback (inbox → shared → embedded)
+    # This ensures we find images in SharedAppleImage (account-wide) as well as inbox-specific images
+    Rails.logger.info "[BotRenderer load_images_from_storage] Calling ImageFetchService with account_id: #{template.account_id}, inbox_id: nil"
+    images_array = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: template.account_id,
+      inbox_id: nil, # Bot/API renders aren't tied to specific inbox
+      embedded_images: attrs['images'] || [] # Pass any embedded images as tier-3 fallback
+    ).fetch_and_encode(image_identifiers)
+
+    Rails.logger.info "[BotRenderer load_images_from_storage] ImageFetchService returned #{images_array.length} images"
+    Rails.logger.debug { "[BotRenderer load_images_from_storage] Images: #{images_array.map { |img| img[:identifier] }.inspect}" }
+
+    # Add images to content_attributes (ImageFetchService returns array of hashes with string keys)
+    if images_array.empty?
+      Rails.logger.warn '[BotRenderer load_images_from_storage] No images returned by ImageFetchService'
+    else
+      attrs['images'] = images_array
+      Rails.logger.info "[BotRenderer load_images_from_storage] Added #{images_array.length} images to attrs"
+    end
+
     attrs
   end
 
   # Collect all image identifiers from all interactive message types
   def collect_image_identifiers(attrs)
     identifiers = []
+    Rails.logger.info '[BotRenderer collect_image_identifiers] Starting collection'
+    Rails.logger.debug { "[BotRenderer collect_image_identifiers] Attrs structure: #{attrs.keys.inspect}" }
 
     # 1. LIST PICKERS: Collect from sections items
     sections = attrs['sections'] || []
+    Rails.logger.debug { "[BotRenderer collect_image_identifiers] Found #{sections.length} sections (list picker)" } if sections.any?
     sections.each do |section|
       items = section['items'] || []
       items.each do |item|
@@ -278,17 +279,37 @@ class Templates::BotRendererService
 
     # 2. FORMS: Collect from form pages
     pages = attrs['pages'] || []
-    pages.each do |page|
+    Rails.logger.info "[BotRenderer collect_image_identifiers] Found #{pages.length} pages (forms)"
+
+    pages.each_with_index do |page, page_idx|
       items = page['items'] || []
-      items.each do |item|
+      Rails.logger.debug { "[BotRenderer collect_image_identifiers] Page #{page_idx} has #{items.length} items" }
+
+      items.each_with_index do |item, item_idx|
+        item_type = item['item_type']
+        Rails.logger.debug { "[BotRenderer collect_image_identifiers] Page #{page_idx}, Item #{item_idx} type: #{item_type}" }
+
         # Only singleSelect and multiSelect items have options with images
-        next unless %w[singleSelect multiSelect].include?(item['item_type'])
+        next unless %w[singleSelect multiSelect].include?(item_type)
 
         options = item['options'] || []
-        options.each do |option|
+        Rails.logger.debug do
+          "[BotRenderer collect_image_identifiers] Page #{page_idx}, Item #{item_idx} (#{item_type}) has #{options.length} options"
+        end
+
+        options.each_with_index do |option, opt_idx|
           # Support both camelCase and snake_case
           image_id = option['imageIdentifier'] || option['image_identifier']
-          identifiers << image_id if image_id.present?
+          Rails.logger.debug do
+            "[BotRenderer collect_image_identifiers] Page #{page_idx}, Item #{item_idx}, Option #{opt_idx}: image_id=#{image_id.inspect}"
+          end
+
+          if image_id.present?
+            identifiers << image_id
+            Rails.logger.debug { "[BotRenderer collect_image_identifiers] ✅ Added identifier: #{image_id}" }
+          else
+            Rails.logger.debug '[BotRenderer collect_image_identifiers] ⚠️  No image_id for this option'
+          end
         end
       end
     end
@@ -341,7 +362,11 @@ class Templates::BotRendererService
       end
     end
 
-    identifiers.compact.uniq
+    unique_identifiers = identifiers.compact.uniq
+    Rails.logger.info "[BotRenderer collect_image_identifiers] Collection complete: #{unique_identifiers.length} unique identifiers"
+    Rails.logger.debug { "[BotRenderer collect_image_identifiers] Final identifiers: #{unique_identifiers.inspect}" }
+
+    unique_identifiers
   end
 
   # Filter parameters to only allow valid root-level keys for the content type
