@@ -39,6 +39,7 @@ import { zonedTimeToUtc } from 'date-fns-tz';
 import EnhancedTimePickerModal from 'dashboard/components-next/message/modals/EnhancedTimePickerModal.vue';
 import AppleFormBuilder from 'dashboard/components-next/message/modals/AppleFormBuilder.vue';
 import SaveAsTemplateModal from 'dashboard/components-next/message/modals/SaveAsTemplateModal.vue';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
 // Phase 1: Migrating to new apple_amb_images endpoint
 import AppleMessagesImagesAPI from 'dashboard/api/appleAmbMessagesImages';
 // Old import (kept commented for Phase 1 rollback capability):
@@ -65,6 +66,10 @@ watch(activeTab, newTab => {
 const savedImages = ref([]);
 const loadingSavedImages = ref(false);
 
+// Image source toggle state for List Picker and Time Picker
+const listPickerHeaderImageSource = ref('inline'); // 'inline' or 'shared'
+const timePickerImageSource = ref('inline'); // 'inline' or 'shared'
+
 // Form Builder State
 const showFormBuilder = ref(false);
 
@@ -75,6 +80,13 @@ const pendingTemplateData = ref(null);
 // iMessage App State
 const selectedAppId = ref('');
 const selectedAppData = ref({});
+
+// Auto-select first app when switching to iMessage Apps tab
+watch(activeTab, (newTab) => {
+  if (newTab === 'imessage_apps' && availableApps.value.length === 1) {
+    selectedAppId.value = availableApps.value[0].id;
+  }
+});
 
 // Computed properties
 const availableApps = computed(() => {
@@ -571,9 +583,24 @@ const timePickerData = ref({
 
 // Apple MSP style options
 const styleOptions = [
-  { value: 'icon', label: 'Icon (280x65)' },
-  { value: 'small', label: 'Small (280x85)' },
-  { value: 'large', label: 'Large (280x210)' },
+  {
+    value: 'icon',
+    label: 'Icon',
+    dimensions: '280×65',
+    description: 'Compact header with small icon',
+  },
+  {
+    value: 'small',
+    label: 'Small',
+    dimensions: '280×85',
+    description: 'Medium-sized header',
+  },
+  {
+    value: 'large',
+    label: 'Large',
+    dimensions: '280×210',
+    description: 'Full-width banner image',
+  },
 ];
 
 // Image management
@@ -622,6 +649,22 @@ const formatFileSize = bytes => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / k ** i).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Get image preview for Time Picker style selectors
+const getImagePreview = identifier => {
+  if (!identifier) return null;
+  // Check inline images
+  const inlineImage = listPickerData.value.images.find(
+    img => img.identifier === identifier
+  );
+  if (inlineImage) return inlineImage.preview;
+
+  // Check saved images
+  const savedImage = savedImages.value.find(
+    img => img.identifier === identifier
+  );
+  return savedImage?.image_url || null;
 };
 
 const removeImage = index => {
@@ -729,6 +772,7 @@ const removeListItem = (sectionIndex, itemIndex) => {
 // Image picker state
 const showImagePicker = ref(false);
 const currentImageSelection = ref({ sectionIndex: null, itemIndex: null });
+const imagePickerSource = ref('inline'); // 'inline' or 'shared'
 
 const getImageByIdentifier = identifier => {
   return [...listPickerData.value.images, ...savedImages.value].find(
@@ -799,6 +843,14 @@ const selectImageForItem = image => {
 const closeImagePicker = () => {
   showImagePicker.value = false;
   currentImageSelection.value = { sectionIndex: null, itemIndex: null };
+  imagePickerSource.value = 'inline'; // Reset to inline for next time
+};
+
+// Handle image selection from SharedImageSelector in modal
+const handleModalSharedImageSelected = imageData => {
+  if (imageData) {
+    selectImageForItem(imageData);
+  }
 };
 
 const addQuickReplyItem = () => {
@@ -1247,6 +1299,29 @@ const selectTimePickerImage = identifier => {
   });
 };
 
+// SharedImageSelector event handlers
+const handleListPickerHeaderImageSelected = imageData => {
+  if (imageData) {
+    console.log('[AMB ListPicker] Shared header image selected:', imageData);
+    listPickerData.value.received_image_identifier = imageData.identifier;
+  } else {
+    console.log('[AMB ListPicker] Header image cleared');
+    listPickerData.value.received_image_identifier = '';
+  }
+};
+
+const handleTimePickerSharedImageSelected = imageData => {
+  if (imageData) {
+    console.log('[AMB TimePicker] Shared image selected:', imageData);
+    timePickerData.value.receivedImageIdentifier = imageData.identifier;
+    timePickerData.value.replyImageIdentifier = imageData.identifier;
+  } else {
+    console.log('[AMB TimePicker] Shared image cleared');
+    timePickerData.value.receivedImageIdentifier = '';
+    timePickerData.value.replyImageIdentifier = '';
+  }
+};
+
 // Template handling
 const toggleTemplateSelector = () => {
   showTemplateSelector.value = !showTemplateSelector.value;
@@ -1617,7 +1692,9 @@ const loadPaymentTemplate = templateType => {
         >
           Received Message
         </h4>
-        <div class="grid grid-cols-2 gap-3">
+
+        <!-- Title, Subtitle, Style in Grid -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
           <div>
             <label
               class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-1"
@@ -1640,89 +1717,14 @@ const loadPaymentTemplate = templateType => {
               placeholder="Optional subtitle"
             />
           </div>
-          <div>
-            <label
-              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
-            >
-              Header Image
-            </label>
-            <div class="grid grid-cols-4 gap-2">
-              <div
-                class="relative cursor-pointer border-2 rounded-lg overflow-hidden transition-all"
-                :class="
-                  listPickerData.received_image_identifier === ''
-                    ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
-                    : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
-                "
-                @click="listPickerData.received_image_identifier = ''"
-              >
-                <div
-                  class="h-16 flex items-center justify-center bg-n-alpha-2 dark:bg-n-alpha-3"
-                >
-                  <span class="text-2xl">🚫</span>
-                </div>
-                <div
-                  class="text-xs text-center py-1 bg-n-solid-1 dark:bg-n-alpha-2"
-                >
-                  None
-                </div>
-              </div>
-              <div
-                v-for="image in [...listPickerData.images, ...savedImages]"
-                :key="image.identifier"
-                class="relative cursor-pointer border-2 rounded-lg overflow-hidden transition-all"
-                :class="
-                  listPickerData.received_image_identifier === image.identifier
-                    ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
-                    : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
-                "
-                @click="
-                  listPickerData.received_image_identifier = image.identifier
-                "
-              >
-                <img
-                  :src="image.preview || image.image_url"
-                  :alt="image.originalName || image.description"
-                  class="w-full h-16 object-cover"
-                />
-                <div
-                  class="text-xs text-center py-1 bg-n-solid-1 dark:bg-n-alpha-2 truncate px-1"
-                  :title="
-                    image.originalName ||
-                    image.original_name ||
-                    image.description ||
-                    image.identifier
-                  "
-                >
-                  {{
-                    (
-                      image.originalName ||
-                      image.original_name ||
-                      image.description ||
-                      image.identifier
-                    ).substring(0, 12)
-                  }}...
-                </div>
-                <div
-                  v-if="
-                    listPickerData.received_image_identifier ===
-                    image.identifier
-                  "
-                  class="absolute top-1 right-1 bg-n-blue-9 dark:bg-n-blue-10 rounded-full w-5 h-5 flex items-center justify-center"
-                >
-                  <span class="text-white text-xs">✓</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div>
+          <div class="col-span-2">
             <label
               class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-1"
               >Style</label
             >
             <select
               v-model="listPickerData.received_style"
-              class="w-full px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-n-solid-1 dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9 h-10"
+              class="w-full px-3 py-2 border border-n-weak dark:border-n-slate-6 rounded-lg bg-n-solid-1 dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11 focus:border-n-blue-8 dark:focus:border-n-blue-9"
             >
               <option
                 v-for="style in styleOptions"
@@ -1732,6 +1734,127 @@ const loadPaymentTemplate = templateType => {
                 {{ style.label }}
               </option>
             </select>
+          </div>
+        </div>
+
+        <!-- Header Image Section (Full Width) -->
+        <div>
+          <label
+            class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+          >
+            Header Image
+          </label>
+
+          <!-- Toggle: Inline vs Shared -->
+          <div
+            class="flex items-center gap-2 mb-3 p-2 bg-n-alpha-1 dark:bg-n-alpha-2 rounded-lg"
+          >
+            <button
+              type="button"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+              :class="
+                listPickerHeaderImageSource === 'inline'
+                  ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                  : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+              "
+              @click="listPickerHeaderImageSource = 'inline'"
+            >
+              Inline Images
+            </button>
+            <button
+              type="button"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+              :class="
+                listPickerHeaderImageSource === 'shared'
+                  ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                  : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+              "
+              @click="listPickerHeaderImageSource = 'shared'"
+            >
+              Shared Images
+            </button>
+          </div>
+
+          <!-- Inline Image Grid -->
+          <div
+            v-if="listPickerHeaderImageSource === 'inline'"
+            class="grid grid-cols-4 gap-2"
+          >
+            <div
+              class="relative cursor-pointer border-2 rounded-lg overflow-hidden transition-all"
+              :class="
+                listPickerData.received_image_identifier === ''
+                  ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
+                  : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
+              "
+              @click="listPickerData.received_image_identifier = ''"
+            >
+              <div
+                class="h-16 flex items-center justify-center bg-n-alpha-2 dark:bg-n-alpha-3"
+              >
+                <span class="text-2xl">🚫</span>
+              </div>
+              <div
+                class="text-xs text-center py-1 bg-n-solid-1 dark:bg-n-alpha-2"
+              >
+                None
+              </div>
+            </div>
+            <div
+              v-for="image in [...listPickerData.images, ...savedImages]"
+              :key="image.identifier"
+              class="relative cursor-pointer border-2 rounded-lg overflow-hidden transition-all"
+              :class="
+                listPickerData.received_image_identifier === image.identifier
+                  ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
+                  : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
+              "
+              @click="
+                listPickerData.received_image_identifier = image.identifier
+              "
+            >
+              <img
+                :src="image.preview || image.image_url"
+                :alt="image.originalName || image.description"
+                class="w-full h-16 object-cover"
+              />
+              <div
+                class="text-xs text-center py-1 bg-n-solid-1 dark:bg-n-alpha-2 truncate px-1"
+                :title="
+                  image.originalName ||
+                  image.original_name ||
+                  image.description ||
+                  image.identifier
+                "
+              >
+                {{
+                  (
+                    image.originalName ||
+                    image.original_name ||
+                    image.description ||
+                    image.identifier
+                  ).substring(0, 12)
+                }}...
+              </div>
+              <div
+                v-if="
+                  listPickerData.received_image_identifier === image.identifier
+                "
+                class="absolute top-1 right-1 bg-n-blue-9 dark:bg-n-blue-10 rounded-full w-5 h-5 flex items-center justify-center"
+              >
+                <span class="text-white text-xs">✓</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shared Image Selector (Full Width) -->
+          <div v-else-if="listPickerHeaderImageSource === 'shared'">
+            <SharedImageSelector
+              v-model="listPickerData.received_image_identifier"
+              :account-id="store.getters.getCurrentAccountId"
+              image-type="system"
+              @image-selected="handleListPickerHeaderImageSelected"
+            />
           </div>
         </div>
       </div>
@@ -2143,6 +2266,7 @@ const loadPaymentTemplate = templateType => {
             Choose 1 image for the Time Picker
           </h4>
           <button
+            v-if="timePickerImageSource === 'inline'"
             class="px-3 py-1 bg-n-blue-9 dark:bg-n-blue-10 text-white dark:text-n-slate-12 rounded text-sm hover:bg-n-blue-10 dark:hover:bg-n-blue-11 transition-colors"
             @click="addImage"
           >
@@ -2150,91 +2274,138 @@ const loadPaymentTemplate = templateType => {
           </button>
         </div>
 
-        <!-- Combined Images Gallery (Saved + Uploaded) -->
-        <div class="grid grid-cols-6 gap-2 mb-4">
-          <!-- Saved Images -->
-          <div
-            v-for="savedImage in savedImages"
-            :key="`saved-${savedImage.id}`"
-            class="relative group cursor-pointer aspect-square border-2 rounded-lg overflow-hidden transition-all"
+        <!-- Toggle: Inline vs Shared -->
+        <div
+          class="flex items-center gap-2 mb-3 p-2 bg-n-alpha-1 dark:bg-n-alpha-2 rounded-lg"
+        >
+          <button
+            type="button"
+            class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
             :class="
-              timePickerData.receivedImageIdentifier === savedImage.identifier
-                ? 'border-n-blue-8 dark:border-n-blue-9 ring-2 ring-n-blue-8 dark:ring-n-blue-9'
-                : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
+              timePickerImageSource === 'inline'
+                ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
             "
-            @click="selectTimePickerImage(savedImage.identifier)"
+            @click="timePickerImageSource = 'inline'"
           >
-            <img
-              :src="savedImage.image_url"
-              :alt="savedImage.description"
-              class="w-full h-full object-cover"
-            />
+            Inline Images
+          </button>
+          <button
+            type="button"
+            class="flex-1 px-3 py-1.5 text-xs font-medium rounded transition-all"
+            :class="
+              timePickerImageSource === 'shared'
+                ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+            "
+            @click="timePickerImageSource = 'shared'"
+          >
+            Shared Images
+          </button>
+        </div>
+
+        <!-- Inline Images Gallery (Saved + Uploaded) -->
+        <div v-if="timePickerImageSource === 'inline'">
+          <div class="grid grid-cols-6 gap-2 mb-4">
+            <!-- Saved Images -->
             <div
-              v-if="
+              v-for="savedImage in savedImages"
+              :key="`saved-${savedImage.id}`"
+              class="relative group cursor-pointer aspect-square border-2 rounded-lg overflow-hidden transition-all"
+              :class="
                 timePickerData.receivedImageIdentifier === savedImage.identifier
+                  ? 'border-n-blue-8 dark:border-n-blue-9 ring-2 ring-n-blue-8 dark:ring-n-blue-9'
+                  : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
               "
-              class="absolute top-1 right-1 bg-n-blue-9 text-white rounded-full p-1"
+              @click="selectTimePickerImage(savedImage.identifier)"
             >
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fill-rule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clip-rule="evenodd"
-                />
-              </svg>
+              <img
+                :src="savedImage.image_url"
+                :alt="savedImage.description"
+                class="w-full h-full object-cover"
+              />
+              <div
+                v-if="
+                  timePickerData.receivedImageIdentifier ===
+                  savedImage.identifier
+                "
+                class="absolute top-1 right-1 bg-n-blue-9 text-white rounded-full p-1"
+              >
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <!-- Uploaded Images -->
+            <div
+              v-for="(image, index) in listPickerData.images"
+              :key="`uploaded-${index}`"
+              class="relative group cursor-pointer aspect-square border-2 rounded-lg overflow-hidden transition-all"
+              :class="
+                timePickerData.receivedImageIdentifier === image.identifier
+                  ? 'border-n-blue-8 dark:border-n-blue-9 ring-2 ring-n-blue-8 dark:ring-n-blue-9'
+                  : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
+              "
+              @click="selectTimePickerImage(image.identifier)"
+            >
+              <img
+                v-if="image.preview"
+                :src="image.preview"
+                :alt="image.originalName || image.description"
+                class="w-full h-full object-cover"
+              />
+              <div
+                v-if="
+                  timePickerData.receivedImageIdentifier === image.identifier
+                "
+                class="absolute top-1 right-1 bg-n-blue-9 text-white rounded-full p-1"
+              >
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+              <button
+                class="absolute top-1 left-1 bg-n-ruby-9 dark:bg-n-ruby-10 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                @click.stop="removeImage(index)"
+              >
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
 
-          <!-- Uploaded Images -->
           <div
-            v-for="(image, index) in listPickerData.images"
-            :key="`uploaded-${index}`"
-            class="relative group cursor-pointer aspect-square border-2 rounded-lg overflow-hidden transition-all"
-            :class="
-              timePickerData.receivedImageIdentifier === image.identifier
-                ? 'border-n-blue-8 dark:border-n-blue-9 ring-2 ring-n-blue-8 dark:ring-n-blue-9'
-                : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
+            v-if="
+              savedImages.length === 0 && listPickerData.images.length === 0
             "
-            @click="selectTimePickerImage(image.identifier)"
+            class="text-sm text-n-slate-11 dark:text-n-slate-10 italic text-center py-4"
           >
-            <img
-              v-if="image.preview"
-              :src="image.preview"
-              :alt="image.originalName || image.description"
-              class="w-full h-full object-cover"
-            />
-            <div
-              v-if="timePickerData.receivedImageIdentifier === image.identifier"
-              class="absolute top-1 right-1 bg-n-blue-9 text-white rounded-full p-1"
-            >
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fill-rule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </div>
-            <button
-              class="absolute top-1 left-1 bg-n-ruby-9 dark:bg-n-ruby-10 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              @click.stop="removeImage(index)"
-            >
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fill-rule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </button>
+            No images available. Click "Add Image" to upload.
           </div>
         </div>
 
-        <div
-          v-if="savedImages.length === 0 && listPickerData.images.length === 0"
-          class="text-sm text-n-slate-11 dark:text-n-slate-10 italic text-center py-4"
-        >
-          No images available. Click "Add Image" to upload.
+        <!-- Shared Image Selector -->
+        <div v-else-if="timePickerImageSource === 'shared'">
+          <SharedImageSelector
+            v-model="timePickerData.receivedImageIdentifier"
+            :account-id="store.getters.getCurrentAccountId"
+            image-type="system"
+            @image-selected="handleTimePickerSharedImageSelected"
+          />
         </div>
       </div>
 
@@ -2275,49 +2446,85 @@ const loadPaymentTemplate = templateType => {
           <!-- Received Style with Preview -->
           <div>
             <label
-              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+              class="block text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
               >Received Style</label
             >
-            <div class="flex gap-4">
-              <label
+            <div class="grid grid-cols-3 gap-3">
+              <div
                 v-for="style in styleOptions"
                 :key="`received-${style.value}`"
-                class="flex-1 cursor-pointer"
+                class="border-2 rounded-lg p-2 cursor-pointer transition-all duration-200 hover:shadow-md"
+                :class="
+                  timePickerData.received_style === style.value
+                    ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
+                    : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
+                "
+                @click="timePickerData.received_style = style.value"
               >
-                <input
-                  v-model="timePickerData.received_style"
-                  type="radio"
-                  :value="style.value"
-                  class="sr-only"
-                />
-                <div
-                  class="border-2 rounded-lg p-3 transition-all"
-                  :class="
-                    timePickerData.received_style === style.value
-                      ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
-                      : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
-                  "
-                >
+                <div class="text-center">
+                  <!-- Style Preview -->
                   <div
-                    class="text-xs font-medium text-n-slate-12 dark:text-n-slate-11 mb-1"
+                    class="mx-auto mb-2 rounded border-2 bg-white dark:bg-n-alpha-2 flex items-center justify-center"
+                    :class="
+                      style.value === 'icon'
+                        ? 'w-20 h-6'
+                        : style.value === 'small'
+                          ? 'w-20 h-8'
+                          : 'w-20 h-16'
+                    "
                   >
-                    {{ style.label }}
+                    <img
+                      v-if="
+                        timePickerData.receivedImageIdentifier &&
+                        getImagePreview(timePickerData.receivedImageIdentifier)
+                      "
+                      :src="
+                        getImagePreview(timePickerData.receivedImageIdentifier)
+                      "
+                      class="w-full h-full object-contain rounded"
+                      alt="Preview"
+                    />
+                    <svg
+                      v-else
+                      class="w-8 h-8 text-n-slate-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
                   </div>
-                  <div
-                    class="bg-n-alpha-3 dark:bg-n-alpha-4 rounded flex items-center justify-center"
-                    :style="{
-                      height:
-                        style.value === 'icon'
-                          ? '40px'
-                          : style.value === 'small'
-                            ? '60px'
-                            : '150px',
-                    }"
+
+                  <p
+                    class="font-medium text-sm text-n-slate-12 dark:text-n-slate-11"
                   >
-                    <span class="text-2xl">📅</span>
+                    {{ style.label }} ({{ style.dimensions }})
+                  </p>
+
+                  <!-- Selected indicator -->
+                  <div
+                    v-if="timePickerData.received_style === style.value"
+                    class="mt-1 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
                   </div>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
 
@@ -2348,49 +2555,85 @@ const loadPaymentTemplate = templateType => {
           <!-- Reply Style with Preview -->
           <div>
             <label
-              class="block text-sm font-medium text-n-slate-12 dark:text-n-slate-11 mb-2"
+              class="block text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
               >Reply Style</label
             >
-            <div class="flex gap-4">
-              <label
+            <div class="grid grid-cols-3 gap-3">
+              <div
                 v-for="style in styleOptions"
                 :key="`reply-${style.value}`"
-                class="flex-1 cursor-pointer"
+                class="border-2 rounded-lg p-2 cursor-pointer transition-all duration-200 hover:shadow-md"
+                :class="
+                  timePickerData.reply_style === style.value
+                    ? 'border-n-blue-8 bg-n-blue-1 dark:border-n-blue-9 dark:bg-n-blue-2'
+                    : 'border-n-weak hover:border-n-blue-6 dark:border-n-slate-6 dark:hover:border-n-blue-7'
+                "
+                @click="timePickerData.reply_style = style.value"
               >
-                <input
-                  v-model="timePickerData.reply_style"
-                  type="radio"
-                  :value="style.value"
-                  class="sr-only"
-                />
-                <div
-                  class="border-2 rounded-lg p-3 transition-all"
-                  :class="
-                    timePickerData.reply_style === style.value
-                      ? 'border-n-blue-8 dark:border-n-blue-9 bg-n-blue-1 dark:bg-n-blue-2'
-                      : 'border-n-weak dark:border-n-slate-6 hover:border-n-blue-8 dark:hover:border-n-blue-9'
-                  "
-                >
+                <div class="text-center">
+                  <!-- Style Preview -->
                   <div
-                    class="text-xs font-medium text-n-slate-12 dark:text-n-slate-11 mb-1"
+                    class="mx-auto mb-2 rounded border-2 bg-white dark:bg-n-alpha-2 flex items-center justify-center"
+                    :class="
+                      style.value === 'icon'
+                        ? 'w-20 h-6'
+                        : style.value === 'small'
+                          ? 'w-20 h-8'
+                          : 'w-20 h-16'
+                    "
                   >
-                    {{ style.label }}
+                    <img
+                      v-if="
+                        timePickerData.receivedImageIdentifier &&
+                        getImagePreview(timePickerData.receivedImageIdentifier)
+                      "
+                      :src="
+                        getImagePreview(timePickerData.receivedImageIdentifier)
+                      "
+                      class="w-full h-full object-contain rounded"
+                      alt="Preview"
+                    />
+                    <svg
+                      v-else
+                      class="w-8 h-8 text-n-slate-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
                   </div>
-                  <div
-                    class="bg-n-alpha-3 dark:bg-n-alpha-4 rounded flex items-center justify-center"
-                    :style="{
-                      height:
-                        style.value === 'icon'
-                          ? '40px'
-                          : style.value === 'small'
-                            ? '60px'
-                            : '150px',
-                    }"
+
+                  <p
+                    class="font-medium text-sm text-n-slate-12 dark:text-n-slate-11"
                   >
-                    <span class="text-2xl">📅</span>
+                    {{ style.label }} ({{ style.dimensions }})
+                  </p>
+
+                  <!-- Selected indicator -->
+                  <div
+                    v-if="timePickerData.reply_style === style.value"
+                    class="mt-1 flex items-center justify-center text-n-blue-10 dark:text-n-blue-9"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
                   </div>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </div>
@@ -2620,30 +2863,6 @@ const loadPaymentTemplate = templateType => {
           </div>
         </div>
       </div>
-    </div>
-    <!-- Actions -->
-    <div
-      class="flex justify-end space-x-3 mt-6 pt-4 border-t border-n-weak dark:border-n-slate-6"
-    >
-      <button
-        class="px-4 py-2 text-n-slate-11 dark:text-n-slate-10 hover:text-n-slate-12 dark:hover:text-n-slate-9 transition-colors"
-        @click="cancelComposer"
-      >
-        Cancel
-      </button>
-      <button
-        v-if="['quick_reply', 'list_picker', 'time_picker'].includes(activeTab)"
-        class="px-4 py-2 border border-n-blue-9 dark:border-n-blue-10 text-n-blue-9 dark:text-n-blue-10 rounded-lg hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-colors"
-        @click="saveAsTemplate"
-      >
-        Save as Template
-      </button>
-      <button
-        class="px-4 py-2 bg-n-blue-9 dark:bg-n-blue-10 text-white dark:text-n-slate-12 rounded-lg hover:bg-n-blue-10 dark:hover:bg-n-blue-11 transition-colors"
-        @click="sendAppleMessage"
-      >
-        Send Message
-      </button>
     </div>
 
     <!-- Forms Tab -->
@@ -3006,11 +3225,39 @@ const loadPaymentTemplate = templateType => {
       </div>
     </div>
 
+    <!-- Actions - Positioned at the bottom for all tabs except Forms -->
+    <div
+      v-if="activeTab !== 'forms'"
+      class="flex justify-end space-x-3 mt-6 pt-4 border-t border-n-weak dark:border-n-slate-6"
+    >
+      <button
+        class="px-4 py-2 text-n-slate-11 dark:text-n-slate-10 hover:text-n-slate-12 dark:hover:text-n-slate-9 transition-colors"
+        @click="cancelComposer"
+      >
+        Cancel
+      </button>
+      <button
+        v-if="['quick_reply', 'list_picker', 'time_picker'].includes(activeTab)"
+        class="px-4 py-2 border border-n-blue-9 dark:border-n-blue-10 text-n-blue-9 dark:text-n-blue-10 rounded-lg hover:bg-n-blue-1 dark:hover:bg-n-blue-2 transition-colors"
+        @click="saveAsTemplate"
+      >
+        Save as Template
+      </button>
+      <button
+        class="px-4 py-2 bg-n-blue-9 dark:bg-n-blue-10 text-white dark:text-n-slate-12 rounded-lg hover:bg-n-blue-10 dark:hover:bg-n-blue-11 transition-colors"
+        @click="sendAppleMessage"
+      >
+        Send Message
+      </button>
+    </div>
+
     <!-- Enhanced Time Picker Modal -->
     <EnhancedTimePickerModal
       :show="showEnhancedTimePicker"
       :initial-data="timePickerData"
       :available-images="[...listPickerData.images, ...savedImages]"
+      :inbox-id="conversation?.inbox_id"
+      :account-id="store.getters.getCurrentAccountId"
       :business-hours="{
         monday: { start: '09:00', end: '17:00', enabled: true },
         tuesday: { start: '09:00', end: '17:00', enabled: true },
@@ -3035,6 +3282,7 @@ const loadPaymentTemplate = templateType => {
     <AppleFormBuilder
       :show="showFormBuilder"
       :available-images="savedImages"
+      :inbox-id="conversation?.inbox_id"
       :msp-id="conversation?.inbox?.channel?.business_id || ''"
       :conversation-id="conversation?.id?.toString() || ''"
       @close="closeFormBuilder"
@@ -3057,14 +3305,19 @@ const loadPaymentTemplate = templateType => {
     <!-- Image Picker Modal -->
     <div
       v-if="showImagePicker"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      class="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm"
       @click.self="closeImagePicker"
     >
       <div
-        class="bg-n-solid-1 dark:bg-n-slate-1 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto m-4"
+        class="bg-n-solid-1 dark:bg-n-slate-1 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto m-4 border-2 border-n-weak dark:border-n-alpha-6"
+        style="
+          box-shadow:
+            0 25px 50px -12px rgba(0, 0, 0, 0.5),
+            0 0 0 1px rgba(0, 0, 0, 0.1);
+        "
       >
         <div
-          class="sticky top-0 bg-n-solid-1 dark:bg-n-slate-1 border-b border-n-weak dark:border-n-alpha-6 p-4 flex justify-between items-center"
+          class="sticky top-0 bg-n-solid-1 dark:bg-n-slate-1 border-b border-n-weak dark:border-n-alpha-6 p-4 flex justify-between items-center z-10 shadow-md"
         >
           <h3
             class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11"
@@ -3080,73 +3333,116 @@ const loadPaymentTemplate = templateType => {
         </div>
 
         <div class="p-4">
-          <!-- Recently uploaded images -->
-          <div v-if="listPickerData.images.length > 0" class="mb-6">
-            <h4
-              class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
-            >
-              Recently Uploaded
-            </h4>
-            <div class="grid grid-cols-3 gap-3">
-              <div
-                v-for="image in listPickerData.images"
-                :key="image.identifier"
-                class="relative cursor-pointer border-2 border-transparent hover:border-n-blue-8 dark:hover:border-n-blue-9 rounded-lg overflow-hidden transition-all"
-                @click="selectImageForItem(image)"
-              >
-                <img
-                  :src="image.preview"
-                  :alt="image.description"
-                  class="w-full h-32 object-cover"
-                />
-                <div
-                  class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 truncate"
-                >
-                  {{ image.originalName || image.description }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Saved images -->
-          <div v-if="savedImages.length > 0">
-            <h4
-              class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
-            >
-              Saved Images
-            </h4>
-            <div class="grid grid-cols-3 gap-3">
-              <div
-                v-for="image in savedImages"
-                :key="image.id"
-                class="relative cursor-pointer border-2 border-transparent hover:border-n-blue-8 dark:hover:border-n-blue-9 rounded-lg overflow-hidden transition-all"
-                @click="selectImageForItem(image)"
-              >
-                <img
-                  :src="image.image_url"
-                  :alt="image.description"
-                  class="w-full h-32 object-cover"
-                />
-                <div
-                  class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 truncate"
-                >
-                  {{ image.original_name || image.description }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- No images -->
+          <!-- Toggle: Inline vs Shared -->
           <div
-            v-if="
-              listPickerData.images.length === 0 && savedImages.length === 0
-            "
-            class="text-center py-8 text-n-slate-10 dark:text-n-slate-9"
+            class="flex items-center gap-2 mb-4 p-2 bg-n-alpha-1 dark:bg-n-alpha-2 rounded-lg"
           >
-            <p>
-              No images available. Upload images using the "Add Image" button
-              above.
-            </p>
+            <button
+              type="button"
+              class="flex-1 px-3 py-2 text-sm font-medium rounded transition-all"
+              :class="
+                imagePickerSource === 'inline'
+                  ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                  : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+              "
+              @click="imagePickerSource = 'inline'"
+            >
+              Inline Images
+            </button>
+            <button
+              type="button"
+              class="flex-1 px-3 py-2 text-sm font-medium rounded transition-all"
+              :class="
+                imagePickerSource === 'shared'
+                  ? 'bg-n-blue-9 text-white dark:bg-n-blue-10'
+                  : 'text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
+              "
+              @click="imagePickerSource = 'shared'"
+            >
+              Shared Images
+            </button>
+          </div>
+
+          <!-- Inline Images View -->
+          <div v-if="imagePickerSource === 'inline'">
+            <!-- Recently uploaded images -->
+            <div v-if="listPickerData.images.length > 0" class="mb-6">
+              <h4
+                class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
+              >
+                Recently Uploaded
+              </h4>
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  v-for="image in listPickerData.images"
+                  :key="image.identifier"
+                  class="relative cursor-pointer border-2 border-transparent hover:border-n-blue-8 dark:hover:border-n-blue-9 rounded-lg overflow-hidden transition-all"
+                  @click="selectImageForItem(image)"
+                >
+                  <img
+                    :src="image.preview"
+                    :alt="image.description"
+                    class="w-full h-32 object-cover"
+                  />
+                  <div
+                    class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-95 text-white text-xs p-2 truncate shadow-lg"
+                  >
+                    {{ image.originalName || image.description }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Saved images -->
+            <div v-if="savedImages.length > 0">
+              <h4
+                class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
+              >
+                Saved Images
+              </h4>
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  v-for="image in savedImages"
+                  :key="image.id"
+                  class="relative cursor-pointer border-2 border-transparent hover:border-n-blue-8 dark:hover:border-n-blue-9 rounded-lg overflow-hidden transition-all"
+                  @click="selectImageForItem(image)"
+                >
+                  <img
+                    :src="image.image_url"
+                    :alt="image.description"
+                    class="w-full h-32 object-cover"
+                  />
+                  <div
+                    class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-95 text-white text-xs p-2 truncate shadow-lg"
+                  >
+                    {{ image.original_name || image.description }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- No images -->
+            <div
+              v-if="
+                listPickerData.images.length === 0 && savedImages.length === 0
+              "
+              class="text-center py-8 text-n-slate-10 dark:text-n-slate-9"
+            >
+              <p>
+                No images available. Upload images using the "Add Image" button
+                above.
+              </p>
+            </div>
+          </div>
+
+          <!-- Shared Images View -->
+          <div v-else-if="imagePickerSource === 'shared'">
+            <SharedImageSelector
+              model-value=""
+              :account-id="store.getters.getCurrentAccountId"
+              image-type="system"
+              @image-selected="handleModalSharedImageSelected"
+            />
           </div>
         </div>
       </div>
