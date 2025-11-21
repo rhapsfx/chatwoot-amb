@@ -2,6 +2,9 @@
 import { computed } from 'vue';
 import { useMessageContext } from '../provider.js';
 import BaseBubble from './Base.vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const { contentAttributes } = useMessageContext();
 
@@ -17,9 +20,26 @@ const receivedImageIdentifier = computed(
   () => contentAttributes.value?.received_image_identifier
 );
 
+// Debug logging removed - was causing excessive console output
+// Uncomment for debugging if needed:
+// onMounted(() => {
+//   console.log('[AppleListPicker] Content attributes:', contentAttributes.value);
+//   console.log('[AppleListPicker] Sections:', sections.value);
+//   console.log('[AppleListPicker] Images:', images.value);
+// });
+
 const getImageById = imageId => {
+  if (!imageId) return null;
   const image = images.value.find(img => img.identifier === imageId);
-  return image ? `data:image/jpeg;base64,${image.data}` : null;
+  if (image) {
+    return `data:image/jpeg;base64,${image.data}`;
+  }
+  return null;
+};
+
+const getItemImageIdentifier = item => {
+  // Support both snake_case and camelCase
+  return item.image_identifier || item.imageIdentifier || null;
 };
 
 const handleItemClick = () => {
@@ -69,6 +89,28 @@ const handleItemClick = () => {
           >
             {{ receivedSubtitle }}
           </p>
+          <!-- Image Indicator Badge -->
+          <div
+            v-if="
+              receivedImageIdentifier && getImageById(receivedImageIdentifier)
+            "
+            class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-n-alpha-2 rounded text-xs text-n-slate-11"
+          >
+            <svg
+              class="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <span>{{ t('APPLE_MESSAGES.IMAGE_INDICATOR') }}</span>
+          </div>
         </div>
       </div>
 
@@ -87,18 +129,43 @@ const handleItemClick = () => {
             <button
               v-for="item in section.items"
               :key="item.identifier"
-              class="w-full flex items-center p-3 bg-n-alpha-1 hover:bg-n-alpha-2 rounded-lg transition-colors text-left border border-n-weak hover:border-n-strong"
+              class="w-full flex items-center p-2.5 bg-n-alpha-1 hover:bg-n-alpha-2 rounded-lg transition-colors text-left border border-n-weak hover:border-n-strong group"
               @click="handleItemClick(section, item)"
             >
-              <!-- Item Image -->
-              <img
+              <!-- Item Image Icon (Small) -->
+              <div
                 v-if="
-                  item.image_identifier && getImageById(item.image_identifier)
+                  getItemImageIdentifier(item) &&
+                  getImageById(getItemImageIdentifier(item))
                 "
-                :src="getImageById(item.image_identifier)"
-                :alt="item.title"
-                class="w-10 h-10 rounded-lg object-cover mr-3 flex-shrink-0"
-              />
+                class="w-6 h-6 rounded-md overflow-hidden mr-2.5 flex-shrink-0 ring-1 ring-n-weak group-hover:ring-n-strong transition-all"
+              >
+                <img
+                  :src="getImageById(getItemImageIdentifier(item))"
+                  :alt="item.title"
+                  class="w-full h-full object-cover"
+                />
+              </div>
+
+              <!-- Fallback Icon for items without images -->
+              <div
+                v-else
+                class="w-6 h-6 rounded-md mr-2.5 flex-shrink-0 bg-n-alpha-2 flex items-center justify-center"
+              >
+                <svg
+                  class="w-3.5 h-3.5 text-n-slate-10"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
 
               <!-- Item Content -->
               <div class="flex-1 min-w-0">
@@ -107,7 +174,7 @@ const handleItemClick = () => {
                 </h5>
                 <p
                   v-if="item.subtitle"
-                  class="text-xs text-n-slate-11 truncate mt-1"
+                  class="text-xs text-n-slate-11 truncate mt-0.5"
                 >
                   {{ item.subtitle }}
                 </p>
@@ -117,11 +184,11 @@ const handleItemClick = () => {
               <div class="ml-2 flex-shrink-0">
                 <div
                   v-if="section.multiple_selection"
-                  class="w-4 h-4 border border-n-strong rounded bg-n-alpha-1"
+                  class="w-4 h-4 border border-n-strong rounded bg-n-alpha-1 group-hover:border-n-blue-8 transition-colors"
                 />
                 <div
                   v-else
-                  class="w-4 h-4 border border-n-strong rounded-full bg-n-alpha-1"
+                  class="w-4 h-4 border border-n-strong rounded-full bg-n-alpha-1 group-hover:border-n-blue-8 transition-colors"
                 />
               </div>
             </button>

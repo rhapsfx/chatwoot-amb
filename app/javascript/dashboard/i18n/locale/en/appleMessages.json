@@ -1,0 +1,25 @@
+{
+  "APPLE_MESSAGES": {
+    "IMAGE_INDICATOR": "[Image #1]",
+    "SHARED_IMAGES": {
+      "TABS": {
+        "SYSTEM": "System",
+        "BRANDING": "Branding",
+        "TEMPLATE": "Template"
+      },
+      "UPLOAD": "Upload Image",
+      "SEARCH_PLACEHOLDER": "Search by identifier or description...",
+      "LOADING": "Loading images...",
+      "ERROR": "Failed to load images",
+      "RETRY": "Retry",
+      "EMPTY_STATE": "No images available",
+      "EMPTY_STATE_HINT": "Upload images to get started",
+      "DELETE": "Delete",
+      "CONFIRM_DELETE": "Are you sure you want to delete this image?",
+      "IMAGE_COUNT": "{count} images",
+      "ERRORS": {
+        "FILE_TOO_LARGE": "Image file size must be less than 5MB"
+      }
+    }
+  }
+}
