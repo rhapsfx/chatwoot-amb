@@ -30,6 +30,8 @@ rsync -avz --delete \
     --exclude='.env' \
     --exclude='.env.*' \
     --exclude='certs' \
+    --include='Gemfile' \
+    --include='Gemfile.lock' \
     --include='app/***' \
     --include='enterprise/***' \
     --include='config/***' \
@@ -155,6 +157,24 @@ if [ -n "$WORKER_CONTAINER" ]; then
 fi
 
 echo ""
+echo "Updating gem dependencies in containers..."
+echo "  → Copying Gemfile and Gemfile.lock to web container..."
+docker cp Gemfile $WEB_CONTAINER:/app/
+docker cp Gemfile.lock $WEB_CONTAINER:/app/
+
+echo "  → Installing gems in web container (this may take a few minutes)..."
+docker exec $WEB_CONTAINER bundle install --jobs=4
+
+if [ -n "$WORKER_CONTAINER" ]; then
+    echo "  → Copying Gemfile and Gemfile.lock to worker container..."
+    docker cp Gemfile $WORKER_CONTAINER:/app/
+    docker cp Gemfile.lock $WORKER_CONTAINER:/app/
+
+    echo "  → Installing gems in worker container..."
+    docker exec $WORKER_CONTAINER bundle install --jobs=4
+fi
+
+echo ""
 echo "Running database migrations..."
 docker exec $WEB_CONTAINER bundle exec rails db:migrate RAILS_ENV=production
 
@@ -233,6 +253,7 @@ echo "✅ Models, controllers, services deployed"
 echo "✅ Bot API endpoints and services deployed"
 echo "✅ Apple Messages image architecture deployed (SharedAppleImage + ImageFetchService)"
 echo "✅ Apple Maps tokens synced to production .env (with backup)"
+echo "✅ Gem dependencies updated (bundle install)"
 echo "✅ Routes and configuration updated"
 echo "✅ Database migrations executed"
 echo "✅ Custom roles feature enabled for all accounts"
