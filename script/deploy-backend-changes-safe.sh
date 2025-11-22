@@ -118,40 +118,21 @@ WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
 WORKER_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q worker)
 
 if [ -z "$WEB_CONTAINER" ]; then
-    echo "⚠️  Web container not running - installing dependencies first..."
+    echo "⚠️  Web container not running - will start with gem installation..."
 
-    # Strategy: Start containers with bundle install before app initialization
-    # This avoids the chicken-and-egg problem of new code requiring new gems
+    # Strategy: Temporarily disable opentelemetry_config.rb to allow container startup
+    # Then install gems, restore file, and restart containers
 
-    echo "Step 2a: Starting containers in detached mode..."
-    docker compose -f docker-compose.production.yml up -d postgres redis
-
-    echo "Waiting for database to be ready..."
-    sleep 5
-
-    # Start web container with a command that keeps it alive but doesn't load Rails
-    echo "Step 2b: Starting web container in maintenance mode..."
-    docker compose -f docker-compose.production.yml run -d --name chatwoot-web-temp web sleep infinity
-
-    # Get temp container ID
-    WEB_CONTAINER=$(docker ps -q -f name=chatwoot-web-temp)
-
-    if [ -z "$WEB_CONTAINER" ]; then
-        echo "❌ Failed to start temporary web container!"
-        exit 1
+    echo "Step 2a: Temporarily disabling OpenTelemetry config (requires gems not yet installed)..."
+    if [ -f lib/opentelemetry_config.rb ]; then
+        mv lib/opentelemetry_config.rb lib/opentelemetry_config.rb.disabled
+        echo "  ✓ Renamed opentelemetry_config.rb → opentelemetry_config.rb.disabled"
     fi
 
-    echo "Step 2c: Installing gems in temporary container..."
-    docker exec $WEB_CONTAINER bundle install --jobs=4
-
-    echo "Step 2d: Stopping temporary container and starting normal services..."
-    docker stop $WEB_CONTAINER
-    docker rm $WEB_CONTAINER
-
-    # Now start normally - gems are installed
+    echo "Step 2b: Starting containers..."
     docker compose -f docker-compose.production.yml up -d
 
-    echo "Waiting for services to initialize..."
+    echo "Waiting for containers to start..."
     sleep 10
 
     # Get container IDs after starting
@@ -160,6 +141,39 @@ if [ -z "$WEB_CONTAINER" ]; then
 
     if [ -z "$WEB_CONTAINER" ]; then
         echo "❌ Failed to start web container!"
+        echo "Restoring OpenTelemetry config..."
+        mv lib/opentelemetry_config.rb.disabled lib/opentelemetry_config.rb 2>/dev/null || true
+        echo "Check logs: docker compose -f docker-compose.production.yml logs web"
+        exit 1
+    fi
+
+    echo "Step 2c: Installing gems in containers..."
+    docker cp Gemfile $WEB_CONTAINER:/app/
+    docker cp Gemfile.lock $WEB_CONTAINER:/app/
+    docker exec $WEB_CONTAINER bundle install --jobs=4
+
+    if [ -n "$WORKER_CONTAINER" ]; then
+        docker cp Gemfile $WORKER_CONTAINER:/app/
+        docker cp Gemfile.lock $WORKER_CONTAINER:/app/
+        docker exec $WORKER_CONTAINER bundle install --jobs=4
+    fi
+
+    echo "Step 2d: Restoring OpenTelemetry config..."
+    if [ -f lib/opentelemetry_config.rb.disabled ]; then
+        mv lib/opentelemetry_config.rb.disabled lib/opentelemetry_config.rb
+        echo "  ✓ Restored opentelemetry_config.rb"
+    fi
+
+    echo "Step 2e: Restarting containers with new gems..."
+    docker compose -f docker-compose.production.yml restart web worker
+
+    echo "Waiting for services to restart..."
+    sleep 10
+
+    # Verify containers are running
+    WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
+    if [ -z "$WEB_CONTAINER" ]; then
+        echo "❌ Failed to restart containers after gem installation!"
         echo "Check logs: docker compose -f docker-compose.production.yml logs web"
         exit 1
     fi
