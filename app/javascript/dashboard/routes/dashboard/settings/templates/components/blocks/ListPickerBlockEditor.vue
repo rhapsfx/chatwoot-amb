@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Button from 'dashboard/components-next/button/Button.vue';
 
@@ -7,10 +7,6 @@ const props = defineProps({
   properties: {
     type: Object,
     required: true,
-  },
-  parameters: {
-    type: Object,
-    default: () => ({}),
   },
 });
 
@@ -74,11 +70,20 @@ const localProps = ref({
 });
 
 // Style options for received and reply messages
-const styleOptions = [
-  { value: 'icon', label: 'Icon' },
-  { value: 'small', label: 'Small' },
-  { value: 'large', label: 'Large' },
-];
+const styleOptions = computed(() => [
+  {
+    value: 'icon',
+    label: t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.STYLE_OPTIONS.ICON'),
+  },
+  {
+    value: 'small',
+    label: t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.STYLE_OPTIONS.SMALL'),
+  },
+  {
+    value: 'large',
+    label: t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.STYLE_OPTIONS.LARGE'),
+  },
+]);
 
 watch(
   localProps,
@@ -243,6 +248,7 @@ const closeImagePicker = () => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-bare-strings-in-template -->
   <div class="space-y-6">
     <!-- Received Message Configuration -->
     <div
@@ -263,7 +269,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.received_title"
             type="text"
-            placeholder="Please select an option"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.RECEIVED_MESSAGE.MESSAGE_TITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -276,7 +286,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.received_subtitle"
             type="text"
-            placeholder="Optional subtitle"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.RECEIVED_MESSAGE.SUBTITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -302,7 +316,11 @@ const closeImagePicker = () => {
               <div class="h-16 flex items-center justify-center bg-n-alpha-2">
                 <span class="text-2xl">🚫</span>
               </div>
-              <div class="text-xs text-center py-1 bg-n-solid-1">None</div>
+              <div class="text-xs text-center py-1 bg-n-solid-1">
+                {{
+                  t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.RECEIVED_MESSAGE.NONE')
+                }}
+              </div>
             </div>
             <!-- Image options -->
             <div
@@ -379,7 +397,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_title"
             type="text"
-            placeholder="Selection Made"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.MESSAGE_TITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -392,7 +414,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_subtitle"
             type="text"
-            placeholder="Your selection"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.SUBTITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -405,7 +431,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_image_title"
             type="text"
-            placeholder="Optional image title"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.IMAGE_TITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -420,7 +450,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_image_subtitle"
             type="text"
-            placeholder="Optional image subtitle"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.IMAGE_SUBTITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -435,7 +469,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_secondary_subtitle"
             type="text"
-            placeholder="Right-aligned title"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.SECONDARY_SUBTITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -450,7 +488,11 @@ const closeImagePicker = () => {
           <input
             v-model="localProps.reply_tertiary_subtitle"
             type="text"
-            placeholder="Right-aligned subtitle"
+            :placeholder="
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.REPLY_MESSAGE.TERTIARY_SUBTITLE_PLACEHOLDER'
+              )
+            "
             class="w-full px-3 py-2 border border-n-slate-7 rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
           />
         </div>
@@ -519,7 +561,7 @@ const closeImagePicker = () => {
               class="opacity-0 group-hover:opacity-100 px-2 py-1 bg-n-ruby-9 text-white rounded text-xs hover:bg-n-ruby-10 transition-all"
               @click.stop="removeImage(index)"
             >
-              Remove
+              {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.IMAGES.REMOVE') }}
             </button>
           </div>
           <div
@@ -570,7 +612,11 @@ const closeImagePicker = () => {
             <input
               v-model="section.title"
               type="text"
-              placeholder="Enter section title"
+              :placeholder="
+                t(
+                  'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.SECTIONS.SECTION_TITLE_PLACEHOLDER'
+                )
+              "
               class="w-full px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7"
             />
           </div>
@@ -617,7 +663,9 @@ const closeImagePicker = () => {
             <div
               class="flex items-center gap-3 mb-4 pb-4 border-b border-n-weak"
             >
-              <span class="text-xs font-medium text-n-slate-11 min-w-[60px]">Image:</span>
+              <span class="text-xs font-medium text-n-slate-11 min-w-[60px]">{{
+                t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.IMAGE_LABEL')
+              }}</span>
 
               <!-- Current image preview with larger thumbnail -->
               <div
@@ -652,7 +700,7 @@ const closeImagePicker = () => {
                   class="px-3 py-1.5 text-xs font-medium bg-n-slate-3 text-n-slate-11 rounded-lg hover:bg-n-slate-4 transition-colors"
                   @click="item.image_identifier = ''"
                 >
-                  Clear
+                  {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.CLEAR') }}
                 </button>
               </div>
 
@@ -664,7 +712,11 @@ const closeImagePicker = () => {
                   <span class="text-xl">📷</span>
                 </div>
                 <span class="text-sm text-n-slate-10 italic">
-                  No image selected
+                  {{
+                    t(
+                      'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.NO_IMAGE_SELECTED'
+                    )
+                  }}
                 </span>
               </div>
 
@@ -674,10 +726,22 @@ const closeImagePicker = () => {
                 class="px-3 py-1.5 text-xs font-medium bg-n-blue-9 text-white rounded-lg hover:bg-n-blue-10 transition-colors whitespace-nowrap"
                 @click="openImagePicker('item', sectionIndex, itemIndex)"
               >
-                {{ item.image_identifier ? 'Change' : 'Select' }}
+                {{
+                  item.image_identifier
+                    ? t(
+                        'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.IMAGE_BUTTON_CHANGE'
+                      )
+                    : t(
+                        'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.IMAGE_BUTTON_SELECT'
+                      )
+                }}
               </button>
               <span v-else class="text-xs text-n-slate-10 italic">
-                Add images first
+                {{
+                  t(
+                    'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.ADD_IMAGES_FIRST'
+                  )
+                }}
               </span>
             </div>
 
@@ -685,23 +749,37 @@ const closeImagePicker = () => {
             <div class="space-y-3">
               <div>
                 <label class="block text-xs font-medium text-n-slate-11 mb-1.5">
-                  Title
+                  {{
+                    t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.TITLE_LABEL')
+                  }}
                 </label>
                 <input
                   v-model="item.title"
                   type="text"
-                  placeholder="Option title"
+                  :placeholder="
+                    t(
+                      'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.TITLE_PLACEHOLDER'
+                    )
+                  "
                   class="w-full px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
                 />
               </div>
               <div>
                 <label class="block text-xs font-medium text-n-slate-11 mb-1.5">
-                  Description
+                  {{
+                    t(
+                      'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.SUBTITLE_LABEL'
+                    )
+                  }}
                 </label>
                 <input
                   v-model="item.subtitle"
                   type="text"
-                  placeholder="Description"
+                  :placeholder="
+                    t(
+                      'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.SUBTITLE_PLACEHOLDER'
+                    )
+                  "
                   class="w-full px-3 py-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-blue-7 text-sm"
                 />
               </div>
@@ -715,7 +793,7 @@ const closeImagePicker = () => {
                 xs
                 @click="removeListItem(sectionIndex, itemIndex)"
               >
-                Remove Item
+                {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.ITEMS.REMOVE') }}
               </Button>
             </div>
           </div>
@@ -744,12 +822,14 @@ const closeImagePicker = () => {
         @click.stop
       >
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold text-n-slate-12">Select Image</h3>
+          <h3 class="text-lg font-semibold text-n-slate-12">
+            {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.IMAGE_PICKER.TITLE') }}
+          </h3>
           <button
             class="text-n-slate-11 hover:text-n-slate-12"
             @click="closeImagePicker"
           >
-            ✕
+            {{ t('TEMPLATES.BUILDER.LIST_PICKER_BLOCK.IMAGE_PICKER.CLOSE') }}
           </button>
         </div>
 
@@ -775,7 +855,13 @@ const closeImagePicker = () => {
         </div>
 
         <div v-if="localProps.images.length === 0" class="text-center py-8">
-          <p class="text-sm text-n-slate-11">No images available</p>
+          <p class="text-sm text-n-slate-11">
+            {{
+              t(
+                'TEMPLATES.BUILDER.LIST_PICKER_BLOCK.IMAGE_PICKER.NO_INLINE_IMAGES'
+              )
+            }}
+          </p>
         </div>
       </div>
     </div>

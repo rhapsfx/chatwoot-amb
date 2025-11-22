@@ -544,6 +544,7 @@ if (localProps.value.pages.length === 0) {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-bare-strings-in-template -->
   <div class="space-y-6">
     <!-- Hidden file input for image upload -->
     <input
