@@ -902,8 +902,8 @@ const createForm = () => {
     formData.value.replyMessage.imageIdentifier,
   ].filter(Boolean);
 
-  const usedImages = props.availableImages.filter(img =>
-    usedImageIdentifiers.includes(img.identifier)
+  const usedImages = props.availableImages.filter(
+    img => usedImageIdentifiers.includes(img.identifier) && img.data
   );
 
   const formConfig = {
@@ -953,8 +953,8 @@ const saveAsTemplate = () => {
     formData.value.replyMessage.imageIdentifier,
   ].filter(Boolean);
 
-  const usedImages = props.availableImages.filter(img =>
-    usedImageIdentifiers.includes(img.identifier)
+  const usedImages = props.availableImages.filter(
+    img => usedImageIdentifiers.includes(img.identifier) && img.data
   );
 
   const formConfig = {
@@ -1638,7 +1638,7 @@ watch(
               class="px-4 py-2 border border-woot-500 text-woot-600 rounded-md hover:bg-woot-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               @click="saveAsTemplate"
             >
-              {{ t('TEMPLATES.BUILDER.APPLE_FORM.SAVE_AS_TEMPLATE_BUTTON') }}
+              Save as Template
             </button>
             <button
               :disabled="!canCreateForm"
