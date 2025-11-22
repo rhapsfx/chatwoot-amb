@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { addDays } from 'date-fns';
 
 const props = defineProps({
@@ -11,8 +10,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:properties']);
-
-const { t } = useI18n();
 
 // Flag to prevent infinite loop between watchers
 const isUpdatingFromProps = ref(false);
@@ -286,6 +283,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-bare-strings-in-template -->
   <div class="space-y-6">
     <!-- Images Section - Gallery Grid -->
     <div
