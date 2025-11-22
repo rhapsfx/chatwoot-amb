@@ -54,8 +54,13 @@ trigger_scheduled_items_job:
 
 # executed every 15 minutes
 # to assign unassigned conversations for all inboxes
-# DISABLED: Not needed for development
-# bulk_auto_assignment_job:
-#   cron: '*/15 * * * *'
-#   class: 'Inboxes::BulkAutoAssignmentJob'
-#   queue: scheduled_jobs
+bulk_auto_assignment_job:
+  cron: '*/15 * * * *'
+  class: 'Inboxes::BulkAutoAssignmentJob'
+  queue: scheduled_jobs
+
+# executed every 30 minutes for assignment_v2
+periodic_assignment_job:
+  cron: '*/30 * * * *'
+  class: 'AutoAssignment::PeriodicAssignmentJob'
+  queue: scheduled_jobs

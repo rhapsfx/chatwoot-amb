@@ -1,30 +1,32 @@
 class SendReplyJob < ApplicationJob
   queue_as :high
 
+  CHANNEL_SERVICES = {
+    'Channel::TwitterProfile' => ::Twitter::SendOnTwitterService,
+    'Channel::TwilioSms' => ::Twilio::SendOnTwilioService,
+    'Channel::Line' => ::Line::SendOnLineService,
+    'Channel::Telegram' => ::Telegram::SendOnTelegramService,
+    'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
+    'Channel::Sms' => ::Sms::SendOnSmsService,
+    'Channel::Instagram' => ::Instagram::SendOnInstagramService,
+    'Channel::Email' => ::Email::SendOnEmailService,
+    'Channel::WebWidget' => ::Messages::SendEmailNotificationService,
+    'Channel::Api' => ::Messages::SendEmailNotificationService,
+    'Channel::AppleMessagesForBusiness' => ::AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService
+  }.freeze
+
   def perform(message_id)
     # Performance Optimization: Eager load attachments with ActiveStorage associations
     # This prevents N+1 queries when processing attachments in SendMessageService
     message = Message.includes(attachments: { file_attachment: :blob }).find(message_id)
-    conversation = message.conversation
-    channel_name = conversation.inbox.channel.class.to_s
+    channel_name = message.conversation.inbox.channel.class.to_s
 
-    services = {
-      'Channel::TwitterProfile' => ::Twitter::SendOnTwitterService,
-      'Channel::TwilioSms' => ::Twilio::SendOnTwilioService,
-      'Channel::Line' => ::Line::SendOnLineService,
-      'Channel::Telegram' => ::Telegram::SendOnTelegramService,
-      'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
-      'Channel::Sms' => ::Sms::SendOnSmsService,
-      'Channel::Instagram' => ::Instagram::SendOnInstagramService,
-      'Channel::AppleMessagesForBusiness' => ::AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService
-    }
+    return send_on_facebook_page(message) if channel_name == 'Channel::FacebookPage'
 
-    case channel_name
-    when 'Channel::FacebookPage'
-      send_on_facebook_page(message)
-    else
-      services[channel_name].new(message: message).perform if services[channel_name].present?
-    end
+    service_class = CHANNEL_SERVICES[channel_name]
+    return unless service_class
+
+    service_class.new(message: message).perform
   end
 
   private
