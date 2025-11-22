@@ -26,7 +26,7 @@ rsync -avz --delete \
     --exclude='.git' \
     --exclude='storage' \
     --exclude='*.tar.gz' \
-    --exclude='public/vite' \
+    --exclude='public/vite*' \
     --exclude='.env' \
     --exclude='.env.*' \
     --exclude='certs' \
