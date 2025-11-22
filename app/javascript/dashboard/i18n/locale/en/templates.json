@@ -297,29 +297,43 @@
         "RECEIVED_MESSAGE": {
           "TITLE": "Received Message",
           "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Please select an option",
           "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "Optional subtitle",
           "HEADER_IMAGE": "Header Image",
-          "STYLE": "Style"
+          "STYLE": "Style",
+          "NONE": "None"
         },
         "REPLY_MESSAGE": {
           "TITLE": "Reply Message",
           "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Selection Made",
           "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "Your selection",
           "IMAGE_TITLE": "Image Title",
+          "IMAGE_TITLE_PLACEHOLDER": "Optional image title",
           "IMAGE_SUBTITLE": "Image Subtitle",
+          "IMAGE_SUBTITLE_PLACEHOLDER": "Optional image subtitle",
           "SECONDARY_SUBTITLE": "Secondary Subtitle",
+          "SECONDARY_SUBTITLE_PLACEHOLDER": "Right-aligned title",
           "TERTIARY_SUBTITLE": "Tertiary Subtitle",
+          "TERTIARY_SUBTITLE_PLACEHOLDER": "Right-aligned subtitle",
           "STYLE": "Style"
         },
         "IMAGES": {
           "TITLE": "Item Images",
           "ADD": "Add Image",
-          "EMPTY": "No images added. Images can be referenced by list items."
+          "EMPTY": "No images added. Images can be referenced by list items.",
+          "UPLOAD_TAB": "Upload New Images",
+          "SHARED_TAB": "Use Shared Images",
+          "UPLOAD_DESCRIPTION": "Upload images directly to this template (stored inline)",
+          "REMOVE": "Remove"
         },
         "SECTIONS": {
           "TITLE": "Sections & Options",
           "ADD": "Add Section",
           "SECTION_TITLE": "Section",
+          "SECTION_TITLE_PLACEHOLDER": "Enter section title",
           "REMOVE": "Remove Section",
           "MULTIPLE_SELECTION": "Allow multiple selections in this section"
         },
@@ -328,8 +342,32 @@
           "ADD": "Add Item",
           "IDENTIFIER": "ID",
           "TITLE": "Title",
+          "TITLE_LABEL": "Title",
+          "TITLE_PLACEHOLDER": "Option title",
           "SUBTITLE": "Subtitle",
-          "IMAGE": "Image"
+          "SUBTITLE_LABEL": "Description",
+          "SUBTITLE_PLACEHOLDER": "Description",
+          "IMAGE": "Image",
+          "IMAGE_LABEL": "Image:",
+          "NO_IMAGE_SELECTED": "No image selected",
+          "IMAGE_BUTTON_CHANGE": "Change",
+          "IMAGE_BUTTON_SELECT": "Select",
+          "ADD_IMAGES_FIRST": "Add images first",
+          "CLEAR": "Clear",
+          "REMOVE": "Remove Item"
+        },
+        "IMAGE_PICKER": {
+          "TITLE": "Select Image",
+          "INLINE_TAB": "Inline Images",
+          "SHARED_TAB": "Shared Images",
+          "NO_INLINE_IMAGES": "No inline images available",
+          "ADD_IMAGES_HINT": "Add images using the \"Upload New Images\" tab above",
+          "CLOSE": "✕"
+        },
+        "STYLE_OPTIONS": {
+          "ICON": "Icon",
+          "SMALL": "Small",
+          "LARGE": "Large"
         }
       },
       "PAYMENT_BLOCK": {
