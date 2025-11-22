@@ -118,10 +118,40 @@ WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
 WORKER_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q worker)
 
 if [ -z "$WEB_CONTAINER" ]; then
-    echo "⚠️  Web container not running - starting containers..."
+    echo "⚠️  Web container not running - installing dependencies first..."
+
+    # Strategy: Start containers with bundle install before app initialization
+    # This avoids the chicken-and-egg problem of new code requiring new gems
+
+    echo "Step 2a: Starting containers in detached mode..."
+    docker compose -f docker-compose.production.yml up -d postgres redis
+
+    echo "Waiting for database to be ready..."
+    sleep 5
+
+    # Start web container with a command that keeps it alive but doesn't load Rails
+    echo "Step 2b: Starting web container in maintenance mode..."
+    docker compose -f docker-compose.production.yml run -d --name chatwoot-web-temp web sleep infinity
+
+    # Get temp container ID
+    WEB_CONTAINER=$(docker ps -q -f name=chatwoot-web-temp)
+
+    if [ -z "$WEB_CONTAINER" ]; then
+        echo "❌ Failed to start temporary web container!"
+        exit 1
+    fi
+
+    echo "Step 2c: Installing gems in temporary container..."
+    docker exec $WEB_CONTAINER bundle install --jobs=4
+
+    echo "Step 2d: Stopping temporary container and starting normal services..."
+    docker stop $WEB_CONTAINER
+    docker rm $WEB_CONTAINER
+
+    # Now start normally - gems are installed
     docker compose -f docker-compose.production.yml up -d
 
-    echo "Waiting for containers to start..."
+    echo "Waiting for services to initialize..."
     sleep 10
 
     # Get container IDs after starting
@@ -134,7 +164,9 @@ if [ -z "$WEB_CONTAINER" ]; then
         exit 1
     fi
 
-    echo "✅ Containers started successfully"
+    echo "✅ Containers started successfully with updated dependencies"
+else
+    echo "✅ Containers already running"
 fi
 
 echo "Copying backend code to web container..."
@@ -170,24 +202,6 @@ if [ -n "$WORKER_CONTAINER" ]; then
     docker cp config/routes.rb $WORKER_CONTAINER:/app/config/
     docker cp config/initializers/. $WORKER_CONTAINER:/app/config/initializers/
     # Note: schedule.yml is NOT copied to preserve production scheduled jobs
-fi
-
-echo ""
-echo "Updating gem dependencies in containers..."
-echo "  → Copying Gemfile and Gemfile.lock to web container..."
-docker cp Gemfile $WEB_CONTAINER:/app/
-docker cp Gemfile.lock $WEB_CONTAINER:/app/
-
-echo "  → Installing gems in web container (this may take a few minutes)..."
-docker exec $WEB_CONTAINER bundle install --jobs=4
-
-if [ -n "$WORKER_CONTAINER" ]; then
-    echo "  → Copying Gemfile and Gemfile.lock to worker container..."
-    docker cp Gemfile $WORKER_CONTAINER:/app/
-    docker cp Gemfile.lock $WORKER_CONTAINER:/app/
-
-    echo "  → Installing gems in worker container..."
-    docker exec $WORKER_CONTAINER bundle install --jobs=4
 fi
 
 echo ""
@@ -269,7 +283,7 @@ echo "✅ Models, controllers, services deployed"
 echo "✅ Bot API endpoints and services deployed"
 echo "✅ Apple Messages image architecture deployed (SharedAppleImage + ImageFetchService)"
 echo "✅ Apple Maps tokens synced to production .env (with backup)"
-echo "✅ Gem dependencies updated (bundle install)"
+echo "✅ Gem dependencies updated (bundle install before container startup)"
 echo "✅ Routes and configuration updated"
 echo "✅ Database migrations executed"
 echo "✅ Custom roles feature enabled for all accounts"
