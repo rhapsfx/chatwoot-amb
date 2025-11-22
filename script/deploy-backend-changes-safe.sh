@@ -113,12 +113,28 @@ ssh root@msp.rhaps.net 'bash -s' << 'ENDSSH'
 set -e
 cd /opt/chatwoot
 
+# Check if containers are running, start them if not
 WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
 WORKER_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q worker)
 
 if [ -z "$WEB_CONTAINER" ]; then
-    echo "❌ Web container not running!"
-    exit 1
+    echo "⚠️  Web container not running - starting containers..."
+    docker compose -f docker-compose.production.yml up -d
+
+    echo "Waiting for containers to start..."
+    sleep 10
+
+    # Get container IDs after starting
+    WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
+    WORKER_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q worker)
+
+    if [ -z "$WEB_CONTAINER" ]; then
+        echo "❌ Failed to start web container!"
+        echo "Check logs: docker compose -f docker-compose.production.yml logs web"
+        exit 1
+    fi
+
+    echo "✅ Containers started successfully"
 fi
 
 echo "Copying backend code to web container..."
