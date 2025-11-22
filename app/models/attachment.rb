@@ -326,17 +326,16 @@ class Attachment < ApplicationRecord
   end
 
   def validate_file_size(byte_size)
-    # Different channels have different size limits:
-    # - WebWidget: 40 MB (general web upload limit)
-    # - Apple Messages for Business: 100 MB (per Apple MSP REST API v4.1.5)
-    max_size = case message.inbox.channel_type
-               when 'Channel::AppleMessagesForBusiness'
-                 100.megabytes
-               else
-                 40.megabytes
-               end
+    # Use configurable limit from GlobalConfigService (upstream feature)
+    limit_mb = GlobalConfigService.load('MAXIMUM_FILE_UPLOAD_SIZE', 40).to_i
+    limit_mb = 40 if limit_mb <= 0
 
-    errors.add(:file, 'size is too big') if byte_size > max_size
+    # Override for Apple Messages for Business - 100 MB per Apple MSP REST API v4.1.5
+    if message.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
+      limit_mb = 100
+    end
+
+    errors.add(:file, 'size is too big') if byte_size > limit_mb.megabytes
   end
 
   def media_file?(file_content_type)

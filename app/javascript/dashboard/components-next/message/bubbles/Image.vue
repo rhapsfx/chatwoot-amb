@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import { useLoadWithRetry } from 'dashboard/composables/loadWithRetry';
 import BaseBubble from './Base.vue';
 import Button from 'next/button/Button.vue';
 import Icon from 'next/icon/Icon.vue';
@@ -11,7 +12,6 @@ import { downloadFile } from '@chatwoot/utils';
 
 import GalleryView from 'dashboard/components/widgets/conversation/components/GalleryView.vue';
 
-const emit = defineEmits(['error']);
 const { t } = useI18n();
 
 const { filteredCurrentChatAttachments, attachments } = useMessageContext();
@@ -20,16 +20,18 @@ const attachment = computed(() => {
   return attachments.value[0];
 });
 
-const hasError = ref(false);
+const { hasError, loadWithRetry } = useLoadWithRetry();
+
 const showGallery = ref(false);
 const isDownloading = ref(false);
 const imageDataUrl = ref(null);
 const isLoading = ref(true);
 
-const handleError = () => {
-  hasError.value = true;
-  emit('error');
-};
+onMounted(() => {
+  if (attachment.value?.dataUrl) {
+    loadWithRetry(attachment.value.dataUrl);
+  }
+});
 
 const downloadAttachment = async () => {
   const { fileType, dataUrl, extension } = attachment.value;
@@ -53,33 +55,28 @@ const isNgrokUrl = computed(() => {
 
 // Load image with proper headers to bypass ngrok browser warning
 const loadImageWithHeaders = async url => {
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'ngrok-skip-browser-warning': 'true',
-        'User-Agent': 'Chatwoot-Apple-Messages-For-Business',
-        Accept: 'image/*,*/*;q=0.8',
-      },
-      mode: 'cors',
-    });
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+      'User-Agent': 'Chatwoot-Apple-Messages-For-Business',
+      Accept: 'image/*,*/*;q=0.8',
+    },
+    mode: 'cors',
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  } catch (error) {
-    console.error('Failed to load image with headers:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
   }
+
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
 };
 
-// Load image on mount
+// Load image on mount - use upstream's loadWithRetry for non-ngrok, custom logic for ngrok
 onMounted(async () => {
   if (!attachment.value?.dataUrl) {
-    handleError();
+    hasError.value = true;
     return;
   }
 
@@ -88,16 +85,20 @@ onMounted(async () => {
       // For ngrok URLs, use fetch with proper headers
       imageDataUrl.value = await loadImageWithHeaders(attachment.value.dataUrl);
     } else {
-      // For regular URLs, use direct URL
+      // For regular URLs, use upstream's loadWithRetry
+      await loadWithRetry(attachment.value.dataUrl);
       imageDataUrl.value = attachment.value.dataUrl;
     }
+    isLoading.value = false;
   } catch (error) {
-    console.error('Image loading failed:', error);
-    handleError();
-  } finally {
+    hasError.value = true;
     isLoading.value = false;
   }
 });
+
+const handleImageError = () => {
+  hasError.value = true;
+};
 </script>
 
 <template>
@@ -124,8 +125,6 @@ onMounted(async () => {
         :src="imageDataUrl"
         :width="attachment.width"
         :height="attachment.height"
-        @click="onClick"
-        @error="handleError"
       />
       <div
         class="inset-0 p-2 pointer-events-none absolute bg-gradient-to-tl from-n-slate-12/30 dark:from-n-slate-1/50 via-transparent to-transparent hidden group-hover:flex"
@@ -150,7 +149,7 @@ onMounted(async () => {
     v-model:show="showGallery"
     :attachment="useSnakeCase(attachment)"
     :all-attachments="filteredCurrentChatAttachments"
-    @error="handleError"
+    @error="handleImageError"
     @close="() => (showGallery = false)"
   />
 </template>

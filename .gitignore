@@ -129,3 +129,8 @@ docs/**/*.pdf
 .roo/mcp.json
 /n8n-flows
 nohup.out
+
+# pnpm cache and local development
+.pnpm-store/*
+local/
+
