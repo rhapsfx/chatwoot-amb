@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Messages::MessageBuilder
   include ::FileTypeHelper
   include ::EmailHelper
