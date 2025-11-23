@@ -1208,17 +1208,35 @@ watch(
               </div>
 
               <div class="mb-6">
-                <div class="flex items-center justify-between mb-3">
-                  <h3
-                    class="text-base font-semibold text-slate-900 dark:text-slate-100"
-                  >
-                    {{ t('APPLE_FORM.PAGES') }}
-                  </h3>
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h3
+                      class="text-base font-semibold text-slate-900 dark:text-slate-100"
+                    >
+                      {{ t('APPLE_FORM.PAGES') }}
+                    </h3>
+                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                      Click a page to view and edit its fields
+                    </p>
+                  </div>
                   <button
-                    class="px-2 py-1 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600 transition-colors"
+                    class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+                    :title="t('APPLE_FORM.ADD_PAGE')"
                     @click="addNewPage"
                   >
-                    {{ `+ ${t('APPLE_FORM.ADD_PAGE')}` }}
+                    <svg
+                      class="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2.5"
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
                   </button>
                 </div>
 
@@ -1265,19 +1283,39 @@ watch(
               </div>
 
               <div v-if="currentPage">
-                <div class="flex items-center justify-between mb-3">
-                  <h4
-                    class="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate"
-                  >
-                    {{
-                      t('APPLE_FORM.FIELDS_TITLE', { page: currentPage.title })
-                    }}
-                  </h4>
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h4
+                      class="text-sm font-semibold text-slate-900 dark:text-slate-100"
+                    >
+                      {{
+                        t('APPLE_FORM.FIELDS_TITLE', {
+                          page: currentPage.title,
+                        })
+                      }}
+                    </h4>
+                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                      Add and configure form fields
+                    </p>
+                  </div>
                   <button
-                    class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
+                    class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+                    :title="t('APPLE_FORM.ADD_FIELD')"
                     @click="openAddFieldModal"
                   >
-                    {{ t('APPLE_FORM.ADD_FIELD') }}
+                    <svg
+                      class="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2.5"
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
                   </button>
                 </div>
 
