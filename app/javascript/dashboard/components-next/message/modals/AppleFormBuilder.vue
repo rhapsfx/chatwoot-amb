@@ -1117,110 +1117,92 @@ watch(
                   {{ t('APPLE_FORM.MESSAGES_TAB.MESSAGE_CONFIGURATION') }}
                 </h3>
 
-                <!-- Two-column layout: Form fields on left, Image browser on right -->
-                <div class="grid grid-cols-2 gap-6">
-                  <!-- Left Column: Form Configuration -->
-                  <div class="space-y-3">
-                    <!-- Received Message Subtitle -->
+                <div class="space-y-3">
+                  <!-- Received Message Subtitle -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                    >
+                      {{
+                        t(
+                          'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_LABEL'
+                        )
+                      }}
+                    </label>
+                    <input
+                      v-model="formData.receivedMessage.subtitle"
+                      type="text"
+                      :placeholder="
+                        t(
+                          'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER'
+                        )
+                      "
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                    />
+                  </div>
+
+                  <!-- Style Selection -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                    >
+                      {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
+                    </label>
+                    <select
+                      v-model="formData.receivedMessage.style"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                    >
+                      <option
+                        v-for="style in styleOptions"
+                        :key="style.value"
+                        :value="style.value"
+                      >
+                        {{ style.label }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Reply Message Section -->
+                  <div
+                    class="space-y-3 pt-3 border-t border-slate-200 dark:border-n-slate-6"
+                  >
+                    <h4
+                      class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
+                    >
+                      {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
+                    </h4>
+
                     <div>
                       <label
                         class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                       >
-                        {{
-                          t(
-                            'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_LABEL'
-                          )
-                        }}
+                        {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
                       </label>
                       <input
-                        v-model="formData.receivedMessage.subtitle"
+                        v-model="formData.replyMessage.title"
                         type="text"
                         :placeholder="
-                          t(
-                            'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER'
-                          )
+                          t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
                         "
                         class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                       />
                     </div>
 
-                    <!-- Style Selection -->
                     <div>
                       <label
                         class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                       >
-                        {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
+                        {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
                       </label>
-                      <select
-                        v-model="formData.receivedMessage.style"
+                      <input
+                        v-model="formData.replyMessage.subtitle"
+                        type="text"
+                        :placeholder="
+                          t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
+                        "
                         class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                      >
-                        <option
-                          v-for="style in styleOptions"
-                          :key="style.value"
-                          :value="style.value"
-                        >
-                          {{ style.label }}
-                        </option>
-                      </select>
+                      />
                     </div>
-
-                    <!-- Reply Message Section -->
-                    <div
-                      class="space-y-3 pt-3 border-t border-slate-200 dark:border-n-slate-6"
-                    >
-                      <h4
-                        class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
-                      >
-                        {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
-                      </h4>
-
-                      <div>
-                        <label
-                          class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                        >
-                          {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
-                        </label>
-                        <input
-                          v-model="formData.replyMessage.title"
-                          type="text"
-                          :placeholder="
-                            t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
-                          "
-                          class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                        >
-                          {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
-                        </label>
-                        <input
-                          v-model="formData.replyMessage.subtitle"
-                          type="text"
-                          :placeholder="
-                            t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
-                          "
-                          class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Right Column: Image Browser -->
-                  <div>
-                    <label
-                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-2"
-                    >
-                      {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
-                    </label>
-                    <SharedImageSelector
-                      v-model="formData.receivedMessage.imageIdentifier"
-                      :account-id="currentAccountId"
-                      image-type="form"
-                    />
                   </div>
                 </div>
               </div>
@@ -1344,38 +1326,56 @@ watch(
             </div>
 
             <div class="w-1/2 p-6 overflow-y-auto">
-              <div v-if="currentPage">
+              <!-- Image Browser -->
+              <div>
                 <h3
                   class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
                 >
-                  {{ t('APPLE_FORM.PAGE_CONFIG') }}
+                  {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
                 </h3>
-                <div class="space-y-3">
-                  <div>
-                    <label
-                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                    >
-                      {{ t('APPLE_FORM.PAGE_TITLE_LABEL') }}
-                    </label>
-                    <input
-                      v-model="currentPage.title"
-                      type="text"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                    >
-                      {{ t('APPLE_FORM.PAGE_DESCRIPTION_LABEL') }}
-                    </label>
-                    <textarea
-                      v-model="currentPage.description"
-                      rows="2"
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                    />
-                  </div>
-                </div>
+                <SharedImageSelector
+                  v-model="formData.receivedMessage.imageIdentifier"
+                  :account-id="currentAccountId"
+                  image-type="form"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Page Configuration (Full Width Below) -->
+          <div
+            v-if="currentPage"
+            class="border-t border-slate-200 dark:border-n-slate-6 p-6"
+          >
+            <h3
+              class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
+            >
+              {{ t('APPLE_FORM.PAGE_CONFIG') }}
+            </h3>
+            <div class="grid grid-cols-2 gap-6">
+              <div>
+                <label
+                  class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                >
+                  {{ t('APPLE_FORM.PAGE_TITLE_LABEL') }}
+                </label>
+                <input
+                  v-model="currentPage.title"
+                  type="text"
+                  class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                />
+              </div>
+              <div>
+                <label
+                  class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                >
+                  {{ t('APPLE_FORM.PAGE_DESCRIPTION_LABEL') }}
+                </label>
+                <textarea
+                  v-model="currentPage.description"
+                  rows="2"
+                  class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                />
               </div>
             </div>
           </div>
