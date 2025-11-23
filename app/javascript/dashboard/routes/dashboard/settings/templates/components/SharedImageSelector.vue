@@ -303,19 +303,31 @@ onMounted(() => {
 
           <!-- Delete button (appears on hover) -->
           <button
-            class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 bg-n-ruby-9 hover:bg-n-ruby-10 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-opacity z-10"
+            class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full w-8 h-8 flex items-center justify-center shadow-lg transition-all z-10"
             title="Delete image"
             @click.stop="deleteImage(image)"
           >
-            <span class="i-lucide-trash-2 text-white text-sm" />
+            <svg
+              class="w-4 h-4 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
           </button>
 
           <!-- Image name label at bottom (always visible) -->
           <div
-            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/90 to-transparent text-white text-xs px-2 py-1.5"
+            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-transparent text-white px-2 py-2"
             :title="image.original_name || image.description"
           >
-            <div class="font-medium truncate text-shadow-sm">
+            <div class="text-sm font-semibold truncate drop-shadow-lg">
               {{ image.original_name || image.description }}
             </div>
           </div>
