@@ -977,7 +977,7 @@ watch(
       class="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-80 flex items-center justify-center p-4"
     >
       <div
-        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg max-w-4xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800"
+        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg max-w-7xl w-full max-h-full overflow-hidden flex flex-col shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800"
       >
         <div
           class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-n-slate-6"
