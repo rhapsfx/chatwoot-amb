@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useAlert } from 'dashboard/composables';
+import { useStore } from 'vuex';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
 
 const props = defineProps({
   show: {
@@ -12,11 +13,17 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  accountId: {
+    type: Number,
+    required: false,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['close', 'create', 'uploadImage', 'saveAsTemplate']);
+const emit = defineEmits(['close', 'create', 'saveAsTemplate']);
 
 const { t: i18nT } = useI18n();
+const store = useStore();
 
 // Safe translation wrapper to prevent vue-i18n parsing errors
 const t = (key, defaultValue = '') => {
@@ -27,6 +34,11 @@ const t = (key, defaultValue = '') => {
     return defaultValue || key.split('.').pop();
   }
 };
+
+// Computed properties for account ID
+const currentAccountId = computed(() => {
+  return props.accountId || store.getters.getCurrentAccountId;
+});
 
 // Form builder state
 const formData = ref({
@@ -102,50 +114,6 @@ const getImagePreviewUrl = identifier => {
   const image = getImageByIdentifier(identifier);
   if (!image) return null;
   return image.preview || image.image_url;
-};
-
-// Image upload handler
-const fileInputRef = ref(null);
-
-const handleImageUpload = () => {
-  // Trigger file input click
-  if (fileInputRef.value) {
-    fileInputRef.value.click();
-  }
-};
-
-const handleFileSelected = async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    useAlert(t('APPLE_FORM.IMAGE_UPLOAD.INVALID_FILE_TYPE'));
-    return;
-  }
-
-  // Read file as base64
-  const reader = new FileReader();
-  reader.onload = e => {
-    const imageData = {
-      identifier: `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      data: e.target.result.split(',')[1], // Remove data URL prefix
-      preview: e.target.result,
-      description: file.name,
-      originalName: file.name,
-      size: file.size,
-    };
-
-    // Emit to parent to save the image
-    emit('uploadImage', imageData);
-
-    // Auto-select the newly uploaded image
-    formData.value.receivedMessage.imageIdentifier = imageData.identifier;
-  };
-  reader.readAsDataURL(file);
-
-  // Reset file input
-  event.target.value = '';
 };
 
 // Apple MSP style options
@@ -1004,15 +972,6 @@ watch(
 <template>
   <!-- eslint-disable vue/no-bare-strings-in-template -->
   <div>
-    <!-- Hidden file input for image upload -->
-    <input
-      ref="fileInputRef"
-      type="file"
-      accept="image/*"
-      class="hidden"
-      @change="handleFileSelected"
-    />
-
     <div
       v-if="show"
       class="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-80 flex items-center justify-center p-4"
@@ -1158,136 +1117,109 @@ watch(
                   {{ t('APPLE_FORM.MESSAGES_TAB.MESSAGE_CONFIGURATION') }}
                 </h3>
 
-                <!-- Received Message Subtitle -->
-                <div class="mb-3">
-                  <label
-                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{
-                      t(
-                        'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_LABEL'
-                      )
-                    }}
-                  </label>
-                  <input
-                    v-model="formData.receivedMessage.subtitle"
-                    type="text"
-                    :placeholder="
-                      t(
-                        'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER'
-                      )
-                    "
-                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                  />
-                </div>
-
-                <!-- Image Selection -->
-                <div class="mb-3">
-                  <label
-                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
-                  </label>
-                  <div class="flex items-center space-x-2">
-                    <select
-                      v-model="formData.receivedMessage.imageIdentifier"
-                      class="flex-1 px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                    >
-                      <option value="">
-                        {{ t('APPLE_FORM.MESSAGES_TAB.NO_IMAGE') }}
-                      </option>
-                      <option
-                        v-for="image in availableImages"
-                        :key="image.identifier"
-                        :value="image.identifier"
+                <!-- Two-column layout: Form fields on left, Image browser on right -->
+                <div class="grid grid-cols-2 gap-6">
+                  <!-- Left Column: Form Configuration -->
+                  <div class="space-y-3">
+                    <!-- Received Message Subtitle -->
+                    <div>
+                      <label
+                        class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                       >
-                        {{ image.description || image.identifier }}
-                      </option>
-                    </select>
-                    <button
-                      type="button"
-                      class="px-2 py-1.5 bg-woot-500 text-white text-xs rounded-md hover:bg-woot-600"
-                      @click="handleImageUpload"
+                        {{
+                          t(
+                            'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_LABEL'
+                          )
+                        }}
+                      </label>
+                      <input
+                        v-model="formData.receivedMessage.subtitle"
+                        type="text"
+                        :placeholder="
+                          t(
+                            'APPLE_FORM.MESSAGES_TAB.RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER'
+                          )
+                        "
+                        class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                      />
+                    </div>
+
+                    <!-- Style Selection -->
+                    <div>
+                      <label
+                        class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                      >
+                        {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
+                      </label>
+                      <select
+                        v-model="formData.receivedMessage.style"
+                        class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                      >
+                        <option
+                          v-for="style in styleOptions"
+                          :key="style.value"
+                          :value="style.value"
+                        >
+                          {{ style.label }}
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- Reply Message Section -->
+                    <div
+                      class="space-y-3 pt-3 border-t border-slate-200 dark:border-n-slate-6"
                     >
-                      {{ t('APPLE_FORM.MESSAGES_TAB.UPLOAD_BUTTON') }}
-                    </button>
+                      <h4
+                        class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
+                      >
+                        {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
+                      </h4>
+
+                      <div>
+                        <label
+                          class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                        >
+                          {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
+                        </label>
+                        <input
+                          v-model="formData.replyMessage.title"
+                          type="text"
+                          :placeholder="
+                            t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
+                          "
+                          class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                        >
+                          {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
+                        </label>
+                        <input
+                          v-model="formData.replyMessage.subtitle"
+                          type="text"
+                          :placeholder="
+                            t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
+                          "
+                          class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div
-                    v-if="formData.receivedMessage.imageIdentifier"
-                    class="mt-2"
-                  >
-                    <img
-                      :src="
-                        getImagePreviewUrl(
-                          formData.receivedMessage.imageIdentifier
-                        )
-                      "
-                      class="h-16 rounded border border-slate-300 dark:border-n-slate-6"
-                      alt="Preview"
-                    />
-                  </div>
-                </div>
 
-                <!-- Style Selection -->
-                <div class="mb-3">
-                  <label
-                    class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
-                  </label>
-                  <select
-                    v-model="formData.receivedMessage.style"
-                    class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                  >
-                    <option
-                      v-for="style in styleOptions"
-                      :key="style.value"
-                      :value="style.value"
-                    >
-                      {{ style.label }}
-                    </option>
-                  </select>
-                </div>
-
-                <!-- Reply Message -->
-                <div
-                  class="space-y-3 pt-3 border-t border-slate-200 dark:border-n-slate-6"
-                >
-                  <h4
-                    class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
-                  >
-                    {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
-                  </h4>
-
+                  <!-- Right Column: Image Browser -->
                   <div>
                     <label
-                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-2"
                     >
-                      {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
+                      {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
                     </label>
-                    <input
-                      v-model="formData.replyMessage.title"
-                      type="text"
-                      :placeholder="
-                        t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
-                      "
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                    >
-                      {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
-                    </label>
-                    <input
-                      v-model="formData.replyMessage.subtitle"
-                      type="text"
-                      :placeholder="
-                        t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
-                      "
-                      class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                    <SharedImageSelector
+                      v-model="formData.receivedMessage.imageIdentifier"
+                      :account-id="currentAccountId"
+                      image-type="form"
                     />
                   </div>
                 </div>
