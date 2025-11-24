@@ -25,6 +25,8 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
       send_form_message
     when 'apple_pay'
       send_apple_pay_message
+    when 'apple_custom_payload'
+      send_custom_payload_message
     else
       Rails.logger.debug '🔥 Unknown content type, using fallback'
       send_text_or_attachment_message # fallback
@@ -120,6 +122,17 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
       channel: channel,
       destination_id: message.conversation.contact_inbox.source_id,
       payment_data: payment_data
+    )
+
+    response = service.perform
+    update_message_status(response)
+  end
+
+  def send_custom_payload_message
+    service = AppleMessagesForBusiness::SendCustomPayloadService.new(
+      channel: channel,
+      destination_id: message.conversation.contact_inbox.source_id,
+      message: message
     )
 
     response = service.perform

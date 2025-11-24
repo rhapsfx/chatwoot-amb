@@ -294,8 +294,12 @@ archive_and_cleanup_logs() {
     done
     
     # Also archive numbered log files (e.g., development.log.0, development.log.1)
+    # Exclude .gz files to prevent re-archiving already compressed files
     for log_file in log/*.log.[0-9]*; do
         [ -e "$log_file" ] || continue
+        
+        # Skip if this is already a .gz archive
+        [[ "$log_file" == *.gz ]] && continue
         
         # Only archive if file has content
         if [ -s "$log_file" ]; then

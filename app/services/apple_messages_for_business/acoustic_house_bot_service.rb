@@ -182,6 +182,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                               'qr_learn_more' # Learn more question
                             when 'AHF1'
                               'applepay_1018' # Apple Pay
+                            when 'DEMO_MODE'
+                              'applepay_1018' # Apple Pay in demo mode
                             when 'DEMO_MODE_LARGE_FORM'
                               'form_large_content' # Large content form response
                             else
@@ -360,7 +362,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     when 'AHJ1'
       # Waiting for photo quick reply response or photo attachment
       # This state is handled by interactive response handler (qr_photo) or attachment handler
-      send_text_message('Please select Yes or No above, or send us a photo if you said Yes!')
+      # No action needed - user already instructed to send photo after clicking Yes
     when 'AHJ2'
       handle_documents_intro
     when 'AHJ3'
@@ -404,10 +406,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Update state here instead of in handle_welcome
     update_bot_state('AHA2') if @bot_state == 'AHA1'
 
-    send_text_message('Which region are you traveling from?')
     send_quick_reply(
       title: 'Select Region',
       request_id: 'qr_travel',
+      message: 'Which region are you traveling from?',
       items: [
         { title: 'Americas', value: 'Americas' },
         { title: 'EMEA', value: 'EMEA' },
@@ -552,10 +554,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     # If both names are present, ask for preference
     if customer_name.present? && stage_name.present?
-      send_text_message('How would you prefer to be addressed?')
       send_quick_reply(
         title: 'Name Preference',
         request_id: 'qr_name',
+        message: 'How would you prefer to be addressed?',
         items: [
           { title: customer_name, value: 'real_name' },
           { title: stage_name, value: 'stage_name' }
@@ -659,6 +661,21 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_guitar_selection(interactive_data)
     log_info '[Bot] 🎸 handle_guitar_selection called'
     log_info "[Bot] 🎸 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
+    log_info "[Bot] 🎸 FULL interactive_data structure: #{utf8_encode(interactive_data).inspect}"
+
+    # Idempotency guard: prevent processing the same guitar selection twice
+    selection_data = interactive_data['ldtext'] || interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
+    selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
+    selection_key = "guitar_selection:#{selection_hash}"
+
+    if Redis::Alfred.get(selection_key).present?
+      log_info "[Bot] 🎸 Guitar selection already processed (hash: #{selection_hash}), skipping"
+      return
+    end
+
+    # Mark as processed (expires after 2 minutes)
+    Redis::Alfred.setex(selection_key, '1', 2.minutes.to_i)
+    log_info "[Bot] 🎸 Guitar selection marked as processed (hash: #{selection_hash})"
 
     # Extract selection from interactive data
     # For list picker responses from IDR, the selection is in the 'ldtext' field
@@ -676,9 +693,30 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   log_info "[Bot] 🎸 NSKeyedArchiver guitar selection: #{utf8_encode(guitar_name)}"
                   guitar_name
                 else
-                  # Standard format
-                  guitar_name = interactive_data.dig('data', 'reply', 'title')
-                  log_info "[Bot] 🎸 Standard format guitar selection: #{utf8_encode(guitar_name)}"
+                  # Standard format - extract from listPicker sections
+                  data = interactive_data['data'] || {}
+                  list_picker = data['listPicker'] || {}
+                  sections = list_picker['sections'] || []
+
+                  # Find the selected item across all sections
+                  guitar_name = nil
+                  sections.each do |section|
+                    items = section['items'] || []
+                    selected_item = items.find { |item| item['title'].present? }
+                    next unless selected_item
+
+                    guitar_name = selected_item['title']
+                    log_info "[Bot] 🎸 Standard format (listPicker) guitar selection: #{utf8_encode(guitar_name)}"
+                    break
+                  end
+
+                  # Fallback to old reply format if list picker format didn't work
+                  if guitar_name.blank?
+                    guitar_name = interactive_data.dig('data', 'reply', 'title')
+                    log_info "[Bot] 🎸 Standard format (reply) guitar selection: #{utf8_encode(guitar_name)}"
+                  end
+
+                  log_info "[Bot] 🎸 Guitar name after all attempts: #{utf8_encode(guitar_name).inspect}"
                   guitar_name
                 end
 
@@ -713,15 +751,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_ar_introduction
     # AHC2: Send AR file with introduction message
-    guitar = get_conversation_attribute('selected_guitar') || 'guitar'
-    send_text_message("Just in. We have this cool #{guitar}. Check it out in AR!")
+    get_conversation_attribute('selected_guitar') || 'guitar'
+    send_text_message('Just in. We have this cool Stratocaster. Check it out in AR!')
     send_ar_file
     update_bot_state('AHC3')
 
     # Wait for AR file to fully upload and be delivered before asking question
     # AR file has 2s delay in after_commit + upload time + network latency + device rendering
-    # Need 9s minimum to ensure file is visible to user before question appears
-    sleep(9.0)
+    # Increased to 15s to ensure AR file is fully visible before question appears
+    sleep(15.0)
     handle_ar_first_question
   end
 
@@ -762,7 +800,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - User didn't see AR view
 
-    # Send the AR placement question (with quick reply) - no need for duplicate text message
+    # Wait a moment before asking the next question
+    sleep(2.0)
+
+    # Send the AR placement question
     send_ar_place_question
 
     update_bot_state('AHE1')
@@ -850,7 +891,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Handle Apple Pay completion
     payment_state = interactive_data.dig('data', 'payment', 'state')
 
-    log_info "[Bot] 💳 Apple Pay response - state: #{payment_state}"
+    log_info '[Bot] 💳 handle_apple_pay_response called'
+    log_info "[Bot] 💳 Current bot_state: #{@bot_state}"
+    log_info "[Bot] 💳 Apple Pay response - payment_state: #{payment_state}"
 
     if payment_state == 'paid'
       customer_name = get_conversation_attribute('customer_name') || 'there'
@@ -861,12 +904,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     # Check if we're in demo mode - if so, stop here
     if @bot_state == 'DEMO_MODE'
-      log_info '[Bot] 💳 In DEMO_MODE - stopping after Apple Pay response'
+      log_info '[Bot] 💳 ✅ In DEMO_MODE - stopping after Apple Pay response'
       send_text_message("Type 'startover' to restart the conversation.")
       return
     end
 
     # Normal flow: continue to lesson introduction
+    log_info "[Bot] 💳 Not in DEMO_MODE (state: #{@bot_state}) - continuing to lesson introduction"
     reset_retry_count
     update_bot_state('AHF2')
     handle_lesson_introduction
@@ -1007,7 +1051,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         coordinates[:latitude],
         coordinates[:longitude],
         'Apple Store',
-        radius: 50_000 # 50 km
+        radius: 10_000 # 10 km - reduced from 20 km to filter closer stores
       )
 
       if stores.present?
@@ -1083,6 +1127,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     log_info '[Bot] 🕐 handle_time_picker_response called'
     log_info "[Bot] 🕐 interactive_data keys: #{utf8_encode(_interactive_data.keys).inspect}"
 
+    # Idempotency guard: prevent processing the same time picker response twice
+    selection_data = _interactive_data['ldtext'] || _interactive_data.dig('data', 'event', 'timeslots')&.to_json || 'unknown'
+    selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
+    selection_key = "time_picker_response:#{selection_hash}"
+
+    if Redis::Alfred.get(selection_key).present?
+      log_info "[Bot] 🕐 Time picker response already processed (hash: #{selection_hash}), skipping"
+      return
+    end
+
+    # Mark as processed (expires after 2 minutes)
+    Redis::Alfred.setex(selection_key, '1', 2.minutes.to_i)
+    log_info "[Bot] 🕐 Time picker response marked as processed (hash: #{selection_hash})"
+
     # Handle both direct format and NSKeyedArchiver format
     selected_time = if _interactive_data['data'].present?
                       # Direct interactiveData format - extract from data structure
@@ -1131,11 +1189,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_continue_prompt
     # AHH2: Ask if user wants to continue
     send_text_message('Thank you for your co-operation, you\'re all set to learn to shred. 🤘')
-    send_text_message('Shall we continue?')
 
     send_quick_reply(
       title: 'Shall we continue?',
       request_id: 'qr_continue',
+      message: 'Shall we continue?',
       items: [
         { title: 'Yes', value: 'Yes' },
         { title: 'No', value: 'No' }
@@ -1169,19 +1227,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       update_bot_state('AHJ4')
       handle_learn_more_prompt
     else
-      # Continue to rich links (AHI2)
-      send_text_message('There\'s so much more you can do like sharing beautiful links to your website:')
-      update_bot_state('AHI2')
-      handle_rich_link_display
+      # Continue to photo question (skip rich link until after photo response)
+      update_bot_state('AHI3')
+      handle_photo_intro
     end
   end
 
   def handle_rich_link_display
-    # AHI2: Send rich link
+    # AHI2: Send rich link (called after photo response)
+    send_text_message('There\'s so much more you can do like sharing beautiful links to your website:')
     send_apple_messages_rich_link
-
-    update_bot_state('AHI3')
-    handle_photo_intro
   end
 
   def handle_photo_intro
@@ -1195,11 +1250,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_photo_request
     # AHI4: Request photo from user
     first_name = get_conversation_attribute('customer_name') || 'there'
-    send_text_message("You can send us one too!!! #{first_name} will you share a picture of your favorite food or place to eat?")
 
     send_quick_reply(
       title: 'Will you share a picture?',
       request_id: 'qr_photo',
+      message: "You can send us one too!!! #{first_name} will you share a picture of your favorite food or place to eat?",
       items: [
         { title: 'Yes', value: 'Yes' },
         { title: 'No', value: 'No' }
@@ -1240,10 +1295,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       send_text_message('Awesome! We will hang tight while you send us your fav.')
       # Stay in AHJ1 state - attachment handler will progress to AHJ2 when photo is received
     else
-      # User said No - skip photo and proceed to documents
-      send_text_message('No problem! Let me show you what else we can do.')
-      update_bot_state('AHJ2')
-      handle_documents_intro
+      # User said No - skip photo and ask if they want to learn more
+      send_text_message('No problem!')
+      update_bot_state('AHJ4')
+      handle_learn_more_prompt
     end
   end
 
@@ -1279,15 +1334,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_learn_more_prompt
     # AHJ4: Ask about learning more
     customer_name = @conversation.custom_attributes&.dig('customer_name') || 'there'
-    send_text_message("#{customer_name}, would you like to learn more about Messages for Business?")
+
     send_quick_reply(
       title: 'Learn More?',
       request_id: 'qr_learn_more',
+      message: "#{customer_name}, would you like to learn more about Messages for Business?",
       items: [
         { title: 'Yes', value: 'yes' },
         { title: 'No', value: 'no' }
       ]
     )
+
     update_bot_state('AHK0')
   end
 
@@ -1346,8 +1403,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if content_type&.start_with?('image/') || has_image_attachment
       log_info '[Bot] 📎 Image attachment detected!'
       send_text_message('Awesome photo! #photooftheday #instadaily')
-      update_bot_state('AHJ2')
-      handle_documents_intro
+      update_bot_state('AHJ4')
+      handle_learn_more_prompt
     elsif content_type == 'application/vnd.apple.numbers'
       send_text_message('Thank you for the spreadsheet.')
     else
@@ -1730,7 +1787,28 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   items[selected_index]&.fetch('title', nil) if selected_index
                 end
 
-    send_text_message('Please connect with your Apple rep for more information.') if selection&.match?(/yes/i)
+    if selection&.match?(/yes/i)
+      # User wants to learn more - show documents and rich link
+      send_text_message('Let me show you what else we can do.')
+      sleep(1.0)
+
+      # Send documents
+      send_text_message('In Messages for Business, we can also share documents like these forms.')
+      send_document('metrics.numbers')
+      send_document('document.pdf')
+
+      # Wait longer for documents to be fully sent and delivered (6 seconds)
+      # Documents need time to: upload to ActiveStorage → send to Apple MSP → deliver to device
+      sleep(6.0)
+
+      # Then show rich link (handle_rich_link_display sends its own intro message)
+      handle_rich_link_display
+      sleep(1.0)
+      send_text_message('Please connect with your Apple rep for more information.')
+    else
+      # User doesn't want to learn more - skip to summary
+      send_text_message('No problem!')
+    end
 
     # Go to summary at the end
     update_bot_state('AHK1')
@@ -1752,9 +1830,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
   end
 
-  def send_quick_reply(title:, request_id:, items:)
+  def send_quick_reply(title:, request_id:, items:, message: nil)
     log_info "[Bot] 📤 Sending quick reply: #{utf8_encode(title)} (request_id: #{request_id})"
     log_info "[Bot] 📤 Called from: #{caller[0..3].join("\n")}"
+
+    # If message parameter is provided, send it as a text message first
+    if message.present?
+      log_info "[Bot] 📤 Sending text message before quick reply: #{utf8_encode(message)}"
+      send_text_message(message)
+    end
 
     with_typing_indicator do
       # Create outgoing message with quick reply content
@@ -1793,16 +1877,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Get guitar list picker template by ID
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 321
+      id: 371
     )
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template (ID: 321) not found')
+      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template (ID: 371) not found')
       send_text_message('Guitar selection temporarily unavailable.')
       return
     end
 
-    log_info "[Bot] Sending Guitar List Picker (ID: 321, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] Sending Guitar List Picker (ID: 371, Name: #{utf8_encode(template.name)})"
 
     # Use TemplateFacade with image loading (latest implementation)
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
@@ -2360,10 +2444,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_ar_view_question
-    # Send quick reply asking if user viewed AR
+    # Send question with quick reply (message parameter handles text + buttons together)
     send_quick_reply(
-      title: 'Did you click on the image and see the 3D augmented reality view of the guitar?',
+      title: 'Did you see the AR view?',
       request_id: 'qr_view_ar',
+      message: 'Did you click on the image and see the 3D augmented reality view of the guitar?',
       items: [
         { title: 'Yes', identifier: '111' },
         { title: 'No', identifier: '222' }
@@ -2372,10 +2457,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_ar_place_question
-    # Send quick reply asking if user placed AR
+    # Send question with quick reply (message parameter handles text + buttons together)
     send_quick_reply(
-      title: 'Did you select AR from the top of the image and set it down in front of you?',
+      title: 'Did you place the AR object?',
       request_id: 'qr_place_ar',
+      message: 'Did you select AR from the top of the image and set it down in front of you?',
       items: [
         { title: 'Yes', identifier: '111' },
         { title: 'No', identifier: '222' }
@@ -2998,6 +3084,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     log_info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
     log_info "[Bot] 🏪 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
 
+    # Idempotency guard: prevent processing the same store selection twice
+    selection_data = interactive_data['ldtext'] || interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
+    selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
+    selection_key = "store_selection:#{selection_hash}"
+
+    if Redis::Alfred.get(selection_key).present?
+      log_info "[Bot] 🏪 Store selection already processed (hash: #{selection_hash}), skipping"
+      return
+    end
+
+    # Mark as processed (expires after 2 minutes)
+    Redis::Alfred.setex(selection_key, '1', 2.minutes.to_i)
+    log_info "[Bot] 🏪 Store selection marked as processed (hash: #{selection_hash})"
+
     # Extract selection from interactive data
     selected_index = if interactive_data['ldtext'].present?
                        # Resolved NSKeyedArchiver/IDR format - extract index from ldtext
@@ -3107,6 +3207,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     log_info '[Bot] 🏪 handle_store_selection_qr called'
     log_info "[Bot] 🏪 Called from: #{caller[0..2].join("\n")}"
     log_info "[Bot] 🏪 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
+
+    # Idempotency guard: prevent processing the same store selection twice
+    selection_data = interactive_data.dig('data', 'quick-reply')&.to_json || interactive_data['$objects']&.to_json || 'unknown'
+    selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
+    selection_key = "store_selection_qr:#{selection_hash}"
+
+    if Redis::Alfred.get(selection_key).present?
+      log_info "[Bot] 🏪 Store selection (QR) already processed (hash: #{selection_hash}), skipping"
+      return
+    end
+
+    # Mark as processed (expires after 2 minutes)
+    Redis::Alfred.setex(selection_key, '1', 2.minutes.to_i)
+    log_info "[Bot] 🏪 Store selection (QR) marked as processed (hash: #{selection_hash})"
 
     # Extract selected index from quick reply
     selected_index = if interactive_data['$archiver'] == 'NSKeyedArchiver'
@@ -3314,7 +3428,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     fallback_identifier = 'guitar_lespaul'
 
     # Guitar name to image identifier mapping
-    # Based on the guitar list picker template (ID 321) items
+    # Based on the guitar list picker template (ID 371) items
     guitar_image_map = {
       # Exact matches from guitar list picker
       'Fender American Elite Stratocaster' => 'guitar_stratocaster',

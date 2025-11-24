@@ -60,6 +60,8 @@ class AppleMessagesForBusiness::SendMessageService
       send_interactive_message
     when 'apple_custom_app'
       send_interactive_message
+    when 'apple_custom_payload'
+      send_interactive_message
     when 'apple_rich_link'
       send_rich_link_message
     when 'apple_pay'
@@ -182,6 +184,23 @@ class AppleMessagesForBusiness::SendMessageService
 
   # Build the correct Apple MSP interactive message format
   def build_apple_msp_payload(message_id)
+    # For custom payloads, merge interactive_data directly instead of wrapping in interactiveData
+    if @message.content_type == 'apple_custom_payload'
+      interactive_data = build_interactive_data
+
+      # Base fields that are always required by Apple MSP
+      base_payload = {
+        v: 1,
+        id: message_id,
+        sourceId: source_id,
+        destinationId: destination_id
+      }
+
+      # Merge custom payload directly - it may contain 'type' and other top-level fields
+      return base_payload.merge(interactive_data)
+    end
+
+    # Standard interactive message format for other types
     {
       v: 1,
       id: message_id,
@@ -1055,8 +1074,15 @@ class AppleMessagesForBusiness::SendMessageService
 
       # Get content_type from message or default to 'apple_pay' for direct Apple Pay requests
       content_type = @message&.content_type || 'apple_pay'
-      validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, content_type)
-      validator.validate!
+
+      # Skip strict validation for custom payloads - users can send any structure
+      # Apple MSP will reject if truly invalid
+      if content_type == 'apple_custom_payload'
+        Rails.logger.info '[AMB Send] Skipping PayloadValidator for custom payload (user controls structure)'
+      else
+        validator = AppleMessagesForBusiness::PayloadValidatorService.new(payload, content_type)
+        validator.validate!
+      end
     rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
       Rails.logger.error "[AMB Send] Payload validation failed: #{e.message}"
       # Log the invalid payload for debugging (sanitized to avoid base64 spam)

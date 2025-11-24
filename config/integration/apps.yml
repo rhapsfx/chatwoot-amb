@@ -151,7 +151,7 @@ dialogflow:
         'label': 'Dialogflow Region',
         'type': 'select',
         'name': 'region',
-        'default': 'global',
+        'value': 'global',
         'options': [
           { 'label': 'Global - Default', 'value': 'global' },
           { 'label': 'AS-NE1 - Tokyo, Japan', 'value': 'asia-northeast1' },

@@ -13,7 +13,9 @@ if Rails.env.development?
         def ensure_utf8(message)
           return message unless message.is_a?(String)
 
-          message.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+          # Force UTF-8 encoding without replacing characters
+          # This preserves emoji and special characters
+          message.force_encoding('UTF-8')
         end
 
         # Create a filtered logger that suppresses routine Vite messages

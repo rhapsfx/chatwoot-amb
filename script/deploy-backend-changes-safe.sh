@@ -11,10 +11,11 @@ echo "  ✓ Template adapters (apple_messages_template_adapter, etc.)"
 echo "  ✓ Bot models (agent_bot, message_template)"
 echo "  ✓ Apple Messages image architecture (shared_apple_image, image_fetch_service)"
 echo "  ✓ Apple Maps tokens (APPLE_MAPS_TEAM_ID, APPLE_MAPS_KEY_ID, APPLE_MAPS_PRIVATE_KEY)"
+echo "  ✓ Apple Pay configuration for inbox 11 (merchant ID, certificate, private key)"
 echo "  ✓ Custom roles feature (auto-enabled for all accounts)"
 echo "  ✓ All other Rails backend code"
 echo ""
-echo "Apple Pay configuration in database will NOT be affected"
+echo "Apple Pay configuration will be set up for production inbox 11"
 echo ""
 
 # Step 1: Sync all backend code to server
@@ -105,6 +106,69 @@ else
     echo "  ⚠️  Local .env file not found"
     echo "  Skipping Apple Maps token sync"
 fi
+
+# Step 1.7: Configure Apple Pay for inbox 11 on production server
+echo ""
+echo "Step 1.7: Configuring Apple Pay for inbox 11 on production..."
+echo "  → Merchant ID: com.apple.apple-pay-matthieu"
+echo "  → Merchant Domain: liquid-m3-pro.tail367da4.ts.net"
+echo "  → Certificate: /opt/chatwoot/certs/apple_pay/apple_pay_cert.pem"
+echo "  → Private Key: /opt/chatwoot/certs/apple_pay/apple_pay_private.key"
+
+# Copy the configuration script to server
+scp script/configure_apple_pay_inbox.rb root@msp.rhaps.net:/opt/chatwoot/script/
+
+# Run the configuration script on production server
+ssh root@msp.rhaps.net 'bash -s' << 'EOF_APPLEPAY'
+set -e
+cd /opt/chatwoot
+
+# Verify certificates exist on server
+if [ ! -f certs/apple_pay/apple_pay_cert.pem ]; then
+    echo "  ❌ Certificate not found: certs/apple_pay/apple_pay_cert.pem"
+    echo "  Please upload certificates to /opt/chatwoot/certs/apple_pay/ first"
+    exit 1
+fi
+
+if [ ! -f certs/apple_pay/apple_pay_private.key ]; then
+    echo "  ❌ Private key not found: certs/apple_pay/apple_pay_private.key"
+    echo "  Please upload certificates to /opt/chatwoot/certs/apple_pay/ first"
+    exit 1
+fi
+
+echo "  ✓ Certificates found on server"
+
+# Get the web container ID
+WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
+
+if [ -z "$WEB_CONTAINER" ]; then
+    echo "  ⚠️  Web container not running - will configure later during startup"
+    exit 0
+fi
+
+# Create directories in container if they don't exist
+echo "  → Creating directories in container..."
+docker exec $WEB_CONTAINER mkdir -p /app/script /app/certs/apple_pay
+
+# Copy configuration script and certificates to container
+echo "  → Copying configuration script to container..."
+docker cp script/configure_apple_pay_inbox.rb $WEB_CONTAINER:/app/script/
+docker cp certs/apple_pay/apple_pay_cert.pem $WEB_CONTAINER:/app/certs/apple_pay/
+docker cp certs/apple_pay/apple_pay_private.key $WEB_CONTAINER:/app/certs/apple_pay/
+
+# Run the configuration script inside container
+echo "  → Running configuration script for inbox 11..."
+docker exec $WEB_CONTAINER bundle exec rails runner \
+  script/configure_apple_pay_inbox.rb \
+  11 \
+  certs/apple_pay/apple_pay_cert.pem \
+  certs/apple_pay/apple_pay_private.key \
+  com.apple.apple-pay-matthieu \
+  liquid-m3-pro.tail367da4.ts.net \
+  RAILS_ENV=production
+
+echo "  ✅ Apple Pay configured for inbox 11"
+EOF_APPLEPAY
 
 # Step 2: Update running containers and run migrations
 echo ""
@@ -297,13 +361,14 @@ echo "✅ Models, controllers, services deployed"
 echo "✅ Bot API endpoints and services deployed"
 echo "✅ Apple Messages image architecture deployed (SharedAppleImage + ImageFetchService)"
 echo "✅ Apple Maps tokens synced to production .env (with backup)"
+echo "✅ Apple Pay configured for inbox 11 (merchant ID, certificate, private key)"
 echo "✅ Gem dependencies updated (bundle install before container startup)"
 echo "✅ Routes and configuration updated"
 echo "✅ Database migrations executed"
 echo "✅ Custom roles feature enabled for all accounts"
 echo "✅ Services restarted"
-echo "✅ Apple Pay configuration preserved"
-echo "✅ Certificates NOT overwritten"
+echo "✅ Apple Pay configuration preserved in database"
+echo "✅ Certificates copied to production container"
 
 # Check if n8n nodes were deployed
 if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
@@ -337,6 +402,10 @@ echo ""
 echo "Verify custom roles feature:"
 echo "  ssh root@msp.rhaps.net \"docker exec chatwoot-web bundle exec rails runner 'puts Account.first.feature_flags[\\\"custom_roles\\\"]' RAILS_ENV=production\""
 echo "  (Should return: true)"
+
+echo ""
+echo "Verify Apple Pay configuration for inbox 11:"
+echo "  ssh root@msp.rhaps.net \"docker exec chatwoot-web bundle exec rails runner 'channel = Inbox.find(11).channel; config = channel.payment_settings.dig(\"apple_pay\"); puts \"Merchant ID: #{config[\"merchant_identifier\"]}\"; puts \"Domain: #{config[\"merchant_domain\"]}\"; puts \"Certificate: #{config[\"merchant_identity_certificate\"].present? ? \"✅ Set\" : \"❌ Not set\"}\"; puts \"Private Key: #{config[\"merchant_identity_private_key\"].present? ? \"✅ Set\" : \"❌ Not set\"}\"' RAILS_ENV=production\""
 
 echo ""
 echo "Monitor logs:"
