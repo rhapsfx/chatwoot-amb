@@ -258,6 +258,11 @@ class AppleMessagesForBusiness::AppleMapsService
       }
     end
 
+    # Filter by radius (convert meters to km for comparison)
+    # Apple Maps API may return results beyond the requested radius, so we filter client-side
+    radius_km = radius / 1000.0
+    places = places.select { |p| p[:distance_km] <= radius_km }
+
     # Sort by distance and limit results
     places.sort_by { |p| p[:distance_km] }.take(MAX_RESULTS)
   end

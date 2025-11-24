@@ -91,12 +91,39 @@ Rails.application.configure do
   # Use :info for less verbose logs, :debug for full troubleshooting
   config.log_level = ENV.fetch('LOG_LEVEL', 'info').to_sym
 
-  # Use a different logger for distributed setups.
+  # Use a different logger for distributed setups with proper UTF-8 encoding
   # require 'syslog/logger'
+  
+  # Create a UTF-8 wrapper for the log file to ensure all output is properly encoded
+  class UTF8LogDevice
+    def initialize(file)
+      @file = file
+      @file.set_encoding('UTF-8')
+      @file.sync = true
+    end
+
+    def write(message)
+      # Force UTF-8 encoding on the message before writing
+      utf8_message = message.is_a?(String) ? message.force_encoding('UTF-8') : message.to_s.force_encoding('UTF-8')
+      @file.write(utf8_message)
+    end
+
+    def close
+      @file.close
+    end
+
+    def method_missing(method, *args, &block)
+      @file.send(method, *args, &block)
+    end
+
+    def respond_to_missing?(method, include_private = false)
+      @file.respond_to?(method, include_private) || super
+    end
+  end
+
   log_file = File.open(Rails.root.join('log', "#{Rails.env}.log"), 'a')
-  log_file.set_encoding('UTF-8')
-  log_file.sync = true
-  config.logger = ActiveSupport::Logger.new(log_file, 1, ENV.fetch('LOG_SIZE', '1024').to_i.megabytes)
+  utf8_device = UTF8LogDevice.new(log_file)
+  config.logger = ActiveSupport::Logger.new(utf8_device, 1, ENV.fetch('LOG_SIZE', '1024').to_i.megabytes)
 
   # Bullet configuration to fix the N+1 queries
   # Logs to bullet.log instead of cluttering development.log

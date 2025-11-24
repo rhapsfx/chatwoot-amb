@@ -1,4 +1,10 @@
 class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::Conversations::BaseController
+  # Rescue Apple Messages custom payload errors
+  rescue_from CustomExceptions::AppleMessages::InvalidPayload, with: :handle_invalid_payload
+  rescue_from CustomExceptions::AppleMessages::PayloadTooLarge, with: :handle_payload_too_large
+  rescue_from CustomExceptions::AppleMessages::GatewayError, with: :handle_gateway_error
+  rescue_from CustomExceptions::AppleMessages::RateLimitExceeded, with: :handle_rate_limit_exceeded
+
   before_action :normalize_apple_messages_content_attributes, only: :create
   before_action :ensure_api_inbox, only: :update
 
@@ -242,7 +248,11 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                                 { :shipping_methods => [:identifier, :label, :detail, :amount] },
                                 { :shippingMethods => [:identifier, :label, :detail, :amount] },
                                 :required_billing_fields, :requiredBillingFields,
-                                :required_shipping_fields, :requiredShippingFields
+                                :required_shipping_fields, :requiredShippingFields,
+                                # Custom Payload
+                                :custom_payload,
+                                :skip_validation,
+                                :apply_case_transform
                               ])
 
     if permitted[:content_type]&.start_with?('apple_')
@@ -352,5 +362,31 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
       shippingMethods: [:identifier, :label, :detail, :amount],
       images: [:identifier, :data, :description]
     )
+  end
+
+  # Error handlers for custom payload errors
+  def handle_invalid_payload(exception)
+    Rails.logger.error "[CustomPayload] Invalid payload: #{exception.message}"
+
+    render json: exception.to_hash, status: :unprocessable_entity
+  end
+
+  def handle_payload_too_large(exception)
+    Rails.logger.error "[CustomPayload] Payload too large: #{exception.message}"
+
+    render json: exception.to_hash, status: :request_entity_too_large
+  end
+
+  def handle_gateway_error(exception)
+    Rails.logger.error "[CustomPayload] Apple MSP Gateway error: #{exception.message}"
+
+    render json: exception.to_hash, status: :bad_gateway
+  end
+
+  def handle_rate_limit_exceeded(exception)
+    Rails.logger.error "[CustomPayload] Rate limit exceeded: #{exception.message}"
+
+    response.set_header('Retry-After', '3600')
+    render json: exception.to_hash.merge(retry_after: 3600), status: :too_many_requests
   end
 end

@@ -32,6 +32,15 @@ class AppleMessagesForBusiness::IncomingMessageService
     process_interactive_data if interactive_message?
     process_attachments if attachments_present?
 
+    # CRITICAL: Trigger bot again after attachments are processed
+    # First trigger happens in create_message, but attachments aren't ready yet
+    # This second trigger ensures bot sees the completed attachments
+    # IMPORTANT: Only trigger for actual photos, not list picker/form preview images
+    if attachments_present? && @message.attachments.any? && !interactive_message?
+      Rails.logger.info '[AMB IncomingMessage] Triggering bot again after attachments processed'
+      trigger_bot_if_enabled
+    end
+
     # Re-broadcast message after attachments are processed to update UI
     if attachments_present? && @message.attachments.any?
       Rails.logger.info '[AMB IncomingMessage] Re-broadcasting message with attachments for UI update'
