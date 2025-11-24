@@ -57,8 +57,14 @@ module AppleMessagesForBusiness
     end
 
     def migrate_to_metadata
-      # Load all blocks from content_blocks
-      blocks = StorageStrategies::ContentBlocksStrategy.new(@template).all_blocks
+      # Load raw properties directly from content_blocks WITHOUT normalization
+      # This prevents double-normalization which can corrupt data
+      blocks = @template.content_blocks.map do |block|
+        {
+          'block_type' => block.block_type,
+          'properties' => block.properties  # Raw properties from DB (already snake_case)
+        }
+      end
 
       # Save to metadata
       metadata_strategy = StorageStrategies::MetadataStrategy.new(@template)
@@ -75,8 +81,17 @@ module AppleMessagesForBusiness
     end
 
     def migrate_to_content_blocks
-      # Load all blocks from metadata
-      blocks = StorageStrategies::MetadataStrategy.new(@template).all_blocks
+      # Load raw properties directly from metadata WITHOUT extra normalization
+      # Access metadata structure directly to avoid double-normalization
+      content_attrs = @template.metadata&.dig('apple_message_content', 'content_attributes') || {}
+
+      # Convert metadata structure to blocks array
+      blocks = content_attrs.map do |block_type, properties|
+        {
+          'block_type' => block_type,
+          'properties' => properties  # Raw properties from metadata (already snake_case)
+        }
+      end
 
       # Save to content_blocks
       blocks.each_with_index do |block, index|
