@@ -29,7 +29,7 @@ class AppleMessagesForBusiness::CustomExtensionService
   private
 
   def validate_app_config!
-    required_fields = %w[app_id bid]
+    required_fields = %w[appId bid]
     missing_fields = required_fields.select { |field| @app_config[field].blank? }
 
     raise ArgumentError, "Missing required app configuration: #{missing_fields.join(', ')}" if missing_fields.any?
@@ -52,23 +52,17 @@ class AppleMessagesForBusiness::CustomExtensionService
   end
 
   def build_interactive_data
+    # CRITICAL: Third-party apps CANNOT have a "data" object
+    # Apple returns: "400 Bad Request : Third party interactive data disallows use of 'data'"
+    # For third-party apps, appId, URL, and receivedMessage go at TOP LEVEL
     base_data = {
       bid: @app_config['bid'],
-      data: {
-        version: @app_config['version'] || '1.0',
-        requestIdentifier: SecureRandom.uuid
-      },
+      appId: @app_config['appId'],
       useLiveLayout: @app_config['use_live_layout'] != false # Default to true unless explicitly false
     }
 
-    # Add URL if provided (for web-based extensions)
-    base_data[:url] = @app_config['url'] if @app_config['url'].present?
-
-    # Add custom app data if provided
-    base_data[:data].merge!(@app_config['app_data']) if @app_config['app_data'].present?
-
-    # Add images if provided
-    base_data[:data][:images] = @app_config['images'] if @app_config['images'].present?
+    # Add URL if provided (REQUIRED for third-party apps)
+    base_data[:URL] = @app_config['URL'] if @app_config['URL'].present?
 
     # Add received and reply message structures for interactive apps
     base_data[:receivedMessage] = normalize_message_structure(@app_config['received_message']) if @app_config['received_message'].present?

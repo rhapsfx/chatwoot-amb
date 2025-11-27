@@ -39,6 +39,8 @@
 #   images = service.fetch_and_encode(['messages_png', 'store_logo'])
 #
 class AppleMessagesForBusiness::ImageFetchService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
+
   def initialize(account_id:, inbox_id:, embedded_images: [])
     @account_id = account_id
     @inbox_id = inbox_id
@@ -119,7 +121,7 @@ class AppleMessagesForBusiness::ImageFetchService
       source: "shared_#{shared_image.image_type}"
     }
   rescue StandardError => e
-    Rails.logger.error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
+    log_error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
     nil
   end
 
@@ -128,7 +130,7 @@ class AppleMessagesForBusiness::ImageFetchService
 
     return nil unless embedded && embedded['data'].present?
 
-    Rails.logger.info "[ImageFetch] ✅ Found in embedded: #{identifier}"
+    log_info "[ImageFetch] ✅ Found in embedded: #{identifier}"
 
     {
       identifier: identifier,

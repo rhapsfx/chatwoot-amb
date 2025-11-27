@@ -1,6 +1,8 @@
 require_relative 'log_sanitizer'
 
 class AppleMessagesForBusiness::SendMessageService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
+
   AMB_SERVER = 'https://mspgw.push.apple.com/v1'.freeze
 
   def initialize(channel:, destination_id:, message:)
@@ -177,7 +179,7 @@ class AppleMessagesForBusiness::SendMessageService
 
       result
     else
-      Rails.logger.error "[AMB Send] ❌ Apple MSP rejected message - HTTP #{response.code}: #{response.body}"
+      log_error "[AMB Send] ❌ Apple MSP rejected message - HTTP #{response.code}: #{response.body}"
       { success: false, error: "HTTP #{response.code}: #{response.body}" }
     end
   end
@@ -1056,7 +1058,7 @@ class AppleMessagesForBusiness::SendMessageService
     }
   end
 
-  def send_to_apple_gateway(payload, message_id, request_idr: false)
+  def send_to_apple_gateway(payload, message_id, request_idr: false, content_type: nil)
     # PRE-SEND VALIDATION: Validate payload before sending to Apple MSP
     begin
       # Debug: Log the actual payload structure (sanitized to avoid base64 spam)
@@ -1072,8 +1074,8 @@ class AppleMessagesForBusiness::SendMessageService
         Rails.logger.info "[AMB Send] event content: #{sanitized_event.inspect}"
       end
 
-      # Get content_type from message or default to 'apple_pay' for direct Apple Pay requests
-      content_type = @message&.content_type || 'apple_pay'
+      # Get content_type from parameter, message, or default to 'apple_pay' for direct Apple Pay requests
+      content_type ||= @message&.content_type || 'apple_pay'
 
       # Skip strict validation for custom payloads - users can send any structure
       # Apple MSP will reject if truly invalid
@@ -1114,12 +1116,12 @@ class AppleMessagesForBusiness::SendMessageService
     if payload[:interactiveData] && payload[:interactiveData][:data] && payload[:interactiveData][:data][:listPicker]
       list_picker = payload[:interactiveData][:data][:listPicker]
       sanitized_list_picker = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(list_picker)
-      Rails.logger.info "[AMB Send] 🔍 Final listPicker payload: #{sanitized_list_picker.to_json}"
+      log_info "[AMB Send] 🔍 Final listPicker payload: #{sanitized_list_picker.to_json}"
       if list_picker[:sections]&.first && list_picker[:sections].first['items']
         first_item = list_picker[:sections].first['items'].first
-        Rails.logger.info "[AMB Send] 🔍 First item keys: #{first_item.keys.inspect}"
+        log_info "[AMB Send] 🔍 First item keys: #{first_item.keys.inspect}"
         sanitized_first_item = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(first_item)
-        Rails.logger.info "[AMB Send] 🔍 First item: #{sanitized_first_item.to_json}"
+        log_info "[AMB Send] 🔍 First item: #{sanitized_first_item.to_json}"
       end
     end
 

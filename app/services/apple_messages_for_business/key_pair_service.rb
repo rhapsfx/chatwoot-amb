@@ -6,8 +6,9 @@ class AppleMessagesForBusiness::KeyPairService
   end
 
   def generate_ecc_key_pair
-    key = OpenSSL::PKey::EC.new('prime256v1')
-    key.generate_key
+    # OpenSSL 3.0 compatible key generation
+    # Use OpenSSL::PKey::EC.generate instead of .new + .generate_key
+    key = OpenSSL::PKey::EC.generate('prime256v1')
 
     {
       private_key: key.to_pem,
@@ -37,8 +38,8 @@ class AppleMessagesForBusiness::KeyPairService
     y_coord = hex_string[66, 64]
 
     {
-      x: Base64.urlsafe_encode64([x_coord].pack('H*')),
-      y: Base64.urlsafe_encode64([y_coord].pack('H*')),
+      x: Base64.urlsafe_encode64([x_coord].pack('H*'), padding: false),
+      y: Base64.urlsafe_encode64([y_coord].pack('H*'), padding: false),
       crv: 'P-256',
       kty: 'EC'
     }

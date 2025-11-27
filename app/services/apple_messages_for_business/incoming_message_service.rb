@@ -1,5 +1,6 @@
 class AppleMessagesForBusiness::IncomingMessageService
   include ::FileTypeHelper
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
 
   def initialize(inbox:, params:, headers:)
     @inbox = inbox
@@ -907,6 +908,16 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   def determine_content_type
     Rails.logger.info '[AMB IncomingMessage] 🔍 determine_content_type called'
+
+    # Check for custom app messages (iMessage extensions)
+    # These have appId in the interactive data
+    if interactive_message?
+      interactive_data = (@params['interactiveData'].presence || @idr_data)
+      if interactive_data && interactive_data['appId'].present?
+        Rails.logger.info "[AMB IncomingMessage] 🎯 Detected custom app message with appId: #{interactive_data['appId']}"
+        return 'apple_custom_app'
+      end
+    end
     Rails.logger.info "[AMB IncomingMessage] 🔍 Has IDR: #{@params['interactiveDataRef'].present?}, IDR data cached: #{@idr_data.present?}"
     Rails.logger.info "[AMB IncomingMessage] 🔍 Has interactiveData: #{@params['interactiveData'].present?}"
     Rails.logger.info "[AMB IncomingMessage] 🔍 Has attachments: #{attachments_present?}"
@@ -928,7 +939,7 @@ class AppleMessagesForBusiness::IncomingMessageService
       end
 
       type_from_idr = determine_content_type_from_data(@idr_data)
-      Rails.logger.info "[AMB IncomingMessage] 🔍 Type from IDR data: #{type_from_idr}"
+      log_info "[AMB IncomingMessage] 🔍 Type from IDR data: #{type_from_idr}"
 
       if type_from_idr == 'apple_form_response'
         Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_form_response (from IDR data structure)'
@@ -1272,7 +1283,7 @@ class AppleMessagesForBusiness::IncomingMessageService
       bot_service.process_message
     end
   rescue StandardError => e
-    Rails.logger.error "[Bot] ❌ Error processing message: #{e.message}"
+    log_error "[Bot] ❌ Error processing message: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
   end
 end
