@@ -111,6 +111,11 @@ deploy-assets-only.sh
 test_*.rb
 validate_*.rb
 debug_*.rb
+diagnose_*.rb
+find_*.rb
+
+# Dialogflow exports
+dialogflow_cx_export*
 
 # Debug output files
 output.txt
