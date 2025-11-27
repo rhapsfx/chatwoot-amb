@@ -1,6 +1,8 @@
 class AppleMessagesForBusiness::Oauth2Service
-  def initialize(provider)
+  def initialize(provider, client_id: nil, client_secret: nil)
     @provider = provider.downcase
+    @client_id = client_id
+    @client_secret = client_secret
   end
 
   def exchange_code(authorization_code, redirect_uri)
@@ -78,7 +80,8 @@ class AppleMessagesForBusiness::Oauth2Service
     when 'google'
       'https://www.googleapis.com/oauth2/v2/userinfo'
     when 'linkedin'
-      'https://api.linkedin.com/v2/people/~:(id,firstName,lastName,emailAddress)'
+      # LinkedIn OpenID Connect userinfo endpoint
+      'https://api.linkedin.com/v2/userinfo'
     when 'facebook'
       'https://graph.facebook.com/me?fields=id,name,email'
     else
@@ -96,18 +99,18 @@ class AppleMessagesForBusiness::Oauth2Service
     case @provider
     when 'google'
       base_params.merge(
-        client_id: ENV.fetch('GOOGLE_OAUTH_CLIENT_ID', nil),
-        client_secret: ENV.fetch('GOOGLE_OAUTH_CLIENT_SECRET', nil)
+        client_id: @client_id || ENV.fetch('GOOGLE_OAUTH_CLIENT_ID', nil),
+        client_secret: @client_secret || ENV.fetch('GOOGLE_OAUTH_CLIENT_SECRET', nil)
       )
     when 'linkedin'
       base_params.merge(
-        client_id: ENV.fetch('LINKEDIN_OAUTH_CLIENT_ID', nil),
-        client_secret: ENV.fetch('LINKEDIN_OAUTH_CLIENT_SECRET', nil)
+        client_id: @client_id || ENV.fetch('LINKEDIN_OAUTH_CLIENT_ID', nil),
+        client_secret: @client_secret || ENV.fetch('LINKEDIN_OAUTH_CLIENT_SECRET', nil)
       )
     when 'facebook'
       base_params.merge(
-        client_id: ENV.fetch('FACEBOOK_OAUTH_CLIENT_ID', nil),
-        client_secret: ENV.fetch('FACEBOOK_OAUTH_CLIENT_SECRET', nil)
+        client_id: @client_id || ENV.fetch('FACEBOOK_OAUTH_CLIENT_ID', nil),
+        client_secret: @client_secret || ENV.fetch('FACEBOOK_OAUTH_CLIENT_SECRET', nil)
       )
     end
   end
@@ -152,10 +155,12 @@ class AppleMessagesForBusiness::Oauth2Service
         provider: 'google'
       }
     when 'linkedin'
+      # LinkedIn OpenID Connect userinfo format
       {
-        id: raw_data['id'],
-        name: "#{raw_data.dig('firstName', 'localized', 'en_US')} #{raw_data.dig('lastName', 'localized', 'en_US')}",
-        email: raw_data['emailAddress'],
+        id: raw_data['sub'],
+        name: raw_data['name'] || "#{raw_data['given_name']} #{raw_data['family_name']}",
+        email: raw_data['email'],
+        picture: raw_data['picture'],
         provider: 'linkedin'
       }
     when 'facebook'
