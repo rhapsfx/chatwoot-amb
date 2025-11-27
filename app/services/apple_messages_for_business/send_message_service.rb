@@ -556,6 +556,14 @@ class AppleMessagesForBusiness::SendMessageService
 
     # Collect from page items (singleSelect/multiSelect options)
     pages.each_with_index do |page, idx|
+      page_type = page['type'] || 'module'
+
+      # Collect splash page images
+      if page_type == 'splash' && page['image_identifier'].present?
+        Rails.logger.info "[collect_form_image_identifiers] Found splash page image: #{page['image_identifier']}"
+        identifiers << page['image_identifier']
+      end
+
       items = page['items'] || []
       Rails.logger.info "[collect_form_image_identifiers] Page #{idx} items count: #{items.length}"
 
@@ -623,14 +631,27 @@ class AppleMessagesForBusiness::SendMessageService
     all_page_items = []
     builder_pages.each_with_index do |page, page_index|
       page_id = page['page_id'] || page_index.to_s
-      items = page['items'] || []
+      page_type = page['type'] || 'module'
 
-      items.each_with_index do |item, item_index|
+      if page_type == 'splash'
+        # Splash pages are standalone - add them directly
         all_page_items << {
-          page_id: "#{page_id}_#{item_index}",
-          item: item,
-          page: page
+          page_id: page_id,
+          item: nil,
+          page: page,
+          is_splash: true
         }
+      else
+        # Module pages - convert each item to a page
+        items = page['items'] || []
+        items.each_with_index do |item, item_index|
+          all_page_items << {
+            page_id: "#{page_id}_#{item_index}",
+            item: item,
+            page: page,
+            is_splash: false
+          }
+        end
       end
     end
 
@@ -638,13 +659,23 @@ class AppleMessagesForBusiness::SendMessageService
     all_page_items.each_with_index do |page_item, global_index|
       next_page_id = global_index < all_page_items.length - 1 ? all_page_items[global_index + 1][:page_id] : nil
 
-      msp_page = build_msp_page_from_item(
-        page_item[:item],
-        page_item[:page],
-        page_item[:page_id],
-        next_page_id,
-        next_page_id.nil?
-      )
+      msp_page = if page_item[:is_splash]
+                   # Build splash page
+                   build_msp_splash_page(
+                     page_item[:page],
+                     page_item[:page_id],
+                     next_page_id
+                   )
+                 else
+                   # Build regular item-based page
+                   build_msp_page_from_item(
+                     page_item[:item],
+                     page_item[:page],
+                     page_item[:page_id],
+                     next_page_id,
+                     next_page_id.nil?
+                   )
+                 end
       msp_pages << msp_page if msp_page
     end
 
@@ -797,6 +828,20 @@ class AppleMessagesForBusiness::SendMessageService
         }.compact
       }
     end
+  end
+
+  def build_msp_splash_page(page, page_id, next_page_id)
+    # Build Apple MSP splash page format
+    # Apple expects: type='splash', header, splashtext, buttonTitle (required), imageIdentifier (optional)
+    {
+      pageIdentifier: page_id,
+      type: 'splash',
+      header: page['header'],
+      splashtext: page['splashtext'],
+      buttonTitle: page['button_title'],
+      imageIdentifier: page['image_identifier'],
+      nextPageIdentifier: next_page_id
+    }.compact
   end
 
   def convert_legacy_fields_to_msp(fields)

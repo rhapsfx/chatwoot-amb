@@ -866,7 +866,7 @@ class AppleMessagesForBusiness::IncomingMessageService
         'text'
       end
     when 'authenticate'
-      'apple_auth'
+      'apple_authentication'
     when 'payment'
       'apple_pay'
     else
@@ -967,7 +967,14 @@ class AppleMessagesForBusiness::IncomingMessageService
       return 'apple_form_response'
     end
 
-    # THEN check for attachments (after form check)
+    # CRITICAL: Check for authentication BEFORE checking attachments
+    # Authentication responses include image attachments (provider logos)
+    if interactive_data&.dig('data', 'authenticate').present? || @idr_data&.dig('data', 'authenticate').present?
+      Rails.logger.info '[AMB IncomingMessage] 🔐 Returning apple_authentication (authentication response detected)'
+      return 'apple_authentication'
+    end
+
+    # THEN check for attachments (after form and auth check)
     if attachments_present?
       Rails.logger.info '[AMB IncomingMessage] 📎 Returning input_email (attachments present, not a form)'
       return 'input_email'
@@ -1005,8 +1012,8 @@ class AppleMessagesForBusiness::IncomingMessageService
         'text'
       end
     when 'authenticate'
-      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_auth'
-      'apple_auth'
+      Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_authentication'
+      'apple_authentication'
     when 'payment'
       Rails.logger.info '[AMB IncomingMessage] ✅ Returning apple_pay'
       'apple_pay'
@@ -1240,10 +1247,17 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def trigger_bot_if_enabled
-    Rails.logger.info "[Bot] 🤖 trigger_bot_if_enabled called - Message ID: #{@message&.id}, Message Type: #{@message&.message_type}"
+    Rails.logger.info "[Bot] 🤖 trigger_bot_if_enabled called - Message ID: #{@message&.id}, Message Type: #{@message&.message_type}, Content Type: #{@message&.content_type}"
 
     unless @message.incoming?
       Rails.logger.info '[Bot] ⏭️  Skipping bot - message is not incoming'
+      return
+    end
+
+    # Check if this is an authentication response webhook
+    if @message.content_type == 'apple_authentication'
+      Rails.logger.info '[Bot] 🔐 Authentication response detected, processing...'
+      handle_authentication_response
       return
     end
 
@@ -1285,5 +1299,75 @@ class AppleMessagesForBusiness::IncomingMessageService
   rescue StandardError => e
     log_error "[Bot] ❌ Error processing message: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def handle_authentication_response
+    Rails.logger.info '[Bot] 🔍 handle_authentication_response called'
+
+    # Extract authentication status from interactiveData
+    interactive_data = @params['interactiveData'] || @idr_data
+    unless interactive_data
+      Rails.logger.error '[Bot] ❌ No interactive_data found'
+      return
+    end
+
+    Rails.logger.info "[Bot] 🔍 Interactive data keys: #{interactive_data.keys.inspect}"
+
+    data = interactive_data['data']
+    unless data
+      Rails.logger.error '[Bot] ❌ No data found in interactive_data'
+      return
+    end
+
+    Rails.logger.info "[Bot] 🔍 Data keys: #{data.keys.inspect}"
+
+    auth_data = data['authenticate']
+    unless auth_data
+      Rails.logger.error '[Bot] ❌ No authenticate found in data'
+      return
+    end
+
+    Rails.logger.info "[Bot] 🔍 Auth data keys: #{auth_data.keys.inspect}"
+
+    status = auth_data['status']
+    Rails.logger.info "[Bot] Authentication status: #{status}"
+
+    if status == 'success'
+      # Get stored authentication result from Redis
+      # Use source_id method to get the Apple Messages source ID
+      destination_id = source_id
+      auth_key = "apple_auth_result:#{@inbox.channel.id}:#{destination_id}"
+      Rails.logger.info "[Bot] 🔍 Looking for Redis key: #{auth_key}"
+      Rails.logger.info "[Bot] 🔍 Channel ID: #{@inbox.channel.id}, Source ID: #{destination_id}"
+
+      begin
+        auth_result_json = Redis::Alfred.get(auth_key)
+        Rails.logger.info "[Bot] 🔍 Redis returned: #{auth_result_json.present? ? 'data found' : 'nil'}"
+
+        if auth_result_json
+          auth_result = JSON.parse(auth_result_json)
+          Rails.logger.info "[Bot] Found stored authentication result for #{destination_id}"
+          Rails.logger.info "[Bot] 🔍 Auth result keys: #{auth_result.keys.inspect}"
+
+          # Trigger job to update contact and send confirmation
+          AppleMessagesForBusiness::AuthenticationCompleteJob.perform_later(
+            channel_id: @inbox.channel.id,
+            auth_key: auth_key,
+            user_data: auth_result['user'],
+            provider: auth_result['provider'],
+            destination_id: destination_id
+          )
+
+          Rails.logger.info '[Bot] ✅ AuthenticationCompleteJob enqueued'
+        else
+          Rails.logger.error "[Bot] ❌ No stored authentication result found for key: #{auth_key}"
+        end
+      rescue StandardError => e
+        Rails.logger.error "[Bot] ❌ Error during Redis lookup or job enqueue: #{e.message}"
+        Rails.logger.error "[Bot] ❌ Backtrace: #{e.backtrace.first(5).join("\n")}"
+      end
+    else
+      Rails.logger.error "[Bot] ❌ Authentication failed with status: #{status}"
+    end
   end
 end

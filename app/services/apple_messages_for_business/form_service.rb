@@ -59,10 +59,18 @@ class AppleMessagesForBusiness::FormService
   def validate_form_page!(page, index)
     raise ArgumentError, "Page #{index} must have a page_id" unless page['page_id'].present?
 
-    raise ArgumentError, "Page #{index} must have at least one form item" unless page['items'].present? && page['items'].is_a?(Array)
+    page_type = page['type'] || 'module'
 
-    page['items'].each_with_index do |item, item_index|
-      validate_form_item!(item, index, item_index)
+    if page_type == 'splash'
+      # Splash pages require buttonTitle, but not items
+      raise ArgumentError, "Page #{index}: Splash pages must have a buttonTitle" unless page['button_title'].present?
+    else
+      # Module pages require items
+      raise ArgumentError, "Page #{index} must have at least one form item" unless page['items'].present? && page['items'].is_a?(Array)
+
+      page['items'].each_with_index do |item, item_index|
+        validate_form_item!(item, index, item_index)
+      end
     end
   end
 
@@ -149,12 +157,40 @@ class AppleMessagesForBusiness::FormService
   end
 
   def build_form_page(page_config)
-    {
+    page_type = page_config['type'] || 'module'
+
+    if page_type == 'splash'
+      build_splash_page(page_config)
+    else
+      build_module_page(page_config)
+    end
+  end
+
+  def build_splash_page(page_config)
+    page_data = {
       page_id: page_config['page_id'],
+      type: 'splash',
+      header: page_config['header'],
+      splashtext: page_config['splashtext'],
+      button_title: page_config['button_title'],
+      image_identifier: page_config['image_identifier']
+    }
+
+    # Transform to Apple format (camelCase)
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(page_data)
+  end
+
+  def build_module_page(page_config)
+    page_data = {
+      page_id: page_config['page_id'],
+      type: page_config['type'] || 'select',
       title: page_config['title'],
       description: page_config['description'],
       items: page_config['items'].map { |item| build_form_item(item) }
     }
+
+    # Transform to Apple format (camelCase)
+    AppleMessagesForBusiness::CaseTransformer.to_apple_format(page_data)
   end
 
   def build_form_item(item_config)
@@ -304,19 +340,28 @@ class AppleMessagesForBusiness::FormService
     reply_image = reply_msg['image_identifier']
     identifiers << reply_image if reply_image.present? && reply_image != header_image
 
-    # Add images from form option items
+    # Add images from splash pages
     pages = @form_config['pages'] || []
     pages.each do |page|
-      items = page['items'] || []
-      items.each do |item|
-        # Check for select items with image options
-        next unless %w[singleSelect multiSelect].include?(item['item_type'])
+      page_type = page['type'] || 'module'
 
-        options = item['options'] || []
-        options.each do |option|
-          # Handle both camelCase and snake_case
-          image_id = option['imageIdentifier'] || option['image_identifier']
-          identifiers << image_id if image_id.present?
+      if page_type == 'splash'
+        # Splash pages have imageIdentifier
+        splash_image = page['image_identifier']
+        identifiers << splash_image if splash_image.present?
+      else
+        # Module pages - check for select items with image options
+        items = page['items'] || []
+        items.each do |item|
+          # Check for select items with image options
+          next unless %w[singleSelect multiSelect].include?(item['item_type'])
+
+          options = item['options'] || []
+          options.each do |option|
+            # Handle both camelCase and snake_case
+            image_id = option['imageIdentifier'] || option['image_identifier']
+            identifiers << image_id if image_id.present?
+          end
         end
       end
     end

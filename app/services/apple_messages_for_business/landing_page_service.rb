@@ -203,6 +203,11 @@ class AppleMessagesForBusiness::LandingPageService
                   cursor: pointer;
                   margin-top: 20px;
               }
+              .close-hint {
+                  color: #999;
+                  font-size: 12px;
+                  margin-top: 10px;
+              }
           </style>
       </head>
       <body>
@@ -216,8 +221,43 @@ class AppleMessagesForBusiness::LandingPageService
                   #{user_data[:email]}
               </div>
 
-              <button class="close-button" onclick="window.close()">Close Window</button>
+              <button class="close-button" onclick="closeWindow()">Close Window</button>
+              <p class="close-hint">This window will close automatically in <span id="countdown">5</span> seconds</p>
           </div>
+
+          <script>
+              let countdown = 5;
+              const countdownElement = document.getElementById('countdown');
+
+              function closeWindow() {
+                  // Try multiple methods to close the window
+                  if (window.opener) {
+                      window.close();
+                  } else {
+                      // For Apple Messages opened windows
+                      window.location.href = 'about:blank';
+                      window.close();
+                  }
+
+                  // If close didn't work, show a message
+                  setTimeout(function() {
+                      document.querySelector('.close-hint').textContent = 'You can now close this window or return to Messages';
+                  }, 500);
+              }
+
+              // Auto-close countdown
+              const countdownInterval = setInterval(function() {
+                  countdown--;
+                  if (countdownElement) {
+                      countdownElement.textContent = countdown;
+                  }
+
+                  if (countdown <= 0) {
+                      clearInterval(countdownInterval);
+                      closeWindow();
+                  }
+              }, 1000);
+          </script>
       </body>
       </html>
     HTML

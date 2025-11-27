@@ -144,7 +144,7 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
 
   def build_interactive_data
     # Apple Messages for Business AuthV2 structure
-    # Reference: https://register.apple.com/resources/messages/msp-rest-api/type-interactive#authentication-message
+    # Reference: /Users/rhaps/LocalGit/chatwoot/_apple/msp-api-tutorial/src/docs/authenticationV2.md
     provider = @authentication_data['provider'] || @authentication_data[:provider]
     branding = provider_branding(provider)
 
@@ -180,51 +180,44 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
     # Generate state and store in Redis for CSRF protection
     state = SecureRandom.hex(32)
 
-    # Generate PKCE code verifier and challenge (RFC 7636)
-    # Apple Messages for Business requires PKCE for OAuth authentication
-    code_verifier = SecureRandom.urlsafe_base64(32)
-    code_challenge = Base64.urlsafe_encode64(
-      Digest::SHA256.digest(code_verifier),
-      padding: false
-    )
+    # Store state and provider in Redis for later verification
+    store_oauth_state(state, provider, nil)
 
-    # Store state, provider, and code_verifier in Redis for later verification
-    store_oauth_state(state, provider, code_verifier)
+    # Build redirect URI for OAuth callback
+    redirect_uri = build_redirect_uri(state, provider)
 
-    # Build oauth2 object according to Apple's PKCE OAuth spec
-    # Apple Messages uses PKCE (Proof Key for Code Exchange) instead of client_id/redirect_uri
-    # Reference: https://developer.apple.com/documentation/businesschatapi/messages_sent/interactive_messages/oauth_2_authentication
+    # Build oauth2 object according to Apple's AuthV2 spec
+    # Apple Messages AuthV2 uses redirectURI (server-side authorization code flow)
+    # Reference: /Users/rhaps/LocalGit/chatwoot/_apple/msp-api-tutorial/src/docs/authenticationV2.md
+    # Example payload lines 116-147
     oauth2_data = {
       state: state,
       response_type: 'code',
       scope: get_provider_scopes(provider),
-      code_challenge_method: 'S256',
-      code_challenge: code_challenge
+      redirect_uri: redirect_uri
     }
 
     log_info "[SendAuth] OAuth provider: #{provider}"
     log_info "[SendAuth] OAuth scopes: #{oauth2_data[:scope].inspect}"
     log_info "[SendAuth] OAuth state: #{state}"
-    log_info '[SendAuth] PKCE code_challenge_method: S256'
-    log_info "[SendAuth] PKCE code_challenge: #{code_challenge[0..20]}... (truncated)"
-    log_info '[SendAuth] Note: Using PKCE OAuth flow (code_challenge instead of client_id)'
+    log_info "[SendAuth] OAuth redirectURI: #{redirect_uri}"
+    log_info '[SendAuth] OAuth flow: Apple Messages AuthV2 (Authorization Code Flow)'
 
     # Transform to Apple's camelCase format
     AppleMessagesForBusiness::CaseTransformer.to_apple_format(oauth2_data)
   end
 
-  def store_oauth_state(state, provider, code_verifier)
-    # Store state, provider, and code_verifier in Redis for CSRF protection and PKCE verification
+  def store_oauth_state(state, provider, _code_verifier)
+    # Store state and provider in Redis for CSRF protection
     # Expires in 10 minutes
     oauth_state_data = {
       channel_id: @channel.id,
       destination_id: @destination_id,
-      provider: provider,
-      code_verifier: code_verifier
+      provider: provider
     }.to_json
 
     Redis::Alfred.setex("oauth_state:#{state}", oauth_state_data, 600)
-    log_info '[SendAuth] Stored OAuth state and PKCE code_verifier in Redis with 10-minute expiration'
+    log_info '[SendAuth] Stored OAuth state in Redis with 10-minute expiration'
   end
 
   def build_redirect_uri(_state, provider)

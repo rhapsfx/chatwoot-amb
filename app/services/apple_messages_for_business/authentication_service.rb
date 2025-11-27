@@ -32,7 +32,10 @@ class AppleMessagesForBusiness::AuthenticationService
     auth_session = get_auth_session(state)
     return { error: 'Invalid state parameter' } unless auth_session
 
-    token_response = exchange_code_for_token(code, provider, auth_session)
+    # Build redirect_uri using the provider from the session
+    redirect_uri = build_redirect_uri_for_callback(provider)
+
+    token_response = exchange_code_for_token(code, provider, redirect_uri)
     return token_response if token_response[:error]
 
     user_data = fetch_user_data(token_response[:access_token], provider)
@@ -105,13 +108,16 @@ class AppleMessagesForBusiness::AuthenticationService
   end
 
   def get_auth_session(state)
-    auth_sessions = @channel.auth_sessions || {}
-    session = auth_sessions[state]
+    # Read from Redis (where SendAuthenticationService stores it)
+    state_key = "oauth_state:#{state}"
+    state_data = Redis::Alfred.get(state_key)
+    return nil unless state_data
 
-    return nil unless session
-    return nil if Time.current.to_i > session['expires_at']
-
-    session
+    begin
+      JSON.parse(state_data)
+    rescue JSON::ParserError
+      nil
+    end
   end
 
   def store_landing_context(state, success_url, cancel_url)
@@ -140,9 +146,25 @@ class AppleMessagesForBusiness::AuthenticationService
     )
   end
 
-  def exchange_code_for_token(code, provider, auth_session)
-    oauth2_service = AppleMessagesForBusiness::Oauth2Service.new(provider)
-    oauth2_service.exchange_code(code, build_redirect_uri(auth_session['state']))
+  def build_redirect_uri_for_callback(provider)
+    # Build the same redirect_uri that was used in the authentication request
+    # This must match exactly what was sent to the OAuth provider
+    host = ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
+    "#{host}/apple_messages_for_business/oauth/callback/#{provider}"
+  end
+
+  def exchange_code_for_token(code, provider, redirect_uri)
+    # Get provider credentials from channel configuration
+    provider_config = @channel.oauth2_providers&.dig(provider.downcase)
+    client_id = provider_config&.dig('clientId')
+    client_secret = provider_config&.dig('clientSecret')
+
+    oauth2_service = AppleMessagesForBusiness::Oauth2Service.new(
+      provider,
+      client_id: client_id,
+      client_secret: client_secret
+    )
+    oauth2_service.exchange_code(code, redirect_uri)
   rescue StandardError => e
     { error: "Token exchange failed: #{e.message}" }
   end

@@ -562,7 +562,7 @@ const loadTemplate = templateId => {
                 ),
                 required: true,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_FULL_NAME'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_FULL_NAME'
                 ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
@@ -575,7 +575,7 @@ const loadTemplate = templateId => {
                 ),
                 required: true,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_EMAIL'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_EMAIL'
                 ),
                 keyboard_type: 'emailAddress',
                 text_content_type: 'emailAddress',
@@ -588,7 +588,7 @@ const loadTemplate = templateId => {
                 ),
                 required: false,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_PHONE'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_PHONE'
                 ),
                 keyboard_type: 'phonePad',
                 text_content_type: 'telephoneNumber',
@@ -644,7 +644,7 @@ const loadTemplate = templateId => {
                 ),
                 required: false,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.FEEDBACK.PLACEHOLDER_COMMENTS'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.PLACEHOLDER_COMMENTS'
                 ),
               },
               {
@@ -701,7 +701,7 @@ const loadTemplate = templateId => {
                 ),
                 required: true,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NAME'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NAME'
                 ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
@@ -725,7 +725,7 @@ const loadTemplate = templateId => {
                   {
                     value: 'consultation',
                     title: t(
-                      'APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_CONSULTATION'
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_CONSULTATION'
                     ),
                   },
                   {
@@ -750,7 +750,7 @@ const loadTemplate = templateId => {
                 ),
                 required: false,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NOTES'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NOTES'
                 ),
               },
             ],
@@ -976,7 +976,7 @@ const loadTemplate = templateId => {
                 ),
                 required: true,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_NAME'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_NAME'
                 ),
                 keyboard_type: 'default',
                 text_content_type: 'name',
@@ -989,7 +989,7 @@ const loadTemplate = templateId => {
                 ),
                 required: true,
                 placeholder: t(
-                  'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_EMAIL'
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_EMAIL'
                 ),
                 keyboard_type: 'emailAddress',
                 text_content_type: 'emailAddress',
@@ -2266,46 +2266,18 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.PREFIX_TEXT_LABEL') }}
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.PREFIX_TEXT_LABEL'
+                      )
+                    }}
                   </label>
                   <input
                     v-model="newField.prefix_text"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.PREFIX_TEXT_PLACEHOLDER')
-                    "
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.HINT_TEXT_LABEL') }}
-                  </label>
-                  <input
-                    v-model="newField.hint_text"
-                    type="text"
-                    :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.HINT_TEXT_PLACEHOLDER')
-                    "
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.MAX_CHAR_COUNT') }}
-                  </label>
-                  <input
-                    v-model.number="newField.maximum_character_count"
-                    type="number"
-                    :placeholder="
                       t(
-                        'TEMPLATES.BUILDER.APPLE_FORM.MAX_CHAR_COUNT_PLACEHOLDER'
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.PREFIX_TEXT_PLACEHOLDER'
                       )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
@@ -2316,7 +2288,55 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.INPUT_TYPE_LABEL') }}
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.HINT_TEXT_LABEL'
+                      )
+                    }}
+                  </label>
+                  <input
+                    v-model="newField.hint_text"
+                    type="text"
+                    :placeholder="
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.HINT_TEXT_PLACEHOLDER'
+                      )
+                    "
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                  >
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.MAX_CHAR_COUNT'
+                      )
+                    }}
+                  </label>
+                  <input
+                    v-model.number="newField.maximum_character_count"
+                    type="number"
+                    :placeholder="
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.MAX_CHAR_COUNT_PLACEHOLDER'
+                      )
+                    "
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                  >
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.INPUT_TYPE_LABEL'
+                      )
+                    }}
                   </label>
                   <select
                     v-model="newField.input_type"
@@ -2324,83 +2344,15 @@ watch(
                   >
                     <option value="singleline">
                       {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.INPUT_TYPE_SINGLELINE')
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.INPUT_TYPE_SINGLELINE'
+                        )
                       }}
                     </option>
                     <option value="multiline">
                       {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.INPUT_TYPE_MULTILINE')
-                      }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
-                  >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_LABEL') }}
-                  </label>
-                  <select
-                    v-model="newField.keyboard_type"
-                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
-                  >
-                    <option value="default">
-                      {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_DEFAULT')
-                      }}
-                    </option>
-                    <option value="asciiCapable">
-                      {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_ASCII')
-                      }}
-                    </option>
-                    <option value="numbersAndPunctuation">
-                      Numbers & Punctuation
-                    </option>
-                    <option value="URL">
-                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_URL') }}
-                    </option>
-                    <option value="numberPad">
-                      {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_NUMBER_PAD'
-                        )
-                      }}
-                    </option>
-                    <option value="phonePad">
-                      {{
-                        t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_PHONE_PAD'
-                        )
-                      }}
-                    </option>
-                    <option value="namePhonePad">
-                      {{
-                        t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_NAME_PHONE'
-                        )
-                      }}
-                    </option>
-                    <option value="emailAddress">
-                      {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_EMAIL')
-                      }}
-                    </option>
-                    <option value="decimalPad">
-                      {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_DECIMAL')
-                      }}
-                    </option>
-                    <option value="UIKeyboardTypeTwitter">
-                      {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_TWITTER')
-                      }}
-                    </option>
-                    <option value="webSearch">
-                      {{
-                        t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_WEB_SEARCH'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.INPUT_TYPE_MULTILINE'
                         )
                       }}
                     </option>
@@ -2412,7 +2364,99 @@ watch(
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
                     {{
-                      t('TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_LABEL')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_LABEL'
+                      )
+                    }}
+                  </label>
+                  <select
+                    v-model="newField.keyboard_type"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
+                  >
+                    <option value="default">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_DEFAULT'
+                        )
+                      }}
+                    </option>
+                    <option value="asciiCapable">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_ASCII'
+                        )
+                      }}
+                    </option>
+                    <option value="numbersAndPunctuation">
+                      Numbers & Punctuation
+                    </option>
+                    <option value="URL">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_URL'
+                        )
+                      }}
+                    </option>
+                    <option value="numberPad">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_NUMBER_PAD'
+                        )
+                      }}
+                    </option>
+                    <option value="phonePad">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_PHONE_PAD'
+                        )
+                      }}
+                    </option>
+                    <option value="namePhonePad">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_NAME_PHONE'
+                        )
+                      }}
+                    </option>
+                    <option value="emailAddress">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_EMAIL'
+                        )
+                      }}
+                    </option>
+                    <option value="decimalPad">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_DECIMAL'
+                        )
+                      }}
+                    </option>
+                    <option value="UIKeyboardTypeTwitter">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_TWITTER'
+                        )
+                      }}
+                    </option>
+                    <option value="webSearch">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_WEB_SEARCH'
+                        )
+                      }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
+                  >
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_LABEL'
+                      )
                     }}
                   </label>
                   <select
@@ -2420,73 +2464,79 @@ watch(
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   >
                     <option value="">
-                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.IMAGE_NONE_OPTION') }}
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.IMAGE_NONE_OPTION'
+                        )
+                      }}
                     </option>
                     <option value="name">
                       {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_NAME')
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_NAME'
+                        )
                       }}
                     </option>
                     <option value="namePrefix">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_NAME_PREFIX'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_NAME_PREFIX'
                         )
                       }}
                     </option>
                     <option value="givenName">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_GIVEN_NAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_GIVEN_NAME'
                         )
                       }}
                     </option>
                     <option value="middleName">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_MIDDLE_NAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_MIDDLE_NAME'
                         )
                       }}
                     </option>
                     <option value="familyName">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_FAMILY_NAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_FAMILY_NAME'
                         )
                       }}
                     </option>
                     <option value="nameSuffix">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_NAME_SUFFIX'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_NAME_SUFFIX'
                         )
                       }}
                     </option>
                     <option value="nickname">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_NICKNAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_NICKNAME'
                         )
                       }}
                     </option>
                     <option value="jobTitle">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_JOB_TITLE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_JOB_TITLE'
                         )
                       }}
                     </option>
                     <option value="organizationName">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_ORG_NAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_ORG_NAME'
                         )
                       }}
                     </option>
                     <option value="location">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_LOCATION'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_LOCATION'
                         )
                       }}
                     </option>
@@ -2501,91 +2551,99 @@ watch(
                     </option>
                     <option value="addressCity">
                       {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_CITY')
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_CITY'
+                        )
                       }}
                     </option>
                     <option value="addressState">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_STATE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_STATE'
                         )
                       }}
                     </option>
                     <option value="addressCityAndState">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_CITY_STATE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_CITY_STATE'
                         )
                       }}
                     </option>
                     <option value="sublocality">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_SUBLOCALITY'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_SUBLOCALITY'
                         )
                       }}
                     </option>
                     <option value="countryName">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_COUNTRY'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_COUNTRY'
                         )
                       }}
                     </option>
                     <option value="postalCode">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_POSTAL_CODE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_POSTAL_CODE'
                         )
                       }}
                     </option>
                     <option value="telephoneNumber">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_PHONE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_PHONE'
                         )
                       }}
                     </option>
                     <option value="emailAddress">
                       {{
-                        t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_EMAIL')
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_EMAIL'
+                        )
                       }}
                     </option>
                     <option value="URL">
-                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.KEYBOARD_TYPE_URL') }}
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.KEYBOARD_TYPE_URL'
+                        )
+                      }}
                     </option>
                     <option value="creditCardNumber">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_CREDIT_CARD'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_CREDIT_CARD'
                         )
                       }}
                     </option>
                     <option value="username">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_USERNAME'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_USERNAME'
                         )
                       }}
                     </option>
                     <option value="password">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_PASSWORD'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_PASSWORD'
                         )
                       }}
                     </option>
                     <option value="newPassword">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_NEW_PASSWORD'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_NEW_PASSWORD'
                         )
                       }}
                     </option>
                     <option value="oneTimeCode">
                       {{
                         t(
-                          'TEMPLATES.BUILDER.APPLE_FORM.TEXT_CONTENT_TYPE_ONE_TIME_CODE'
+                          'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.TEXT_CONTENT_TYPE_ONE_TIME_CODE'
                         )
                       }}
                     </option>
@@ -2602,7 +2660,9 @@ watch(
                     v-model="newField.regex"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.REGEX_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.REGEX_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white font-mono text-sm"
                   />
@@ -2624,7 +2684,9 @@ watch(
                     v-model="newField.label_text"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.DATE_LABEL_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.DATE_LABEL_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
@@ -2634,13 +2696,19 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
-                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.HINT_TEXT_LABEL') }}
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.HINT_TEXT_LABEL'
+                      )
+                    }}
                   </label>
                   <input
                     v-model="newField.hint_text"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.DATE_HINT_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.DATE_HINT_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
@@ -2656,7 +2724,9 @@ watch(
                     v-model="newField.date_format"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.DATE_FORMAT_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.DATE_FORMAT_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
@@ -2723,7 +2793,9 @@ watch(
                     v-model="newField.picker_title"
                     type="text"
                     :placeholder="
-                      t('TEMPLATES.BUILDER.APPLE_FORM.PICKER_TITLE_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.PICKER_TITLE_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
@@ -2771,7 +2843,7 @@ watch(
                   <label class="text-sm text-slate-700 dark:text-n-slate-10">
                     {{
                       t(
-                        'TEMPLATES.BUILDER.APPLE_FORM.ENABLE_MULTIPLE_SELECTION'
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.ENABLE_MULTIPLE_SELECTION'
                       )
                     }}
                   </label>
@@ -2828,7 +2900,9 @@ watch(
                           class="text-xs text-slate-600 dark:text-n-slate-11"
                         >
                           {{
-                            t('TEMPLATES.BUILDER.APPLE_FORM.OPTION_IMAGE_LABEL')
+                            t(
+                              'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.OPTION_IMAGE_LABEL'
+                            )
                           }}
                         </label>
                         <select
@@ -2838,7 +2912,7 @@ watch(
                           <option value="">
                             {{
                               t(
-                                'TEMPLATES.BUILDER.APPLE_FORM.IMAGE_NONE_OPTION'
+                                'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.IMAGE_NONE_OPTION'
                               )
                             }}
                           </option>
