@@ -38,17 +38,26 @@ class AppleMessagesForBusiness::SendRichLinkService
         sourceId: @channel.business_id,
         destinationId: @destination_id,
         v: 1,
-        body: rich_link_data[:url],
-        richLinkData: rich_link_data
+        body: rich_link_data[:url]
       }
 
-      # Log sanitized payload (truncate base64 data)
-      sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
-      log_info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
-      log_info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
-      if rich_link_data[:assets]&.key?(:image)
-        Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
-        Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
+      # Add EITHER richLinkData OR richLinkDataRef (not both)
+      # richLinkDataRef takes precedence (App Clips mode)
+      if rich_link_data[:richLinkDataRef].present?
+        payload[:richLinkDataRef] = rich_link_data[:richLinkDataRef]
+        log_info '🔍 Rich Link - Using richLinkDataRef (App Clips)'
+        log_info "🔍 Rich Link - richLinkDataRef keys: #{rich_link_data[:richLinkDataRef].keys.join(', ')}"
+      else
+        payload[:richLinkData] = rich_link_data
+        # Log sanitized payload (truncate base64 data)
+        sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
+        log_info '🔍 Rich Link - Using manual richLinkData'
+        log_info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
+        log_info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
+        if rich_link_data[:assets]&.key?(:image)
+          Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
+          Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
+        end
       end
 
       response = send_to_apple_gateway(payload, message_id)
@@ -91,6 +100,16 @@ class AppleMessagesForBusiness::SendRichLinkService
 
   def build_rich_link_data
     content_attrs = @message.content_attributes
+
+    # PRIORITY 1: Check if richLinkDataRef exists (App Clips mode)
+    # This takes precedence over manual rich link building
+    if content_attrs['rich_link_data_ref'].present?
+      log_info '🔍 Rich Link - Using richLinkDataRef (App Clips mode)'
+      return build_from_rich_link_data_ref(content_attrs)
+    end
+
+    # PRIORITY 2: Build manual richLinkData with assets
+    log_info '🔍 Rich Link - Building manual richLinkData with assets'
     url = content_attrs['url'] || @message.content
 
     # If title or image not provided, try to scrape Open Graph metadata
@@ -118,6 +137,25 @@ class AppleMessagesForBusiness::SendRichLinkService
       url: url,
       title: content_attrs['title'] || extract_title_from_url(url),
       assets: build_assets(content_attrs)
+    }
+  end
+
+  # Build rich link data from richLinkDataRef (App Clips)
+  # richLinkDataRef is stored in snake_case in database
+  # Must be converted to camelCase for Apple MSP
+  def build_from_rich_link_data_ref(content_attrs)
+    rich_link_data_ref = content_attrs['rich_link_data_ref']
+    url = content_attrs['url']
+
+    # Transform to Apple format (snake_case → camelCase)
+    apple_format_ref = AppleMessagesForBusiness::CaseTransformer.to_apple_format(rich_link_data_ref)
+
+    log_info "🔍 Rich Link - richLinkDataRef keys: #{apple_format_ref.keys.join(', ')}"
+    log_info "🔍 Rich Link - URL: #{url}"
+
+    {
+      url: url,
+      richLinkDataRef: apple_format_ref
     }
   end
 
@@ -217,7 +255,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   end
 
   def download_and_encode_image(image_url)
-    return nil unless image_url.present?
+    return nil if image_url.blank?
 
     Rails.logger.info "🔍 Rich Link - Starting download for: #{image_url}"
 
@@ -270,7 +308,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   end
 
   def extract_title_from_url(url)
-    return 'Rich Link' unless url.present?
+    return 'Rich Link' if url.blank?
 
     # Try to extract domain name as fallback title
     uri = URI.parse(url)

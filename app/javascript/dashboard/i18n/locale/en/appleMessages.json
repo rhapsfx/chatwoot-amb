@@ -172,6 +172,46 @@
       "SUCCESS": {
         "MESSAGE": "Custom payload sent successfully"
       }
+    },
+    "RICH_LINK": {
+      "MODAL_TITLE": "Rich Link",
+      "MODAL_DESCRIPTION": "Create rich links with images, titles, and descriptions - or generate App Clips",
+      "MODE_LABEL": "Mode",
+      "MANUAL_MODE": "Manual Rich Link",
+      "APP_CLIPS_MODE": "App Clips (Auto-Generate)",
+      "URL_LABEL": "URL",
+      "URL_REQUIRED": "URL *",
+      "URL_PLACEHOLDER": "https://example.com/product",
+      "URL_HELP": "Must be HTTPS for App Clips",
+      "TITLE_LABEL": "Title",
+      "TITLE_PLACEHOLDER": "Product Name",
+      "DESCRIPTION_LABEL": "Description",
+      "DESCRIPTION_PLACEHOLDER": "Brief description of the content",
+      "IMAGE_LABEL": "Image",
+      "IMAGE_SOURCE_UPLOAD": "Upload New",
+      "IMAGE_SOURCE_SHARED": "Use Shared",
+      "IMAGE_SOURCE_URL": "URL",
+      "IMAGE_UPLOAD_TEXT": "Click to upload image",
+      "IMAGE_SIZE_LIMIT": "Max 5MB",
+      "IMAGE_SIZE_ERROR": "Image file size must be less than 5MB",
+      "IMAGE_URL_PLACEHOLDER": "https://example.com/image.jpg",
+      "IMAGE_PREVIEW_ALT": "Preview",
+      "VIDEO_URL_LABEL": "Video URL (Optional)",
+      "VIDEO_URL_PLACEHOLDER": "https://example.com/video.mp4",
+      "FAVICON_URL_LABEL": "Favicon URL (Optional)",
+      "FAVICON_URL_PLACEHOLDER": "https://example.com/favicon.ico",
+      "STORE_REGION_LABEL": "Store Region",
+      "STORE_REGION_HELP": "Select the App Store region for this App Clips experience",
+      "GENERATE_APP_CLIPS": "Generate App Clips",
+      "GENERATING_APP_CLIPS": "Generating App Clips...",
+      "APP_CLIPS_SUCCESS": "App Clips generated successfully! You can now send this rich link.",
+      "APP_CLIPS_INFO": "App Clips allows users to instantly experience your app without installation. The URL must support App Clips meta tags.",
+      "APP_CLIPS_READY_TITLE": "App Clips Ready",
+      "APP_CLIPS_READY_INFO": "This rich link will display an App Clips card when sent to iOS users. The content is hosted by Apple.",
+      "CANCEL": "Cancel",
+      "CREATE_ONLY": "Create Only",
+      "CREATE_AND_SEND": "Create & Send",
+      "CLOSE_MODAL": "Close modal"
     }
   }
 }
