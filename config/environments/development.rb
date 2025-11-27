@@ -103,8 +103,12 @@ Rails.application.configure do
     end
 
     def write(message)
-      # Force UTF-8 encoding on the message before writing
-      utf8_message = message.is_a?(String) ? message.force_encoding('UTF-8') : message.to_s.force_encoding('UTF-8')
+      # Properly encode message to UTF-8, replacing invalid characters
+      if message.is_a?(String)
+        utf8_message = message.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+      else
+        utf8_message = message.to_s.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+      end
       @file.write(utf8_message)
     end
 
