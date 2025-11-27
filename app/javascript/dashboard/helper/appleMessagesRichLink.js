@@ -1,6 +1,8 @@
 // Apple Messages Rich Link Helper
 // Automatic URL detection and Rich Link conversion for Apple Messages conversations
 
+import ConstructPayloadAPI from '../api/appleMessages/constructPayload';
+
 // Enhanced URL regex that detects URLs with and without protocol
 export const URL_REGEX =
   /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s<>"{}|\\^`[\]]*)?/gi;
@@ -87,9 +89,9 @@ export const extractMainURL = text => {
   return urls.length > 0 ? urls[0] : null;
 };
 
-export const createRichLinkPreview = async url => {
+export const createRichLinkPreview = async (url, conversation = null) => {
   try {
-    // Normalize URL before sending to backend
+    // Normalize URL before processing
     const normalizedURL = normalizeURL(url);
 
     // Get account ID from current URL path
@@ -98,7 +100,44 @@ export const createRichLinkPreview = async url => {
       throw new Error('Account ID not found');
     }
 
-    // Call backend to parse OpenGraph data
+    // ✅ PRIORITY 1: Try App Clips (Construct Payload API) if conversation available
+    if (conversation?.inbox_id) {
+      try {
+        // Check if URL might support App Clips (basic HTTPS validation)
+        if (ConstructPayloadAPI.mightSupportAppClips(normalizedURL)) {
+          // Attempt to generate App Clips richLinkDataRef
+          const constructResult = await ConstructPayloadAPI.create(
+            accountId,
+            conversation.inbox_id,
+            {
+              url: normalizedURL,
+              storeRegion: 'US', // Default to US, could be made configurable
+            }
+          );
+
+          // Success! URL supports App Clips
+          if (constructResult.success && constructResult.rich_link_data_ref) {
+            return {
+              success: true,
+              isAppClips: true,
+              richLinkData: {
+                url: normalizedURL,
+                rich_link_data_ref: constructResult.rich_link_data_ref,
+                // App Clips don't need title/description/image as they're hosted by Apple
+              },
+            };
+          }
+
+          // If error_code is NO_APP_CLIPS_SUPPORT, fall through to OpenGraph
+          // For other errors, silently fall through to OpenGraph
+        }
+      } catch (error) {
+        // Construct Payload API failed, fall through to OpenGraph
+        // Silently catch and continue to OpenGraph fallback
+      }
+    }
+
+    // ✅ PRIORITY 2: Fallback to OpenGraph scraping (manual rich link)
     const response = await fetch(
       `/api/v1/accounts/${accountId}/apple_messages/parse_url`,
       {
@@ -118,6 +157,7 @@ export const createRichLinkPreview = async url => {
     const data = await response.json();
     return {
       success: true,
+      isAppClips: false,
       richLinkData: {
         url: data.url,
         title: data.title,
@@ -221,7 +261,11 @@ export const processMessageForAppleMessages = async (
 
     if (urlPart) {
       // Convert URL to Rich Link with full message text
-      const richLinkPreview = await createRichLinkPreview(urlPart.content);
+      // Pass conversation to enable App Clips detection
+      const richLinkPreview = await createRichLinkPreview(
+        urlPart.content,
+        conversation
+      );
 
       if (richLinkPreview.success) {
         return [
@@ -256,7 +300,11 @@ export const processMessageForAppleMessages = async (
       });
     } else if (part.type === 'url') {
       // Convert URL to Rich Link
-      const richLinkPreview = await createRichLinkPreview(part.content);
+      // Pass conversation to enable App Clips detection
+      const richLinkPreview = await createRichLinkPreview(
+        part.content,
+        conversation
+      );
 
       if (richLinkPreview.success) {
         processedMessages.push({
