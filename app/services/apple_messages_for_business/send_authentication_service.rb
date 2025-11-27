@@ -200,7 +200,8 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
     log_info "[SendAuth] OAuth client_id: #{provider_config[:client_id] ? 'present' : 'MISSING'}"
     log_info "[SendAuth] OAuth scopes: #{oauth2_data[:scope].inspect}"
     log_info "[SendAuth] OAuth state: #{state}"
-    log_info "[SendAuth] Redirect URI: #{redirect_uri}"
+    log_info "[SendAuth] OAuth redirect_uri (base URL): #{redirect_uri}"
+    log_info '[SendAuth] Note: State and code will be added as query parameters by OAuth provider'
 
     # Validate required fields
     if oauth2_data[:client_id].blank?
@@ -223,11 +224,13 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
     log_info '[SendAuth] Stored OAuth state in Redis with 10-minute expiration'
   end
 
-  def build_redirect_uri(state, provider)
+  def build_redirect_uri(_state, provider)
     # Build OAuth redirect URI for this channel
     # The callback will receive the authorization code from the OAuth provider
+    # NOTE: redirect_uri should be the base URL without query parameters
+    # The state parameter is sent separately in the OAuth2 config and will be added by the OAuth provider
     host = ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
-    "#{host}/apple_messages_for_business/oauth/callback/#{provider}?state=#{state}"
+    "#{host}/apple_messages_for_business/oauth/callback/#{provider}"
   end
 
   def get_provider_scopes(provider)
