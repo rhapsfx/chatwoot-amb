@@ -183,21 +183,46 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
 
     redirect_uri = build_redirect_uri(state, provider)
 
+    # Get provider configuration (client_id is REQUIRED by Apple Messages OAuth)
+    provider_config = get_provider_config(provider)
+    auth_url = get_provider_auth_url(provider)
+
     # Build oauth2 object according to Apple's AuthV2 spec
+    # Apple Messages will redirect user to the authorization URL with these params
     oauth2_data = {
+      client_id: provider_config[:client_id],
       state: state,
       response_type: 'code',
       scope: get_provider_scopes(provider),
-      redirect_uri: redirect_uri
+      redirect_uri: redirect_uri,
+      authorization_url: auth_url
     }
 
     log_info "[SendAuth] OAuth provider: #{provider}"
+    log_info "[SendAuth] OAuth client_id: #{provider_config[:client_id] ? 'present' : 'MISSING'}"
+    log_info "[SendAuth] OAuth authorization_url: #{auth_url}"
     log_info "[SendAuth] OAuth scopes: #{oauth2_data[:scope].inspect}"
     log_info "[SendAuth] OAuth state: #{state}"
     log_info "[SendAuth] Redirect URI: #{redirect_uri}"
 
+    # Validate required fields
+    if oauth2_data[:client_id].blank?
+      raise "OAuth client_id is required for provider: #{provider}. Please configure oauth2_providers in channel settings."
+    end
+
     # Transform to Apple's camelCase format
     AppleMessagesForBusiness::CaseTransformer.to_apple_format(oauth2_data)
+  end
+
+  def get_provider_auth_url(provider)
+    case provider.to_s.downcase
+    when 'google'
+      'https://accounts.google.com/o/oauth2/v2/auth'
+    when 'linkedin'
+      'https://www.linkedin.com/oauth/v2/authorization'
+    when 'facebook'
+      'https://www.facebook.com/v18.0/dialog/oauth'
+    end
   end
 
   def store_oauth_state(state, provider)
