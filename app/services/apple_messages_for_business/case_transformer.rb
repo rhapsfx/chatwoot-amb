@@ -53,6 +53,7 @@ module AppleMessagesForBusiness
       'picker_type' => 'pickerType',
       'picker_options' => 'pickerOptions',
       'button_style' => 'buttonStyle',
+      'button_title' => 'buttonTitle',
       'image_url' => 'imageUrl',
       'use_live_layout' => 'useLiveLayout',
       'show_summary' => 'showSummary',
@@ -101,10 +102,12 @@ module AppleMessagesForBusiness
       'required_billing_contact_fields' => 'requiredBillingContactFields',
       'required_shipping_contact_fields' => 'requiredShippingContactFields',
 
-      # OAuth
+      # OAuth & PKCE
       'response_type' => 'responseType',
       'response_encryption_key' => 'responseEncryptionKey',
-      'redirect_uri' => 'redirectURI'  # Apple uses uppercase 'URI' per AuthV2 spec
+      'redirect_uri' => 'redirectURI',  # Apple uses uppercase 'URI' per AuthV2 spec
+      'code_challenge' => 'codeChallenge',
+      'code_challenge_method' => 'codeChallengeMethod'
     }.freeze
 
     # Fields that change name based on context
@@ -136,6 +139,7 @@ module AppleMessagesForBusiness
       required pattern options default state
       images items sections pages timeslots event location
       oauth2 payment form fields
+      header splashtext
     ].freeze
 
     class << self
