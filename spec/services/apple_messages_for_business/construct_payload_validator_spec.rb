@@ -235,8 +235,8 @@ RSpec.describe AppleMessagesForBusiness::ConstructPayloadValidator do
     end
 
     context 'with full list of valid regions' do
-      it 'contains exactly 30 valid regions' do
-        expected_count = 30
+      it 'contains exactly 37 valid regions' do
+        expected_count = 37
         actual_count = described_class::VALID_STORE_REGIONS.length
 
         expect(actual_count).to eq(expected_count),

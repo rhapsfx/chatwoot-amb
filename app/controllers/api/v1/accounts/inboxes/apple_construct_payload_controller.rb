@@ -3,6 +3,7 @@
 class Api::V1::Accounts::Inboxes::AppleConstructPayloadController < Api::V1::Accounts::BaseController
   before_action :set_inbox
   before_action :validate_apple_messages_inbox
+  before_action -> { check_authorization(Inbox) }
 
   # POST /api/v1/accounts/:account_id/inboxes/:inbox_id/apple_construct_payload
   # rubocop:disable Metrics/MethodLength
