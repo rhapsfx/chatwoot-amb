@@ -496,7 +496,7 @@ class ContentAttributeValidator < ActiveModel::Validator
     # BID is required
     record.errors.add(:content_attributes, 'bid is required for apple_custom_app') if content_attrs['bid'].blank?
 
-    # URL is required
-    record.errors.add(:content_attributes, 'url is required for apple_custom_app') if content_attrs['url'].blank?
+    # URL is optional for third-party apps
+    # record.errors.add(:content_attributes, 'url is required for apple_custom_app') if content_attrs['url'].blank?
   end
 end
