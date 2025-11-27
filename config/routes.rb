@@ -288,6 +288,8 @@ Rails.application.routes.draw do
                 post :bulk_upload
               end
             end
+            # Apple Messages for Business construct_payload (App Clips)
+            resource :apple_construct_payload, only: [:create], module: :inboxes
             get :health, on: :member
           end
           resources :inbox_members, only: [:create, :show], param: :inbox_id do

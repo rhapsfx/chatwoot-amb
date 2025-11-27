@@ -79,6 +79,9 @@ module AppleMessagesForBusiness
       'video_url' => 'videoUrl',
       'video_mime_type' => 'videoMimeType',
       'site_name' => 'siteName',
+      'rich_link_data_ref' => 'richLinkDataRef',
+      'store_region' => 'storeRegion',
+      'signature_base64' => 'signature-base64',  # Special case: underscore → hyphen
 
       # Custom app
       'app_id' => 'appId',
@@ -106,6 +109,7 @@ module AppleMessagesForBusiness
       'response_type' => 'responseType',
       'response_encryption_key' => 'responseEncryptionKey',
       'redirect_uri' => 'redirectURI',  # Apple uses uppercase 'URI' per AuthV2 spec
+      'client_secret' => 'clientSecret',
       'code_challenge' => 'codeChallenge',
       'code_challenge_method' => 'codeChallengeMethod'
     }.freeze
