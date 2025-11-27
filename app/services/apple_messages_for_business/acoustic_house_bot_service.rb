@@ -1,7 +1,54 @@
 # frozen_string_literal: true
 
 class AppleMessagesForBusiness::AcousticHouseBotService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
+
   IDLE_TIMEOUT = 30.minutes
+
+  # Template dependencies for deployment automation
+  # These templates must exist for the bot to function correctly
+  # Used by deployment scripts to auto-detect required templates
+  REQUIRED_TEMPLATES = %w[
+    ah_guitar_list_picker
+    ah_guitar_info_form
+    ah_large_form_demo
+    ah_main_menu
+    ah_ar_guitar
+    ah_summary
+  ].freeze
+
+  # Returns array of required template names
+  def self.required_template_names
+    REQUIRED_TEMPLATES
+  end
+
+  # Returns array of template IDs for a given account
+  # @param account_id [Integer] Account ID to look up templates
+  # @return [Array<Integer>] Template IDs
+  def self.required_template_ids(account_id)
+    MessageTemplate.where(
+      account_id: account_id,
+      name: REQUIRED_TEMPLATES
+    ).pluck(:id)
+  end
+
+  # Verifies all required templates exist for an account
+  # @param account_id [Integer] Account ID to verify
+  # @return [Hash] Verification result with :all_present, :found, :missing keys
+  def self.verify_templates_exist(account_id)
+    found = MessageTemplate.where(
+      account_id: account_id,
+      name: REQUIRED_TEMPLATES
+    )
+
+    missing = REQUIRED_TEMPLATES - found.pluck(:name)
+
+    {
+      all_present: missing.empty?,
+      found: found.pluck(:id, :name),
+      missing: missing
+    }
+  end
 
   # Typing indicator configuration
   # Set to false during development for faster testing
@@ -16,10 +63,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'listpicker' => :handle_list_picker_demo,
     'guitar' => :handle_list_picker_demo,
     'guitars' => :handle_list_picker_demo,
-    'time picker' => :handle_time_picker_demo,
-    'timepicker' => :handle_time_picker_demo,
-    'appointment' => :handle_time_picker_demo,
-    'time' => :handle_time_picker_demo,
+    'time picker' => :handle_schedule_lesson,
+    'timepicker' => :handle_schedule_lesson,
+    'appointment' => :handle_schedule_lesson,
+    'time' => :handle_schedule_lesson,
     'apple pay' => :handle_apple_pay_demo,
     'payment' => :handle_apple_pay_demo,
     'pay' => :handle_apple_pay_demo,
@@ -28,7 +75,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'large form' => :handle_large_form_demo,
     'big form' => :handle_large_form_demo,
     'ar' => :handle_ar_demo,
-    'augmented reality' => :handle_ar_demo
+    'augmented reality' => :handle_ar_demo,
+    'imessage app' => :handle_imessage_app,
+    'imessage extension' => :handle_imessage_app,
+    'authentication' => :handle_authentication_menu,
+    'auth' => :handle_authentication_menu,
+    'shazam' => :handle_imessage_app
   }.freeze
 
   # Keywords that control flow (reset, navigation, etc.)
@@ -66,7 +118,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'qr_photo' => :handle_photo_response,
     'qr_learn_more' => :handle_learn_more_response,
     'lp_menu_0319' => :handle_menu_selection,
-    'form_large_content' => :handle_large_form_response
+    'form_large_content' => :handle_large_form_response,
+    'act_imessage_app' => :handle_imessage_app,
+    'qr_oauth_provider' => :handle_oauth_provider_selection
   }.freeze
 
   def initialize(conversation, message)
@@ -1335,10 +1389,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # AHJ4: Ask about learning more
     customer_name = @conversation.custom_attributes&.dig('customer_name') || 'there'
 
+    # First, send the text message
+    send_text_message("#{customer_name}, would you like to learn more about Messages for Business?")
+
+    # Then, send the quick reply without a message body
     send_quick_reply(
       title: 'Learn More?',
       request_id: 'qr_learn_more',
-      message: "#{customer_name}, would you like to learn more about Messages for Business?",
       items: [
         { title: 'Yes', value: 'yes' },
         { title: 'No', value: 'no' }
@@ -1482,8 +1539,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_form_demo
     # Demo mode: just show the form, don't continue flow
-    send_text_message('Here\'s our guitar information form:')
-    send_guitar_info_form
+    # Check if device supports Apple Messages Forms
+    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
+    supports_forms = capabilities.include?('FORM')
+
+    if supports_forms
+      send_text_message('Here\'s our guitar information form:')
+      send_guitar_info_form
+    else
+      send_text_message('Your device does not support FORM, please switch to an iOS device')
+    end
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
@@ -1496,8 +1561,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_large_form_demo
     # Demo mode: send large content form (template 343)
-    send_text_message('Here\'s a form with large content:')
-    send_large_content_form
+    # Check if device supports Apple Messages Forms
+    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
+    supports_forms = capabilities.include?('FORM')
+
+    if supports_forms
+      send_text_message('Here\'s a form with large content:')
+      send_large_content_form
+    else
+      send_text_message('Your device does not support FORM, please switch to an iOS device')
+    end
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
@@ -1737,18 +1810,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       log_info '[Bot] 📋 Menu: Large Form'
       handle_large_form_demo
     when '10'
-      # 10. Authentication - TODO: Implement authentication demo
-      log_info '[Bot] 📋 Menu: Authentication (not implemented)'
-      send_text_message('🔐 Authentication Demo')
-      send_text_message('This feature demonstrates OAuth authentication flow with Apple Messages for Business.')
-      send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
-      update_bot_state('DEMO_MODE')
+      # 10. Authentication
+      log_info '[Bot] 📋 Menu: Authentication'
+      handle_authentication_menu
     when '11'
       # 11. iMessage App - TODO: Implement custom iMessage app demo
       log_info '[Bot] 📋 Menu: iMessage App (not implemented)'
       send_text_message('📱 iMessage App Demo')
       send_text_message('This feature demonstrates custom iMessage app extensions.')
-      send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
+      handle_imessage_app
+      #send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
       update_bot_state('DEMO_MODE')
     when '12'
       # 12. Apple Wallet
@@ -1874,19 +1945,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_guitar_list_picker
-    # Get guitar list picker template by ID
+    # Get guitar list picker template by name
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 371
+      name: 'ah_guitar_list_picker'
     )
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template (ID: 371) not found')
+      Rails.logger.error utf8_encode("[Bot] Guitar List Picker template 'ah_guitar_list_picker' not found")
       send_text_message('Guitar selection temporarily unavailable.')
       return
     end
 
-    log_info "[Bot] Sending Guitar List Picker (ID: 371, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] Sending Guitar List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # Use TemplateFacade with image loading (latest implementation)
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
@@ -1983,25 +2054,25 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_guitar_info_form
-    # Use the specific form template by ID
+    # Use the specific form template by name
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 356
+      name: 'ah_guitar_info_form'
     )
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] Guitar Info Form template (ID: 356) not found - falling back to guitar list')
+      Rails.logger.error utf8_encode("[Bot] Guitar Info Form template 'ah_guitar_info_form' not found - falling back to guitar list")
       # Fallback: skip to guitar list if form template doesn't exist
       update_bot_state('AHB3')
       handle_guitar_list_prompt
       return
     end
 
-    log_info "[Bot] Sending Guitar Info Form (ID: 356, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] Sending Guitar Info Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # Use BotRendererService to properly render the template
     renderer = Templates::BotRendererService.new(
-      template_id: 356,
+      template_id: template.id,
       parameters: {},
       channel_type: 'apple_messages_for_business'
     )
@@ -2036,24 +2107,24 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_large_content_form
-    # Send large content form (template 343)
+    # Send large content form by name
     # Force reload to bust any Rails caching
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 343
+      name: 'ah_large_form_demo'
     )&.reload
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] Large Content Form template (ID: 343) not found')
+      Rails.logger.error utf8_encode("[Bot] Large Content Form template 'ah_large_form_demo' not found")
       send_text_message('Large content form is not available.')
       return
     end
 
-    log_info "[Bot] 📋 Sending Large Content Form (ID: 343, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] 📋 Sending Large Content Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # Use BotRendererService to properly render the template
     renderer = Templates::BotRendererService.new(
-      template_id: 343,
+      template_id: template.id,
       parameters: {},
       channel_type: 'apple_messages_for_business'
     )
@@ -2186,19 +2257,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_summary_list_picker
-    # Get summary list picker template by ID
+    # Get summary list picker template by name
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 355
+      name: 'ah_summary'
     )
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] Summary List Picker template (ID: 355) not found')
+      Rails.logger.error utf8_encode("[Bot] Summary List Picker template 'ah_summary' not found")
       send_text_message('Summary temporarily unavailable.')
       return
     end
 
-    log_info "[Bot] Sending Summary List Picker (ID: 355, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] Sending Summary List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # UNIFIED APPROACH: Use TemplateFacade for consistent data access
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
@@ -2277,28 +2348,28 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_menu_list_picker
-    # Get menu list picker template by ID
-    log_info "[Bot] 🔍 Looking for menu template 366 in account: #{@conversation.account_id}"
+    # Get menu list picker template by name
+    log_info "[Bot] 🔍 Looking for menu template 'ah_main_menu' in account: #{@conversation.account_id}"
 
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 366
+      name: 'ah_main_menu'
     )
 
     unless template
       # Debug: Check if template exists globally (different account)
-      global_template = MessageTemplate.find_by(id: 366)
+      global_template = MessageTemplate.find_by(name: 'ah_main_menu')
       if global_template
-        Rails.logger.error utf8_encode("[Bot] ⚠️  Menu template 366 EXISTS but in account #{global_template.account_id}, not #{@conversation.account_id}")
+        Rails.logger.error utf8_encode("[Bot] ⚠️  Menu template 'ah_main_menu' EXISTS but in account #{global_template.account_id}, not #{@conversation.account_id}")
         Rails.logger.error utf8_encode("[Bot] 💡 Inbox: #{@conversation.inbox_id}, Conversation: #{@conversation.id}")
       else
-        Rails.logger.error utf8_encode('[Bot] ❌ Menu List Picker template (ID: 366) not found in ANY account')
+        Rails.logger.error utf8_encode("[Bot] ❌ Menu List Picker template 'ah_main_menu' not found in ANY account")
       end
       send_text_message('Menu temporarily unavailable.')
       return
     end
 
-    log_info "📋 [Bot] Sending Menu List Picker (ID: 366, Name: #{utf8_encode(template.name)})"
+    log_info "📋 [Bot] Sending Menu List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # Use TemplateFacade with image loading (latest implementation)
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
@@ -2373,19 +2444,19 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_ar_file
-    # Use template 344 for AR content
+    # Use AR guitar template by name
     template = MessageTemplate.find_by(
       account_id: @conversation.account_id,
-      id: 344
+      name: 'ah_ar_guitar'
     )
 
     unless template
-      Rails.logger.error utf8_encode('[Bot] AR template (ID: 344) not found - sending placeholder')
-      send_text_message('[AR File: Template 344 not found]')
+      Rails.logger.error utf8_encode("[Bot] AR template 'ah_ar_guitar' not found - sending placeholder")
+      send_text_message('[AR File: Template not found]')
       return
     end
 
-    log_info "[Bot] 🎸 Sending AR content (ID: 344, Name: #{utf8_encode(template.name)})"
+    log_info "[Bot] 🎸 Sending AR content (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
 
     # Check if template has AR file attached
     unless template.attachments.attached?
@@ -3466,4 +3537,186 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     fallback_identifier
   end
   # rubocop:enable Metrics/MethodLength
+
+  def handle_imessage_app(_interactive_data = nil)
+    log_info '[Bot] 🎵 handle_imessage_app called - Sending Shazam extension'
+
+    # Create message record - SendReplyJob will handle sending to Apple MSP
+    begin
+      log_info '[Bot] 🎵 Creating Shazam message record'
+
+      message = Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        {
+          message_type: :outgoing,
+          content_type: 'apple_custom_app',
+          content: 'Shazam',
+          content_attributes: {
+            app_id: '284993459',
+            app_name: 'Shazam',
+            bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:4GWDBCF5A4:com.shazam.Shazam.imessageextension',
+            use_live_layout: true
+          },
+          private: false
+        }
+      ).perform
+
+      log_info "[Bot] 🎵 Message created successfully: ID=#{message&.id}, content_type=#{message&.content_type}"
+
+      send_text_message('🎵 Tap the Shazam bubble above to identify songs!')
+    rescue StandardError => e
+      log_warn "[Bot] ❌ Error creating Shazam message: #{e.message}"
+      log_warn e.backtrace.join("\n")
+      send_text_message('Sorry, there was an error sending the Shazam extension. Please try again.')
+    end
+  end
+
+  # === OAuth Authentication Handlers ===
+
+  def handle_authentication_menu
+    send_text_message('🔐 OAuth Authentication Demo')
+    send_text_message('Choose which provider you\'d like to authenticate with:')
+
+    # Send quick reply with provider options
+    send_quick_reply(
+      title: 'Select OAuth Provider',
+      request_id: 'qr_oauth_provider',
+      items: [
+        { title: 'LinkedIn', value: 'linkedin' },
+        { title: 'Google', value: 'google' },
+        { title: 'Facebook', value: 'facebook' }
+      ]
+    )
+
+    update_bot_state('DEMO_MODE_AUTH_PROVIDER')
+  end
+
+  def handle_oauth_provider_selection(interactive_data)
+    log_info '[Bot] 🔐 handle_oauth_provider_selection called'
+
+    # Extract selected provider - handle both standard format and NSKeyedArchiver
+    provider = if interactive_data['$archiver'] == 'NSKeyedArchiver'
+                 # NSKeyedArchiver format - extract from $objects array
+                 objects = interactive_data['$objects'] || []
+                 objects.find { |obj| obj.is_a?(String) && obj.match?(/linkedin|google|facebook/i) }
+               else
+                 # Standard quick reply format
+                 quick_reply_data = interactive_data.dig('data', 'quick-reply') || {}
+                 selected_index = quick_reply_data['selectedIndex']
+                 items = quick_reply_data['items'] || []
+
+                 items[selected_index]&.fetch('title', nil) if selected_index
+               end
+
+    log_info "[Bot] 🔐 Selected provider: #{utf8_encode(provider)}"
+
+    case provider&.downcase
+    when 'linkedin'
+      handle_linkedin_oauth_demo
+    when 'google'
+      handle_google_oauth_demo
+    when 'facebook'
+      handle_facebook_oauth_demo
+    else
+      send_text_message('Invalid provider selected. Type \'menu\' to try again.')
+    end
+  end
+
+  def handle_linkedin_oauth_demo
+    log_info '[Bot] 🔗 LinkedIn OAuth demo'
+
+    # Check if LinkedIn OAuth is enabled for this inbox
+    unless @conversation.inbox.channel.oauth2_provider_enabled?('linkedin')
+      send_text_message('❌ LinkedIn OAuth is not enabled for this inbox.')
+      send_text_message('Please configure LinkedIn OAuth in inbox settings.')
+      update_bot_state('DEMO_MODE')
+      return
+    end
+
+    send_text_message('🔗 LinkedIn Authentication')
+    send_text_message('Please authenticate with your LinkedIn account to continue.')
+
+    send_oauth_authentication('linkedin')
+    update_bot_state('DEMO_MODE')
+  end
+
+  def handle_google_oauth_demo
+    log_info '[Bot] 🔵 Google OAuth demo'
+
+    # Check if Google OAuth is enabled for this inbox
+    unless @conversation.inbox.channel.oauth2_provider_enabled?('google')
+      send_text_message('❌ Google OAuth is not enabled for this inbox.')
+      send_text_message('Please configure Google OAuth in inbox settings.')
+      update_bot_state('DEMO_MODE')
+      return
+    end
+
+    send_text_message('🔵 Google Authentication')
+    send_text_message('Please authenticate with your Google account to continue.')
+
+    send_oauth_authentication('google')
+    update_bot_state('DEMO_MODE')
+  end
+
+  def handle_facebook_oauth_demo
+    log_info '[Bot] 🔷 Facebook OAuth demo'
+
+    # Check if Facebook OAuth is enabled for this inbox
+    unless @conversation.inbox.channel.oauth2_provider_enabled?('facebook')
+      send_text_message('❌ Facebook OAuth is not enabled for this inbox.')
+      send_text_message('Please configure Facebook OAuth in inbox settings.')
+      update_bot_state('DEMO_MODE')
+      return
+    end
+
+    send_text_message('🔷 Facebook Authentication')
+    send_text_message('Please authenticate with your Facebook account to continue.')
+
+    send_oauth_authentication('facebook')
+    update_bot_state('DEMO_MODE')
+  end
+
+  def send_oauth_authentication(provider)
+    log_info "[Bot] 🔐 Sending OAuth authentication for provider: #{provider}"
+
+    # Build authentication data
+    authentication_data = {
+      'provider' => provider
+    }
+
+    # Create custom message text based on provider
+    message_content = case provider.downcase
+                      when 'linkedin'
+                        'Sign in with LinkedIn to access your professional profile'
+                      when 'google'
+                        'Sign in with Google to continue'
+                      when 'facebook'
+                        'Sign in with Facebook to continue'
+                      else
+                        "Sign in with #{provider.capitalize} to continue"
+                      end
+
+    # Use SendAuthenticationService to send OAuth request
+    service = AppleMessagesForBusiness::SendAuthenticationService.new(
+      channel: @conversation.inbox.channel,
+      destination_id: @conversation.contact_inbox.source_id,
+      authentication_data: authentication_data,
+      message_content: message_content
+    )
+
+    result = service.perform
+
+    if result[:success]
+      log_info '[Bot] ✅ OAuth authentication message sent successfully'
+    else
+      error_msg = result[:error] || 'unknown error'
+      log_warn "[Bot] ❌ OAuth authentication failed: #{error_msg}"
+      send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
+    end
+  rescue StandardError => e
+    Rails.logger.error utf8_encode("[Bot] ❌ Exception in send_oauth_authentication: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+    send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
+  end
 end

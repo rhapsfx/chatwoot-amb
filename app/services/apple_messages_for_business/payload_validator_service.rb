@@ -4,6 +4,8 @@
 # Validates payload structure, ISO 8601 dates, and base64 image encoding
 # before sending to mspgw.apple.com
 class AppleMessagesForBusiness::PayloadValidatorService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
+
   class ValidationError < StandardError; end
 
   def initialize(payload, message_type)
@@ -13,7 +15,7 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def validate!
-    Rails.logger.info "[AMB PayloadValidator] Validating #{@message_type} payload before sending to Apple MSP"
+    log_info "[AMB PayloadValidator] Validating #{@message_type} payload before sending to Apple MSP"
 
     validate_payload_structure
     validate_required_fields
@@ -22,11 +24,11 @@ class AppleMessagesForBusiness::PayloadValidatorService
 
     if @errors.any?
       error_message = "Payload validation failed: #{@errors.join(', ')}"
-      Rails.logger.error "[AMB PayloadValidator] #{error_message}"
+      log_error "[AMB PayloadValidator] #{error_message}"
       raise ValidationError, error_message
     end
 
-    Rails.logger.info '[AMB PayloadValidator] ✅ Payload validation passed'
+    log_info '[AMB PayloadValidator] ✅ Payload validation passed'
     log_payload_summary
     true
   end
@@ -80,14 +82,35 @@ class AppleMessagesForBusiness::PayloadValidatorService
     # Validate bid
     @errors << 'interactiveData missing bid' unless interactive_data[:bid].present?
 
-    # CRITICAL: Third-party custom apps (apple_custom_app) CANNOT have a "data" object
+    # CRITICAL: Third-party custom apps (apple_custom_app) and OAuth authentication (apple_authentication)
+    # CANNOT have a "data" object
     # Apple returns: "400 Bad Request : Third party interactive data disallows use of 'data'"
-    # Skip data validation for custom apps
+    # Skip data validation for custom apps and OAuth
     if @message_type == 'apple_custom_app'
       # For custom apps, validate required top-level fields instead
       @errors << 'apple_custom_app missing appId' unless interactive_data[:appId].present?
-      @errors << 'apple_custom_app missing URL' unless interactive_data[:URL].present?
+      # URL is optional for some third-party apps
+      # @errors << 'apple_custom_app missing URL' unless interactive_data[:URL].present?
       @errors << 'apple_custom_app missing receivedMessage' unless interactive_data[:receivedMessage].present?
+      return
+    end
+
+    if @message_type == 'apple_authentication'
+      # OAuth authentication uses Apple's AuthV2 structure with data.authenticate.oauth2
+      # Validate the structure
+      data = interactive_data[:data] || interactive_data['data']
+      unless data.present?
+        @errors << 'Authentication missing data object'
+        return
+      end
+
+      authenticate = data[:authenticate] || data['authenticate']
+      unless authenticate.present?
+        @errors << 'Authentication missing authenticate object'
+        return
+      end
+
+      validate_authentication_data(authenticate)
       return
     end
 
@@ -109,6 +132,8 @@ class AppleMessagesForBusiness::PayloadValidatorService
       validate_quick_reply_data(data)
     when 'apple_form'
       validate_form_data(data)
+    when 'apple_authentication'
+      validate_authentication_data(data)
     end
   end
 
@@ -263,6 +288,38 @@ class AppleMessagesForBusiness::PayloadValidatorService
     @errors << "Form page #{index} missing pageIdentifier" if page_identifier.blank?
     @errors << "Form page #{index} missing type" if page_type.blank?
     @errors << "Form page #{index} missing title" if page_title.blank?
+  end
+
+  def validate_authentication_data(authenticate)
+    # OAuth2 is inside authenticate object per Apple's AuthV2 spec
+    # Handle both string and symbol keys
+    oauth2 = authenticate[:oauth2] || authenticate['oauth2']
+
+    unless oauth2.present?
+      @errors << 'Authentication missing oauth2 field'
+      return
+    end
+
+    # Validate OAuth2 required fields per Apple's AuthV2 spec
+    scope = oauth2[:scope] || oauth2['scope']
+    state = oauth2[:state] || oauth2['state']
+    response_type = oauth2[:responseType] || oauth2['responseType'] || oauth2[:response_type] || oauth2['response_type']
+    redirect_uri = oauth2[:redirectUri] || oauth2['redirectUri'] || oauth2[:redirect_uri] || oauth2['redirect_uri']
+
+    @errors << 'OAuth2 missing scope field' unless scope.present?
+    @errors << 'OAuth2 scope must be an array' unless scope.is_a?(Array)
+    @errors << 'OAuth2 missing state field' unless state.present?
+    @errors << 'OAuth2 missing responseType field' unless response_type.present?
+    @errors << "OAuth2 responseType must be 'code' (got: #{response_type})" unless response_type == 'code'
+    @errors << 'OAuth2 missing redirectUri field' unless redirect_uri.present?
+  end
+
+  def valid_base64url?(string)
+    return false unless string.is_a?(String)
+    return false if string.empty?
+
+    # Base64url uses A-Z, a-z, 0-9, -, _ (no padding = characters)
+    string.match?(/^[A-Za-z0-9\-_]+$/)
   end
 
   def validate_iso8601_dates

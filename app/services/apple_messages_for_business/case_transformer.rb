@@ -104,7 +104,7 @@ module AppleMessagesForBusiness
       # OAuth
       'response_type' => 'responseType',
       'response_encryption_key' => 'responseEncryptionKey',
-      'redirect_uri' => 'redirectUri'
+      'redirect_uri' => 'redirectURI'  # Apple uses uppercase 'URI' per AuthV2 spec
     }.freeze
 
     # Fields that change name based on context

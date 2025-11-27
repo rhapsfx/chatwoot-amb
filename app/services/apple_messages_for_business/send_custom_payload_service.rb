@@ -117,7 +117,7 @@ module AppleMessagesForBusiness
 
       # Log sanitized final payload for debugging
       sanitized = LogSanitizer.sanitize_for_log(merged_payload, format: :compact)
-      Rails.logger.debug { "[CustomPayload] Final payload (sanitized): #{sanitized.to_json}" }
+      log_debug "[CustomPayload] Final payload (sanitized): #{sanitized.to_json}"
 
       merged_payload
     end

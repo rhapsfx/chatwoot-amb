@@ -4,6 +4,8 @@ require 'base64'
 require_relative 'log_sanitizer'
 
 class AppleMessagesForBusiness::SendRichLinkService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
+
   AMB_SERVER = 'https://mspgw.push.apple.com/v1'
 
   def initialize(channel:, destination_id:, message:)
@@ -42,8 +44,8 @@ class AppleMessagesForBusiness::SendRichLinkService
 
       # Log sanitized payload (truncate base64 data)
       sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(rich_link_data)
-      Rails.logger.info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
-      Rails.logger.info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
+      log_info "🔍 Rich Link - Final payload richLinkData: #{sanitized_data.to_json}"
+      log_info "🔍 Rich Link - Has image asset: #{rich_link_data[:assets]&.key?(:image)}"
       if rich_link_data[:assets]&.key?(:image)
         Rails.logger.info "🔍 Rich Link - Image data length: #{rich_link_data[:assets][:image][:data]&.length} chars"
         Rails.logger.info "🔍 Rich Link - Image mime type: #{rich_link_data[:assets][:image][:mimeType]}"
@@ -235,9 +237,9 @@ class AppleMessagesForBusiness::SendRichLinkService
       follow_redirects: true
     )
 
-    Rails.logger.info "🔍 Rich Link - Response code: #{response.code}"
-    Rails.logger.info "🔍 Rich Link - Content-Type: #{response.headers['content-type']}"
-    Rails.logger.info "🔍 Rich Link - Body size: #{response.body.bytesize} bytes"
+    log_info "🔍 Rich Link - Response code: #{response.code}"
+    log_info "🔍 Rich Link - Content-Type: #{response.headers['content-type']}"
+    log_info "🔍 Rich Link - Body size: #{response.body.bytesize} bytes"
 
     unless response.success?
       Rails.logger.error "❌ Rich Link - HTTP request failed with code: #{response.code}"
@@ -262,8 +264,8 @@ class AppleMessagesForBusiness::SendRichLinkService
     Rails.logger.info "✅ Rich Link - Successfully encoded image (#{encoded.length} chars)"
     encoded
   rescue StandardError => e
-    Rails.logger.error "❌ Rich Link - Failed to download image #{image_url}: #{e.message}"
-    Rails.logger.error "❌ Rich Link - Backtrace: #{e.backtrace.first(3).join("\n")}"
+    log_error "❌ Rich Link - Failed to download image #{image_url}: #{e.message}"
+    log_error "❌ Rich Link - Backtrace: #{e.backtrace.first(3).join("\n")}"
     nil
   end
 
