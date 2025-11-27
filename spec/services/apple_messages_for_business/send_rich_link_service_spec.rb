@@ -4,13 +4,12 @@ require 'rails_helper'
 
 RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
   let(:account) { create(:account) }
-  let(:inbox) { create(:inbox, account: account, channel_type: 'Channel::AppleMessagesForBusiness') }
-  let(:channel) { inbox.channel }
+  let(:channel) { create(:channel_apple_messages_for_business, account: account) }
+  let(:inbox) { channel.inbox }
   let(:conversation) { create(:conversation, account: account, inbox: inbox) }
   let(:message) { create(:message, conversation: conversation, account: account, content: 'https://www.example.com') }
 
   before do
-    allow_any_instance_of(Channel::AppleMessagesForBusiness).to receive(:generate_jwt_token).and_return('test_jwt_token')
     allow(HTTParty).to receive(:post).and_return(double(success?: true, code: 200, body: '{}'))
   end
 
@@ -85,8 +84,8 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
         expect(HTTParty).to receive(:post) do |_path, options|
           body = JSON.parse(options[:body])
 
-          # Verify camelCase transformation
-          expect(body['richLinkDataRef']).to have_key('signatureBase64')
+          # Verify camelCase transformation (except signature-base64 which uses hyphen per Apple spec)
+          expect(body['richLinkDataRef']).to have_key('signature-base64')
           expect(body['richLinkDataRef']).to have_key('referenceId')
           expect(body['richLinkDataRef']).to have_key('certChain')
 
@@ -145,6 +144,10 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
                                 'title' => 'Example Site',
                                 'image_url' => 'https://example.com/image.png'
                               })
+
+        # Stub HTTP request for image download
+        stub_request(:get, 'https://example.com/image.png')
+          .to_return(status: 200, body: 'fake_image_data', headers: { 'Content-Type' => 'image/png' })
 
         allow_any_instance_of(AppleMessagesForBusiness::SendRichLinkService)
           .to receive(:scrape_open_graph_data).and_return(
@@ -275,6 +278,13 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
                                 'image_mime_type' => 'image/png'
                               })
 
+        # Mock scrape_open_graph_data to prevent real HTTP calls
+        allow_any_instance_of(AppleMessagesForBusiness::SendRichLinkService)
+          .to receive(:scrape_open_graph_data).and_return(
+            success: false,
+            error: 'Not scraping'
+          )
+
         expect(HTTParty).to receive(:post) do |_path, options|
           body = JSON.parse(options[:body])
 
@@ -383,7 +393,8 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
         expect(HTTParty).to receive(:post) do |_path, options|
           headers = options[:headers]
 
-          expect(headers['Authorization']).to eq('Bearer test_jwt_token')
+          # Verify JWT token format (starts with Bearer eyJ...)
+          expect(headers['Authorization']).to match(/^Bearer eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/)
 
           double(success?: true, code: 200, body: '{}')
         end
@@ -679,7 +690,7 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
           .to receive(:scrape_open_graph_data).and_raise(StandardError, 'Error')
 
         allow(Redis::Alfred).to receive(:set).and_return(true)
-        expect(Redis::Alfred).to receive(:delete).with("amb:send_lock:#{message.id}")
+        allow(Redis::Alfred).to receive(:delete).and_return(true)
 
         service = described_class.new(
           channel: channel,
@@ -689,8 +700,8 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
 
         service.perform
 
-        # Verify delete was called
-        expect(Redis::Alfred).to have_received(:delete)
+        # Verify delete was called to release lock
+        expect(Redis::Alfred).to have_received(:delete).with("amb:send_lock:#{message.id}")
       end
     end
   end
