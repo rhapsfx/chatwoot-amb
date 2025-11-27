@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
+ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -141,6 +141,20 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_agent_capacity_policies_on_account_id"
+  end
+
+  create_table "apple_app_metadata", force: :cascade do |t|
+    t.string "bundle_id", null: false
+    t.string "app_name"
+    t.string "developer_name"
+    t.string "app_icon_url"
+    t.string "app_store_url"
+    t.text "description"
+    t.decimal "price", precision: 10, scale: 2
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bundle_id"], name: "index_apple_app_metadata_on_bundle_id", unique: true
   end
 
   create_table "apple_list_picker_images", force: :cascade do |t|
@@ -623,7 +637,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
     t.bigint "account_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "contacts_count"
+    t.integer "contacts_count", default: 0, null: false
     t.index ["account_id", "domain"], name: "index_companies_on_account_and_domain", unique: true, where: "(domain IS NOT NULL)"
     t.index ["account_id"], name: "index_companies_on_account_id"
     t.index ["name", "account_id"], name: "index_companies_on_name_and_account_id"
@@ -633,8 +647,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_19_161025) do
     t.bigint "contact_id"
     t.bigint "inbox_id"
     t.text "source_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "hmac_verified", default: false
     t.string "pubsub_token"
     t.index ["contact_id"], name: "index_contact_inboxes_on_contact_id"
