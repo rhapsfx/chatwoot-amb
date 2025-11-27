@@ -22,7 +22,7 @@ class ConstructPayloadAPI {
   static async create(accountId, inboxId, payload) {
     try {
       const response = await axios.post(
-        `/api/v1/accounts/${accountId}/inboxes/${inboxId}/apple_messages/construct_payload`,
+        `/api/v1/accounts/${accountId}/inboxes/${inboxId}/apple_construct_payload`,
         {
           construct_payload: {
             url: payload.url,
