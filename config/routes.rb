@@ -289,7 +289,7 @@ Rails.application.routes.draw do
               end
             end
             # Apple Messages for Business construct_payload (App Clips)
-            resource :apple_construct_payload, only: [:create], module: :inboxes
+            resource :apple_construct_payload, only: [:create], module: :inboxes, controller: 'apple_construct_payload'
             get :health, on: :member
           end
           resources :inbox_members, only: [:create, :show], param: :inbox_id do
