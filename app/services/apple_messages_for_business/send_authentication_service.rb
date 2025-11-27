@@ -236,9 +236,9 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
   def get_provider_scopes(provider)
     case provider.to_s.downcase
     when 'linkedin'
-      # LinkedIn OAuth 2.0 scopes (NOT OpenID Connect)
-      # https://docs.microsoft.com/en-us/linkedin/shared/references/v2/profile
-      %w[r_liteprofile r_emailaddress]
+      # LinkedIn now uses OpenID Connect (migrated from OAuth 2.0)
+      # https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2
+      %w[openid profile email]
     when 'google'
       %w[openid email profile]
     when 'facebook'
