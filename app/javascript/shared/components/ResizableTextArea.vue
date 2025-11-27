@@ -166,6 +166,7 @@ export default {
     :placeholder="placeholder"
     :rows="rows"
     :value="modelValue"
+    v-bind="$attrs"
     @input="onInput"
     @focus="onFocus"
     @keyup="onKeyup"

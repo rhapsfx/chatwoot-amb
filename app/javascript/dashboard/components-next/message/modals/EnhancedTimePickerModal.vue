@@ -868,7 +868,7 @@ onUnmounted(() => {
       <!-- Modal Container -->
       <div
         ref="modalRef"
-        class="w-full max-w-4xl max-h-[90vh] bg-white dark:bg-n-slate-1 rounded-xl shadow-2xl border border-n-weak dark:border-n-slate-6 overflow-hidden transition-all duration-300 transform"
+        class="w-full max-w-4xl max-h-[90vh] bg-white dark:bg-n-slate-1 rounded-xl shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800 overflow-hidden transition-all duration-300 transform"
         :class="{
           'scale-100 opacity-100': !isAnimating,
           'scale-95 opacity-0': isAnimating,
@@ -1746,3 +1746,22 @@ onUnmounted(() => {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* Scoped styles for time picker modal */
+</style>
+
+<style>
+/* Unscoped styles to override modal-container for time picker - using :has() selector */
+.modal-container:has(.w-full.max-w-4xl.max-h-\[90vh\]) {
+  background: transparent !important;
+  padding: 0 !important;
+  border: 4px solid #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(191, 219, 254, 1) !important;
+}
+
+.dark .modal-container:has(.w-full.max-w-4xl.max-h-\[90vh\]) {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 4px rgba(30, 64, 175, 1) !important;
+}
+</style>

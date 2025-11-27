@@ -1,307 +1,196 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useMessageContext } from '../provider.js';
+import { useStore } from 'dashboard/composables/store';
 import BaseBubble from './Base.vue';
 
 const { contentAttributes } = useMessageContext();
+const store = useStore();
 
+const accountId = computed(() => store.getters.getCurrentAccountId);
 const appData = computed(() => contentAttributes.value || {});
-const isLoading = ref(false);
-const errorMessage = ref('');
+const appMetadata = ref(null);
+const loading = ref(false);
+const error = ref(false);
 
-// Extract app name from BID
-function extractAppName() {
-  const bid = appData.value.bid;
-  if (!bid) return 'Custom App';
+// Use the configured axios instance with authentication
+const axios = window.axios;
 
-  // BID format: com.apple.messages.MSMessageExtensionBalloonPlugin:bundleId:extension
-  const parts = bid.split(':');
-  if (parts.length >= 2) {
-    const bundleId = parts[1];
-    // Extract app name from bundle ID (e.g., com.company.appname -> AppName)
-    const appName = bundleId.split('.').pop();
-    return (
-      appName.charAt(0).toUpperCase() +
-      appName.slice(1).replace(/([A-Z])/g, ' $1')
+// Get bundle ID from backend data
+const bundleId = computed(() => {
+  // Backend stores it as 'bid', but also check common alternatives and nested interactive_data
+  return (
+    appData.value.bid ||
+    appData.value.bundle_id ||
+    appData.value.bundleId ||
+    appData.value.interactive_data?.bid ||
+    appData.value.interactive_data?.bundleId
+  );
+});
+
+// Get app name - use cached metadata first, then fallback to backend data
+const appName = computed(() => {
+  return appMetadata.value?.app_name || appData.value.app_name || 'Custom App';
+});
+
+// Get developer name - use cached metadata first
+const developerName = computed(() => {
+  return (
+    appMetadata.value?.developer_name ||
+    appData.value.developer_name ||
+    'Developer'
+  );
+});
+
+// Get app icon URL - use cached metadata first, with fallback
+const appIconUrl = computed(() => {
+  return (
+    appMetadata.value?.app_icon_url ||
+    appData.value.app_icon_url ||
+    '/AppStore-1024.png'
+  );
+});
+
+// Get app store URL
+const appStoreUrl = computed(() => {
+  return (
+    appMetadata.value?.app_store_url || appData.value.app_store_url || null
+  );
+});
+
+// Fetch app metadata from iTunes API via our backend proxy
+const fetchAppMetadata = async () => {
+  // Debug logging
+  // eslint-disable-next-line no-console
+  console.log('[AppleCustomApp] contentAttributes:', appData.value);
+  // eslint-disable-next-line no-console
+  console.log('[AppleCustomApp] bundleId:', bundleId.value);
+
+  if (!bundleId.value || !accountId.value) {
+    // eslint-disable-next-line no-console
+    console.warn('[AppleCustomApp] Missing bundleId or accountId', {
+      bundleId: bundleId.value,
+      accountId: accountId.value,
+    });
+    return;
+  }
+
+  loading.value = true;
+  error.value = false;
+
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[AppleCustomApp] Fetching metadata for:', bundleId.value);
+    const response = await axios.get(
+      `/api/v1/accounts/${accountId.value}/apple_messages/app_metadata`,
+      {
+        params: { bundle_id: bundleId.value },
+      }
     );
+    appMetadata.value = response.data;
+    // eslint-disable-next-line no-console
+    console.log('[AppleCustomApp] Fetched metadata:', appMetadata.value);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[AppleCustomApp] Failed to fetch metadata:', err);
+    // Fail silently and use fallback data from contentAttributes
+    error.value = true;
+  } finally {
+    loading.value = false;
   }
-
-  return 'Custom App';
-}
-
-// Extract app configuration
-const appConfig = computed(() => ({
-  appId: appData.value.app_id,
-  bid: appData.value.bid,
-  version: appData.value.version || '1.0',
-  url: appData.value.url,
-  appName: extractAppName(),
-  parameters: appData.value.parameters || {},
-  receivedMessage: appData.value.received_message,
-  replyMessage: appData.value.reply_message,
-  images: appData.value.images || [],
-  useLiveLayout: appData.value.use_live_layout !== false,
-}));
-
-// Check if app has preview image
-const hasPreviewImage = computed(() => {
-  return appConfig.value.images && appConfig.value.images.length > 0;
-});
-
-const previewImage = computed(() => {
-  if (!hasPreviewImage.value) return null;
-  return appConfig.value.images[0];
-});
-
-// Handle app invocation (this would trigger the backend service)
-const invokeApp = () => {
-  isLoading.value = true;
-  errorMessage.value = '';
-
-  // In a real implementation, this would trigger the AppInvocationService
-  // For now, we'll simulate the app invocation
-  setTimeout(() => {
-    isLoading.value = false;
-  }, 2000);
 };
 
-// Format app description
-const appDescription = computed(() => {
-  if (appData.value.description) {
-    return appData.value.description;
+// Open app in App Store
+const openAppStore = () => {
+  if (appStoreUrl.value) {
+    window.open(appStoreUrl.value, '_blank');
   }
-
-  return `Tap to launch ${appConfig.value.appName}`;
-});
-
-// Check if app is web-based (has URL)
-const isWebBasedApp = computed(() => {
-  return !!appConfig.value.url;
-});
-
-// Get app icon based on type
-const getAppIcon = () => {
-  if (isWebBasedApp.value) {
-    return 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z'; // Web/Globe icon
-  }
-
-  return 'M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z'; // Native app icon
 };
+
+onMounted(() => {
+  fetchAppMetadata();
+});
 </script>
 
 <template>
   <BaseBubble>
     <div
-      class="apple-custom-app-bubble cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-      @click="invokeApp"
+      class="apple-custom-app-bubble cursor-pointer transition-all rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
+      :class="{ 'hover:shadow-lg hover:-translate-y-0.5': appStoreUrl }"
+      @click="openAppStore"
     >
-      <!-- App Preview Image -->
-      <div v-if="hasPreviewImage" class="app-preview-image">
-        <img
-          :src="previewImage.url || previewImage.data"
-          :alt="appConfig.appName"
-          class="w-full h-32 object-cover rounded-t-lg"
-        />
-
-        <!-- App overlay indicator -->
-        <div
-          class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-t-lg"
-        >
-          <div
-            class="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center"
-          >
-            <svg
-              class="w-6 h-6 text-slate-700"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path :d="getAppIcon()" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- App Icon Header (when no preview image) -->
+      <!-- Loading State -->
       <div
-        v-else
-        class="app-header bg-gradient-to-br from-blue-500 to-purple-600 p-4 rounded-t-lg"
+        v-if="loading"
+        class="flex items-center justify-center p-3 bg-slate-50 dark:bg-slate-800"
       >
-        <div class="flex items-center space-x-3">
-          <div
-            class="w-12 h-12 bg-white bg-opacity-90 rounded-xl flex items-center justify-center"
+        <div
+          class="flex items-center space-x-2 text-slate-500 dark:text-slate-400"
+        >
+          <svg
+            class="animate-spin h-4 w-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
           >
-            <svg
-              class="w-6 h-6 text-slate-700"
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path
+              class="opacity-75"
               fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path :d="getAppIcon()" />
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-white font-semibold text-lg">
-              {{ appConfig.appName }}
-            </h3>
-            <p v-if="isWebBasedApp" class="text-blue-100 text-sm">Web App</p>
-            <p v-else class="text-blue-100 text-sm">Native App</p>
-          </div>
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <span class="text-xs">{{
+            $t('APPLE_MESSAGES.CUSTOM_APP_BUBBLE.LOADING')
+          }}</span>
         </div>
       </div>
 
       <!-- App Content -->
-      <div class="app-content p-4">
-        <!-- App Name (if preview image is shown) -->
-        <h3
-          v-if="hasPreviewImage"
-          class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2"
-        >
-          {{ appConfig.appName }}
-        </h3>
-
-        <!-- App Description -->
-        <p class="text-sm text-slate-600 dark:text-slate-400 mb-3">
-          {{ appDescription }}
-        </p>
-
-        <!-- App Parameters (if any) -->
-        <div
-          v-if="Object.keys(appConfig.parameters).length > 0"
-          class="app-parameters mb-3"
-        >
-          <div
-            class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2"
-          >
-            Configuration
+      <div v-else class="bg-gradient-to-br from-blue-500 to-purple-600 p-3">
+        <div class="flex items-center space-x-2">
+          <!-- App Icon -->
+          <img
+            :src="appIconUrl"
+            :alt="appName"
+            class="w-10 h-10 rounded-lg shadow-md bg-white flex-shrink-0"
+            @error="$event.target.src = '/AppStore-1024.png'"
+          />
+          <div class="flex-1 min-w-0">
+            <h3 class="text-white font-semibold text-sm truncate">
+              {{ appName }}
+            </h3>
+            <p class="text-blue-100 text-xs truncate">
+              {{ developerName }}
+            </p>
           </div>
-          <div class="space-y-1">
-            <div
-              v-for="(value, key) in appConfig.parameters"
-              :key="key"
-              class="flex justify-between text-xs"
+          <!-- App Store Badge (only show if URL is available) -->
+          <div v-if="appStoreUrl" class="flex-shrink-0">
+            <svg
+              class="w-5 h-5 text-white opacity-80"
+              fill="currentColor"
+              viewBox="0 0 24 24"
             >
-              <span class="text-slate-600 dark:text-slate-400 capitalize">{{ key.replace(/_/g, ' ') }}:</span>
-              <span class="text-slate-800 dark:text-slate-200 font-medium">{{
-                value
-              }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- App Status -->
-        <div class="app-status flex items-center justify-between">
-          <!-- Loading State -->
-          <div
-            v-if="isLoading"
-            class="flex items-center space-x-2 text-blue-600"
-          >
-            <div
-              class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"
-            />
-            <span class="text-sm">Launching app...</span>
-          </div>
-
-          <!-- Error State -->
-          <div
-            v-else-if="errorMessage"
-            class="flex items-center space-x-2 text-red-600"
-          >
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
-              />
-            </svg>
-            <span class="text-sm">{{ errorMessage }}</span>
-          </div>
-
-          <!-- Ready State -->
-          <div
-            v-else
-            class="flex items-center space-x-2 text-slate-600 dark:text-slate-400"
-          >
-            <span class="text-sm">Tap to launch</span>
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path
-                d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
+                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
               />
             </svg>
           </div>
         </div>
-
-        <!-- App Version Info -->
-        <div
-          class="app-version mt-2 pt-2 border-t border-slate-200 dark:border-slate-600"
-        >
-          <div
-            class="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400"
-          >
-            <span>Version {{ appConfig.version }}</span>
-            <span
-              v-if="appConfig.bid"
-              class="font-mono truncate max-w-32"
-              :title="appConfig.bid"
-            >
-              {{ appConfig.bid.split(':').pop() }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- App Launch Indicator -->
-      <div class="app-launch-indicator">
-        <svg
-          class="w-4 h-4 text-slate-500"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M8 5v14l11-7z" />
-        </svg>
       </div>
     </div>
   </BaseBubble>
 </template>
 
-<style lang="scss" scoped>
+<style scoped lang="scss">
 .apple-custom-app-bubble {
-  @apply max-w-sm bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden relative;
-
-  .app-preview-image {
-    @apply relative;
-
-    img {
-      @apply block;
-    }
-  }
-
-  .app-header {
-    @apply relative;
-  }
-
-  .app-content {
-    @apply relative;
-  }
-
-  .app-parameters {
-    @apply bg-slate-50 dark:bg-slate-700 rounded-md p-3;
-  }
-
-  .app-status {
-    @apply text-sm;
-  }
-
-  .app-version {
-    @apply text-xs;
-  }
-
-  .app-launch-indicator {
-    @apply absolute top-2 right-2 opacity-0 transition-opacity;
-  }
-}
-
-.apple-custom-app-bubble:hover {
-  @apply shadow-md;
-
-  .app-launch-indicator {
-    @apply opacity-100;
-  }
+  max-width: 280px;
 }
 </style>

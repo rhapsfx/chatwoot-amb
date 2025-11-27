@@ -2229,6 +2229,10 @@ export default {
         :signature="signatureToApply"
         allow-signature
         :send-with-signature="sendWithSignature"
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore
+        autocomplete="off"
         @typing-off="onTypingOff"
         @typing-on="onTypingOn"
         @focus="onFocus"
@@ -2248,6 +2252,9 @@ export default {
         :signature="signatureToApply"
         allow-signature
         :channel-type="channelType"
+        data-form-type="other"
+        data-lpignore="true"
+        data-1p-ignore
         @typing-off="onTypingOff"
         @typing-on="onTypingOn"
         @focus="onFocus"

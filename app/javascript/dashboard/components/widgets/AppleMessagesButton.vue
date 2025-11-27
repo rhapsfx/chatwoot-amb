@@ -51,7 +51,7 @@ const toggleAppleComposer = () => {
       @click.self="showAppleComposer = false"
     >
       <div
-        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+        class="bg-n-solid-1 dark:bg-n-slate-2 rounded-lg shadow-2xl border-4 border-blue-500 dark:border-blue-400 ring-4 ring-blue-200 dark:ring-blue-800 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
       >
         <div
           class="flex items-center justify-between p-4 border-b border-n-weak dark:border-n-slate-6"

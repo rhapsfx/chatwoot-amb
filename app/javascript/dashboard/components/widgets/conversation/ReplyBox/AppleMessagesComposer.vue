@@ -81,6 +81,16 @@ const pendingTemplateData = ref(null);
 const selectedAppId = ref('');
 const selectedAppData = ref({});
 
+// Custom Payload State
+const customPayloadData = ref({
+  payload: '',
+  skipValidation: false,
+  applyCaseTransform: false,
+});
+const sendError = ref(null);
+const isSending = ref(false);
+const showErrorDetails = ref(false);
+
 // Auto-select first app when switching to iMessage Apps tab
 watch(activeTab, (newTab) => {
   if (newTab === 'imessage_apps' && availableApps.value.length === 1) {
@@ -117,6 +127,53 @@ const availableApps = computed(() => {
 const selectedApp = computed(() => {
   if (!selectedAppId.value) return null;
   return availableApps.value.find(app => app.id === selectedAppId.value);
+});
+
+// Custom Payload Computed Properties
+const isValidJson = computed(() => {
+  try {
+    if (!customPayloadData.value.payload.trim()) return false;
+    JSON.parse(customPayloadData.value.payload);
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
+const jsonValidationError = computed(() => {
+  try {
+    if (!customPayloadData.value.payload.trim()) return '';
+    JSON.parse(customPayloadData.value.payload);
+    return '';
+  } catch (e) {
+    return e.message;
+  }
+});
+
+const previewPayload = computed(() => {
+  if (!isValidJson.value) {
+    return JSON.stringify({
+      v: 1,
+      id: '<generated-on-send>',
+      sourceId: '<your-business-id>',
+      destinationId: '<contact-id>',
+      // Your custom payload will appear here after parsing
+    }, null, 2);
+  }
+
+  try {
+    const parsed = JSON.parse(customPayloadData.value.payload);
+
+    return JSON.stringify({
+      v: 1,
+      id: '<generated-on-send>',
+      sourceId: '<your-business-id>',
+      destinationId: '<contact-id>',
+      ...parsed
+    }, null, 2);
+  } catch {
+    return '{}';
+  }
 });
 
 // Enhanced Time Picker State
@@ -1638,6 +1695,145 @@ const loadPaymentTemplate = templateType => {
   emit('send', messageData);
 };
 
+// Custom Payload Methods
+const validateCustomPayload = () => {
+  if (isValidJson.value) {
+    alert('✅ Payload is valid JSON');
+  } else {
+    alert(`❌ Invalid JSON: ${jsonValidationError.value}`);
+  }
+};
+
+const getErrorTitle = (errorType) => {
+  const titles = {
+    validation: 'JSON Validation Error',
+    send_error: 'Failed to Send Message',
+    apple_error: 'Apple MSP Gateway Error',
+    payload_too_large: 'Payload Size Limit Exceeded',
+    rate_limit: 'Rate Limit Exceeded',
+    permission_error: 'Permission Denied',
+    network_error: 'Network Error',
+    warning: 'Warning'
+  };
+  return titles[errorType] || 'Error';
+};
+
+const getSuggestionsForError = (error) => {
+  const suggestions = {
+    validation: [
+      'Check your JSON syntax for missing commas, brackets, or quotes',
+      'Use a JSON validator tool to identify the exact issue',
+      'Enable "Allow experimental payloads" to bypass validation (not recommended)'
+    ],
+    apple_error: [
+      'Verify your payload matches Apple MSP Gateway requirements',
+      'Check that all required fields are present and correctly formatted',
+      'Review Apple Business Chat documentation for the message type you\'re sending',
+      'Try sending a simpler payload to isolate the issue'
+    ],
+    send_error: [
+      'Verify the conversation is active and the contact is reachable',
+      'Check your network connection',
+      'Try again in a few moments',
+      'Contact support if the issue persists'
+    ],
+    payload_too_large: [
+      'Reduce the size of your payload (current limit: 100KB)',
+      'Compress or optimize any embedded data',
+      'Consider splitting into multiple messages'
+    ],
+    rate_limit: [
+      'Wait a few minutes before sending more custom payloads',
+      'Current limit: 100 payloads per hour per account'
+    ]
+  };
+  return suggestions[error.type] || [];
+};
+
+const enhanceError = (error) => {
+  error.suggestions = getSuggestionsForError(error);
+  return error;
+};
+
+const sendCustomPayload = async () => {
+  // Clear previous errors
+  sendError.value = null;
+
+  // Validate JSON if validation is enabled
+  if (!isValidJson.value && !customPayloadData.value.skipValidation) {
+    sendError.value = enhanceError({
+      type: 'validation',
+      message: 'Please fix JSON errors before sending',
+      details: jsonValidationError.value
+    });
+    return;
+  }
+
+  const messageData = {
+    content_type: 'apple_custom_payload',
+    content_attributes: {
+      custom_payload: customPayloadData.value.payload,
+      skip_validation: customPayloadData.value.skipValidation,
+      apply_case_transform: customPayloadData.value.applyCaseTransform,
+    },
+    content: 'Custom Apple Messages payload',
+  };
+
+  try {
+    isSending.value = true;
+    console.log('[Custom Payload] Sending:', messageData);
+
+    emit('send', messageData);
+
+    // Success - reset form
+    customPayloadData.value = {
+      payload: '',
+      skipValidation: false,
+      applyCaseTransform: false,
+    };
+  } catch (error) {
+    // Handle sending errors
+    console.error('[Custom Payload] Send error:', error);
+
+    if (error.response) {
+      // Server returned an error response
+      const errorData = error.response.data;
+
+      sendError.value = enhanceError({
+        type: errorData.error_type || 'send_error',
+        message: errorData.message || 'Failed to send custom payload',
+        details: errorData.details || null,
+        appleError: errorData.apple_error || null
+      });
+    } else if (error.request) {
+      // Request was made but no response received
+      sendError.value = enhanceError({
+        type: 'network_error',
+        message: 'No response from server. Please check your connection.',
+        details: 'Network timeout or server unreachable'
+      });
+    } else {
+      // Something else went wrong
+      sendError.value = enhanceError({
+        type: 'send_error',
+        message: error.message || 'An unexpected error occurred',
+        details: error.toString()
+      });
+    }
+
+    console.error('[Custom Payload] Enhanced error:', sendError.value);
+  } finally {
+    isSending.value = false;
+  }
+};
+
+// Clear send error when user modifies payload
+watch(() => customPayloadData.value.payload, () => {
+  if (sendError.value) {
+    sendError.value = null;
+  }
+});
+
 </script>
 
 <!-- eslint-disable vue/no-bare-strings-in-template -->
@@ -1648,35 +1844,29 @@ const loadPaymentTemplate = templateType => {
     <!-- Header with Tabs and Template Button -->
     <div class="flex items-center justify-between mb-4 border-b border-n-weak">
       <!-- Tabs -->
-      <div class="flex space-x-2">
+      <div class="flex flex-wrap space-x-1 gap-y-1">
         <button
           v-for="tab in [
-            'quick_reply',
-            'list_picker',
-            'time_picker',
-            'forms',
-            'imessage_apps',
-            'oauth',
-            'apple_pay',
+            { id: 'quick_reply', emoji: '💬', label: 'Quick Reply' },
+            { id: 'list_picker', emoji: '📋', label: 'List Picker' },
+            { id: 'time_picker', emoji: '🕐', label: 'Time Picker' },
+            { id: 'forms', emoji: '📝', label: 'Forms' },
+            { id: 'imessage_apps', emoji: '📱', label: 'iMessage Apps' },
+            { id: 'oauth', emoji: '🔐', label: 'OAuth' },
+            { id: 'apple_pay', emoji: '💳', label: 'Apple Pay' },
+            { id: 'custom_payload', emoji: '🔧', label: 'Custom Payload' },
           ]"
-          :key="tab"
-          class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+          :key="tab.id"
+          class="px-3 py-2 text-xl border-b-2 transition-colors"
           :class="
-            activeTab === tab
+            activeTab === tab.id
               ? 'border-n-blue-8 text-n-blue-11 dark:text-n-blue-10'
               : 'border-transparent text-n-slate-11 hover:text-n-slate-12 dark:text-n-slate-10 dark:hover:text-n-slate-9'
           "
-          @click="activeTab = tab"
+          :title="tab.label"
+          @click="activeTab = tab.id"
         >
-          {{
-            tab === 'imessage_apps'
-              ? 'iMessage Apps'
-              : tab === 'oauth'
-                ? 'OAuth'
-                : tab === 'apple_pay'
-                  ? 'Apple Pay'
-                  : tab.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-          }}
+          {{ tab.emoji }}
         </button>
       </div>
     </div>
@@ -3225,9 +3415,328 @@ const loadPaymentTemplate = templateType => {
       </div>
     </div>
 
-    <!-- Actions - Positioned at the bottom for all tabs except Forms -->
+    <!-- Custom Payload Tab -->
+    <div v-if="activeTab === 'custom_payload'" class="space-y-6 max-w-none">
+      <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <!-- Editor Section (Left) - Takes 3/5 of width -->
+        <div class="custom-payload-editor space-y-4 xl:col-span-3">
+          <div>
+            <label
+              class="block text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-2"
+            >
+              Custom Payload JSON
+            </label>
+            <textarea
+              v-model="customPayloadData.payload"
+              class="w-full h-96 p-4 font-mono text-sm border rounded-lg bg-n-slate-1 dark:bg-n-alpha-2 text-n-slate-12 dark:text-n-slate-11"
+              :class="{
+                'border-red-500': jsonValidationError,
+                'border-green-500': isValidJson && !jsonValidationError,
+                'border-n-weak dark:border-n-slate-6':
+                  !jsonValidationError && !isValidJson,
+              }"
+              placeholder='{
+  "type": "richLink",
+  "richLinkData": {
+    "url": "https://www.example.com/order/12345",
+    "title": "Order Tracking",
+    "assets": {
+      "image": {
+        "data": "base64_encoded_image_data_here",
+        "mimeType": "image/png"
+      }
+    }
+  }
+}'
+            />
+
+            <div v-if="jsonValidationError" class="text-red-500 text-sm mt-2">
+              ❌ {{ jsonValidationError }}
+            </div>
+
+            <div
+              v-if="isValidJson && !jsonValidationError"
+              class="text-green-500 text-sm mt-2"
+            >
+              ✅ Valid JSON
+            </div>
+          </div>
+
+          <!-- Error Display Component -->
+          <div
+            v-if="sendError"
+            class="error-display mt-4 p-4 rounded-lg border"
+            :class="{
+              'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-800':
+                sendError.type !== 'warning',
+              'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-800':
+                sendError.type === 'warning',
+            }"
+          >
+            <!-- Error Header -->
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0">
+                <span v-if="sendError.type === 'validation'"
+class="text-2xl"
+                  >❌</span>
+                <span
+                  v-else-if="sendError.type === 'send_error'"
+                  class="text-2xl"
+                  >⚠️</span>
+                <span
+                  v-else-if="sendError.type === 'apple_error'"
+                  class="text-2xl"
+                  >🚫</span>
+                <span v-else class="text-2xl">⚠️</span>
+              </div>
+
+              <div class="flex-1">
+                <!-- Error Title -->
+                <h4
+                  class="font-semibold text-sm"
+                  :class="{
+                    'text-red-800 dark:text-red-300':
+                      sendError.type !== 'warning',
+                    'text-yellow-800 dark:text-yellow-300':
+                      sendError.type === 'warning',
+                  }"
+                >
+                  {{ getErrorTitle(sendError.type) }}
+                </h4>
+
+                <!-- Error Message -->
+                <p
+                  class="text-sm mt-1"
+                  :class="{
+                    'text-red-700 dark:text-red-400':
+                      sendError.type !== 'warning',
+                    'text-yellow-700 dark:text-yellow-400':
+                      sendError.type === 'warning',
+                  }"
+                >
+                  {{ sendError.message }}
+                </p>
+
+                <!-- Error Details (Expandable) -->
+                <div v-if="sendError.details" class="mt-2">
+                  <button
+                    class="text-xs font-medium underline"
+                    :class="{
+                      'text-red-600 dark:text-red-400':
+                        sendError.type !== 'warning',
+                      'text-yellow-600 dark:text-yellow-400':
+                        sendError.type === 'warning',
+                    }"
+                    @click="showErrorDetails = !showErrorDetails"
+                  >
+                    {{ showErrorDetails ? '▼ Hide' : '▶ Show' }} Details
+                  </button>
+
+                  <pre
+                    v-if="showErrorDetails"
+                    class="mt-2 p-3 bg-white dark:bg-n-slate-1 rounded text-xs font-mono overflow-auto max-h-40 border border-red-200 dark:border-red-800"
+                    >{{ sendError.details }}</pre>
+                </div>
+
+                <!-- Apple MSP Error (if present) -->
+                <div
+                  v-if="sendError.appleError"
+                  class="mt-3 p-3 bg-red-100 dark:bg-red-950/50 rounded-lg border border-red-300 dark:border-red-800"
+                >
+                  <p
+                    class="text-xs font-semibold text-red-900 dark:text-red-300 mb-1"
+                  >
+                    Apple MSP Gateway Error:
+                  </p>
+                  <p class="text-xs text-red-800 dark:text-red-400">
+                    <strong>Status:</strong>
+                    {{ sendError.appleError.status || 'Unknown' }}
+                  </p>
+                  <p class="text-xs text-red-800 dark:text-red-400">
+                    <strong>Message:</strong>
+                    {{ sendError.appleError.message || 'Unknown error' }}
+                  </p>
+
+                  <!-- Apple Error Body (if available) -->
+                  <details v-if="sendError.appleError.body" class="mt-2">
+                    <summary
+                      class="text-xs font-medium text-red-700 dark:text-red-400 cursor-pointer"
+                    >
+                      View Apple Response Body
+                    </summary>
+                    <pre
+                      class="mt-2 p-2 bg-white dark:bg-n-slate-1 rounded text-xs font-mono overflow-auto max-h-32 border border-red-200 dark:border-red-800"
+                      >{{ sendError.appleError.body }}</pre>
+                  </details>
+                </div>
+
+                <!-- Suggested Actions -->
+                <div v-if="sendError.suggestions" class="mt-3">
+                  <p
+                    class="text-xs font-semibold"
+                    :class="{
+                      'text-red-800 dark:text-red-300':
+                        sendError.type !== 'warning',
+                      'text-yellow-800 dark:text-yellow-300':
+                        sendError.type === 'warning',
+                    }"
+                  >
+                    Suggested Actions:
+                  </p>
+                  <ul
+                    class="list-disc list-inside text-xs mt-1 space-y-1"
+                    :class="{
+                      'text-red-700 dark:text-red-400':
+                        sendError.type !== 'warning',
+                      'text-yellow-700 dark:text-yellow-400':
+                        sendError.type === 'warning',
+                    }"
+                  >
+                    <li
+                      v-for="suggestion in sendError.suggestions"
+                      :key="suggestion"
+                    >
+                      {{ suggestion }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Close Button -->
+              <button
+                class="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                @click="sendError = null"
+              >
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Validation Controls and Action Buttons - All in one row -->
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- Validation Toggles -->
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input
+                v-model="customPayloadData.skipValidation"
+                type="checkbox"
+                class="checkbox w-4 h-4 text-n-blue-9 bg-n-solid-1 border-n-weak rounded focus:ring-n-blue-8 dark:focus:ring-n-blue-9 dark:ring-offset-n-alpha-1 focus:ring-2 dark:bg-n-alpha-2 dark:border-n-alpha-6"
+              />
+              <span
+                class="text-sm text-n-slate-12 dark:text-n-slate-11 whitespace-nowrap"
+              >
+                Allow experimental payloads
+              </span>
+            </label>
+
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input
+                v-model="customPayloadData.applyCaseTransform"
+                type="checkbox"
+                class="checkbox w-4 h-4 text-n-blue-9 bg-n-solid-1 border-n-weak rounded focus:ring-n-blue-8 dark:focus:ring-n-blue-9 dark:ring-offset-n-alpha-1 focus:ring-2 dark:bg-n-alpha-2 dark:border-n-alpha-6"
+              />
+              <span
+                class="text-sm text-n-slate-12 dark:text-n-slate-11 whitespace-nowrap"
+              >
+                Auto-apply case transformation
+              </span>
+            </label>
+
+            <!-- Action Buttons -->
+            <div class="flex space-x-3 ml-auto">
+              <button
+                type="button"
+                class="px-4 py-2 border border-n-weak dark:border-n-slate-6 text-n-slate-11 dark:text-n-slate-10 rounded-lg hover:bg-n-alpha-2 dark:hover:bg-n-alpha-3 transition-colors"
+                :disabled="!isValidJson && !customPayloadData.skipValidation"
+                @click="validateCustomPayload"
+              >
+                Validate
+              </button>
+
+              <button
+                type="button"
+                class="px-4 py-2 bg-n-blue-9 dark:bg-n-blue-10 text-white rounded-lg hover:bg-n-blue-10 dark:hover:bg-n-blue-11 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                :disabled="
+                  (!isValidJson && !customPayloadData.skipValidation) ||
+                  isSending
+                "
+                @click="sendCustomPayload"
+              >
+                {{ isSending ? 'Sending...' : 'Send Custom Payload' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Warning message for experimental mode -->
+          <div
+            v-if="customPayloadData.skipValidation"
+            class="text-yellow-600 dark:text-yellow-400 text-sm p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg"
+          >
+            ⚠️ <strong>Warning:</strong> Experimental mode bypasses validation.
+            Invalid payloads may fail at Apple's gateway.
+          </div>
+        </div>
+
+        <!-- Preview Section (Right) - Takes 2/5 of width -->
+        <div class="preview-section space-y-4 xl:col-span-2">
+          <div
+            class="bg-n-alpha-2 dark:bg-n-alpha-3 p-4 rounded-lg border border-n-weak dark:border-n-slate-6"
+          >
+            <h4
+              class="text-sm font-semibold text-n-slate-12 dark:text-n-slate-11 mb-3"
+            >
+              Final Payload Preview
+            </h4>
+
+            <pre
+              class="font-mono text-xs bg-n-slate-1 dark:bg-n-alpha-2 p-4 rounded-lg overflow-auto max-h-96 text-n-slate-12 dark:text-n-slate-11"
+              >{{ previewPayload }}</pre>
+          </div>
+
+          <div
+            class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-sm border border-blue-200 dark:border-blue-800"
+          >
+            <p class="font-semibold text-blue-900 dark:text-blue-300 mb-2">
+              Auto-populated fields:
+            </p>
+            <ul
+              class="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-400"
+            >
+              <li>
+                <code class="font-mono text-xs">v</code>: API version (always 1)
+              </li>
+              <li>
+                <code class="font-mono text-xs">id</code>: Unique message ID
+                (generated on send)
+              </li>
+              <li>
+                <code class="font-mono text-xs">sourceId</code>: Your business
+                ID
+              </li>
+              <li>
+                <code class="font-mono text-xs">destinationId</code>: Contact ID
+                (from conversation)
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions - Positioned at the bottom for all tabs except Forms and Custom Payload -->
     <div
-      v-if="activeTab !== 'forms'"
+      v-if="activeTab !== 'forms' && activeTab !== 'custom_payload'"
       class="flex justify-end space-x-3 mt-6 pt-4 border-t border-n-weak dark:border-n-slate-6"
     >
       <button
