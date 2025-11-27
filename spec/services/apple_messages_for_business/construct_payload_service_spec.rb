@@ -4,10 +4,7 @@ require 'rails_helper'
 
 RSpec.describe AppleMessagesForBusiness::ConstructPayloadService, type: :service do
   let(:account) { create(:account) }
-  let(:channel) do
-    create(:inbox, account: account, channel_type: 'Channel::AppleMessagesForBusiness')
-      .channel
-  end
+  let(:channel) { create(:channel_apple_messages_for_business, account: account) }
 
   describe '#perform' do
     context 'with valid inputs and successful API response' do
