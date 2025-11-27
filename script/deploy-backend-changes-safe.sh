@@ -110,7 +110,7 @@ fi
 # Step 1.7: Configure Apple Pay for inbox 11 on production server
 echo ""
 echo "Step 1.7: Configuring Apple Pay for inbox 11 on production..."
-echo "  → Merchant ID: com.apple.apple-pay-matthieu"
+echo "  → Merchant ID: MS58PRCFSS.com.apple.apple-pay-matthieu"
 echo "  → Merchant Domain: liquid-m3-pro.tail367da4.ts.net"
 echo "  → Certificate: /opt/chatwoot/certs/apple_pay/apple_pay_cert.pem"
 echo "  → Private Key: /opt/chatwoot/certs/apple_pay/apple_pay_private.key"
@@ -158,17 +158,89 @@ docker cp certs/apple_pay/apple_pay_private.key $WEB_CONTAINER:/app/certs/apple_
 
 # Run the configuration script inside container
 echo "  → Running configuration script for inbox 11..."
-docker exec $WEB_CONTAINER bundle exec rails runner \
+docker exec -e RAILS_ENV=production $WEB_CONTAINER bundle exec rails runner \
   script/configure_apple_pay_inbox.rb \
   11 \
   certs/apple_pay/apple_pay_cert.pem \
   certs/apple_pay/apple_pay_private.key \
-  com.apple.apple-pay-matthieu \
-  liquid-m3-pro.tail367da4.ts.net \
-  RAILS_ENV=production
+  MS58PRCFSS.com.apple.apple-pay-matthieu \
+  msp.rhaps.net
 
 echo "  ✅ Apple Pay configured for inbox 11"
 EOF_APPLEPAY
+
+# Step 1.8: Sync Acoustic House Bot templates to production
+echo ""
+echo "Step 1.8: Syncing Acoustic House Bot templates to production..."
+echo "  → Detecting required templates from bot service"
+echo "  → Account ID: 1 (production account)"
+
+# Run drift detection locally to ensure constant is up-to-date
+echo ""
+echo "  → Running drift detection (pre-deployment check)..."
+if rails runner script/detect_acoustic_house_bot_templates.rb; then
+    echo "  ✅ No drift detected - REQUIRED_TEMPLATES is up-to-date"
+else
+    echo "  ⚠️  Drift detected - REQUIRED_TEMPLATES may need updating"
+    echo "  Continuing with export using current constant..."
+fi
+
+# Export templates locally
+TEMPLATE_EXPORT_FILE="/tmp/acoustic_house_bot_templates_$(date +%Y%m%d_%H%M%S).json"
+echo ""
+echo "  → Exporting templates to: $TEMPLATE_EXPORT_FILE"
+rails runner script/export_acoustic_house_bot_templates.rb 1 "$TEMPLATE_EXPORT_FILE"
+
+if [ ! -f "$TEMPLATE_EXPORT_FILE" ]; then
+    echo "  ❌ Template export failed - file not created"
+    echo "  Skipping template sync (bot may not work correctly on production)"
+else
+    # Copy export file to server
+    echo ""
+    echo "  → Copying template export to production server..."
+    scp "$TEMPLATE_EXPORT_FILE" root@msp.rhaps.net:/tmp/bot_templates.json
+
+    # Copy import script to server
+    echo "  → Copying import script to production server..."
+    scp script/production_import_templates.rb root@msp.rhaps.net:/tmp/
+
+    # Import templates on production server
+    echo "  → Importing templates on production server..."
+    ssh root@msp.rhaps.net 'bash -s' << 'EOF_TEMPLATES'
+set -e
+cd /opt/chatwoot
+
+# Get the web container ID
+WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
+
+if [ -z "$WEB_CONTAINER" ]; then
+    echo "  ⚠️  Web container not running - cannot import templates"
+    echo "  Templates will need to be imported manually after container starts"
+    exit 0
+fi
+
+# Copy template export file and import script to container
+echo "  → Copying files to container..."
+docker cp /tmp/bot_templates.json $WEB_CONTAINER:/tmp/
+docker cp /tmp/production_import_templates.rb $WEB_CONTAINER:/tmp/
+
+# Import templates using the import script
+echo "  → Running import script..."
+docker exec $WEB_CONTAINER bundle exec rails runner /tmp/production_import_templates.rb RAILS_ENV=production
+
+# Clean up
+rm -f /tmp/bot_templates.json
+rm -f /tmp/production_import_templates.rb
+
+echo ""
+echo "  ✅ Templates imported successfully"
+EOF_TEMPLATES
+
+    # Clean up local export file
+    rm -f "$TEMPLATE_EXPORT_FILE"
+
+    echo "  ✅ Template synchronization complete"
+fi
 
 # Step 2: Update running containers and run migrations
 echo ""
@@ -362,6 +434,7 @@ echo "✅ Bot API endpoints and services deployed"
 echo "✅ Apple Messages image architecture deployed (SharedAppleImage + ImageFetchService)"
 echo "✅ Apple Maps tokens synced to production .env (with backup)"
 echo "✅ Apple Pay configured for inbox 11 (merchant ID, certificate, private key)"
+echo "✅ Acoustic House Bot templates synced (auto-detected from REQUIRED_TEMPLATES)"
 echo "✅ Gem dependencies updated (bundle install before container startup)"
 echo "✅ Routes and configuration updated"
 echo "✅ Database migrations executed"
@@ -406,6 +479,10 @@ echo "  (Should return: true)"
 echo ""
 echo "Verify Apple Pay configuration for inbox 11:"
 echo "  ssh root@msp.rhaps.net \"docker exec chatwoot-web bundle exec rails runner 'channel = Inbox.find(11).channel; config = channel.payment_settings.dig(\"apple_pay\"); puts \"Merchant ID: #{config[\"merchant_identifier\"]}\"; puts \"Domain: #{config[\"merchant_domain\"]}\"; puts \"Certificate: #{config[\"merchant_identity_certificate\"].present? ? \"✅ Set\" : \"❌ Not set\"}\"; puts \"Private Key: #{config[\"merchant_identity_private_key\"].present? ? \"✅ Set\" : \"❌ Not set\"}\"' RAILS_ENV=production\""
+
+echo ""
+echo "Verify Acoustic House Bot templates (account 1):"
+echo "  ssh root@msp.rhaps.net \"docker exec chatwoot-web bundle exec rails runner 'result = AppleMessagesForBusiness::AcousticHouseBotService.verify_templates_exist(1); puts \\\"All Present: #{result[:all_present]}\\\"; puts \\\"Found: #{result[:found].size} templates\\\"; puts \\\"Missing: #{result[:missing].join(\\\", \\\")}\\\" if result[:missing].any?' RAILS_ENV=production\""
 
 echo ""
 echo "Monitor logs:"
