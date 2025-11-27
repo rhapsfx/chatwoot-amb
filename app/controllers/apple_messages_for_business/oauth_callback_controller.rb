@@ -1,7 +1,7 @@
 class AppleMessagesForBusiness::OauthCallbackController < ApplicationController
   before_action :find_channel
 
-  def process_callback
+  def callback
     return render_error('Missing authorization code') unless params[:code]
     return render_error('Missing state parameter') unless params[:state]
 
@@ -33,19 +33,35 @@ class AppleMessagesForBusiness::OauthCallbackController < ApplicationController
   private
 
   def find_channel
-    @channel = Channel::AppleMessagesForBusiness.find_by!(msp_id: params[:msp_id])
-  rescue ActiveRecord::RecordNotFound
-    render_error('Channel not found')
+    # Get channel_id from Redis state (stored during OAuth initiation)
+    return render_error('Missing state parameter') unless params[:state]
+
+    state_key = "oauth_state:#{params[:state]}"
+    state_data = Redis::Alfred.get(state_key)
+    return render_error('Invalid or expired state') unless state_data
+
+    begin
+      state_json = JSON.parse(state_data)
+      channel_id = state_json['channel_id']
+      @channel = Channel::AppleMessagesForBusiness.find(channel_id)
+    rescue JSON::ParserError, ActiveRecord::RecordNotFound => e
+      Rails.logger.error "[OAuth Callback] Error finding channel: #{e.message}"
+      render_error('Channel not found')
+    end
   end
 
   def extract_provider_from_state(state)
-    # Extract provider from stored auth session
-    auth_sessions = @channel.auth_sessions || {}
-    session = auth_sessions[state]
+    # Extract provider from Redis state
+    state_key = "oauth_state:#{state}"
+    state_data = Redis::Alfred.get(state_key)
+    return nil unless state_data
 
-    return nil unless session
-
-    session['provider']
+    begin
+      state_json = JSON.parse(state_data)
+      state_json['provider']
+    rescue JSON::ParserError
+      nil
+    end
   end
 
   def render_success(result, provider)

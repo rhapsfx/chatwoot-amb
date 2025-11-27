@@ -1,6 +1,75 @@
 {
   "APPLE_MESSAGES": {
     "IMAGE_INDICATOR": "[Image #1]",
+    "LOADING_APP": "Loading app...",
+    "CUSTOM_APP_BUBBLE": {
+      "LOADING": "Loading app info..."
+    },
+    "AUTHENTICATION": {
+      "MODAL": {
+        "CANCEL": "Cancel",
+        "CREATE_MESSAGE": "Create Message",
+        "SAVE_AS_TEMPLATE": "Save as Template"
+      },
+      "PROVIDERS": {
+        "GOOGLE": {
+          "DESCRIPTION": "Sign in with Google"
+        },
+        "LINKEDIN": {
+          "DESCRIPTION": "Sign in with LinkedIn"
+        },
+        "FACEBOOK": {
+          "DESCRIPTION": "Sign in with Facebook"
+        }
+      },
+      "DEFAULT_MESSAGE": "Please authenticate with {provider} to continue"
+    },
+    "TEMPLATES": {
+      "BUILDER": {
+        "APPLE_FORM": {
+          "PREFIX_TEXT_LABEL": "Prefix Text",
+          "PREFIX_TEXT_PLACEHOLDER": "Enter prefix text (optional)",
+          "HINT_TEXT_LABEL": "Hint Text",
+          "HINT_TEXT_PLACEHOLDER": "Enter hint text for the field",
+          "MAX_CHAR_COUNT": "Maximum Character Count",
+          "MAX_CHAR_COUNT_PLACEHOLDER": "Enter max character count (e.g., 100)",
+          "INPUT_TYPE_LABEL": "Input Type",
+          "INPUT_TYPE_SINGLELINE": "Single Line",
+          "INPUT_TYPE_MULTILINE": "Multi Line",
+          "KEYBOARD_TYPE_LABEL": "Keyboard Type",
+          "KEYBOARD_TYPE_DEFAULT": "Default",
+          "KEYBOARD_TYPE_EMAIL": "Email",
+          "KEYBOARD_TYPE_PHONE": "Phone",
+          "KEYBOARD_TYPE_NUMBER": "Number",
+          "KEYBOARD_TYPE_URL": "URL",
+          "TEXT_CONTENT_TYPE_LABEL": "Text Content Type",
+          "TEXT_CONTENT_TYPE_NONE": "None",
+          "TEXT_CONTENT_TYPE_NAME": "Name",
+          "TEXT_CONTENT_TYPE_EMAIL": "Email Address",
+          "TEXT_CONTENT_TYPE_PHONE": "Phone Number",
+          "IMAGE_NONE_OPTION": "No Image",
+          "REGEX_PLACEHOLDER": "Enter regex pattern (JSON encoded)",
+          "PAGE_TYPE_LABEL": "Page Type",
+          "PAGE_TYPE_MODULE": "Form Fields (Module)",
+          "PAGE_TYPE_SPLASH": "Splash Screen",
+          "PAGE_TYPE_HELP": "Splash screens are shown at the start of forms with image, header, text, and button. Module pages contain form fields.",
+          "MOVE_UP": "Move page up",
+          "MOVE_DOWN": "Move page down",
+          "SPLASH_FIELDS_TITLE": "Splash Screen Configuration",
+          "SPLASH_HEADER": "Header",
+          "SPLASH_HEADER_PLACEHOLDER": "Enter header title",
+          "SPLASH_HEADER_HELP": "Displays in bold beneath the image",
+          "SPLASH_TEXT": "Splash Text",
+          "SPLASH_TEXT_PLACEHOLDER": "Enter body text for the splash screen",
+          "SPLASH_TEXT_HELP": "Main body copy shown on the splash screen",
+          "SPLASH_BUTTON_TITLE": "Button Title",
+          "SPLASH_BUTTON_TITLE_PLACEHOLDER": "e.g., Get Started",
+          "SPLASH_BUTTON_TITLE_HELP": "REQUIRED: Without a button title, this splash screen will not display",
+          "SPLASH_IMAGE": "Splash Image",
+          "SPLASH_IMAGE_HELP": "Image displayed at the top of the splash screen"
+        }
+      }
+    },
     "SHARED_IMAGES": {
       "TABS": {
         "SYSTEM": "System",
@@ -19,6 +88,89 @@
       "IMAGE_COUNT": "{count} images",
       "ERRORS": {
         "FILE_TOO_LARGE": "Image file size must be less than 5MB"
+      }
+    },
+    "CUSTOM_PAYLOAD": {
+      "TAB_LABEL": "Custom Payload",
+      "EDITOR": {
+        "LABEL": "Custom Payload JSON",
+        "PLACEHOLDER": "{\n  \"interactiveData\": {\n    \"bid\": \"com.apple.messages...\",\n    \"data\": {\n      \"version\": \"1.0\",\n      ...\n    }\n  }\n}",
+        "VALIDATION_SUCCESS": "✅ Valid JSON",
+        "VALIDATION_ERROR": "❌ {error}"
+      },
+      "CONTROLS": {
+        "SKIP_VALIDATION": {
+          "LABEL": "Allow experimental payloads (turn off validations)",
+          "WARNING": "⚠️ Warning: Experimental mode bypasses validation. Invalid payloads may fail or cause unexpected behavior."
+        },
+        "CASE_TRANSFORM": {
+          "LABEL": "Auto-apply case transformation (snake_case → camelCase)"
+        }
+      },
+      "BUTTONS": {
+        "VALIDATE": "Validate",
+        "SEND": "Send Custom Payload",
+        "SENDING": "Sending..."
+      },
+      "PREVIEW": {
+        "TITLE": "Final Payload Preview",
+        "AUTO_FIELDS_TITLE": "Auto-populated fields:",
+        "AUTO_FIELDS": {
+          "VERSION": "v: API version (always 1)",
+          "ID": "id: Unique message ID (generated on send)",
+          "SOURCE_ID": "sourceId: Your business ID",
+          "DESTINATION_ID": "destinationId: Contact ID (from conversation)"
+        }
+      },
+      "ERRORS": {
+        "TITLES": {
+          "VALIDATION": "JSON Validation Error",
+          "SEND_ERROR": "Failed to Send Message",
+          "APPLE_ERROR": "Apple MSP Gateway Error",
+          "PAYLOAD_TOO_LARGE": "Payload Size Limit Exceeded",
+          "RATE_LIMIT": "Rate Limit Exceeded",
+          "PERMISSION_ERROR": "Permission Denied",
+          "NETWORK_ERROR": "Network Error",
+          "WARNING": "Warning"
+        },
+        "SHOW_DETAILS": "▶ Show Details",
+        "HIDE_DETAILS": "▼ Hide Details",
+        "APPLE_MSP_ERROR": "Apple MSP Gateway Error:",
+        "APPLE_STATUS": "Status",
+        "APPLE_MESSAGE": "Message",
+        "APPLE_RESPONSE_BODY": "View Apple Response Body",
+        "SUGGESTED_ACTIONS": "Suggested Actions:",
+        "SUGGESTIONS": {
+          "VALIDATION": {
+            "1": "Check your JSON syntax for missing commas, brackets, or quotes",
+            "2": "Use a JSON validator tool to identify the exact issue",
+            "3": "Enable \"Allow experimental payloads\" to bypass validation (not recommended)"
+          },
+          "APPLE_ERROR": {
+            "1": "Verify your payload matches Apple MSP Gateway requirements",
+            "2": "Check that all required fields are present and correctly formatted",
+            "3": "Review Apple Business Chat documentation for the message type you're sending",
+            "4": "Try sending a simpler payload to isolate the issue"
+          },
+          "SEND_ERROR": {
+            "1": "Verify the conversation is active and the contact is reachable",
+            "2": "Check your network connection",
+            "3": "Try again in a few moments",
+            "4": "Contact support if the issue persists"
+          },
+          "PAYLOAD_TOO_LARGE": {
+            "1": "Reduce the size of your payload (current limit: 100KB)",
+            "2": "Compress or optimize any embedded data",
+            "3": "Consider splitting into multiple messages"
+          },
+          "RATE_LIMIT": {
+            "1": "Wait a few minutes before sending more custom payloads",
+            "2": "Current limit: 100 payloads per hour per account"
+          }
+        }
+      },
+      "SUCCESS": {
+        "MESSAGE": "Custom payload sent successfully"
       }
     }
   }

@@ -165,6 +165,7 @@ Rails.application.routes.draw do
           resources :apple_messages, only: [] do
             collection do
               post :parse_url
+              get :app_metadata
             end
           end
           resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do

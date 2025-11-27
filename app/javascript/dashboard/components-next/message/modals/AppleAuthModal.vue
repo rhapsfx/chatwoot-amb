@@ -16,12 +16,8 @@ export default {
       type: String,
       required: true,
     },
-    conversationId: {
-      type: String,
-      required: true,
-    },
   },
-  emits: ['close', 'create', 'save-as-template'],
+  emits: ['close', 'create', 'saveAsTemplate'],
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -69,6 +65,27 @@ export default {
       return selectedProvider.value && authMessage.value.trim().length > 0;
     });
 
+    const getProviderScopes = providerId => {
+      const scopes = {
+        google: ['openid', 'profile', 'email'],
+        linkedin: ['r_liteprofile', 'r_emailaddress'],
+        facebook: ['public_profile', 'email'],
+      };
+
+      return scopes[providerId] || ['profile', 'email'];
+    };
+
+    const onClose = () => {
+      // Reset form
+      selectedProvider.value = null;
+      authMessage.value = '';
+      successUrl.value = '';
+      cancelUrl.value = '';
+      requireEncryption.value = true;
+
+      emit('close');
+    };
+
     const selectProvider = provider => {
       selectedProvider.value = provider;
 
@@ -107,27 +124,6 @@ export default {
       onClose();
     };
 
-    const getProviderScopes = providerId => {
-      const scopes = {
-        google: ['openid', 'profile', 'email'],
-        linkedin: ['r_liteprofile', 'r_emailaddress'],
-        facebook: ['public_profile', 'email'],
-      };
-
-      return scopes[providerId] || ['profile', 'email'];
-    };
-
-    const onClose = () => {
-      // Reset form
-      selectedProvider.value = null;
-      authMessage.value = '';
-      successUrl.value = '';
-      cancelUrl.value = '';
-      requireEncryption.value = true;
-
-      emit('close');
-    };
-
     const saveAsTemplate = () => {
       if (!canCreateMessage.value) return;
 
@@ -139,7 +135,7 @@ export default {
         require_encryption: requireEncryption.value,
       };
 
-      emit('save-as-template', {
+      emit('saveAsTemplate', {
         messageType: 'oauth',
         messageData,
       });
@@ -184,7 +180,7 @@ export default {
 <template>
   <woot-modal :show="show" :on-close="onClose">
     <div
-      class="apple-auth-modal shadow-2xl border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden"
+      class="apple-auth-modal bg-white dark:bg-n-slate-1 shadow-2xl rounded-lg overflow-hidden"
     >
       <div class="modal-header">
         <h2 class="modal-title">
@@ -326,7 +322,7 @@ export default {
           :disabled="!canCreateMessage"
           @click="saveAsTemplate"
         >
-          Save as Template
+          {{ $t('APPLE_MESSAGES.AUTHENTICATION.MODAL.SAVE_AS_TEMPLATE') }}
         </button>
 
         <button
@@ -351,7 +347,9 @@ export default {
 .apple-auth-modal::v-deep(.modal-mask) {
   @apply bg-black bg-opacity-75;
 }
+</style>
 
+<style>
 .modal-header {
   @apply pb-6 border-b border-gray-200 dark:border-n-slate-6;
 }
