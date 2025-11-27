@@ -186,7 +186,8 @@ onMounted(() => {
         <Button
           icon="i-lucide-upload"
           xs
-          variant="primary"
+          solid
+          blue
           :disabled="loading"
           @click="uploadNewImage"
         >

@@ -63,6 +63,7 @@ const activeTab = ref('templates'); // 'builder', 'preview', 'templates', 'messa
 const selectedTemplate = ref(null);
 const currentPageIndex = ref(0);
 const showAddFieldModal = ref(false);
+const showPageTypeMenu = ref(false);
 
 // Automatically sync reply image with received image
 watch(
@@ -131,63 +132,73 @@ const fieldTypes = computed(() => {
   return [
     {
       value: 'text',
-      label: t('APPLE_FORM.FIELD_TYPES.TEXT'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.TEXT'),
       icon: '📝',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT'),
+      description: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.TEXT'),
     },
     {
       value: 'textArea',
-      label: t('APPLE_FORM.FIELD_TYPES.TEXT_AREA'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.TEXT_AREA'),
       icon: '📄',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TEXT_AREA'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.TEXT_AREA'
+      ),
     },
     {
       value: 'email',
-      label: t('APPLE_FORM.FIELD_TYPES.EMAIL'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.EMAIL'),
       icon: '📧',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.EMAIL'),
+      description: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.EMAIL'),
     },
     {
       value: 'phone',
-      label: t('APPLE_FORM.FIELD_TYPES.PHONE'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.PHONE'),
       icon: '📱',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.PHONE'),
+      description: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.PHONE'),
     },
     {
       value: 'singleSelect',
-      label: t('APPLE_FORM.FIELD_TYPES.SINGLE_CHOICE'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.SINGLE_CHOICE'),
       icon: '🔘',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.SINGLE_CHOICE'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.SINGLE_CHOICE'
+      ),
     },
     {
       value: 'multiSelect',
-      label: t('APPLE_FORM.FIELD_TYPES.MULTIPLE_CHOICE'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.MULTIPLE_CHOICE'),
       icon: '☑️',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.MULTIPLE_CHOICE'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.MULTIPLE_CHOICE'
+      ),
     },
     {
       value: 'dateTime',
-      label: t('APPLE_FORM.FIELD_TYPES.DATE_TIME'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.DATE_TIME'),
       icon: '📅',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.DATE_TIME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.DATE_TIME'
+      ),
     },
     {
       value: 'toggle',
-      label: t('APPLE_FORM.FIELD_TYPES.TOGGLE'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.TOGGLE'),
       icon: '🔄',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.TOGGLE'),
+      description: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.TOGGLE'),
     },
     {
       value: 'stepper',
-      label: t('APPLE_FORM.FIELD_TYPES.STEPPER'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.STEPPER'),
       icon: '🔢',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.STEPPER'),
+      description: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.STEPPER'),
     },
     {
       value: 'richLink',
-      label: t('APPLE_FORM.FIELD_TYPES.RICH_LINK'),
+      label: t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPES.RICH_LINK'),
       icon: '🔗',
-      description: t('APPLE_FORM.FIELD_DESCRIPTIONS.RICH_LINK'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTIONS.RICH_LINK'
+      ),
     },
   ];
 });
@@ -200,36 +211,46 @@ const formTemplates = computed(() => {
   return [
     {
       id: 'contact',
-      name: t('APPLE_FORM.TEMPLATES.CONTACT.NAME'),
-      description: t('APPLE_FORM.TEMPLATES.CONTACT.DESCRIPTION'),
+      name: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.NAME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.DESCRIPTION'
+      ),
       icon: '👤',
       fields: ['name', 'email', 'phone', 'message'],
     },
     {
       id: 'feedback',
-      name: t('APPLE_FORM.TEMPLATES.FEEDBACK.NAME'),
-      description: t('APPLE_FORM.TEMPLATES.FEEDBACK.DESCRIPTION'),
+      name: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.NAME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.DESCRIPTION'
+      ),
       icon: '⭐',
       fields: ['rating', 'comments', 'recommend'],
     },
     {
       id: 'appointment',
-      name: t('APPLE_FORM.TEMPLATES.APPOINTMENT.NAME'),
-      description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.DESCRIPTION'),
+      name: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.NAME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.DESCRIPTION'
+      ),
       icon: '📅',
       fields: ['name', 'date', 'service', 'notes'],
     },
     {
       id: 'survey',
-      name: t('APPLE_FORM.TEMPLATES.SURVEY.NAME'),
-      description: t('APPLE_FORM.TEMPLATES.SURVEY.DESCRIPTION'),
+      name: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.NAME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.DESCRIPTION'
+      ),
       icon: '📊',
       fields: ['demographics', 'preferences', 'satisfaction'],
     },
     {
       id: 'order',
-      name: t('APPLE_FORM.TEMPLATES.ORDER.NAME'),
-      description: t('APPLE_FORM.TEMPLATES.ORDER.DESCRIPTION'),
+      name: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.NAME'),
+      description: t(
+        'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.DESCRIPTION'
+      ),
       icon: '🛒',
       fields: ['product', 'quantity', 'billing', 'terms'],
     },
@@ -353,14 +374,23 @@ const initializeForm = () => {
   selectedTemplate.value = null;
 };
 
-const addNewPage = () => {
+const addNewPage = (pageType = 'module') => {
   const pageNumber = formData.value.pages.length + 1;
   const newPage = {
     page_id: `page_${pageNumber}`,
-    title: `${t('APPLE_FORM.PAGE_LABEL')} ${pageNumber}`,
+    type: pageType,
+    title: `${t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_LABEL')} ${pageNumber}`,
     description: '',
     items: [],
   };
+
+  // Add splash-specific fields if it's a splash page
+  if (pageType === 'splash') {
+    newPage.header = '';
+    newPage.splashtext = '';
+    newPage.buttonTitle = '';
+    newPage.imageIdentifier = '';
+  }
 
   formData.value.pages.push(newPage);
   currentPageIndex.value = formData.value.pages.length - 1;
@@ -372,6 +402,43 @@ const removePage = index => {
     if (currentPageIndex.value >= formData.value.pages.length) {
       currentPageIndex.value = formData.value.pages.length - 1;
     }
+  }
+};
+
+const movePageUp = index => {
+  if (index > 0) {
+    const temp = formData.value.pages[index];
+    formData.value.pages[index] = formData.value.pages[index - 1];
+    formData.value.pages[index - 1] = temp;
+    currentPageIndex.value = index - 1;
+  }
+};
+
+const movePageDown = index => {
+  if (index < formData.value.pages.length - 1) {
+    const temp = formData.value.pages[index];
+    formData.value.pages[index] = formData.value.pages[index + 1];
+    formData.value.pages[index + 1] = temp;
+    currentPageIndex.value = index + 1;
+  }
+};
+
+const onPageTypeChange = () => {
+  const page = currentPage.value;
+  if (!page) return;
+
+  if (page.type === 'splash') {
+    // Initialize splash-specific fields if switching to splash
+    if (!page.header) page.header = '';
+    if (!page.splashtext) page.splashtext = '';
+    if (!page.buttonTitle) page.buttonTitle = '';
+    if (!page.imageIdentifier) page.imageIdentifier = '';
+  } else {
+    // Clean up splash-specific fields if switching to module
+    delete page.header;
+    delete page.splashtext;
+    delete page.buttonTitle;
+    delete page.imageIdentifier;
   }
 };
 
@@ -473,18 +540,26 @@ const loadTemplate = templateId => {
   switch (templateId) {
     case 'contact':
       formData.value = {
-        title: t('APPLE_FORM.TEMPLATES.CONTACT.FORM_TITLE'),
-        description: t('APPLE_FORM.TEMPLATES.CONTACT.FORM_DESC'),
+        title: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.FORM_TITLE'),
+        description: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.FORM_DESC'
+        ),
         pages: [
           {
             page_id: 'page_1',
-            title: t('APPLE_FORM.TEMPLATES.CONTACT.PAGE_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.CONTACT.PAGE_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.PAGE_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.PAGE_DESC'
+            ),
             items: [
               {
                 item_id: 'full_name',
                 item_type: 'text',
-                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_FULL_NAME'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.FIELD_FULL_NAME'
+                ),
                 required: true,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_FULL_NAME'
@@ -495,7 +570,9 @@ const loadTemplate = templateId => {
               {
                 item_id: 'email',
                 item_type: 'email',
-                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_EMAIL'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.FIELD_EMAIL'
+                ),
                 required: true,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_EMAIL'
@@ -506,7 +583,9 @@ const loadTemplate = templateId => {
               {
                 item_id: 'phone',
                 item_type: 'phone',
-                title: t('APPLE_FORM.TEMPLATES.CONTACT.FIELD_PHONE'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.CONTACT.FIELD_PHONE'
+                ),
                 required: false,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.CONTACT.PLACEHOLDER_PHONE'
@@ -533,18 +612,26 @@ const loadTemplate = templateId => {
       break;
     case 'feedback':
       formData.value = {
-        title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FORM_TITLE'),
-        description: t('APPLE_FORM.TEMPLATES.FEEDBACK.FORM_DESC'),
+        title: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.FORM_TITLE'),
+        description: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.FORM_DESC'
+        ),
         pages: [
           {
             page_id: 'page_1',
-            title: t('APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.PAGE_DESC'
+            ),
             items: [
               {
                 item_id: 'rating',
                 item_type: 'stepper',
-                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RATING'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RATING'
+                ),
                 required: true,
                 min_value: 1,
                 max_value: 5,
@@ -552,7 +639,9 @@ const loadTemplate = templateId => {
               {
                 item_id: 'comments',
                 item_type: 'textArea',
-                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_COMMENTS'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_COMMENTS'
+                ),
                 required: false,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.FEEDBACK.PLACEHOLDER_COMMENTS'
@@ -561,9 +650,13 @@ const loadTemplate = templateId => {
               {
                 item_id: 'recommend',
                 item_type: 'toggle',
-                title: t('APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RECOMMEND'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.FIELD_RECOMMEND'
+                ),
                 required: false,
-                description: t('APPLE_FORM.TEMPLATES.FEEDBACK.DESC_RECOMMEND'),
+                description: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.FEEDBACK.DESC_RECOMMEND'
+                ),
               },
             ],
           },
@@ -584,18 +677,28 @@ const loadTemplate = templateId => {
       break;
     case 'appointment':
       formData.value = {
-        title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_TITLE'),
-        description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_DESC'),
+        title: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_TITLE'
+        ),
+        description: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FORM_DESC'
+        ),
         pages: [
           {
             page_id: 'page_1',
-            title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.PAGE_DESC'
+            ),
             items: [
               {
                 item_id: 'name',
                 item_type: 'text',
-                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NAME'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NAME'
+                ),
                 required: true,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NAME'
@@ -606,13 +709,17 @@ const loadTemplate = templateId => {
               {
                 item_id: 'date',
                 item_type: 'dateTime',
-                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_DATE'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_DATE'
+                ),
                 required: true,
               },
               {
                 item_id: 'service',
                 item_type: 'singleSelect',
-                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_SERVICE'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_SERVICE'
+                ),
                 required: true,
                 options: [
                   {
@@ -623,18 +730,24 @@ const loadTemplate = templateId => {
                   },
                   {
                     value: 'meeting',
-                    title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_MEETING'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_MEETING'
+                    ),
                   },
                   {
                     value: 'demo',
-                    title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_DEMO'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.OPTION_DEMO'
+                    ),
                   },
                 ],
               },
               {
                 item_id: 'notes',
                 item_type: 'textArea',
-                title: t('APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NOTES'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.APPOINTMENT.FIELD_NOTES'
+                ),
                 required: false,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.APPOINTMENT.PLACEHOLDER_NOTES'
@@ -659,35 +772,51 @@ const loadTemplate = templateId => {
       break;
     case 'survey':
       formData.value = {
-        title: t('APPLE_FORM.TEMPLATES.SURVEY.FORM_TITLE'),
-        description: t('APPLE_FORM.TEMPLATES.SURVEY.FORM_DESC'),
+        title: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.FORM_TITLE'),
+        description: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.FORM_DESC'
+        ),
         pages: [
           {
             page_id: 'page_1',
-            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE1_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE1_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE1_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE1_DESC'
+            ),
             items: [
               {
                 item_id: 'age_group',
                 item_type: 'singleSelect',
-                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_AGE_GROUP'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.FIELD_AGE_GROUP'
+                ),
                 required: false,
                 options: [
                   {
                     value: '18-24',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_18_24'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_18_24'
+                    ),
                   },
                   {
                     value: '25-34',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_25_34'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_25_34'
+                    ),
                   },
                   {
                     value: '35-44',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_35_44'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_35_44'
+                    ),
                   },
                   {
                     value: '45+',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_45_PLUS'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_45_PLUS'
+                    ),
                   },
                 ],
               },
@@ -695,30 +824,44 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_2',
-            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE2_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE2_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE2_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE2_DESC'
+            ),
             items: [
               {
                 item_id: 'preferences',
                 item_type: 'multiSelect',
-                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_PREFERENCES'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.FIELD_PREFERENCES'
+                ),
                 required: false,
                 options: [
                   {
                     value: 'quality',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_QUALITY'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_QUALITY'
+                    ),
                   },
                   {
                     value: 'price',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_PRICE'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_PRICE'
+                    ),
                   },
                   {
                     value: 'support',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_SUPPORT'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_SUPPORT'
+                    ),
                   },
                   {
                     value: 'features',
-                    title: t('APPLE_FORM.TEMPLATES.SURVEY.OPTION_FEATURES'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.OPTION_FEATURES'
+                    ),
                   },
                 ],
               },
@@ -726,13 +869,19 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_3',
-            title: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE3_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.SURVEY.PAGE3_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE3_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.PAGE3_DESC'
+            ),
             items: [
               {
                 item_id: 'satisfaction',
                 item_type: 'stepper',
-                title: t('APPLE_FORM.TEMPLATES.SURVEY.FIELD_SATISFACTION'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.SURVEY.FIELD_SATISFACTION'
+                ),
                 required: true,
                 min_value: 1,
                 max_value: 10,
@@ -756,38 +905,54 @@ const loadTemplate = templateId => {
       break;
     case 'order':
       formData.value = {
-        title: t('APPLE_FORM.TEMPLATES.ORDER.FORM_TITLE'),
-        description: t('APPLE_FORM.TEMPLATES.ORDER.FORM_DESC'),
+        title: t('TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FORM_TITLE'),
+        description: t(
+          'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FORM_DESC'
+        ),
         pages: [
           {
             page_id: 'page_1',
-            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE1_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE1_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE1_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE1_DESC'
+            ),
             items: [
               {
                 item_id: 'product',
                 item_type: 'singleSelect',
-                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_PRODUCT'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FIELD_PRODUCT'
+                ),
                 required: true,
                 options: [
                   {
                     value: 'basic',
-                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_BASIC'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.OPTION_BASIC'
+                    ),
                   },
                   {
                     value: 'pro',
-                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_PRO'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.OPTION_PRO'
+                    ),
                   },
                   {
                     value: 'enterprise',
-                    title: t('APPLE_FORM.TEMPLATES.ORDER.OPTION_ENTERPRISE'),
+                    title: t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.OPTION_ENTERPRISE'
+                    ),
                   },
                 ],
               },
               {
                 item_id: 'quantity',
                 item_type: 'stepper',
-                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_QUANTITY'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FIELD_QUANTITY'
+                ),
                 required: true,
                 min_value: 1,
                 max_value: 100,
@@ -796,13 +961,19 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_2',
-            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE2_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE2_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE2_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE2_DESC'
+            ),
             items: [
               {
                 item_id: 'billing_name',
                 item_type: 'text',
-                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_NAME'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_NAME'
+                ),
                 required: true,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_NAME'
@@ -813,7 +984,9 @@ const loadTemplate = templateId => {
               {
                 item_id: 'billing_email',
                 item_type: 'email',
-                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_EMAIL'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FIELD_BILLING_EMAIL'
+                ),
                 required: true,
                 placeholder: t(
                   'APPLE_FORM.TEMPLATES.ORDER.PLACEHOLDER_BILLING_EMAIL'
@@ -825,15 +998,23 @@ const loadTemplate = templateId => {
           },
           {
             page_id: 'page_3',
-            title: t('APPLE_FORM.TEMPLATES.ORDER.PAGE3_TITLE'),
-            description: t('APPLE_FORM.TEMPLATES.ORDER.PAGE3_DESC'),
+            title: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE3_TITLE'
+            ),
+            description: t(
+              'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.PAGE3_DESC'
+            ),
             items: [
               {
                 item_id: 'terms',
                 item_type: 'toggle',
-                title: t('APPLE_FORM.TEMPLATES.ORDER.FIELD_TERMS'),
+                title: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.FIELD_TERMS'
+                ),
                 required: true,
-                description: t('APPLE_FORM.TEMPLATES.ORDER.DESC_TERMS'),
+                description: t(
+                  'TEMPLATES.BUILDER.APPLE_FORM.TEMPLATES.ORDER.DESC_TERMS'
+                ),
               },
             ],
           },
@@ -986,10 +1167,10 @@ watch(
             <h2
               class="text-xl font-semibold text-slate-900 dark:text-slate-100"
             >
-              {{ t('APPLE_FORM.MODAL_TITLE') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.MODAL_TITLE') }}
             </h2>
             <p class="text-sm text-slate-600 dark:text-n-slate-11 mt-1">
-              {{ t('APPLE_FORM.MODAL_SUBTITLE') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.MODAL_SUBTITLE') }}
             </p>
           </div>
           <button
@@ -1014,7 +1195,7 @@ watch(
             ]"
             @click="activeTab = 'templates'"
           >
-            {{ t('APPLE_FORM.TABS.TEMPLATES') }}
+            {{ t('TEMPLATES.BUILDER.APPLE_FORM.TABS.TEMPLATES') }}
           </button>
           <button
             class="px-6 py-3 text-sm font-medium border-b-2 transition-colors"
@@ -1025,7 +1206,7 @@ watch(
             ]"
             @click="activeTab = 'builder'"
           >
-            {{ t('APPLE_FORM.TABS.BUILDER') }}
+            {{ t('TEMPLATES.BUILDER.APPLE_FORM.TABS.BUILDER') }}
           </button>
           <button
             class="px-6 py-3 text-sm font-medium border-b-2 transition-colors"
@@ -1036,7 +1217,7 @@ watch(
             ]"
             @click="activeTab = 'preview'"
           >
-            {{ t('APPLE_FORM.TABS.PREVIEW') }}
+            {{ t('TEMPLATES.BUILDER.APPLE_FORM.TABS.PREVIEW') }}
           </button>
         </div>
 
@@ -1045,7 +1226,7 @@ watch(
             <h3
               class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4"
             >
-              {{ t('APPLE_FORM.CHOOSE_TEMPLATE') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.CHOOSE_TEMPLATE') }}
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
@@ -1077,19 +1258,21 @@ watch(
                 <h3
                   class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
                 >
-                  {{ t('APPLE_FORM.FORM_DETAILS') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.FORM_DETAILS') }}
                 </h3>
                 <div class="space-y-3">
                   <div>
                     <label
                       class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
-                      {{ t('APPLE_FORM.FORM_TITLE_LABEL') }}
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.FORM_TITLE_LABEL') }}
                     </label>
                     <input
                       v-model="formData.title"
                       type="text"
-                      :placeholder="t('APPLE_FORM.FORM_TITLE_PLACEHOLDER')"
+                      :placeholder="
+                        t('TEMPLATES.BUILDER.APPLE_FORM.FORM_TITLE_PLACEHOLDER')
+                      "
                       class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
@@ -1097,12 +1280,16 @@ watch(
                     <label
                       class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
-                      {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.DESCRIPTION_LABEL') }}
                     </label>
                     <textarea
                       v-model="formData.description"
                       rows="2"
-                      :placeholder="t('APPLE_FORM.DESCRIPTION_PLACEHOLDER')"
+                      :placeholder="
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.DESCRIPTION_PLACEHOLDER'
+                        )
+                      "
                       class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                     />
                   </div>
@@ -1114,7 +1301,11 @@ watch(
                 <h3
                   class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
                 >
-                  {{ t('APPLE_FORM.MESSAGES_TAB.MESSAGE_CONFIGURATION') }}
+                  {{
+                    t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.MESSAGES_TAB.MESSAGE_CONFIGURATION'
+                    )
+                  }}
                 </h3>
 
                 <div class="space-y-3">
@@ -1146,7 +1337,11 @@ watch(
                     <label
                       class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                     >
-                      {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE') }}
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.MESSAGES_TAB.IMAGE_STYLE'
+                        )
+                      }}
                     </label>
                     <select
                       v-model="formData.receivedMessage.style"
@@ -1169,20 +1364,30 @@ watch(
                     <h4
                       class="text-xs font-semibold text-slate-700 dark:text-n-slate-10"
                     >
-                      {{ t('APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE') }}
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.MESSAGES_TAB.REPLY_MESSAGE'
+                        )
+                      }}
                     </h4>
 
                     <div>
                       <label
                         class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                       >
-                        {{ t('APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL') }}
+                        {{
+                          t(
+                            'TEMPLATES.BUILDER.APPLE_FORM.REPLY_MESSAGE_TITLE_LABEL'
+                          )
+                        }}
                       </label>
                       <input
                         v-model="formData.replyMessage.title"
                         type="text"
                         :placeholder="
-                          t('APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER')
+                          t(
+                            'TEMPLATES.BUILDER.APPLE_FORM.REPLY_MESSAGE_TITLE_PLACEHOLDER'
+                          )
                         "
                         class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                       />
@@ -1192,13 +1397,19 @@ watch(
                       <label
                         class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                       >
-                        {{ t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL') }}
+                        {{
+                          t(
+                            'TEMPLATES.BUILDER.APPLE_FORM.REPLY_MESSAGE_SUBTITLE_LABEL'
+                          )
+                        }}
                       </label>
                       <input
                         v-model="formData.replyMessage.subtitle"
                         type="text"
                         :placeholder="
-                          t('APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER')
+                          t(
+                            'TEMPLATES.BUILDER.APPLE_FORM.REPLY_MESSAGE_SUBTITLE_PLACEHOLDER'
+                          )
                         "
                         class="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                       />
@@ -1213,59 +1424,198 @@ watch(
                     <h3
                       class="text-base font-semibold text-slate-900 dark:text-slate-100"
                     >
-                      {{ t('APPLE_FORM.PAGES') }}
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGES') }}
                     </h3>
                     <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
                       Click a page to view and edit its fields
                     </p>
                   </div>
-                  <button
-                    class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
-                    :title="t('APPLE_FORM.ADD_PAGE')"
-                    @click="addNewPage"
-                  >
-                    <svg
-                      class="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  <div class="relative">
+                    <button
+                      class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+                      :title="t('TEMPLATES.BUILDER.APPLE_FORM.ADD_PAGE')"
+                      @click="showPageTypeMenu = !showPageTypeMenu"
                     >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2.5"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </button>
+                      <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2.5"
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    </button>
+                    <!-- Page Type Dropdown Menu -->
+                    <div
+                      v-if="showPageTypeMenu"
+                      class="absolute right-0 mt-2 w-64 bg-white dark:bg-n-slate-2 rounded-lg shadow-lg border border-slate-200 dark:border-n-slate-6 z-50"
+                    >
+                      <div class="p-2">
+                        <button
+                          class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-n-slate-3 transition-colors flex items-start gap-3"
+                          @click="
+                            addNewPage('module');
+                            showPageTypeMenu = false;
+                          "
+                        >
+                          <div class="mt-0.5">
+                            <svg
+                              class="w-5 h-5 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          </div>
+                          <div class="flex-1">
+                            <div
+                              class="text-sm font-medium text-slate-900 dark:text-slate-100"
+                            >
+                              {{
+                                t(
+                                  'TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_MODULE'
+                                )
+                              }}
+                            </div>
+                            <div
+                              class="text-xs text-slate-600 dark:text-n-slate-11 mt-0.5"
+                            >
+                              Add form fields for user input
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-n-slate-3 transition-colors flex items-start gap-3"
+                          @click="
+                            addNewPage('splash');
+                            showPageTypeMenu = false;
+                          "
+                        >
+                          <div class="mt-0.5">
+                            <svg
+                              class="w-5 h-5 text-purple-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                          <div class="flex-1">
+                            <div
+                              class="text-sm font-medium text-slate-900 dark:text-slate-100"
+                            >
+                              {{
+                                t(
+                                  'TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_SPLASH'
+                                )
+                              }}
+                            </div>
+                            <div
+                              class="text-xs text-slate-600 dark:text-n-slate-11 mt-0.5"
+                            >
+                              Welcome screen with image and button
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="space-y-2">
                   <div
                     v-for="(page, index) in formData.pages"
                     :key="page.page_id"
-                    class="flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors"
+                    class="flex items-center gap-2 p-2 rounded-lg border transition-colors"
                     :class="[
                       index === currentPageIndex
                         ? 'border-woot-500 bg-woot-50 dark:bg-woot-900/20'
                         : 'border-slate-200 dark:border-n-slate-6 hover:border-slate-300',
                     ]"
-                    @click="currentPageIndex = index"
                   >
-                    <div class="flex-1 min-w-0">
-                      <input
-                        v-model="page.title"
-                        class="w-full text-sm font-medium text-slate-900 dark:text-slate-100 bg-transparent border-none p-0 focus:outline-none truncate"
-                        @click.stop
-                      />
+                    <!-- Reordering buttons -->
+                    <div class="flex flex-col gap-1">
+                      <button
+                        :disabled="index === 0"
+                        class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        :title="t('TEMPLATES.BUILDER.APPLE_FORM.MOVE_UP')"
+                        @click.stop="movePageUp(index)"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        :disabled="index === formData.pages.length - 1"
+                        class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        :title="t('TEMPLATES.BUILDER.APPLE_FORM.MOVE_DOWN')"
+                        @click.stop="movePageDown(index)"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <!-- Page content - clickable area -->
+                    <div
+                      class="flex-1 min-w-0 cursor-pointer"
+                      @click="currentPageIndex = index"
+                    >
+                      <div class="flex items-center gap-2">
+                        <input
+                          v-model="page.title"
+                          class="flex-1 text-sm font-medium text-slate-900 dark:text-slate-100 bg-transparent border-none p-0 focus:outline-none truncate"
+                          @click.stop
+                        />
+                        <span
+                          v-if="page.type === 'splash'"
+                          class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 rounded"
+                        >
+                          {{
+                            t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_SPLASH')
+                          }}
+                        </span>
+                      </div>
                       <p class="text-xs text-slate-600 dark:text-n-slate-11">
                         {{ page.items ? page.items.length : 0 }}
-                        {{ t('APPLE_FORM.FIELDS_COUNT') }}
+                        {{ t('TEMPLATES.BUILDER.APPLE_FORM.FIELDS_COUNT') }}
                       </p>
                     </div>
+
+                    <!-- Delete button -->
                     <button
                       v-if="formData.pages.length > 1"
-                      class="text-red-500 hover:text-red-700 transition-colors ml-2 flex-shrink-0"
+                      class="text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
                       @click.stop="removePage(index)"
                     >
                       <svg
@@ -1283,81 +1633,220 @@ watch(
               </div>
 
               <div v-if="currentPage">
-                <div class="flex items-center justify-between mb-4">
-                  <div>
-                    <h4
-                      class="text-sm font-semibold text-slate-900 dark:text-slate-100"
-                    >
-                      {{
-                        t('APPLE_FORM.FIELDS_TITLE', {
-                          page: currentPage.title,
-                        })
-                      }}
-                    </h4>
-                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
-                      Add and configure form fields
-                    </p>
-                  </div>
-                  <button
-                    class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
-                    :title="t('APPLE_FORM.ADD_FIELD')"
-                    @click="openAddFieldModal"
+                <!-- Page Type Selector -->
+                <div
+                  class="mb-6 p-4 border border-slate-200 dark:border-n-slate-6 rounded-lg"
+                >
+                  <label
+                    class="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2"
                   >
-                    <svg
-                      class="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2.5"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </button>
+                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_LABEL') }}
+                  </label>
+                  <select
+                    v-model="currentPage.type"
+                    class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-5 rounded-md bg-white dark:bg-n-slate-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-woot-500"
+                    @change="onPageTypeChange"
+                  >
+                    <option value="module">
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_MODULE') }}
+                    </option>
+                    <option value="splash">
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_SPLASH') }}
+                    </option>
+                  </select>
+                  <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_HELP') }}
+                  </p>
                 </div>
 
-                <div class="space-y-2">
-                  <div
-                    v-for="(field, index) in currentPage.items"
-                    :key="field.item_id"
-                    class="flex items-center justify-between p-2 bg-slate-50 dark:bg-n-slate-1 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-n-slate-3 transition-colors"
-                    @click="editField(index)"
+                <!-- Splash Page Fields -->
+                <div
+                  v-if="currentPage.type === 'splash'"
+                  class="mb-6 p-4 border border-purple-200 dark:border-purple-900 bg-purple-50 dark:bg-purple-900/10 rounded-lg space-y-4"
+                >
+                  <h4
+                    class="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2"
                   >
-                    <div class="flex-1 min-w-0">
-                      <div
-                        class="text-sm font-medium text-slate-900 dark:text-slate-100 truncate"
-                      >
-                        {{ field.title }}
-                      </div>
-                      <div
-                        class="text-xs text-slate-600 dark:text-n-slate-11 truncate"
+                    <span
+                      class="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 rounded"
+                    >
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TYPE_SPLASH') }}
+                    </span>
+                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_FIELDS_TITLE') }}
+                  </h4>
+
+                  <!-- Header -->
+                  <div>
+                    <label
+                      class="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-1"
+                    >
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_HEADER') }}
+                    </label>
+                    <input
+                      v-model="currentPage.header"
+                      type="text"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-5 rounded-md bg-white dark:bg-n-slate-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-woot-500"
+                      :placeholder="
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.SPLASH_HEADER_PLACEHOLDER'
+                        )
+                      "
+                    />
+                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_HEADER_HELP') }}
+                    </p>
+                  </div>
+
+                  <!-- Splash Text -->
+                  <div>
+                    <label
+                      class="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-1"
+                    >
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_TEXT') }}
+                    </label>
+                    <textarea
+                      v-model="currentPage.splashtext"
+                      rows="3"
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-5 rounded-md bg-white dark:bg-n-slate-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-woot-500"
+                      :placeholder="
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.SPLASH_TEXT_PLACEHOLDER'
+                        )
+                      "
+                    />
+                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_TEXT_HELP') }}
+                    </p>
+                  </div>
+
+                  <!-- Button Title (REQUIRED) -->
+                  <div>
+                    <label
+                      class="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-1"
+                    >
+                      {{
+                        t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_BUTTON_TITLE')
+                      }}
+                      <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      v-model="currentPage.buttonTitle"
+                      type="text"
+                      required
+                      class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-5 rounded-md bg-white dark:bg-n-slate-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-woot-500"
+                      :placeholder="
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.SPLASH_BUTTON_TITLE_PLACEHOLDER'
+                        )
+                      "
+                    />
+                    <p class="text-xs text-red-600 dark:text-red-400 mt-1">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.APPLE_FORM.SPLASH_BUTTON_TITLE_HELP'
+                        )
+                      }}
+                    </p>
+                  </div>
+
+                  <!-- Image Identifier -->
+                  <div>
+                    <label
+                      class="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-1"
+                    >
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_IMAGE') }}
+                    </label>
+                    <SharedImageSelector
+                      v-model="currentPage.imageIdentifier"
+                      :account-id="currentAccountId"
+                      image-type="form"
+                    />
+                    <p class="text-xs text-slate-600 dark:text-n-slate-11 mt-1">
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.SPLASH_IMAGE_HELP') }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Module Page Fields Section -->
+                <div v-if="currentPage.type !== 'splash'">
+                  <div class="flex items-center justify-between mb-4">
+                    <div>
+                      <h4
+                        class="text-sm font-semibold text-slate-900 dark:text-slate-100"
                       >
                         {{
-                          fieldTypes.find(ft => ft.value === field.item_type)
-                            ?.label || field.item_type
+                          t('TEMPLATES.BUILDER.APPLE_FORM.FIELDS_TITLE', {
+                            page: currentPage.title,
+                          })
                         }}
-                        <span v-if="field.required" class="text-red-500 ml-1">
-                          *
-                        </span>
-                      </div>
+                      </h4>
+                      <p
+                        class="text-xs text-slate-600 dark:text-n-slate-11 mt-1"
+                      >
+                        Add and configure form fields
+                      </p>
                     </div>
                     <button
-                      class="text-red-500 hover:text-red-700 transition-colors ml-2 flex-shrink-0"
-                      @click.stop="removeField(index)"
+                      class="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+                      :title="t('TEMPLATES.BUILDER.APPLE_FORM.ADD_FIELD')"
+                      @click="openAddFieldModal"
                     >
                       <svg
-                        class="w-4 h-4"
-                        fill="currentColor"
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <path
-                          d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2.5"
+                          d="M12 4v16m8-8H4"
                         />
                       </svg>
                     </button>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div
+                      v-for="(field, index) in currentPage.items"
+                      :key="field.item_id"
+                      class="flex items-center justify-between p-2 bg-slate-50 dark:bg-n-slate-1 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-n-slate-3 transition-colors"
+                      @click="editField(index)"
+                    >
+                      <div class="flex-1 min-w-0">
+                        <div
+                          class="text-sm font-medium text-slate-900 dark:text-slate-100 truncate"
+                        >
+                          {{ field.title }}
+                        </div>
+                        <div
+                          class="text-xs text-slate-600 dark:text-n-slate-11 truncate"
+                        >
+                          {{
+                            fieldTypes.find(ft => ft.value === field.item_type)
+                              ?.label || field.item_type
+                          }}
+                          <span v-if="field.required" class="text-red-500 ml-1">
+                            *
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        class="text-red-500 hover:text-red-700 transition-colors ml-2 flex-shrink-0"
+                        @click.stop="removeField(index)"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1369,7 +1858,9 @@ watch(
                 <h3
                   class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
                 >
-                  {{ t('APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL') }}
+                  {{
+                    t('TEMPLATES.BUILDER.APPLE_FORM.MESSAGES_TAB.IMAGE_LABEL')
+                  }}
                 </h3>
                 <SharedImageSelector
                   v-model="formData.receivedMessage.imageIdentifier"
@@ -1388,14 +1879,14 @@ watch(
             <h3
               class="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3"
             >
-              {{ t('APPLE_FORM.PAGE_CONFIG') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_CONFIG') }}
             </h3>
             <div class="grid grid-cols-2 gap-6">
               <div>
                 <label
                   class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
-                  {{ t('APPLE_FORM.PAGE_TITLE_LABEL') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_TITLE_LABEL') }}
                 </label>
                 <input
                   v-model="currentPage.title"
@@ -1407,7 +1898,7 @@ watch(
                 <label
                   class="block text-xs font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
-                  {{ t('APPLE_FORM.PAGE_DESCRIPTION_LABEL') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.PAGE_DESCRIPTION_LABEL') }}
                 </label>
                 <textarea
                   v-model="currentPage.description"
@@ -1422,11 +1913,11 @@ watch(
             <h3
               class="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4"
             >
-              {{ t('APPLE_FORM.FORM_PREVIEW') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.FORM_PREVIEW') }}
             </h3>
             <div v-if="formData.pages.length === 0" class="text-center py-12">
               <p class="text-slate-600 dark:text-n-slate-11">
-                {{ t('APPLE_FORM.NO_PAGES_YET') }}
+                {{ t('TEMPLATES.BUILDER.APPLE_FORM.NO_PAGES_YET') }}
               </p>
             </div>
             <div v-else class="space-y-6">
@@ -1499,7 +1990,7 @@ watch(
                       class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md bg-slate-50 dark:bg-n-slate-1 text-slate-900 dark:text-slate-100"
                     >
                       <option value="">
-                        {{ t('APPLE_FORM.SELECT_OPTION') }}
+                        {{ t('TEMPLATES.BUILDER.APPLE_FORM.SELECT_OPTION') }}
                       </option>
                       <option
                         v-for="option in field.options"
@@ -1522,7 +2013,10 @@ watch(
                       <span
                         class="ml-2 text-sm text-slate-600 dark:text-n-slate-11"
                       >
-                        {{ field.description || t('APPLE_FORM.TOGGLE_OPTION') }}
+                        {{
+                          field.description ||
+                          t('TEMPLATES.BUILDER.APPLE_FORM.TOGGLE_OPTION')
+                        }}
                       </span>
                     </div>
 
@@ -1569,7 +2063,10 @@ watch(
                         rel="noopener noreferrer"
                         class="text-woot-600 hover:underline"
                       >
-                        {{ field.url || t('APPLE_FORM.LINK_URL') }}
+                        {{
+                          field.url ||
+                          t('TEMPLATES.BUILDER.APPLE_FORM.LINK_URL')
+                        }}
                       </a>
                     </div>
                   </div>
@@ -1578,7 +2075,7 @@ watch(
                   v-else
                   class="text-center py-8 text-slate-500 dark:text-n-slate-11"
                 >
-                  {{ t('APPLE_FORM.NO_FIELDS_YET') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.NO_FIELDS_YET') }}
                 </div>
               </div>
             </div>
@@ -1590,7 +2087,7 @@ watch(
         >
           <div class="text-sm text-slate-600 dark:text-n-slate-11">
             {{
-              t('APPLE_FORM.SUMMARY', {
+              t('TEMPLATES.BUILDER.APPLE_FORM.SUMMARY', {
                 pages: formData.pages.length,
                 fields: totalFields,
               })
@@ -1601,7 +2098,7 @@ watch(
               class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
               @click="closeModal"
             >
-              {{ t('APPLE_FORM.CANCEL') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.CANCEL') }}
             </button>
             <button
               :disabled="!canCreateForm"
@@ -1615,7 +2112,7 @@ watch(
               class="px-4 py-2 bg-woot-500 text-white rounded-md hover:bg-woot-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               @click="createForm"
             >
-              {{ t('APPLE_FORM.CREATE_FORM') }}
+              {{ t('TEMPLATES.BUILDER.APPLE_FORM.CREATE_FORM') }}
             </button>
           </div>
         </div>
@@ -1635,7 +2132,7 @@ watch(
               {{
                 typeof newField.editingIndex === 'number'
                   ? 'Edit Form Field'
-                  : t('APPLE_FORM.ADD_FIELD_TITLE')
+                  : t('TEMPLATES.BUILDER.APPLE_FORM.ADD_FIELD_TITLE')
               }}
             </h3>
 
@@ -1643,7 +2140,7 @@ watch(
               <label
                 class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-2"
               >
-                {{ t('APPLE_FORM.FIELD_TYPE') }}
+                {{ t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TYPE') }}
               </label>
               <div class="grid grid-cols-2 gap-2">
                 <button
@@ -1679,12 +2176,14 @@ watch(
                 <label
                   class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
-                  {{ t('APPLE_FORM.FIELD_TITLE') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TITLE') }}
                 </label>
                 <input
                   v-model="newField.title"
                   type="text"
-                  :placeholder="t('APPLE_FORM.FIELD_TITLE_PLACEHOLDER')"
+                  :placeholder="
+                    t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_TITLE_PLACEHOLDER')
+                  "
                   class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                 />
               </div>
@@ -1693,12 +2192,16 @@ watch(
                 <label
                   class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                 >
-                  {{ t('APPLE_FORM.DESCRIPTION_LABEL') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.DESCRIPTION_LABEL') }}
                 </label>
                 <input
                   v-model="newField.description"
                   type="text"
-                  :placeholder="t('APPLE_FORM.FIELD_DESCRIPTION_PLACEHOLDER')"
+                  :placeholder="
+                    t(
+                      'TEMPLATES.BUILDER.APPLE_FORM.FIELD_DESCRIPTION_PLACEHOLDER'
+                    )
+                  "
                   class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                 />
               </div>
@@ -1710,7 +2213,7 @@ watch(
                   class="rounded border-slate-300 text-woot-600 focus:ring-woot-500"
                 />
                 <label class="text-sm text-slate-700 dark:text-n-slate-10">
-                  {{ t('APPLE_FORM.REQUIRED_FIELD') }}
+                  {{ t('TEMPLATES.BUILDER.APPLE_FORM.REQUIRED_FIELD') }}
                 </label>
               </div>
 
@@ -1727,12 +2230,14 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
-                    {{ t('APPLE_FORM.PLACEHOLDER') }}
+                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.PLACEHOLDER') }}
                   </label>
                   <input
                     v-model="newField.placeholder"
                     type="text"
-                    :placeholder="t('APPLE_FORM.PLACEHOLDER_TEXT')"
+                    :placeholder="
+                      t('TEMPLATES.BUILDER.APPLE_FORM.PLACEHOLDER_TEXT')
+                    "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
                 </div>
@@ -1741,13 +2246,17 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-1"
                   >
-                    {{ t('APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT') }}
+                    {{
+                      t('TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT')
+                    }}
                   </label>
                   <input
                     v-model="newField.label_text"
                     type="text"
                     :placeholder="
-                      t('APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT_PLACEHOLDER')
+                      t(
+                        'TEMPLATES.BUILDER.APPLE_FORM.FIELD_OPTIONS.LABEL_TEXT_PLACEHOLDER'
+                      )
                     "
                     class="w-full px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                   />
@@ -2272,7 +2781,7 @@ watch(
                   <label
                     class="block text-sm font-medium text-slate-700 dark:text-n-slate-10 mb-2"
                   >
-                    {{ t('APPLE_FORM.OPTIONS') }}
+                    {{ t('TEMPLATES.BUILDER.APPLE_FORM.OPTIONS') }}
                   </label>
                   <div class="space-y-2">
                     <div
@@ -2284,13 +2793,17 @@ watch(
                         <input
                           v-model="option.value"
                           type="text"
-                          :placeholder="t('APPLE_FORM.OPTION_VALUE')"
+                          :placeholder="
+                            t('TEMPLATES.BUILDER.APPLE_FORM.OPTION_VALUE')
+                          "
                           class="flex-1 px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                         />
                         <input
                           v-model="option.title"
                           type="text"
-                          :placeholder="t('APPLE_FORM.OPTION_LABEL')"
+                          :placeholder="
+                            t('TEMPLATES.BUILDER.APPLE_FORM.OPTION_LABEL')
+                          "
                           class="flex-1 px-3 py-2 border border-slate-300 dark:border-n-slate-6 rounded-md focus:outline-none focus:ring-2 focus:ring-woot-500 dark:bg-n-slate-1 dark:text-white"
                         />
                         <button
@@ -2356,7 +2869,7 @@ watch(
                       class="w-full py-2 border-2 border-dashed border-slate-300 dark:border-n-slate-6 rounded-md text-slate-600 dark:text-n-slate-11 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
                       @click="addOption"
                     >
-                      {{ t('APPLE_FORM.ADD_OPTION') }}
+                      {{ t('TEMPLATES.BUILDER.APPLE_FORM.ADD_OPTION') }}
                     </button>
                   </div>
                 </div>
@@ -2368,14 +2881,14 @@ watch(
                 class="px-4 py-2 text-slate-600 dark:text-n-slate-11 hover:text-slate-800 dark:hover:text-n-slate-10 transition-colors"
                 @click="showAddFieldModal = false"
               >
-                {{ t('APPLE_FORM.CANCEL') }}
+                {{ t('TEMPLATES.BUILDER.APPLE_FORM.CANCEL') }}
               </button>
               <button
                 :disabled="!newField.title"
                 class="px-4 py-2 bg-woot-500 text-white rounded-md hover:bg-woot-600 transition-colors disabled:opacity-50"
                 @click="addFieldToCurrentPage"
               >
-                {{ t('APPLE_FORM.ADD_FIELD') }}
+                {{ t('TEMPLATES.BUILDER.APPLE_FORM.ADD_FIELD') }}
               </button>
             </div>
           </div>

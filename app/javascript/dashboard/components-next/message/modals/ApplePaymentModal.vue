@@ -279,7 +279,7 @@ export default {
 <template>
   <woot-modal :show="show" :on-close="onClose" size="large">
     <div
-      class="apple-payment-modal shadow-2xl border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden"
+      class="apple-payment-modal bg-white dark:bg-n-slate-1 shadow-2xl rounded-lg overflow-hidden"
     >
       <div class="modal-header">
         <h2 class="modal-title">
@@ -606,7 +606,9 @@ export default {
 .apple-payment-modal::v-deep(.modal-mask) {
   @apply bg-black bg-opacity-75;
 }
+</style>
 
+<style>
 .modal-header {
   @apply pb-6 border-b border-gray-200 dark:border-n-slate-6;
 }

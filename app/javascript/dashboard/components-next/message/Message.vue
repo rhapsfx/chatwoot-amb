@@ -43,6 +43,7 @@ import AppleQuickReplyBubble from './bubbles/AppleQuickReply.vue';
 import AppleFormBubble from './bubbles/AppleForm.vue';
 import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
 import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
+import AppleCustomAppBubble from './bubbles/AppleCustomApp.vue';
 import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
 
 import MessageError from './MessageError.vue';
@@ -326,6 +327,10 @@ const componentToRender = computed(() => {
   }
   if (props.contentType === CONTENT_TYPES.APPLE_FORM_RESPONSE) {
     return AppleFormResponseBubble;
+  }
+
+  if (props.contentType === CONTENT_TYPES.APPLE_CUSTOM_APP) {
+    return AppleCustomAppBubble;
   }
 
   // Check for tapback reactions (Apple Messages)

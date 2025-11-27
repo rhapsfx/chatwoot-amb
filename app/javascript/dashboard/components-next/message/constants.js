@@ -72,6 +72,7 @@ export const CONTENT_TYPES = {
   APPLE_PAY: 'apple_pay',
   APPLE_RICH_LINK: 'apple_rich_link',
   APPLE_FORM_RESPONSE: 'apple_form_response',
+  APPLE_CUSTOM_APP: 'apple_custom_app',
 };
 
 export const MEDIA_TYPES = [
