@@ -137,8 +137,8 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
     # Capture the final URL after following redirects
     # This is important for Apple Maps short URLs that redirect to full URLs
-    if response.request.respond_to?(:last_uri)
-      @final_url = response.request.last_uri.to_s
+    if response.request.respond_to?(:uri)
+      @final_url = response.request.uri.to_s
       Rails.logger.info "🔍 OpenGraph - URL redirected from #{@url} to #{@final_url}" if @final_url != @url
     end
 
