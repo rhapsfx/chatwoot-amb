@@ -18,7 +18,7 @@ module AppleMessagesForBusiness
   #   result = service.perform
   #
   class SendCustomPayloadService < SendMessageService
-    MAX_PAYLOAD_SIZE = 500.kilobytes
+    MAX_PAYLOAD_SIZE = 10.megabytes
 
     # Override parent's build_interactive_data to parse and validate custom payload
     #
@@ -61,8 +61,9 @@ module AppleMessagesForBusiness
         custom_data = CaseTransformer.to_apple_format(custom_data)
       end
 
-      # Validate payload structure (unless validation is skipped)
-      validate_payload_structure(custom_data) unless skip_validation
+      # Always validate basic payload structure (even if skip_validation is true)
+      # This ensures the payload has the minimum required fields for Apple MSP
+      validate_payload_structure(custom_data, skip_validation)
 
       Rails.logger.info "[CustomPayload] Successfully processed custom payload - keys: #{custom_data.keys.inspect}"
 
@@ -211,9 +212,10 @@ module AppleMessagesForBusiness
     # Validate payload structure (basic checks)
     #
     # @param data [Object] Parsed payload data
+    # @param skip_validation [Boolean] Whether to skip non-critical validation
     # @raise [CustomExceptions::AppleMessages::InvalidPayload] If structure is invalid
-    def validate_payload_structure(data)
-      # Basic validation: ensure it's a hash
+    def validate_payload_structure(data, skip_validation = false)
+      # Basic validation: ensure it's a hash (always enforced)
       unless data.is_a?(Hash)
         raise CustomExceptions::AppleMessages::InvalidPayload.new(
           'Payload must be a JSON object (not array or primitive)',
@@ -224,10 +226,31 @@ module AppleMessagesForBusiness
         )
       end
 
-      # Warn if payload doesn't have expected Apple MSP fields
-      # (This is lenient - Apple will reject if truly invalid)
-      if data['interactiveData'].nil? && data[:interactiveData].nil? && data['type'].nil? && data[:type].nil?
-        Rails.logger.warn '[CustomPayload] Payload missing interactiveData or type field - may fail at Apple MSP'
+      # Check if payload has required Apple MSP fields for interactive messages
+      has_interactive_data = data['interactiveData'].present? || data[:interactiveData].present?
+      has_interactive_data_ref = data['interactiveDataRef'].present? || data[:interactiveDataRef].present?
+      data['type'].present? || data[:type].present?
+
+      # If type is 'interactive' (or will default to it), we need interactiveData or interactiveDataRef
+      message_type = data['type'] || data[:type] || 'interactive'
+
+      if message_type == 'interactive' && !has_interactive_data && !has_interactive_data_ref
+        if skip_validation
+          # When skip_validation is true, only warn instead of raising error
+          Rails.logger.warn '[CustomPayload] WARNING: Payload missing interactiveData/interactiveDataRef - Apple will likely reject this'
+          Rails.logger.warn "[CustomPayload] Received keys: #{data.keys.inspect}"
+          Rails.logger.warn '[CustomPayload] Hint: Your payload should have an "interactiveData" object at the root level'
+        else
+          # When validation is enabled, raise error
+          Rails.logger.error '[CustomPayload] Payload validation failed: interactive messages require interactiveData or interactiveDataRef'
+          raise CustomExceptions::AppleMessages::InvalidPayload.new(
+            'Interactive messages require "interactiveData" or "interactiveDataRef" field',
+            details: {
+              received_keys: data.keys,
+              hint: 'Your payload should have an "interactiveData" object at the root level. Example: {"interactiveData": {"bid": "...", "data": {...}}}'
+            }
+          )
+        end
       end
 
       true

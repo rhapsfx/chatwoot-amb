@@ -101,7 +101,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   def build_rich_link_data
     content_attrs = @message.content_attributes
 
-    # Always scrape Open Graph data for rich links to get accurate title/description/image
+    # Always scrape Open Graph data for rich links to get accurate title/description/image/video
     # This ensures we use proper OpenGraph metadata instead of frontend fallback values
     url = content_attrs['url'] || @message.content
     Rails.logger.info "🔍 Rich Link - Attempting Open Graph scraping for: #{url}"
@@ -111,6 +111,7 @@ class AppleMessagesForBusiness::SendRichLinkService
       Rails.logger.info '✅ Rich Link - Open Graph scraping successful'
       Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
       Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
+      Rails.logger.info "🔍 Rich Link - Scraped video: #{og_data[:video_url]}"
       Rails.logger.info "🔍 Rich Link - Scraped description: #{og_data[:description]}"
 
       # Update content_attributes with scraped data
@@ -119,6 +120,8 @@ class AppleMessagesForBusiness::SendRichLinkService
       updates = {
         'title' => og_data[:title] || content_attrs['title'],
         'image_url' => og_data[:image_url] || content_attrs['image_url'],
+        'video_url' => og_data[:video_url] || content_attrs['video_url'],
+        'video_mime_type' => og_data[:video_mime_type] || content_attrs['video_mime_type'],
         'description' => og_data[:description] || content_attrs['description']
       }.compact
 
@@ -168,6 +171,13 @@ class AppleMessagesForBusiness::SendRichLinkService
     # PRIORITY 2: Build manual richLinkData with assets
     log_info '🔍 Rich Link - Building manual richLinkData with assets'
     url = content_attrs['url'] || @message.content
+
+    # Auto-detect direct video URLs (URLs ending with video extensions)
+    # If the primary URL is a video, use it as both the URL and video asset
+    if direct_video_url?(url)
+      Rails.logger.info "🔍 Rich Link - Direct video URL detected: #{url}"
+      content_attrs['video_url'] = url unless content_attrs['video_url'].present?
+    end
 
     {
       url: url,
@@ -243,10 +253,12 @@ class AppleMessagesForBusiness::SendRichLinkService
 
     # Add video asset if provided
     if content_attrs['video_url'].present?
+      Rails.logger.info "🔍 Rich Link - Adding video asset: #{content_attrs['video_url']}"
       assets[:video] = {
         url: content_attrs['video_url'],
-        mimeType: content_attrs['video_mime_type'] || 'video/mp4'
+        mimeType: content_attrs['video_mime_type'] || detect_video_mime_type(content_attrs['video_url'])
       }
+      Rails.logger.info "✅ Rich Link - Video asset added with mimeType: #{assets[:video][:mimeType]}"
     end
 
     assets
@@ -287,6 +299,32 @@ class AppleMessagesForBusiness::SendRichLinkService
       'image/x-icon'
     else
       'image/jpeg'
+    end
+  end
+
+  def detect_video_mime_type(video_url)
+    # Detect from URL extension
+    case video_url
+    when /\.mp4$/i
+      'video/mp4'
+    when /\.mov$/i
+      'video/quicktime'
+    when /\.m4v$/i
+      'video/x-m4v'
+    when /\.avi$/i
+      'video/x-msvideo'
+    when /\.wmv$/i
+      'video/x-ms-wmv'
+    when /\.flv$/i
+      'video/x-flv'
+    when /\.webm$/i
+      'video/webm'
+    when /\.mkv$/i
+      'video/x-matroska'
+    when /\.3gp$/i
+      'video/3gpp'
+    else
+      'video/mp4' # Default to mp4
     end
   end
 
@@ -351,6 +389,14 @@ class AppleMessagesForBusiness::SendRichLinkService
     uri.host&.gsub('www.', '')&.capitalize || 'Rich Link'
   rescue URI::InvalidURIError
     'Rich Link'
+  end
+
+  def direct_video_url?(url)
+    return false if url.blank?
+
+    # Check if URL ends with common video extensions
+    video_extensions = %w[.mp4 .mov .m4v .avi .wmv .flv .webm .mkv .3gp]
+    video_extensions.any? { |ext| url.downcase.end_with?(ext) }
   end
 
   def send_to_apple_gateway(payload, message_id)

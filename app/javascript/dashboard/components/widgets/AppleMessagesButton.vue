@@ -22,6 +22,11 @@ const isAppleMessagesChannel = computed(() => {
 });
 
 const handleSendAppleMessage = messageData => {
+  // eslint-disable-next-line no-console
+  console.log(
+    '[DEBUG AppleMessagesButton] Received messageData:',
+    JSON.parse(JSON.stringify(messageData))
+  );
   emit('sendAppleMessage', messageData);
   showAppleComposer.value = false;
 };
@@ -34,14 +39,14 @@ const toggleAppleComposer = () => {
 <template>
   <div v-if="isAppleMessagesChannel" class="relative">
     <NextButton
-      v-tooltip.top-end="'Apple Messages'"
+      v-tooltip.top-end="$t('APPLE_MESSAGES.BUTTON.TOOLTIP')"
       icon="i-ph-device-mobile"
       slate
       faded
       sm
       @click="toggleAppleComposer"
     >
-      Apple Messages
+      {{ $t('APPLE_MESSAGES.BUTTON.LABEL') }}
     </NextButton>
 
     <!-- Apple Messages Composer Modal - Direct Access -->
@@ -59,7 +64,7 @@ const toggleAppleComposer = () => {
           <h3
             class="text-lg font-semibold text-n-slate-12 dark:text-n-slate-11"
           >
-            Apple Messages for Business
+            {{ $t('APPLE_MESSAGES.MODAL.TITLE') }}
           </h3>
           <NextButton
             icon="i-ph-x"

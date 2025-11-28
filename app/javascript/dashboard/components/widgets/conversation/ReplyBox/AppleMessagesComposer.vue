@@ -22,7 +22,12 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['send', 'sendAppleMessage', 'cancel', 'saveAsTemplate']);
+const emit = defineEmits([
+  'send',
+  'sendAppleMessage',
+  'cancel',
+  'saveAsTemplate',
+]);
 
 console.log('[AMB] AppleMessagesComposer loading...');
 
@@ -92,11 +97,23 @@ const isSending = ref(false);
 const showErrorDetails = ref(false);
 
 // Auto-select first app when switching to iMessage Apps tab
-watch(activeTab, (newTab) => {
+watch(activeTab, newTab => {
   if (newTab === 'imessage_apps' && availableApps.value.length === 1) {
     selectedAppId.value = availableApps.value[0].id;
   }
 });
+
+// DEBUG: Watch for changes to listPickerData.sections
+watch(
+  () => listPickerData.value.sections,
+  (newSections, oldSections) => {
+    console.log('[DEBUG] listPickerData.sections changed:', {
+      newSections: JSON.parse(JSON.stringify(newSections)),
+      oldSections: oldSections ? JSON.parse(JSON.stringify(oldSections)) : null,
+    });
+  },
+  { deep: true }
+);
 
 // Computed properties
 const availableApps = computed(() => {
@@ -152,25 +169,33 @@ const jsonValidationError = computed(() => {
 
 const previewPayload = computed(() => {
   if (!isValidJson.value) {
-    return JSON.stringify({
-      v: 1,
-      id: '<generated-on-send>',
-      sourceId: '<your-business-id>',
-      destinationId: '<contact-id>',
-      // Your custom payload will appear here after parsing
-    }, null, 2);
+    return JSON.stringify(
+      {
+        v: 1,
+        id: '<generated-on-send>',
+        sourceId: '<your-business-id>',
+        destinationId: '<contact-id>',
+        // Your custom payload will appear here after parsing
+      },
+      null,
+      2
+    );
   }
 
   try {
     const parsed = JSON.parse(customPayloadData.value.payload);
 
-    return JSON.stringify({
-      v: 1,
-      id: '<generated-on-send>',
-      sourceId: '<your-business-id>',
-      destinationId: '<contact-id>',
-      ...parsed
-    }, null, 2);
+    return JSON.stringify(
+      {
+        v: 1,
+        id: '<generated-on-send>',
+        sourceId: '<your-business-id>',
+        destinationId: '<contact-id>',
+        ...parsed,
+      },
+      null,
+      2
+    );
   } catch {
     return '{}';
   }
@@ -581,9 +606,21 @@ const listPickerData = ref({
       title: 'Options',
       multipleSelection: false,
       items: [
-        { identifier: 'option_1', title: 'Option 1', subtitle: 'Description 1' },
-        { identifier: 'option_2', title: 'Option 2', subtitle: 'Description 2' },
-        { identifier: 'option_3', title: 'Option 3', subtitle: 'Description 3' },
+        {
+          identifier: 'option_1',
+          title: 'Option 1',
+          subtitle: 'Description 1',
+        },
+        {
+          identifier: 'option_2',
+          title: 'Option 2',
+          subtitle: 'Description 2',
+        },
+        {
+          identifier: 'option_3',
+          title: 'Option 3',
+          subtitle: 'Description 3',
+        },
       ],
     },
   ],
@@ -987,17 +1024,58 @@ const sendAppleMessage = () => {
       // Prepare content_attributes with images if they exist
       content_attributes = { ...listPickerData.value };
 
+      // DEBUG: Log sections before conversion
+      console.log(
+        '[DEBUG] listPickerData.value.sections BEFORE conversion:',
+        JSON.parse(JSON.stringify(listPickerData.value.sections))
+      );
+
       // Transform sections to use snake_case for backend
       content_attributes.sections = listPickerData.value.sections.map(
-        section => ({
-          title: section.title,
-          multiple_selection: section.multipleSelection || false,
-          items: section.items.map(item => ({
-            title: item.title,
-            subtitle: item.subtitle,
-            image_identifier: item.image_identifier,
-          })),
-        })
+        section => {
+          console.log('[DEBUG] Processing section:', {
+            title: section.title,
+            multipleSelection_value: section.multipleSelection,
+            multipleSelection_type: typeof section.multipleSelection,
+            section_keys: Object.keys(section),
+          });
+
+          const result = {
+            title: section.title,
+            multiple_selection: section.multipleSelection ?? false, // Use nullish coalescing
+            items: section.items.map(item => ({
+              title: item.title,
+              subtitle: item.subtitle,
+              image_identifier: item.image_identifier,
+            })),
+          };
+
+          // Determine the reason for multiple_selection value
+          let multipleSelectionReason = 'other';
+          if (section.multipleSelection === undefined) {
+            multipleSelectionReason = 'undefined->false';
+          } else if (section.multipleSelection === null) {
+            multipleSelectionReason = 'null->false';
+          } else if (section.multipleSelection === false) {
+            multipleSelectionReason = 'explicitly false';
+          } else if (section.multipleSelection === true) {
+            multipleSelectionReason = 'explicitly true';
+          }
+
+          console.log('[DEBUG] Converted section:', {
+            title: result.title,
+            multiple_selection: result.multiple_selection,
+            reason: multipleSelectionReason,
+          });
+
+          return result;
+        }
+      );
+
+      // DEBUG: Log sections after conversion
+      console.log(
+        '[DEBUG] content_attributes.sections AFTER conversion:',
+        JSON.parse(JSON.stringify(content_attributes.sections))
       );
 
       // Debug: log items with image_identifier
@@ -1055,31 +1133,40 @@ const sendAppleMessage = () => {
         timeslotsLength: timePickerData.value.event.timeslots?.length || 0,
         // Check if slots have startTime
         firstSlot: timePickerData.value.event.timeslots?.[0],
-        firstSlotHasStartTime: timePickerData.value.event.timeslots?.[0]?.startTime !== undefined,
-        firstSlotHasStartTimeSnake: timePickerData.value.event.timeslots?.[0]?.start_time !== undefined,
+        firstSlotHasStartTime:
+          timePickerData.value.event.timeslots?.[0]?.startTime !== undefined,
+        firstSlotHasStartTimeSnake:
+          timePickerData.value.event.timeslots?.[0]?.start_time !== undefined,
       });
 
       // Validate that slots are selected
-      if (!timePickerData.value.event.timeslots || timePickerData.value.event.timeslots.length === 0) {
-        alert('Please select at least one time slot before sending. Click on the time slots in the calendar to select them.');
+      if (
+        !timePickerData.value.event.timeslots ||
+        timePickerData.value.event.timeslots.length === 0
+      ) {
+        alert(
+          'Please select at least one time slot before sending. Click on the time slots in the calendar to select them.'
+        );
         return;
       }
 
       // Transform timeslots to snake_case (similar to list picker transformation)
-      const transformedTimeslots = timePickerData.value.event.timeslots.map(slot => {
-        const startTime = slot.startTime || slot.start_time;
+      const transformedTimeslots = timePickerData.value.event.timeslots.map(
+        slot => {
+          const startTime = slot.startTime || slot.start_time;
 
-        // Log warning if startTime is missing
-        if (!startTime) {
-          console.warn('[AMB TimePicker] Slot missing startTime:', slot);
+          // Log warning if startTime is missing
+          if (!startTime) {
+            console.warn('[AMB TimePicker] Slot missing startTime:', slot);
+          }
+
+          return {
+            identifier: slot.identifier,
+            start_time: startTime,
+            duration: slot.duration,
+          };
         }
-
-        return {
-          identifier: slot.identifier,
-          start_time: startTime,
-          duration: slot.duration
-        };
-      });
+      );
 
       console.log('[AMB TimePicker] Transformation result:', {
         originalSlots: timePickerData.value.event.timeslots,
@@ -1092,7 +1179,7 @@ const sendAppleMessage = () => {
       content_attributes = {
         event: {
           ...timePickerData.value.event,
-          timeslots: transformedTimeslots  // Use transformed timeslots
+          timeslots: transformedTimeslots, // Use transformed timeslots
         },
         timezone_offset: timePickerData.value.timezone_offset,
         received_title: timePickerData.value.received_title,
@@ -1170,6 +1257,18 @@ const sendAppleMessage = () => {
       break;
   }
 
+  console.log('[DEBUG AppleMessagesComposer] About to emit - full payload:', {
+    content_type,
+    sections: JSON.parse(JSON.stringify(content_attributes.sections)),
+    content_attributes_full: JSON.parse(JSON.stringify(content_attributes)),
+  });
+  console.log(
+    '[DEBUG AppleMessagesComposer] CRITICAL - multiple_selection values:',
+    content_attributes.sections
+      .map((s, i) => `Section ${i}: ${s.multiple_selection}`)
+      .join(', ')
+  );
+
   emit('send', {
     content_type,
     content_attributes,
@@ -1203,7 +1302,7 @@ const saveAsTemplate = () => {
       console.log('[AMB Templates] Saving template with timeslots:', {
         selectedSlotsCount: globalSelectedSlots.value.size,
         timeslotsInData: messageData.event?.timeslots?.length || 0,
-        timeslots: messageData.event?.timeslots
+        timeslots: messageData.event?.timeslots,
       });
       break;
     default:
@@ -1248,11 +1347,11 @@ const openFormBuilder = () => {
 
 const handleFormCreated = formData => {
   console.log('[AMB Form] Form created with data:', formData);
-  
+
   // Emit both events to ensure proper handling
   emit('send', formData);
   emit('sendAppleMessage', formData);
-  
+
   showFormBuilder.value = false;
 };
 
@@ -1320,7 +1419,7 @@ const handleFormImageUpload = async imageData => {
     const response = await AppleMessagesImagesAPI.create({
       inboxId,
       identifier: imageData.identifier,
-      image_data: imageData.data,  // Changed from imageData to image_data
+      image_data: imageData.data, // Changed from imageData to image_data
       description: imageData.description || imageData.originalName,
       original_name: imageData.originalName,
       filename: imageData.originalName,
@@ -1337,7 +1436,10 @@ const handleFormImageUpload = async imageData => {
         preview: imageData.preview, // Use the preview from upload
       });
 
-      console.log('[AppleFormBuilder] Image saved successfully:', newImage.identifier);
+      console.log(
+        '[AppleFormBuilder] Image saved successfully:',
+        newImage.identifier
+      );
     }
   } catch (error) {
     console.error('Failed to save image:', error);
@@ -1401,12 +1503,17 @@ const handleTemplateSelect = async item => {
 
     try {
       // Call the render API to get the formatted message
-      const inboxChannelType = props.conversation?.inbox?.channel_type || 'Channel::AppleMessagesForBusiness';
+      const inboxChannelType =
+        props.conversation?.inbox?.channel_type ||
+        'Channel::AppleMessagesForBusiness';
       console.log('[AMB Templates] Channel type:', inboxChannelType);
 
       // Generate sample parameters for time picker templates
       let parameters = {};
-      if (template.category === 'scheduling' || template.name.includes('time_picker')) {
+      if (
+        template.category === 'scheduling' ||
+        template.name.includes('time_picker')
+      ) {
         // Generate 3 sample time slots starting from tomorrow at 9 AM
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1415,14 +1522,14 @@ const handleTemplateSelect = async item => {
         parameters.available_slots = [
           new Date(tomorrow.getTime()).toISOString(),
           new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(), // +2 hours
-          new Date(tomorrow.getTime() + 4 * 60 * 60 * 1000).toISOString()  // +4 hours
+          new Date(tomorrow.getTime() + 4 * 60 * 60 * 1000).toISOString(), // +4 hours
         ];
       }
 
       const response = await store.dispatch('messageTemplates/render', {
         templateId: template.id,
         parameters: parameters,
-        channelType: inboxChannelType
+        channelType: inboxChannelType,
       });
 
       console.log('[AMB Templates] Rendered template response:', response);
@@ -1431,17 +1538,28 @@ const handleTemplateSelect = async item => {
       const renderedData = response.data || response;
 
       // Send the rendered message
-      if (renderedData && renderedData.content_type && renderedData.content_attributes) {
+      if (
+        renderedData &&
+        renderedData.content_type &&
+        renderedData.content_attributes
+      ) {
         const messageData = {
           content_type: renderedData.content_type,
           content_attributes: renderedData.content_attributes,
           content: renderedData.content,
           // Include template_id so backend can attach template files
-          template_id: template.id
+          template_id: template.id,
         };
 
-        console.log('[AMB Templates] Emitting sendAppleMessage event with:', messageData);
-        console.log('[AMB Templates] Template has', renderedData.attachments?.length || 0, 'attachments');
+        console.log(
+          '[AMB Templates] Emitting sendAppleMessage event with:',
+          messageData
+        );
+        console.log(
+          '[AMB Templates] Template has',
+          renderedData.attachments?.length || 0,
+          'attachments'
+        );
 
         emit('send', messageData);
         emit('sendAppleMessage', messageData);
@@ -1451,7 +1569,8 @@ const handleTemplateSelect = async item => {
       }
     } catch (error) {
       console.error('[AMB Templates] Error rendering template:', error);
-      const errorMessage = error.response?.data?.details || error.message || 'Unknown error';
+      const errorMessage =
+        error.response?.data?.details || error.message || 'Unknown error';
       alert(`Error loading template: ${errorMessage}`);
     }
   }
@@ -1461,12 +1580,18 @@ const handleTemplateSelect = async item => {
 
 // Register global handler immediately after definition
 window.handleAppleTemplateSelect = handleTemplateSelect;
-console.log('[AMB Templates] Registered global template handler:', typeof handleTemplateSelect);
+console.log(
+  '[AMB Templates] Registered global template handler:',
+  typeof handleTemplateSelect
+);
 
 // Watch for template selection from store (fallback for event propagation issues)
 const selectedTemplateFromStore = computed(() => {
   const value = store.getters['messageTemplates/getSelectedTemplate'];
-  console.log('[AMB Templates] Computed selectedTemplateFromStore evaluated:', value);
+  console.log(
+    '[AMB Templates] Computed selectedTemplateFromStore evaluated:',
+    value
+  );
   return value;
 });
 
@@ -1475,9 +1600,17 @@ console.log('[AMB Templates] Setting up watcher for selectedTemplateFromStore');
 watch(
   selectedTemplateFromStore,
   async (newValue, oldValue) => {
-    console.log('[AMB Templates] Watcher triggered! Old:', oldValue, 'New:', newValue);
+    console.log(
+      '[AMB Templates] Watcher triggered! Old:',
+      oldValue,
+      'New:',
+      newValue
+    );
     if (newValue && newValue.type === 'template') {
-      console.log('[AMB Templates] Store watcher detected template selection:', newValue);
+      console.log(
+        '[AMB Templates] Store watcher detected template selection:',
+        newValue
+      );
       await handleTemplateSelect(newValue);
       // Clear the selection after handling
       store.commit('messageTemplates/SET_SELECTED_TEMPLATE', null);
@@ -1518,7 +1651,9 @@ const loadTemplateIntoComposer = template => {
       break;
     case 'form':
       // Forms need to go through the form builder
-      console.log('[AMB Templates] Form templates not yet supported via selector');
+      console.log(
+        '[AMB Templates] Form templates not yet supported via selector'
+      );
       break;
     default:
       console.warn('[AMB Templates] Unknown block type:', blockType);
@@ -1529,7 +1664,8 @@ const loadQuickReplyTemplate = block => {
   const config = block.blockConfig || block.block_config || {};
 
   quickReplyData.value = {
-    summary_text: config.summaryText || config.summary_text || 'Quick Reply Question',
+    summary_text:
+      config.summaryText || config.summary_text || 'Quick Reply Question',
     items: (config.items || []).map(item => ({
       title: item.title || item.label || 'Reply',
     })),
@@ -1545,9 +1681,12 @@ const loadListPickerTemplate = block => {
   const sections = config.sections || [];
   listPickerData.value.sections = sections.map(section => ({
     title: section.title || 'Section',
-    multipleSelection: section.multipleSelection || section.multiple_selection || false,
+    multipleSelection:
+      section.multipleSelection || section.multiple_selection || false,
     items: (section.items || []).map(item => ({
-      identifier: item.identifier || `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      identifier:
+        item.identifier ||
+        `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: item.title || '',
       subtitle: item.subtitle || '',
       image_identifier: item.imageIdentifier || item.image_identifier || '',
@@ -1567,9 +1706,11 @@ const loadListPickerTemplate = block => {
   }
 
   // Load received message config - backend always returns snake_case via TemplateFacade
-  listPickerData.value.received_title = config.received_title || 'Please select an option';
+  listPickerData.value.received_title =
+    config.received_title || 'Please select an option';
   listPickerData.value.received_subtitle = config.received_subtitle || '';
-  listPickerData.value.received_image_identifier = config.received_image_identifier || '';
+  listPickerData.value.received_image_identifier =
+    config.received_image_identifier || '';
   listPickerData.value.received_style = config.received_style || 'icon';
 
   // Load reply message config
@@ -1578,8 +1719,10 @@ const loadListPickerTemplate = block => {
   listPickerData.value.reply_style = config.reply_style || 'icon';
   listPickerData.value.reply_image_title = config.reply_image_title || '';
   listPickerData.value.reply_image_subtitle = config.reply_image_subtitle || '';
-  listPickerData.value.reply_secondary_subtitle = config.reply_secondary_subtitle || '';
-  listPickerData.value.reply_tertiary_subtitle = config.reply_tertiary_subtitle || '';
+  listPickerData.value.reply_secondary_subtitle =
+    config.reply_secondary_subtitle || '';
+  listPickerData.value.reply_tertiary_subtitle =
+    config.reply_tertiary_subtitle || '';
 
   console.log('[AMB Templates] Loaded list picker:', listPickerData.value);
 };
@@ -1590,7 +1733,10 @@ const loadTimePickerTemplate = block => {
   // Load event details - backend always returns snake_case via TemplateFacade
   timePickerData.value.event = {
     title: config.event_title || config.event?.title || 'Schedule Appointment',
-    description: config.event_description || config.event?.description || 'Select a time slot',
+    description:
+      config.event_description ||
+      config.event?.description ||
+      'Select a time slot',
     timeslots: config.timeslots || config.event?.timeslots || [],
   };
 
@@ -1598,20 +1744,26 @@ const loadTimePickerTemplate = block => {
   timePickerData.value.timezone_offset = config.timezone_offset || -480;
 
   // Load received message config
-  timePickerData.value.received_title = config.received_title || 'Please pick a time';
-  timePickerData.value.received_subtitle = config.received_subtitle || 'Select your preferred time slot';
-  timePickerData.value.receivedImageIdentifier = config.received_image_identifier || '';
+  timePickerData.value.received_title =
+    config.received_title || 'Please pick a time';
+  timePickerData.value.received_subtitle =
+    config.received_subtitle || 'Select your preferred time slot';
+  timePickerData.value.receivedImageIdentifier =
+    config.received_image_identifier || '';
   timePickerData.value.received_style = config.received_style || 'icon';
 
   // Load reply message config
   timePickerData.value.reply_title = config.reply_title || 'Thank you!';
   timePickerData.value.reply_subtitle = config.reply_subtitle || '';
-  timePickerData.value.replyImageIdentifier = config.reply_image_identifier || '';
+  timePickerData.value.replyImageIdentifier =
+    config.reply_image_identifier || '';
   timePickerData.value.reply_style = config.reply_style || 'icon';
   timePickerData.value.reply_image_title = config.reply_image_title || '';
   timePickerData.value.reply_image_subtitle = config.reply_image_subtitle || '';
-  timePickerData.value.reply_secondary_subtitle = config.reply_secondary_subtitle || '';
-  timePickerData.value.reply_tertiary_subtitle = config.reply_tertiary_subtitle || '';
+  timePickerData.value.reply_secondary_subtitle =
+    config.reply_secondary_subtitle || '';
+  timePickerData.value.reply_tertiary_subtitle =
+    config.reply_tertiary_subtitle || '';
 
   // Load images if present
   if (config.images && Array.isArray(config.images)) {
@@ -1671,7 +1823,9 @@ const loadPaymentTemplate = templateType => {
       merchantName: 'European Shop',
       currencyCode: 'EUR',
       countryCode: 'DE',
-      lineItems: [{ label: 'Premium Product', amount: '149.99', type: 'final' }],
+      lineItems: [
+        { label: 'Premium Product', amount: '149.99', type: 'final' },
+      ],
       total: { label: 'Total', amount: '149.99', type: 'final' },
       requiresShipping: false,
       requiresBilling: true,
@@ -1704,7 +1858,7 @@ const validateCustomPayload = () => {
   }
 };
 
-const getErrorTitle = (errorType) => {
+const getErrorTitle = errorType => {
   const titles = {
     validation: 'JSON Validation Error',
     send_error: 'Failed to Send Message',
@@ -1713,44 +1867,44 @@ const getErrorTitle = (errorType) => {
     rate_limit: 'Rate Limit Exceeded',
     permission_error: 'Permission Denied',
     network_error: 'Network Error',
-    warning: 'Warning'
+    warning: 'Warning',
   };
   return titles[errorType] || 'Error';
 };
 
-const getSuggestionsForError = (error) => {
+const getSuggestionsForError = error => {
   const suggestions = {
     validation: [
       'Check your JSON syntax for missing commas, brackets, or quotes',
       'Use a JSON validator tool to identify the exact issue',
-      'Enable "Allow experimental payloads" to bypass validation (not recommended)'
+      'Enable "Allow experimental payloads" to bypass validation (not recommended)',
     ],
     apple_error: [
       'Verify your payload matches Apple MSP Gateway requirements',
       'Check that all required fields are present and correctly formatted',
-      'Review Apple Business Chat documentation for the message type you\'re sending',
-      'Try sending a simpler payload to isolate the issue'
+      "Review Apple Business Chat documentation for the message type you're sending",
+      'Try sending a simpler payload to isolate the issue',
     ],
     send_error: [
       'Verify the conversation is active and the contact is reachable',
       'Check your network connection',
       'Try again in a few moments',
-      'Contact support if the issue persists'
+      'Contact support if the issue persists',
     ],
     payload_too_large: [
-      'Reduce the size of your payload (current limit: 100KB)',
+      'Reduce the size of your payload (current limit: 10MB)',
       'Compress or optimize any embedded data',
-      'Consider splitting into multiple messages'
+      'Consider splitting into multiple messages',
     ],
     rate_limit: [
       'Wait a few minutes before sending more custom payloads',
-      'Current limit: 100 payloads per hour per account'
-    ]
+      'Current limit: 100 payloads per hour per account',
+    ],
   };
   return suggestions[error.type] || [];
 };
 
-const enhanceError = (error) => {
+const enhanceError = error => {
   error.suggestions = getSuggestionsForError(error);
   return error;
 };
@@ -1764,7 +1918,7 @@ const sendCustomPayload = async () => {
     sendError.value = enhanceError({
       type: 'validation',
       message: 'Please fix JSON errors before sending',
-      details: jsonValidationError.value
+      details: jsonValidationError.value,
     });
     return;
   }
@@ -1803,21 +1957,21 @@ const sendCustomPayload = async () => {
         type: errorData.error_type || 'send_error',
         message: errorData.message || 'Failed to send custom payload',
         details: errorData.details || null,
-        appleError: errorData.apple_error || null
+        appleError: errorData.apple_error || null,
       });
     } else if (error.request) {
       // Request was made but no response received
       sendError.value = enhanceError({
         type: 'network_error',
         message: 'No response from server. Please check your connection.',
-        details: 'Network timeout or server unreachable'
+        details: 'Network timeout or server unreachable',
       });
     } else {
       // Something else went wrong
       sendError.value = enhanceError({
         type: 'send_error',
         message: error.message || 'An unexpected error occurred',
-        details: error.toString()
+        details: error.toString(),
       });
     }
 
@@ -1828,12 +1982,14 @@ const sendCustomPayload = async () => {
 };
 
 // Clear send error when user modifies payload
-watch(() => customPayloadData.value.payload, () => {
-  if (sendError.value) {
-    sendError.value = null;
+watch(
+  () => customPayloadData.value.payload,
+  () => {
+    if (sendError.value) {
+      sendError.value = null;
+    }
   }
-});
-
+);
 </script>
 
 <!-- eslint-disable vue/no-bare-strings-in-template -->
@@ -2168,6 +2324,14 @@ watch(() => customPayloadData.value.payload, () => {
               v-model="section.multipleSelection"
               type="checkbox"
               class="w-4 h-4 text-n-blue-9 bg-n-solid-1 border-n-weak rounded focus:ring-n-blue-8 dark:focus:ring-n-blue-9 dark:ring-offset-n-alpha-1 focus:ring-2 dark:bg-n-alpha-2 dark:border-n-alpha-6"
+              @change="
+                console.log(
+                  `[DEBUG] Checkbox changed for section ${sectionIndex}:`,
+                  section.multipleSelection,
+                  'Section object:',
+                  section
+                )
+              "
             />
             <label
               :for="`multipleSelection-${sectionIndex}`"
@@ -3476,17 +3640,19 @@ watch(() => customPayloadData.value.payload, () => {
             <!-- Error Header -->
             <div class="flex items-start space-x-3">
               <div class="flex-shrink-0">
-                <span v-if="sendError.type === 'validation'"
-class="text-2xl"
-                  >❌</span>
+                <span v-if="sendError.type === 'validation'" class="text-2xl">
+                  ❌
+                </span>
                 <span
                   v-else-if="sendError.type === 'send_error'"
                   class="text-2xl"
-                  >⚠️</span>
+                  >⚠️</span
+                >
                 <span
                   v-else-if="sendError.type === 'apple_error'"
                   class="text-2xl"
-                  >🚫</span>
+                  >🚫</span
+                >
                 <span v-else class="text-2xl">⚠️</span>
               </div>
 
@@ -3535,7 +3701,8 @@ class="text-2xl"
                   <pre
                     v-if="showErrorDetails"
                     class="mt-2 p-3 bg-white dark:bg-n-slate-1 rounded text-xs font-mono overflow-auto max-h-40 border border-red-200 dark:border-red-800"
-                    >{{ sendError.details }}</pre>
+                    >{{ sendError.details }}</pre
+                  >
                 </div>
 
                 <!-- Apple MSP Error (if present) -->
@@ -3566,7 +3733,8 @@ class="text-2xl"
                     </summary>
                     <pre
                       class="mt-2 p-2 bg-white dark:bg-n-slate-1 rounded text-xs font-mono overflow-auto max-h-32 border border-red-200 dark:border-red-800"
-                      >{{ sendError.appleError.body }}</pre>
+                      >{{ sendError.appleError.body }}</pre
+                    >
                   </details>
                 </div>
 
@@ -3701,7 +3869,8 @@ class="text-2xl"
 
             <pre
               class="font-mono text-xs bg-n-slate-1 dark:bg-n-alpha-2 p-4 rounded-lg overflow-auto max-h-96 text-n-slate-12 dark:text-n-slate-11"
-              >{{ previewPayload }}</pre>
+              >{{ previewPayload }}</pre
+            >
           </div>
 
           <div

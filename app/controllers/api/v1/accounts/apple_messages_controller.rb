@@ -17,6 +17,8 @@ class Api::V1::Accounts::AppleMessagesController < Api::V1::Accounts::BaseContro
           title: result[:title],
           description: result[:description],
           image_url: result[:image_url],
+          video_url: result[:video_url],
+          video_mime_type: result[:video_mime_type],
           favicon_url: result[:favicon_url],
           site_name: result[:site_name]
         }

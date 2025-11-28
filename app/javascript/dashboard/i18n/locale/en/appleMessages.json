@@ -2,6 +2,13 @@
   "APPLE_MESSAGES": {
     "IMAGE_INDICATOR": "[Image #1]",
     "LOADING_APP": "Loading app...",
+    "BUTTON": {
+      "TOOLTIP": "Apple Messages",
+      "LABEL": "Apple Messages"
+    },
+    "MODAL": {
+      "TITLE": "Apple Messages for Business"
+    },
     "CUSTOM_APP_BUBBLE": {
       "LOADING": "Loading app info..."
     },
@@ -159,7 +166,7 @@
             "4": "Contact support if the issue persists"
           },
           "PAYLOAD_TOO_LARGE": {
-            "1": "Reduce the size of your payload (current limit: 100KB)",
+            "1": "Reduce the size of your payload (current limit: 10MB)",
             "2": "Compress or optimize any embedded data",
             "3": "Consider splitting into multiple messages"
           },
