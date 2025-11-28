@@ -132,8 +132,17 @@ class AppleMessagesForBusiness::OpenGraphParserService
       'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15'
     }
 
-    html = URI.open(@url, headers).read
-    Nokogiri::HTML(html)
+    # Use HTTParty to follow redirects and capture final URL
+    response = HTTParty.get(@url, headers: headers, follow_redirects: true, timeout: 15)
+
+    # Capture the final URL after following redirects
+    # This is important for Apple Maps short URLs that redirect to full URLs
+    if response.request.respond_to?(:last_uri)
+      @final_url = response.request.last_uri.to_s
+      Rails.logger.info "🔍 OpenGraph - URL redirected from #{@url} to #{@final_url}" if @final_url != @url
+    end
+
+    Nokogiri::HTML(response.body)
   end
 
   def extract_open_graph_data(doc)
@@ -145,7 +154,7 @@ class AppleMessagesForBusiness::OpenGraphParserService
       video_url: extract_video_url(doc),
       video_mime_type: extract_video_mime_type(doc),
       favicon_url: extract_favicon_url(doc),
-      url: @url,
+      url: @final_url || @url, # Use final URL after redirects if available, fallback to original
       site_name: extract_site_name(doc)
     }
   end
@@ -281,7 +290,9 @@ class AppleMessagesForBusiness::OpenGraphParserService
   def make_absolute_url(url)
     return url if url.blank? || url.start_with?('http')
 
-    uri = URI.parse(@url)
+    # Use final URL after redirects for base URL, fallback to original
+    base = @final_url || @url
+    uri = URI.parse(base)
     base_url = "#{uri.scheme}://#{uri.host}"
     base_url += ":#{uri.port}" if uri.port != 80 && uri.port != 443
 
@@ -297,7 +308,9 @@ class AppleMessagesForBusiness::OpenGraphParserService
   end
 
   def extract_domain_name
-    uri = URI.parse(@url)
+    # Use final URL after redirects for domain extraction, fallback to original
+    base = @final_url || @url
+    uri = URI.parse(base)
     uri.host&.gsub('www.', '')&.capitalize
   rescue URI::InvalidURIError
     'Website'
@@ -320,10 +333,12 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
   # Attempt to get favicon when page parsing fails
   def try_default_favicon
-    return nil if @url.blank?
+    # Use final URL if available, fallback to original
+    base = @final_url || @url
+    return nil if base.blank?
 
     begin
-      uri = URI.parse(@url)
+      uri = URI.parse(base)
 
       # Check for well-known domain favicon mappings first
       known_favicon = get_known_domain_favicon(uri.host)
