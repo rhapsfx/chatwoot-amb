@@ -712,6 +712,60 @@ Claude Code runs in a macOS sandbox that **ALWAYS BLOCKS** direct database conne
 
 **Remember**: The sandbox restriction is PERMANENT and CANNOT be bypassed. Always work through Rails.
 
+## Rails Command Execution Policy - CRITICAL
+
+**🚨 ABSOLUTE RULE: NEVER run Rails commands directly without explicit user approval**
+
+Rails commands can modify database state, trigger side effects, or perform operations that the user should review first.
+
+**✅ ALWAYS follow this workflow**:
+
+1. **For simple Rails commands** - Provide the command to the user:
+   ```bash
+   # Example: Tell the user to run
+   rails runner "puts Message.where(message_type: :incoming).count"
+   ```
+
+2. **For complex Rails operations** - Create a script file and provide instructions:
+   ```ruby
+   # Create script/analyze_custom_payload.rb with the logic
+   # Then tell the user: "Please run: rails runner script/analyze_custom_payload.rb"
+   ```
+
+3. **For multi-step operations** - Create a documented script:
+   ```ruby
+   # script/migrate_data.rb
+   # Purpose: Migrate old format to new format
+   # Usage: rails runner script/migrate_data.rb [--dry-run]
+
+   # [Script implementation here]
+   ```
+
+**Exceptions (require user context/approval)**:
+- ✅ Read-only queries that were explicitly requested
+- ✅ Running tests (`bundle exec rspec`)
+- ✅ Linting/formatting commands
+- ✅ Log file inspection
+
+**❌ NEVER run without approval**:
+- Database modifications (`rails runner "Model.update_all(...)"`)
+- Data migrations or transformations
+- Service calls that trigger external APIs
+- Any operation with side effects
+
+**Why This Rule**:
+- User maintains control over database changes
+- Scripts can be reviewed before execution
+- Operations can be run with appropriate timing
+- User can verify preconditions are met
+- Enables dry-run testing
+
+**Best Practice**:
+```
+❌ BAD: Directly run rails runner "complex operation"
+✅ GOOD: Create script/operation.rb and say "Please run: rails runner script/operation.rb"
+```
+
 ## Deployment Scripts
 
 - **NEVER run deployment scripts through Claude Code** - SSH and rsync are blocked by sandbox
