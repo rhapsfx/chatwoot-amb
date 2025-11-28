@@ -25,10 +25,11 @@ module ParameterFilterHelper
 
   def self.truncate(_key, value)
     size_kb = (value.length / 1024.0).round(2)
-    preview_length = 100
+    # Reduced preview length from 100 to 20 to minimize log spam
+    preview_length = 20
 
     if value.match?(%r{\A[A-Za-z0-9+/]+=*\z})
-      "[BASE64 DATA FILTERED - #{size_kb} KB - preview: #{value[0...preview_length]}...]"
+      "[BASE64 DATA FILTERED - #{size_kb} KB]"
     else
       "[LARGE DATA FILTERED - #{size_kb} KB - preview: #{value[0...preview_length]}...]"
     end

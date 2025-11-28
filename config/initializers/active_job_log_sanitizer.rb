@@ -81,15 +81,24 @@ module RailsLoggerJobSuppressor
 
     # Pattern 2: Parameters with base64 data (more aggressive)
     # This handles cases like: "data"=>"[BASE64 DATA FILTERED - 499.32 KB - preview: iVBORw0K...]"
-    if message.include?('Parameters:') || message.include?('"data"=>')
-      # Remove long base64 strings (anything that looks like base64 data > 100 chars)
-      message = message.gsub(/("data"=>"[^"]{100,}")/, '"data"=>"[BASE64 TRUNCATED]"')
+    if message.include?('Parameters:') || message.include?('"data"=>') || message.include?('Custom Apple Messages payload')
+      # First, handle already filtered base64 with preview - clean it up
+      # This must come BEFORE the general base64 truncation to preserve the marker
+      message = message.gsub(/\[BASE64 DATA FILTERED - [\d.]+ [KMG]B - preview: [^\]]+\]/, '[BASE64 DATA FILTERED]')
+      message = message.gsub(/("data"=>")\[BASE64 DATA FILTERED[^\]]+\]"/, '\1[BASE64 DATA FILTERED]"')
+
+      # Then remove long base64 strings (anything that looks like base64 data > 100 chars)
+      # Skip if already marked as [BASE64 DATA FILTERED]
+      message = message.gsub(/("data"=>"(?!\[BASE64 DATA FILTERED\])[^"]{100,}")/, '"data"=>"[BASE64 TRUNCATED]"')
 
       # Also handle the preview field with base64
       message = message.gsub(%r{("preview"=>"data:image/[^;]+;base64,[^"]{50,}")}, '"preview"=>"[BASE64 IMAGE]"')
 
-      # Handle already filtered base64 with preview
-      message = message.gsub(/\[BASE64 DATA FILTERED - [\d.]+ [KMG]B - preview: [^\]]{50,}\]/, '[BASE64 DATA FILTERED]')
+      # For Custom Apple Messages payload specifically, aggressively filter content_attributes
+      if message.include?('Custom Apple Messages payload')
+        # Replace entire content_attributes hash with summary when it's too large
+        message = message.gsub(/"content_attributes"=>\{[^}]{500,}\}/, '"content_attributes"=>{...TRUNCATED...}')
+      end
     end
 
     message
