@@ -5,29 +5,55 @@ import ConstructPayloadAPI from '../api/appleMessages/constructPayload';
 import ParseUrlAPI from '../api/appleMessages/parseUrl';
 
 // Enhanced URL regex that detects URLs with and without protocol
-// More permissive path matching to handle complex URLs with special characters
+// Supports multi-level domains (e.g., maps.apple.com) and complex paths with query params
+// Path matching includes all RFC 3986 URL-safe characters: unreserved + reserved + percent-encoding
 export const URL_REGEX =
-  /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s<>"{}|\\^`[\]]+)?/gi;
+  /(?:https?:\/\/)?(?:www\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[a-zA-Z0-9\-._~:/?#@!$&'()*+,;=%]+)?/gi;
 
 // Preprocess text to join URLs split across lines
 // This handles cases where users copy-paste URLs that get line-wrapped
 export const preprocessTextForURLDetection = text => {
   if (!text || typeof text !== 'string') return text;
 
-  // First pass: Join URL parts that are split across lines
+  // Remove all line breaks and extra whitespace within URLs
+  // This aggressively joins any URL fragments
+  let processed = text;
+
+  // First pass: Join URL parts split mid-domain (e.g., "maps.apple" + ".com/path")
+  // This handles cases where the TLD is separated from the domain name
+  processed = processed.replace(
+    /(https?:\/\/[a-zA-Z0-9-]+)([\s\n]+)(\.[a-zA-Z]{2,}[^\s]*)/g,
+    '$1$3'
+  );
+
+  // Second pass: Join protocol/domain with path on next line
+  // Example: "https://maps.apple.com" + "\n/place?..." -> "https://maps.apple.com/place?..."
+  processed = processed.replace(
+    /(https?:\/\/[a-zA-Z0-9-]+\.[a-zA-Z]{2,})([\s\n]+)(\/[^\s]*)/g,
+    '$1$3'
+  );
+
+  // Third pass: Join URL fragments that start with query params or path segments
+  // Example: "https://example.com" + "\n?param=value" -> "https://example.com?param=value"
+  processed = processed.replace(
+    /(https?:\/\/[^\s]+)([\s\n]+)([?&/][^\s]*)/g,
+    '$1$3'
+  );
+
+  // Fourth pass: Join any remaining URL-like fragments
   // Pattern: URL-like text followed by whitespace followed by URL continuation
-  let processed = text.replace(
-    /(https?:\/\/[^\s]+)\s+([a-zA-Z0-9/_.-]+)/g,
+  processed = processed.replace(
+    /(https?:\/\/[^\s]+)\s+([a-zA-Z0-9/_\-.?&=+%]+)/g,
     (match, part1, part2) => {
-      // Only join if part2 looks like a URL path continuation
-      if (/^[a-zA-Z0-9/_.-]/.test(part2) && !part2.includes(' ')) {
+      // Only join if part2 looks like a URL path/query continuation
+      if (/^[a-zA-Z0-9/_\-.?&=+%]/.test(part2) && !part2.includes(' ')) {
         return `${part1}${part2}`;
       }
       return match;
     }
   );
 
-  // Second pass: Handle domains followed by paths on new lines
+  // Fifth pass: Handle domains followed by paths on new lines
   // Example: "apple.com\n/path/to/video.mp4" -> "apple.com/path/to/video.mp4"
   processed = processed.replace(
     /([a-zA-Z0-9-]+\.[a-zA-Z]{2,})([\s\n]+)(\/[^\s]+)/g,
@@ -163,6 +189,7 @@ const isAppleMapsURL = url => {
   if (!url || typeof url !== 'string') return false;
 
   // Match Apple Maps patterns:
+  // - maps.apple.com/directions?... (directions URLs with source/destination)
   // - maps.apple.com/frame?... (frame URLs with parameters: center, span, distance, heading, pitch, map mode, tracking)
   // - maps.apple.com/?... (with query params)
   // - maps.apple/p/... (short URLs)
@@ -170,6 +197,7 @@ const isAppleMapsURL = url => {
   return (
     url.includes('maps.apple.com') ||
     url.includes('maps.apple/') ||
+    /maps\.apple\.com\/directions\?/.test(url) ||
     /maps\.apple\.com\/frame\?/.test(url) ||
     /maps\.apple\.com\/\?/.test(url) ||
     /maps\.apple\.com\/place\//.test(url) ||

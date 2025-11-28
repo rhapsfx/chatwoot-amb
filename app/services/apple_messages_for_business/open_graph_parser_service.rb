@@ -67,6 +67,9 @@ class AppleMessagesForBusiness::OpenGraphParserService
     uri = URI.parse(encoded_url)
     params = URI.decode_www_form(uri.query || '').to_h
 
+    # Check if this is a directions URL
+    return parse_directions_url(params) if params['source'].present? || params['destination'].present?
+
     # Extract place information from URL parameters
     place_name = params['name'] || params['q'] || 'Location'
     address = params['address'] || ''
@@ -95,6 +98,38 @@ class AppleMessagesForBusiness::OpenGraphParserService
       description: 'View location in Apple Maps',
       image_url: nil,
       favicon_url: 'https://logo.clearbit.com/apple.com',
+      url: @url,
+      site_name: 'Apple Maps'
+    }
+  end
+
+  # Parse Apple Maps directions URL
+  def parse_directions_url(params)
+    source = params['source'] || 'Current Location'
+    destination = params['destination'] || 'Destination'
+    mode = params['mode']&.capitalize || 'Driving'
+
+    # Build descriptive title and description
+    title = "Directions: #{source} → #{destination}"
+    description = "Get #{mode.downcase} directions from #{source} to #{destination}"
+
+    {
+      success: true,
+      title: title,
+      description: description,
+      image_url: 'https://maps.apple.com/static/maps-app-web-client/images/maps-app-icon-180x180.png',
+      favicon_url: 'https://maps.apple.com/static/maps-app-web-client/images/maps-app-icon-180x180.png',
+      url: @url,
+      site_name: 'Apple Maps'
+    }
+  rescue StandardError => e
+    Rails.logger.error "Apple Maps directions URL parsing failed for #{@url}: #{e.message}"
+    {
+      success: true,
+      title: 'Apple Maps Directions',
+      description: 'Get directions in Apple Maps',
+      image_url: 'https://maps.apple.com/static/maps-app-web-client/images/maps-app-icon-180x180.png',
+      favicon_url: 'https://maps.apple.com/static/maps-app-web-client/images/maps-app-icon-180x180.png',
       url: @url,
       site_name: 'Apple Maps'
     }
