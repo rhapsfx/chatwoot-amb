@@ -8,8 +8,8 @@ class ContentAttributeValidator < ActiveModel::Validator
   # Apple Messages for Business validation keys
   ALLOWED_APPLE_LIST_PICKER_KEYS = [:sections, :images, :request_identifier, :received_title, :received_subtitle, :received_image_identifier, :received_style,
                                     :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
-  ALLOWED_APPLE_LIST_PICKER_SECTION_KEYS = [:title, :multiple_selection, :multipleSelection, :order, :items].freeze
-  ALLOWED_APPLE_LIST_PICKER_ITEM_KEYS = [:identifier, :title, :subtitle, :image_identifier, :imageIdentifier, :order, :style].freeze
+  ALLOWED_APPLE_LIST_PICKER_SECTION_KEYS = [:title, :multiple_selection, :order, :items].freeze
+  ALLOWED_APPLE_LIST_PICKER_ITEM_KEYS = [:identifier, :title, :subtitle, :image_identifier, :order, :style].freeze
   ALLOWED_APPLE_TIME_PICKER_KEYS = [:event, :request_identifier, :timezone_offset, :timeslots, :received_title, :received_subtitle, :received_image_identifier,
                                     :received_style, :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
   ALLOWED_APPLE_QUICK_REPLY_KEYS = [:summary_text, :request_identifier, :items, :received_title, :received_subtitle, :received_style,
@@ -109,13 +109,17 @@ class ContentAttributeValidator < ActiveModel::Validator
 
     case record.content_type
     when 'apple_list_picker'
-      # Normalize list picker structure for Apple MSP
+      # Normalize list picker structure - keep snake_case for internal storage
+      # Case transformation to camelCase happens in services via CaseTransformer
       sections = content_attrs['sections'] || []
       sections.each do |section|
         next unless section.is_a?(Hash)
 
-        # Ensure multipleSelection is properly named (Apple uses camelCase)
-        section['multipleSelection'] = section.delete('multiple_selection') if section.key?('multiple_selection')
+        # Support legacy data: convert old camelCase to snake_case for consistency
+        if section.key?('multipleSelection') && !section.key?('multiple_selection')
+          section['multiple_selection'] =
+            section.delete('multipleSelection')
+        end
 
         items = section['items'] || []
         items.each do |item|
@@ -124,8 +128,8 @@ class ContentAttributeValidator < ActiveModel::Validator
           # Auto-generate identifier if not present (platform-generated, not agent-exposed)
           item['identifier'] ||= "item_#{SecureRandom.hex(8)}"
 
-          # Normalize imageIdentifier field (Apple uses camelCase)
-          item['imageIdentifier'] = item.delete('image_identifier') if item.key?('image_identifier')
+          # Support legacy data: convert old camelCase to snake_case for consistency
+          item['image_identifier'] = item.delete('imageIdentifier') if item.key?('imageIdentifier') && !item.key?('image_identifier')
 
           # Set default style if not present (use valid Apple MSP style)
           item['style'] ||= 'icon'

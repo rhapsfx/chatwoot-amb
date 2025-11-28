@@ -25,27 +25,12 @@ class Messages::MessageBuilder
   def perform
     @message = @conversation.messages.build(message_params)
 
-    # 🔵 DEBUG: Log sender information
-    Rails.logger.info "🔵 MessageBuilder - @user class: #{@user.class.name}, ID: #{@user.id}"
-    Rails.logger.info "🔵 MessageBuilder - message_type: #{message_type}"
-    Rails.logger.info "🔵 MessageBuilder - message_sender: #{message_sender.inspect}"
-    Rails.logger.info "🔵 MessageBuilder - computed sender: #{sender.class.name}, ID: #{sender.id}"
-    Rails.logger.info "🔵 MessageBuilder - @message.sender_type: #{@message.sender_type}"
-    Rails.logger.info "🔵 MessageBuilder - @message.sender_id: #{@message.sender_id}"
-
     process_attachments
     process_emails
 
-    # Debug log for Apple Messages
-    if @message.content_type&.start_with?('apple_')
-      Rails.logger.debug { "🔥 MessageBuilder - Saving #{@message.content_type} message (valid: #{@message.valid?})" }
-      Rails.logger.error "🔥 Validation Errors: #{@message.errors.full_messages}" unless @message.valid?
-    end
-
-    # When the message has no quoted content, it will just be rendered as a regular message
-    # The frontend is equipped to handle this case
     process_email_content
     @message.save!
+
     @message
   end
 
@@ -60,34 +45,14 @@ class Messages::MessageBuilder
     content_attributes = params.fetch(:content_attributes, {})
 
     # Early return for String - use upstream's safe_parse_json
-    if content_attributes.is_a?(String)
-      parsed = safe_parse_json(content_attributes)
-      # Debug log for Apple Messages
-      if @params[:content_type]&.start_with?('apple_')
-        image_count = params.key?(:images) ? params[:images]&.length : 0
-        Rails.logger.debug { "🔥 MessageBuilder content_attributes - Type: #{@params[:content_type]}, Images: #{image_count}" }
-      end
-      return parsed
-    end
+    return safe_parse_json(content_attributes) if content_attributes.is_a?(String)
 
     # Get content_attributes as hash
     parsed_content_attributes = content_attributes.is_a?(Hash) ? content_attributes : {}
 
-    # 🔥 FIX: Include images in content_attributes for Apple Messages
+    # Include images in content_attributes for Apple Messages
     # Check both separate images parameter AND images nested in content_attributes
-    if @params[:content_type]&.start_with?('apple_')
-      if params.key?(:images)
-        parsed_content_attributes[:images] = params[:images]
-        Rails.logger.info '🔥 MessageBuilder content_attributes - Added images from separate parameter'
-      elsif parsed_content_attributes.key?(:images) || parsed_content_attributes.key?('images')
-        # Images are already in content_attributes, keep them there
-        images_data = parsed_content_attributes[:images] || parsed_content_attributes['images']
-        sanitized_images = LogSanitizerService.sanitize_for_log(images_data)
-        Rails.logger.info "🔥 MessageBuilder content_attributes - Images already in content_attributes: #{sanitized_images.inspect}"
-      else
-        Rails.logger.info '🔥 MessageBuilder content_attributes - No images found anywhere'
-      end
-    end
+    parsed_content_attributes[:images] = params[:images] if @params[:content_type]&.start_with?('apple_') && params.key?(:images)
 
     parsed_content_attributes
   end
@@ -150,10 +115,7 @@ class Messages::MessageBuilder
 
   def sender
     # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
-    result = message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
-
-    Rails.logger.debug { "🔵 MessageBuilder sender: #{result.class.name} ID:#{result.id} (type: #{message_type})" }
-    result
+    message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
   end
 
   def external_created_at

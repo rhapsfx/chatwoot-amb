@@ -179,88 +179,77 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   def create_params
-    if params[:content_type]&.start_with?('apple_')
-      image_count = params.dig(:content_attributes, :images)&.length || 0
-      Rails.logger.debug { "🔥 MessagesController create_params - Type: #{params[:content_type]}, Images: #{image_count}" }
-    end
-
-    permitted = params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at, :template_id,
-                              :attachments => [],
-                              # Apple Messages interactive response data
-                              :interactive_data => [:requestIdentifier, { :data => {} }],
-                              :content_attributes => [
-                                # Common type field for all Apple Messages
-                                :type,
-                                # Apple Quick Reply
-                                :summary_text, { :items => [:title, :identifier, :description] },
-                                { :replies => [:title, :identifier, :description, :imageIdentifier, :image_identifier] },
-                                # Apple List Picker
-                                { :sections => [:title, :multiple_selection, { :items => [:title, :subtitle, :identifier, :imageIdentifier, :image_identifier] }] },
-                                { :images => [:identifier, :data, :description] },  # Fixed: Allow nested image structure
-                                # Apple Time Picker
-                                { :event => [:title, :description, :identifier, { :timeslots => [:identifier, :start_time, :duration] }] },
-                                :timezone_offset,
-                                # Apple Rich Link
-                                :url, :title, :description, :image_url, :site_name,
-                                # Apple Form
-                                :title, :description, :submit_url, :method, :validation_rules,
-                                :version, :form_id, :use_live_layout,
-                                { :submit_button => [:title] },
-                                { :cancel_button => [:title] },
-                                { :fields => [:type, :name, :label, :placeholder, :required, :default, :pattern, :title, :pattern_error, { :options => [:value, :title, :description] }] },
-                                { :pages => [:page_id, :title, :description, { :items => [
-                                  # Base fields
-                                  :item_id, :item_type, :title, :description, :required, :placeholder, :default_value,
-                                  # Text/TextArea/Email/Phone fields
-                                  :max_length, :keyboard_type, :text_content_type,
-                                  # Select fields (singleSelect/multiSelect)
-                                  { :options => [:id, :value, :title, :description, :image_identifier, :imageIdentifier] },
-                                  # DateTime fields
-                                  :date_format, :min_date, :max_date,
-                                  # Toggle fields
-                                  :toggle_style,
-                                  # Stepper fields
-                                  :min_value, :max_value, :step,
-                                  # Picker fields
-                                  :picker_type, :picker_options,
-                                  # RichLink fields
-                                  :url, :image_url,
-                                  # Button fields
-                                  :button_style, :action
-                                ] }] },
-                                # Apple Custom App
-                                :app_id, :app_name, :bid, :url, :use_live_layout,
-                                # Common Apple Messages fields (flat structure for backward compatibility)
-                                :received_title, :received_subtitle, :received_image_identifier, :received_style,
-                                :reply_title, :reply_subtitle, :reply_style,
-                                :reply_image_title, :reply_image_subtitle,
-                                :reply_secondary_subtitle, :reply_tertiary_subtitle,
-                                :reply_image_identifier,
-                                # Nested message structures (new form builder format)
-                                { :received_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
-                                { :reply_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
-                                # Apple Pay
-                                :merchant_name, :merchantName, :currency_code, :currencyCode, :country_code, :countryCode,
-                                :requires_shipping, :requiresShipping, :requires_billing, :requiresBilling,
-                                { :line_items => [:label, :amount, :type] },
-                                { :lineItems => [:label, :amount, :type] },
-                                { :total => [:label, :amount, :type] },
-                                { :shipping_methods => [:identifier, :label, :detail, :amount] },
-                                { :shippingMethods => [:identifier, :label, :detail, :amount] },
-                                :required_billing_fields, :requiredBillingFields,
-                                :required_shipping_fields, :requiredShippingFields,
-                                # Custom Payload
-                                :custom_payload,
-                                :skip_validation,
-                                :apply_case_transform
-                              ])
-
-    if permitted[:content_type]&.start_with?('apple_')
-      image_count = permitted.dig(:content_attributes, :images)&.length || 0
-      Rails.logger.debug { "🔥 MessagesController permitted - Type: #{permitted[:content_type]}, Images: #{image_count}" }
-    end
-
-    permitted
+    params.permit(:content, :private, :message_type, :content_type, :echo_id, :sender_type, :sender_id, :external_created_at, :template_id,
+                  :attachments => [],
+                  # Apple Messages interactive response data
+                  :interactive_data => [:requestIdentifier, { :data => {} }],
+                  :content_attributes => [
+                    # Common type field for all Apple Messages
+                    :type,
+                    # Apple Quick Reply
+                    :summary_text, { :items => [:title, :identifier, :description] },
+                    { :replies => [:title, :identifier, :description, :imageIdentifier, :image_identifier] },
+                    # Apple List Picker
+                    { :sections => [:title, :multiple_selection, { :items => [:title, :subtitle, :identifier, :imageIdentifier, :image_identifier] }] },
+                    { :images => [:identifier, :data, :description] },  # Fixed: Allow nested image structure
+                    # Apple Time Picker
+                    { :event => [:title, :description, :identifier, { :timeslots => [:identifier, :start_time, :duration] }] },
+                    :timezone_offset,
+                    # Apple Rich Link
+                    :url, :title, :description, :image_url, :site_name,
+                    { :rich_link_data_ref => [:title, :url, :owner, :key, :size, :signature_base64, :'signature-base64'] },
+                    # Apple Form
+                    :title, :description, :submit_url, :method, :validation_rules,
+                    :version, :form_id, :use_live_layout,
+                    { :submit_button => [:title] },
+                    { :cancel_button => [:title] },
+                    { :fields => [:type, :name, :label, :placeholder, :required, :default, :pattern, :title, :pattern_error, { :options => [:value, :title, :description] }] },
+                    { :pages => [:page_id, :title, :description, { :items => [
+                      # Base fields
+                      :item_id, :item_type, :title, :description, :required, :placeholder, :default_value,
+                      # Text/TextArea/Email/Phone fields
+                      :max_length, :keyboard_type, :text_content_type,
+                      # Select fields (singleSelect/multiSelect)
+                      { :options => [:id, :value, :title, :description, :image_identifier, :imageIdentifier] },
+                      # DateTime fields
+                      :date_format, :min_date, :max_date,
+                      # Toggle fields
+                      :toggle_style,
+                      # Stepper fields
+                      :min_value, :max_value, :step,
+                      # Picker fields
+                      :picker_type, :picker_options,
+                      # RichLink fields
+                      :url, :image_url,
+                      # Button fields
+                      :button_style, :action
+                    ] }] },
+                    # Apple Custom App
+                    :app_id, :app_name, :bid, :url, :use_live_layout,
+                    # Common Apple Messages fields (flat structure for backward compatibility)
+                    :received_title, :received_subtitle, :received_image_identifier, :received_style,
+                    :reply_title, :reply_subtitle, :reply_style,
+                    :reply_image_title, :reply_image_subtitle,
+                    :reply_secondary_subtitle, :reply_tertiary_subtitle,
+                    :reply_image_identifier,
+                    # Nested message structures (new form builder format)
+                    { :received_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
+                    { :reply_message => [:title, :subtitle, :image_identifier, :imageIdentifier, :style] },
+                    # Apple Pay
+                    :merchant_name, :merchantName, :currency_code, :currencyCode, :country_code, :countryCode,
+                    :requires_shipping, :requiresShipping, :requires_billing, :requiresBilling,
+                    { :line_items => [:label, :amount, :type] },
+                    { :lineItems => [:label, :amount, :type] },
+                    { :total => [:label, :amount, :type] },
+                    { :shipping_methods => [:identifier, :label, :detail, :amount] },
+                    { :shippingMethods => [:identifier, :label, :detail, :amount] },
+                    :required_billing_fields, :requiredBillingFields,
+                    :required_shipping_fields, :requiredShippingFields,
+                    # Custom Payload
+                    :custom_payload,
+                    :skip_validation,
+                    :apply_case_transform
+                  ])
   end
 
   def already_translated_content_available?
@@ -273,20 +262,11 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     return if params[:content_attributes].blank?
     return unless apple_messages_content_type?
 
-    Rails.logger.info '[API] Normalizing Apple Messages content_attributes from camelCase to snake_case'
-
-    # Log structure only, not the actual data
-    before_keys = params[:content_attributes].keys
-    Rails.logger.info "[API] Before normalization - Keys: #{before_keys.join(', ')}"
-
     # Convert from frontend camelCase to internal snake_case
-    params[:content_attributes] = AppleMessagesForBusiness::CaseTransformer.from_apple_format(
+    normalized_hash = AppleMessagesForBusiness::CaseTransformer.from_apple_format(
       params[:content_attributes].to_unsafe_h
     )
-
-    # Log structure only, not the actual data
-    after_keys = params[:content_attributes].keys
-    Rails.logger.info "[API] After normalization - Keys: #{after_keys.join(', ')}"
+    params[:content_attributes] = normalized_hash
   end
 
   def apple_messages_content_type?
