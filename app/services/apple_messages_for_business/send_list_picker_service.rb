@@ -236,18 +236,16 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
   # Override parent to properly transform section/item keys
   def build_list_picker_data
-    Rails.logger.info '[AMB ListPicker] Building list picker data with CaseTransformer'
     sections = content_attributes['sections'] || []
-
-    Rails.logger.info "[AMB ListPicker] Processing #{sections.length} sections"
 
     # Use CaseTransformer to convert snake_case → camelCase for Apple MSP
     # This handles all field transformations automatically and consistently
     transformed_sections = sections.map.with_index do |section, section_index|
       # Set defaults for required fields
+      # Use fetch() to properly handle nil vs false distinction
       section_with_defaults = section.merge(
-        'order' => section['order'] || section_index,
-        'multiple_selection' => section['multiple_selection'] || false
+        'order' => section.fetch('order', section_index),
+        'multiple_selection' => section.fetch('multiple_selection', false)
       )
 
       # Transform items if present
@@ -265,7 +263,6 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
       AppleMessagesForBusiness::CaseTransformer.to_apple_format(section_with_defaults)
     end
 
-    Rails.logger.info "[AMB ListPicker] Transformed #{transformed_sections.length} sections to Apple format"
     { sections: transformed_sections }
   end
 
