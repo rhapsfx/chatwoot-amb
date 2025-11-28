@@ -20,7 +20,7 @@ Based on Apple MSP REST API v4.1.5 requirements analysis, this report provides t
 | **Receiving and Sending Attachments** | Required | Required | ✅ **COMPLETE** | `attachment_cipher_service.rb` + attachment handling |
 | **Tapback Reactions** | N/A | Required | ✅ **COMPLETE** | Built-in Chatwoot reaction system |
 | **Receiving Closed Conversation Messages** | Required | Required | ✅ **COMPLETE** | Conversation status management |
-| **Rich Link Messages** | Required | Required | ✅ **COMPLETE** | `AppleRichLink.vue` + `send_rich_link_service.rb` |
+| **Rich Link Messages** | Required | Required | ✅ **COMPLETE** | `AppleRichLink.vue` + `send_rich_link_service.rb` + **App Clips** + **Auto OpenGraph** |
 | **Quick Reply Messages** | Required | Optional | ✅ **COMPLETE** | `AppleQuickReply.vue` + `send_quick_reply_service.rb` |
 | **List Picker Message** | Required | Optional | ✅ **COMPLETE** | `AppleListPicker.vue` + `send_list_picker_service.rb` |
 | **Time Picker Message** | Required | Optional | ✅ **COMPLETE** | `AppleTimePicker.vue` + `send_time_picker_service.rb` |
@@ -57,6 +57,23 @@ Based on Apple MSP REST API v4.1.5 requirements analysis, this report provides t
   - ✅ `app/javascript/dashboard/components-next/message/bubbles/AppleForm.vue`
   - ✅ `app/javascript/dashboard/components-next/message/modals/AppleFormBuilder.vue`
 - **Features**: Dynamic form creation, multi-page forms, all field types, form templates, response handling
+
+#### ✅ **3. Rich Link Messages - Enhanced** (COMPLETE - 2025-11-28)
+- **Status**: ✅ **ENHANCED WITH APP CLIPS + AUTO OPENGRAPH**
+- **Impact**: BEST-IN-CLASS RICH LINK EXPERIENCE
+- **Key Enhancements**:
+  - ✅ **App Clips Integration** - Construct Payload API for instant app experiences
+  - ✅ **Automatic URL Detection** - Zero-configuration URL to rich link conversion
+  - ✅ **Smart OpenGraph Scraping** - Always fetches proper title, description, images
+  - ✅ **Preview Images** - Full image support in Chatwoot transcript
+  - ✅ **Real-time Updates** - ActionCable broadcasts for instant preview updates
+  - ✅ **No Duplicate URLs** - Scraped metadata prioritized over fallbacks
+- **Files Enhanced**:
+  - ✅ `app/services/apple_messages_for_business/send_rich_link_service.rb` (OpenGraph priority fix)
+  - ✅ `app/javascript/dashboard/components-next/message/bubbles/AppleRichLink.vue` (camelCase/snake_case compatibility)
+  - ✅ `app/javascript/dashboard/api/appleMessages/parseUrl.js` (authenticated API client)
+  - ✅ `app/javascript/dashboard/helper/appleMessagesRichLink.js` (automatic detection)
+- **User Experience**: Agent types "www.apple.com/iphone" → Automatic rich link with proper title, description, and image OR App Clips experience
 
 ---
 

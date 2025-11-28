@@ -101,6 +101,63 @@ class AppleMessagesForBusiness::SendRichLinkService
   def build_rich_link_data
     content_attrs = @message.content_attributes
 
+    # Always scrape Open Graph data for rich links to get accurate title/description/image
+    # This ensures we use proper OpenGraph metadata instead of frontend fallback values
+    url = content_attrs['url'] || @message.content
+    Rails.logger.info "🔍 Rich Link - Attempting Open Graph scraping for: #{url}"
+    og_data = scrape_open_graph_data(url)
+
+    if og_data[:success]
+      Rails.logger.info '✅ Rich Link - Open Graph scraping successful'
+      Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
+      Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
+      Rails.logger.info "🔍 Rich Link - Scraped description: #{og_data[:description]}"
+
+      # Update content_attributes with scraped data
+      # ALWAYS prefer scraped data over frontend-provided fallbacks
+      # Frontend may send URL as title/description, but we want actual OpenGraph data
+      updates = {
+        'title' => og_data[:title] || content_attrs['title'],
+        'image_url' => og_data[:image_url] || content_attrs['image_url'],
+        'description' => og_data[:description] || content_attrs['description']
+      }.compact
+
+      # Save updates to database for frontend display
+      # Use save! instead of update_column to trigger callbacks and ActionCable broadcasts
+      @message.content_attributes = content_attrs.merge(updates)
+      Rails.logger.info '🔍 Rich Link - About to save message with scraped data'
+      Rails.logger.info "🔍 Rich Link - content_attributes before save: #{@message.content_attributes.inspect}"
+      Rails.logger.info "🔍 Rich Link - Message changed?: #{@message.changed?}"
+      Rails.logger.info "🔍 Rich Link - Changed attributes: #{@message.changes.inspect}"
+
+      begin
+        @message.save!
+        Rails.logger.info '✅ Rich Link - Message saved successfully with scraped data'
+        Rails.logger.info "🔍 Rich Link - Previous changes after save: #{@message.previous_changes.inspect}"
+
+        # Manually dispatch update event if Rails didn't detect changes
+        if @message.previous_changes.blank?
+          Rails.logger.warn '⚠️ Rich Link - No previous_changes detected, manually dispatching MESSAGE_UPDATED event'
+          Rails.configuration.dispatcher.dispatch(
+            'MESSAGE_UPDATED',
+            Time.zone.now,
+            message: @message.reload,
+            performed_by: nil
+          )
+          Rails.logger.info '✅ Rich Link - Manually dispatched MESSAGE_UPDATED event'
+        end
+      rescue StandardError => e
+        Rails.logger.error "❌ Rich Link - Failed to save message: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+      end
+
+      # Update local content_attrs for building payload
+      content_attrs = @message.content_attributes
+      Rails.logger.info "🔍 Rich Link - content_attributes after save: #{content_attrs.inspect}"
+    else
+      Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
+    end
+
     # PRIORITY 1: Check if richLinkDataRef exists (App Clips mode)
     # This takes precedence over manual rich link building
     if content_attrs['rich_link_data_ref'].present?
@@ -111,27 +168,6 @@ class AppleMessagesForBusiness::SendRichLinkService
     # PRIORITY 2: Build manual richLinkData with assets
     log_info '🔍 Rich Link - Building manual richLinkData with assets'
     url = content_attrs['url'] || @message.content
-
-    # If title or image not provided, try to scrape Open Graph metadata
-    if content_attrs['title'].blank? || content_attrs['image_url'].blank?
-      Rails.logger.info "🔍 Rich Link - Title or image missing, attempting Open Graph scraping for: #{url}"
-      og_data = scrape_open_graph_data(url)
-
-      if og_data[:success]
-        Rails.logger.info '✅ Rich Link - Open Graph scraping successful'
-        Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
-        Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
-
-        # Merge scraped data with provided data (provided data takes precedence)
-        content_attrs = content_attrs.merge({
-          'title' => content_attrs['title'].presence || og_data[:title],
-          'image_url' => content_attrs['image_url'].presence || og_data[:image_url],
-          'description' => content_attrs['description'].presence || og_data[:description]
-        }.compact)
-      else
-        Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
-      end
-    end
 
     {
       url: url,

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref } from 'vue';
 import { useMessageContext } from '../provider.js';
 import BaseBubble from './Base.vue';
 
@@ -10,9 +10,12 @@ const hasImage = computed(
   () =>
     richLinkData.value.image_data ||
     richLinkData.value.imageData ||
-    richLinkData.value.image_url
+    richLinkData.value.image_url ||
+    richLinkData.value.imageUrl
 );
-const hasFavicon = computed(() => richLinkData.value.favicon_url);
+const hasFavicon = computed(
+  () => richLinkData.value.favicon_url || richLinkData.value.faviconUrl
+);
 const hasVideo = computed(
   () => richLinkData.value.video_url || richLinkData.value.videoUrl
 );
@@ -23,36 +26,20 @@ const imageError = ref(false);
 const faviconLoaded = ref(false);
 const faviconError = ref(false);
 
-// Debug logging
-onMounted(() => {
-  console.log('🔗 AppleRichLink component mounted');
-  console.log('📊 Rich Link Data:', richLinkData.value);
-  console.log('🖼️ Has Image:', hasImage.value);
-  console.log('🎥 Has Video:', hasVideo.value);
-});
-
 // Check if image_data is a URL or base64 data
 const isImageDataUrl = computed(() => {
   const imageData =
     richLinkData.value.image_data || richLinkData.value.imageData;
-  const isUrl =
+  return (
     imageData &&
-    (imageData.startsWith('http://') || imageData.startsWith('https://'));
-  console.log(
-    '🔍 Is Image Data URL:',
-    isUrl,
-    'for:',
-    imageData?.substring(0, 50)
+    (imageData.startsWith('http://') || imageData.startsWith('https://'))
   );
-  return isUrl;
 });
 
 const isImageDataBase64 = computed(() => {
   const imageData =
     richLinkData.value.image_data || richLinkData.value.imageData;
-  const isBase64 = imageData && !isImageDataUrl.value;
-  console.log('🔍 Is Image Data Base64:', isBase64);
-  return isBase64;
+  return imageData && !isImageDataUrl.value;
 });
 
 // Get the image source URL
@@ -67,10 +54,9 @@ const imageSource = computed(() => {
     source = `data:${imageMimeType || 'image/jpeg'};base64,${imageData}`;
   } else if (isImageDataUrl.value) {
     source = imageData;
-  } else if (richLinkData.value.image_url) {
-    source = richLinkData.value.image_url;
+  } else if (richLinkData.value.image_url || richLinkData.value.imageUrl) {
+    source = richLinkData.value.image_url || richLinkData.value.imageUrl;
   }
-  console.log('🖼️ Image Source:', source?.substring(0, 100));
   return source;
 });
 
@@ -82,7 +68,6 @@ const onImageLoad = () => {
 const onImageError = event => {
   imageError.value = true;
   imageLoaded.value = false;
-  console.error('❌ Rich Link image failed to load:', imageSource.value);
   // Hide the image element
   event.target.style.display = 'none';
 };
@@ -95,14 +80,12 @@ const onFaviconLoad = () => {
 const onFaviconError = event => {
   faviconError.value = true;
   faviconLoaded.value = false;
-  console.error('❌ Favicon failed to load:', richLinkData.value.favicon_url);
   // Hide the favicon element
   event.target.style.display = 'none';
 };
 
 const openLink = () => {
   if (richLinkData.value.url) {
-    console.log('🔗 Opening link:', richLinkData.value.url);
     window.open(richLinkData.value.url, '_blank', 'noopener,noreferrer');
   }
 };
@@ -172,7 +155,7 @@ const openLink = () => {
           class="w-full h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-t-lg flex items-center justify-center"
         >
           <img
-            :src="richLinkData.favicon_url"
+            :src="richLinkData.favicon_url || richLinkData.faviconUrl"
             :alt="richLinkData.title || 'Rich Link'"
             class="w-8 h-8 object-contain"
             @load="onFaviconLoad"
