@@ -35,6 +35,8 @@ class ParseUrlAPI {
         title: null,
         description: null,
         image_url: null,
+        video_url: null,
+        video_mime_type: null,
         favicon_url: null,
         site_name: null,
       };

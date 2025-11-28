@@ -1886,6 +1886,11 @@ export default {
       this.$emit('update:popOutReplyBox', !this.popOutReplyBox);
     },
     async sendAppleMessage(messageData) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG ReplyBox] Received messageData:',
+        JSON.parse(JSON.stringify(messageData))
+      );
       try {
         // Handle content: allow empty string for attachment-only messages
         let messageContent = 'Apple Message'; // default fallback

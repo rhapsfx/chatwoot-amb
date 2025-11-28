@@ -291,6 +291,11 @@ export default {
       this.$emit('toggleInsertArticle');
     },
     handleSendAppleMessage(messageData) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG ReplyBottomPanel] Received messageData:',
+        JSON.parse(JSON.stringify(messageData))
+      );
       this.$emit('sendAppleMessage', messageData);
     },
   },

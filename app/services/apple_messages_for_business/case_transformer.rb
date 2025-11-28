@@ -146,6 +146,12 @@ module AppleMessagesForBusiness
       header splashtext
     ].freeze
 
+    # Keys where we should preserve the key name but NOT recurse into the value
+    # This is for opaque Apple MSP responses that should not be transformed
+    NO_RECURSE_KEYS = %w[
+      rich_link_data_ref
+    ].freeze
+
     class << self
       # Convert snake_case hash to camelCase for Apple MSP API
       #
@@ -227,8 +233,18 @@ module AppleMessagesForBusiness
           # Skip nil values
           next if value.nil?
 
-          # Check if this key should be preserved as-is
+          # Check if this key should not be recursed into (opaque Apple responses)
+          if NO_RECURSE_KEYS.include?(string_key)
+            # Keep value as-is WITHOUT recursive transformation
+            # This is for opaque Apple MSP responses like rich_link_data_ref
+            transformed[string_key] = value
+            next
+          end
+
+          # Check if this key should be preserved (but still recurse into value)
           if PRESERVE_KEYS.include?(string_key)
+            # Preserve the key name but transform nested values
+            # This is consistent with to_apple_format behavior
             transformed[string_key] = transform_value_from_apple(value)
             next
           end

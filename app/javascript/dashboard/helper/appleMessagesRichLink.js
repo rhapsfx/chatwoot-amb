@@ -5,8 +5,37 @@ import ConstructPayloadAPI from '../api/appleMessages/constructPayload';
 import ParseUrlAPI from '../api/appleMessages/parseUrl';
 
 // Enhanced URL regex that detects URLs with and without protocol
+// More permissive path matching to handle complex URLs with special characters
 export const URL_REGEX =
-  /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s<>"{}|\\^`[\]]*)?/gi;
+  /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s<>"{}|\\^`[\]]+)?/gi;
+
+// Preprocess text to join URLs split across lines
+// This handles cases where users copy-paste URLs that get line-wrapped
+export const preprocessTextForURLDetection = text => {
+  if (!text || typeof text !== 'string') return text;
+
+  // First pass: Join URL parts that are split across lines
+  // Pattern: URL-like text followed by whitespace followed by URL continuation
+  let processed = text.replace(
+    /(https?:\/\/[^\s]+)\s+([a-zA-Z0-9/_.-]+)/g,
+    (match, part1, part2) => {
+      // Only join if part2 looks like a URL path continuation
+      if (/^[a-zA-Z0-9/_.-]/.test(part2) && !part2.includes(' ')) {
+        return `${part1}${part2}`;
+      }
+      return match;
+    }
+  );
+
+  // Second pass: Handle domains followed by paths on new lines
+  // Example: "apple.com\n/path/to/video.mp4" -> "apple.com/path/to/video.mp4"
+  processed = processed.replace(
+    /([a-zA-Z0-9-]+\.[a-zA-Z]{2,})([\s\n]+)(\/[^\s]+)/g,
+    '$1$3'
+  );
+
+  return processed;
+};
 
 export const isAppleMessagesConversation = conversation => {
   return (
@@ -32,7 +61,10 @@ export const normalizeURL = url => {
 export const detectURLsInText = text => {
   if (!text || typeof text !== 'string') return [];
 
-  const urls = text.match(URL_REGEX);
+  // Preprocess text to join URLs split across lines
+  const processedText = preprocessTextForURLDetection(text);
+
+  const urls = processedText.match(URL_REGEX);
   // Normalize URLs by adding protocol if missing
   return urls ? [...new Set(urls.map(normalizeURL))] : [];
 };
@@ -47,17 +79,20 @@ export const splitMessageByURLs = text => {
   if (!text || typeof text !== 'string')
     return [{ type: 'text', content: text }];
 
+  // Preprocess text to join URLs split across lines
+  const processedText = preprocessTextForURLDetection(text);
+
   const parts = [];
   let lastIndex = 0;
 
   // Reset regex to start from beginning
   const urlRegex = new RegExp(URL_REGEX.source, URL_REGEX.flags);
-  let match = urlRegex.exec(text);
+  let match = urlRegex.exec(processedText);
 
   while (match !== null) {
     // Add text before URL if exists
     if (match.index > lastIndex) {
-      const beforeText = text.slice(lastIndex, match.index).trim();
+      const beforeText = processedText.slice(lastIndex, match.index).trim();
       if (beforeText) {
         parts.push({ type: 'text', content: beforeText });
       }
@@ -67,12 +102,12 @@ export const splitMessageByURLs = text => {
     parts.push({ type: 'url', content: normalizeURL(match[0]) });
 
     lastIndex = match.index + match[0].length;
-    match = urlRegex.exec(text);
+    match = urlRegex.exec(processedText);
   }
 
   // Add remaining text after last URL if exists
-  if (lastIndex < text.length) {
-    const afterText = text.slice(lastIndex).trim();
+  if (lastIndex < processedText.length) {
+    const afterText = processedText.slice(lastIndex).trim();
     if (afterText) {
       parts.push({ type: 'text', content: afterText });
     }
@@ -80,7 +115,7 @@ export const splitMessageByURLs = text => {
 
   // If no URLs found, return original text
   if (parts.length === 0) {
-    parts.push({ type: 'text', content: text });
+    parts.push({ type: 'text', content: processedText });
   }
 
   return parts;
@@ -101,6 +136,27 @@ const extractDomainFromURL = url => {
   }
 };
 
+// Check if URL is a direct video file
+// Video URLs should use manual rich link with video assets, not App Clips
+const isDirectVideoURL = url => {
+  if (!url || typeof url !== 'string') return false;
+
+  const videoExtensions = [
+    '.mp4',
+    '.mov',
+    '.m4v',
+    '.avi',
+    '.wmv',
+    '.flv',
+    '.webm',
+    '.mkv',
+    '.3gp',
+  ];
+
+  const lowerURL = url.toLowerCase();
+  return videoExtensions.some(ext => lowerURL.endsWith(ext));
+};
+
 export const createRichLinkPreview = async (url, conversation = null) => {
   try {
     // Normalize URL before processing
@@ -112,8 +168,20 @@ export const createRichLinkPreview = async (url, conversation = null) => {
       throw new Error('Account ID not found');
     }
 
+    // ⚠️ SKIP App Clips for direct video URLs
+    // Video URLs need manual rich link with video assets
+    const skipAppClips = isDirectVideoURL(normalizedURL);
+    if (skipAppClips) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[Rich Link] Direct video URL detected, skipping App Clips:',
+        normalizedURL
+      );
+    }
+
     // ✅ PRIORITY 1: Try App Clips (Construct Payload API) if conversation available
-    if (conversation?.inbox_id) {
+    // BUT skip for direct video URLs - they need manual rich link with video assets
+    if (conversation?.inbox_id && !skipAppClips) {
       try {
         // Check if URL might support App Clips (basic HTTPS validation)
         if (ConstructPayloadAPI.mightSupportAppClips(normalizedURL)) {
@@ -150,6 +218,14 @@ export const createRichLinkPreview = async (url, conversation = null) => {
     }
 
     // ✅ PRIORITY 2: Fallback to OpenGraph scraping (manual rich link)
+    // This is also used for direct video URLs (bypassing App Clips)
+    if (skipAppClips) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[Rich Link] Using manual rich link for video URL (video assets will be added by backend)'
+      );
+    }
+
     const data = await ParseUrlAPI.parse(accountId, normalizedURL);
 
     return {
@@ -160,6 +236,8 @@ export const createRichLinkPreview = async (url, conversation = null) => {
         title: data.title,
         description: data.description,
         image_url: data.image_url,
+        video_url: data.video_url, // Video URL from OpenGraph
+        video_mime_type: data.video_mime_type, // Video MIME type from OpenGraph
         favicon_url: data.favicon_url,
         image_data: data.image_url, // For backward compatibility
         image_mime_type: 'image/jpeg',

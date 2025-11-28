@@ -122,7 +122,9 @@ class Message < ApplicationRecord
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data, :sections, :event, :summary_text,
                                          :images, :timezone_offset, :received_title, :received_subtitle, :received_style,
                                          :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
-                                         :reply_secondary_subtitle, :reply_tertiary_subtitle], coder: JSON
+                                         :reply_secondary_subtitle, :reply_tertiary_subtitle,
+                                         :url, :title, :description, :rich_link_data_ref, :image_url, :image_data, :image_mime_type,
+                                         :site_name, :favicon_url], coder: JSON
 
   store :external_source_ids, accessors: [:slack, :apple_messages], coder: JSON, prefix: :external_source_id
 

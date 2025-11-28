@@ -3575,21 +3575,26 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # === OAuth Authentication Handlers ===
 
   def handle_authentication_menu
+    # TEMPORARY: Skip provider selection and go directly to LinkedIn OAuth
+    # Other providers (Google, Facebook) are temporarily disabled
+    log_info '[Bot] 🔐 Authentication menu - defaulting to LinkedIn OAuth'
     send_text_message('🔐 OAuth Authentication Demo')
-    send_text_message('Choose which provider you\'d like to authenticate with:')
 
-    # Send quick reply with provider options
-    send_quick_reply(
-      title: 'Select OAuth Provider',
-      request_id: 'qr_oauth_provider',
-      items: [
-        { title: 'LinkedIn', value: 'linkedin' },
-        { title: 'Google', value: 'google' },
-        { title: 'Facebook', value: 'facebook' }
-      ]
-    )
+    # Directly call LinkedIn OAuth handler
+    handle_linkedin_oauth_demo
 
-    update_bot_state('DEMO_MODE_AUTH_PROVIDER')
+    # ORIGINAL CODE (commented out for temporary LinkedIn-only flow):
+    # send_text_message('Choose which provider you\'d like to authenticate with:')
+    # send_quick_reply(
+    #   title: 'Select OAuth Provider',
+    #   request_id: 'qr_oauth_provider',
+    #   items: [
+    #     { title: 'LinkedIn', value: 'linkedin' },
+    #     { title: 'Google', value: 'google' },
+    #     { title: 'Facebook', value: 'facebook' }
+    #   ]
+    # )
+    # update_bot_state('DEMO_MODE_AUTH_PROVIDER')
   end
 
   def handle_oauth_provider_selection(interactive_data)

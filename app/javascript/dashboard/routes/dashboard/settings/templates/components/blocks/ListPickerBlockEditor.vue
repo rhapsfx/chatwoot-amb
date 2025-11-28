@@ -14,19 +14,22 @@ const emit = defineEmits(['update:properties']);
 
 const { t } = useI18n();
 
-// Normalize sections - backend always returns snake_case via TemplateFacade
+// Normalize sections - handle both camelCase (template storage) and snake_case (API)
 const normalizeSections = sections => {
   if (!sections || !Array.isArray(sections)) return [];
 
   return sections.map(section => ({
     title: section.title || 'Options',
-    multipleSelection: section.multiple_selection ?? false,
+    // Handle both camelCase (from template) and snake_case (from API)
+    multipleSelection:
+      section.multipleSelection ?? section.multiple_selection ?? false,
     items: (section.items || []).map(item => ({
       title: item.title || '',
       subtitle: item.subtitle || '',
       identifier: item.identifier || '',
       order: item.order ?? 0,
-      image_identifier: item.image_identifier || '',
+      // Handle both camelCase and snake_case for image_identifier
+      image_identifier: item.image_identifier || item.imageIdentifier || '',
     })),
   }));
 };

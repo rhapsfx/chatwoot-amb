@@ -330,7 +330,7 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
         expect(result[:useLiveLayout]).to eq(true)
 
         page = result[:pages].first
-        expect(page[:pageId]).to eq('page_1')
+        expect(page[:pageIdentifier]).to eq('page_1')
 
         item = page[:items].first
         expect(item[:itemId]).to eq('name')
@@ -471,8 +471,8 @@ RSpec.describe AppleMessagesForBusiness::CaseTransformer do
 
         # All converted to snake_case
         expect(result['image_identifier']).to eq('img_main')
-        expect(result['received_image_identifier']).to be_nil # mapped to image_identifier
-        expect(result['reply_image_identifier']).to be_nil # mapped to image_identifier
+        expect(result['received_image_identifier']).to eq('img_received')
+        expect(result['reply_image_identifier']).to eq('img_reply')
         expect(result['sections'].first['multiple_selection']).to eq(false)
         expect(result['sections'].first['items'].first['image_identifier']).to eq('img_item')
       end

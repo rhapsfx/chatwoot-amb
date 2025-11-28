@@ -62,6 +62,7 @@ class AppleMessagesForBusiness::MessageProcessorService
       apple_pay
       apple_authentication
       apple_custom_payload
+      apple_rich_link
     ].include?(content_type)
   end
 

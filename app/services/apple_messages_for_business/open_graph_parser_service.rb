@@ -142,6 +142,8 @@ class AppleMessagesForBusiness::OpenGraphParserService
       title: extract_title(doc),
       description: extract_description(doc),
       image_url: extract_image_url(doc),
+      video_url: extract_video_url(doc),
+      video_mime_type: extract_video_mime_type(doc),
       favicon_url: extract_favicon_url(doc),
       url: @url,
       site_name: extract_site_name(doc)
@@ -195,6 +197,28 @@ class AppleMessagesForBusiness::OpenGraphParserService
     # Fallback to favicon as the last resort
     favicon_url = extract_favicon_url(doc)
     return favicon_url if favicon_url.present?
+
+    nil
+  end
+
+  def extract_video_url(doc)
+    # Try OpenGraph video
+    og_video = doc.at_css('meta[property="og:video"]')&.[]('content') ||
+               doc.at_css('meta[property="og:video:url"]')&.[]('content') ||
+               doc.at_css('meta[property="og:video:secure_url"]')&.[]('content')
+    return make_absolute_url(og_video) if og_video.present?
+
+    # Try Twitter Card video
+    twitter_video = doc.at_css('meta[name="twitter:player:stream"]')&.[]('content')
+    return make_absolute_url(twitter_video) if twitter_video.present?
+
+    nil
+  end
+
+  def extract_video_mime_type(doc)
+    # Try OpenGraph video type
+    og_video_type = doc.at_css('meta[property="og:video:type"]')&.[]('content')
+    return og_video_type if og_video_type.present?
 
     nil
   end
