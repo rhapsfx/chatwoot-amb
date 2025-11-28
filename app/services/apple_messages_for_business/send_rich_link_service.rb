@@ -63,10 +63,14 @@ class AppleMessagesForBusiness::SendRichLinkService
       response = send_to_apple_gateway(payload, message_id)
 
       if response.success?
+        # Store the payload that was sent to Apple MSP for debugging
+        store_apple_msp_payload(payload, 'sent', message_id)
         # Mark as sent if successful
         mark_as_sent
         { success: true, message_id: message_id }
       else
+        # Store the failed payload for debugging
+        store_apple_msp_payload(payload, 'failed', message_id, "HTTP #{response.code}: #{response.body}")
         { success: false, error: "HTTP #{response.code}: #{response.body}" }
       end
     ensure
@@ -89,6 +93,45 @@ class AppleMessagesForBusiness::SendRichLinkService
 
     @message.update_column(:external_source_ids,
                            @message.external_source_ids.merge('apple_messages' => SecureRandom.uuid))
+  end
+
+  def store_apple_msp_payload(payload, status, message_id, error = nil)
+    # Store the actual payload sent to Apple MSP Gateway for debugging
+    # This allows agents to see exactly what was sent via the info (i) button
+    apple_msp_payload = {
+      payload: sanitize_payload_for_storage(payload),
+      debug: {
+        status: status,
+        message_id: message_id,
+        timestamp: Time.current.iso8601,
+        msp_gateway: AMB_SERVER
+      }
+    }
+
+    # Add error details if present
+    apple_msp_payload[:debug][:error] = error if error.present?
+
+    # Store in database
+    @message.update_column(:apple_msp_payload, apple_msp_payload)
+
+    Rails.logger.info "✅ Rich Link - Stored Apple MSP payload (status: #{status})"
+  end
+
+  def sanitize_payload_for_storage(payload)
+    # Create a deep copy to avoid modifying the original
+    sanitized = payload.deep_dup
+
+    # Truncate base64 image data for storage (keep first/last 100 chars for verification)
+    if sanitized[:richLinkData]&.dig(:assets, :image, :data)
+      image_data = sanitized[:richLinkData][:assets][:image][:data]
+      if image_data.length > 200
+        sanitized[:richLinkData][:assets][:image][:data] = "#{image_data[0...100]}...#{image_data[-100..]}"
+        sanitized[:richLinkData][:assets][:image][:_truncated] = true
+        sanitized[:richLinkData][:assets][:image][:_original_length] = image_data.length
+      end
+    end
+
+    sanitized
   end
 
   def idempotency_response

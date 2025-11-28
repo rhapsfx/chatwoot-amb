@@ -93,6 +93,69 @@ class AppleMessagesForBusiness::SendMessageService
     { success: true, message_id: @message.external_source_id_apple_messages, skipped: true }
   end
 
+  def store_apple_msp_payload(payload, status, message_id, error = nil)
+    # Store the actual payload sent to Apple MSP Gateway for debugging
+    # This allows agents to see exactly what was sent via the info (i) button in Chatwoot UI
+    apple_msp_payload = {
+      payload: sanitize_payload_for_storage(payload),
+      debug: {
+        status: status,
+        message_id: message_id,
+        timestamp: Time.current.iso8601,
+        msp_gateway: AMB_SERVER
+      }
+    }
+
+    # Add error details if present
+    apple_msp_payload[:debug][:error] = error if error.present?
+
+    # Store in database
+    @message.update_column(:apple_msp_payload, apple_msp_payload)
+
+    Rails.logger.info "✅ Apple MSP - Stored payload (status: #{status}, type: #{@message.content_type})"
+  end
+
+  def sanitize_payload_for_storage(payload)
+    # Create a deep copy to avoid modifying the original
+    sanitized = payload.deep_dup
+
+    # Truncate base64 image data for storage (keep first/last 100 chars for verification)
+    # This applies to various payload types
+    if sanitized.dig(:interactiveData, :data, :imageBubbleStyle, :imageIdentifier)
+      # For interactive messages with image bubbles
+      image_data = sanitized[:interactiveData][:data][:imageBubbleStyle][:imageIdentifier]
+      if image_data.is_a?(String) && image_data.length > 200
+        sanitized[:interactiveData][:data][:imageBubbleStyle][:imageIdentifier] = truncate_base64(image_data)
+      end
+    end
+
+    if sanitized.dig(:richLinkData, :assets, :image, :data)
+      # For rich links with embedded images
+      image_data = sanitized[:richLinkData][:assets][:image][:data]
+      if image_data.length > 200
+        sanitized[:richLinkData][:assets][:image][:data] = truncate_base64(image_data)
+        sanitized[:richLinkData][:assets][:image][:_truncated] = true
+        sanitized[:richLinkData][:assets][:image][:_original_length] = image_data.length
+      end
+    end
+
+    if sanitized[:attachments].is_a?(Array)
+      # For text messages with attachments
+      sanitized[:attachments].each do |attachment|
+        next unless attachment[:data].is_a?(String) && attachment[:data].length > 200
+
+        attachment[:data] = truncate_base64(attachment[:data])
+        attachment[:_truncated] = true
+      end
+    end
+
+    sanitized
+  end
+
+  def truncate_base64(data)
+    "#{data[0...100]}...#{data[-100..]}"
+  end
+
   def send_text_message
     message_id = SecureRandom.uuid
 
@@ -132,10 +195,12 @@ class AppleMessagesForBusiness::SendMessageService
     response = send_to_apple_gateway(payload, message_id)
 
     if response.success?
-      # Store the payload in the message for debugging
-      @message.update(apple_msp_payload: payload)
+      # Store the payload that was sent to Apple MSP for debugging
+      store_apple_msp_payload(payload, 'sent', message_id)
       { success: true, message_id: message_id }
     else
+      # Store the failed payload for debugging
+      store_apple_msp_payload(payload, 'failed', message_id, "HTTP #{response.code}: #{response.body}")
       { success: false, error: "HTTP #{response.code}: #{response.body}" }
     end
   end
@@ -159,8 +224,8 @@ class AppleMessagesForBusiness::SendMessageService
 
     if response.success?
       Rails.logger.info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
-      # Store the payload in the message for debugging
-      @message.update(apple_msp_payload: payload)
+      # Store the payload that was sent to Apple MSP for debugging
+      store_apple_msp_payload(payload, 'sent', message_id)
 
       result = { success: true, message_id: message_id }
 
@@ -180,6 +245,8 @@ class AppleMessagesForBusiness::SendMessageService
       result
     else
       log_error "[AMB Send] ❌ Apple MSP rejected message - HTTP #{response.code}: #{response.body}"
+      # Store the failed payload for debugging
+      store_apple_msp_payload(payload, 'failed', message_id, "HTTP #{response.code}: #{response.body}")
       { success: false, error: "HTTP #{response.code}: #{response.body}" }
     end
   end
