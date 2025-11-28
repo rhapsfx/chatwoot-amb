@@ -2,6 +2,7 @@
 // Automatic URL detection and Rich Link conversion for Apple Messages conversations
 
 import ConstructPayloadAPI from '../api/appleMessages/constructPayload';
+import ParseUrlAPI from '../api/appleMessages/parseUrl';
 
 // Enhanced URL regex that detects URLs with and without protocol
 export const URL_REGEX =
@@ -48,12 +49,12 @@ export const splitMessageByURLs = text => {
 
   const parts = [];
   let lastIndex = 0;
-  let match;
 
   // Reset regex to start from beginning
   const urlRegex = new RegExp(URL_REGEX.source, URL_REGEX.flags);
+  let match = urlRegex.exec(text);
 
-  while ((match = urlRegex.exec(text)) !== null) {
+  while (match !== null) {
     // Add text before URL if exists
     if (match.index > lastIndex) {
       const beforeText = text.slice(lastIndex, match.index).trim();
@@ -66,6 +67,7 @@ export const splitMessageByURLs = text => {
     parts.push({ type: 'url', content: normalizeURL(match[0]) });
 
     lastIndex = match.index + match[0].length;
+    match = urlRegex.exec(text);
   }
 
   // Add remaining text after last URL if exists
@@ -87,6 +89,16 @@ export const splitMessageByURLs = text => {
 export const extractMainURL = text => {
   const urls = detectURLsInText(text);
   return urls.length > 0 ? urls[0] : null;
+};
+
+// Helper to extract domain from URL for fallback display
+const extractDomainFromURL = url => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch {
+    return 'Website';
+  }
 };
 
 export const createRichLinkPreview = async (url, conversation = null) => {
@@ -138,28 +150,13 @@ export const createRichLinkPreview = async (url, conversation = null) => {
     }
 
     // ✅ PRIORITY 2: Fallback to OpenGraph scraping (manual rich link)
-    const response = await fetch(
-      `/api/v1/accounts/${accountId}/apple_messages/parse_url`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin', // Include cookies for authentication
-        body: JSON.stringify({ url: normalizedURL }),
-      }
-    );
+    const data = await ParseUrlAPI.parse(accountId, normalizedURL);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
     return {
-      success: true,
+      success: data.success,
       isAppClips: false,
       richLinkData: {
-        url: data.url,
+        url: data.url || normalizedURL,
         title: data.title,
         description: data.description,
         image_url: data.image_url,
@@ -170,7 +167,6 @@ export const createRichLinkPreview = async (url, conversation = null) => {
       },
     };
   } catch (error) {
-    console.error('Rich Link preview failed:', error);
     return {
       success: false,
       error: error.message,
@@ -183,15 +179,6 @@ export const createRichLinkPreview = async (url, conversation = null) => {
         site_name: extractDomainFromURL(url),
       },
     };
-  }
-};
-
-export const extractDomainFromURL = url => {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname.replace('www.', '');
-  } catch {
-    return 'Website';
   }
 };
 
@@ -288,44 +275,48 @@ export const processMessageForAppleMessages = async (
   }
 
   // Fallback: Process as separate messages (original behavior)
-  const processedMessages = [];
-
-  for (const part of parts) {
-    if (part.type === 'text') {
-      processedMessages.push({
-        type: 'text',
-        content: part.content,
-        content_type: 'text',
-        content_attributes: {},
-      });
-    } else if (part.type === 'url') {
-      // Convert URL to Rich Link
-      // Pass conversation to enable App Clips detection
-      const richLinkPreview = await createRichLinkPreview(
-        part.content,
-        conversation
-      );
-
-      if (richLinkPreview.success) {
-        processedMessages.push({
-          type: 'rich_link',
-          content: part.content, // Original URL as fallback
-          content_type: 'apple_rich_link',
-          content_attributes: richLinkPreview.richLinkData,
-        });
-      } else {
-        // Fallback to text if Rich Link fails
-        processedMessages.push({
+  const processedMessages = await Promise.all(
+    parts.map(async part => {
+      if (part.type === 'text') {
+        return {
           type: 'text',
           content: part.content,
           content_type: 'text',
           content_attributes: {},
-        });
+        };
       }
-    }
-  }
 
-  return processedMessages;
+      if (part.type === 'url') {
+        // Convert URL to Rich Link
+        // Pass conversation to enable App Clips detection
+        const richLinkPreview = await createRichLinkPreview(
+          part.content,
+          conversation
+        );
+
+        if (richLinkPreview.success) {
+          return {
+            type: 'rich_link',
+            content: part.content, // Original URL as fallback
+            content_type: 'apple_rich_link',
+            content_attributes: richLinkPreview.richLinkData,
+          };
+        }
+
+        // Fallback to text if Rich Link fails
+        return {
+          type: 'text',
+          content: part.content,
+          content_type: 'text',
+          content_attributes: {},
+        };
+      }
+
+      return null;
+    })
+  );
+
+  return processedMessages.filter(Boolean);
 };
 
 // Process canned response for automatic Rich Link conversion

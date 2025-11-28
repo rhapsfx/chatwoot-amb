@@ -755,7 +755,7 @@ export default {
     hideContentTemplatesModal() {
       this.showContentTemplatesModal = false;
     },
-    confirmOnSendReply() {
+    async confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
         return;
       }
@@ -768,6 +768,71 @@ export default {
         // Although Chatwoot combines these into a single message, Instagram sends separate echo events for each component.
         // This can create duplicate messages in Chatwoot. To prevent this issue, we'll handle text and attachments as separate messages.
         const isOnInstagram = this.isAnInstagramChannel;
+
+        // ✅ NEW: Auto-convert URLs to Rich Links for Apple Messages conversations
+        if (
+          this.isAppleMessagesConversation &&
+          !this.isPrivate &&
+          !this.hasAttachments
+        ) {
+          const detectedURLs = detectURLsInText(this.message);
+          if (detectedURLs.length > 0) {
+            // Process message to convert URLs to rich links
+            try {
+              // Add inbox to conversation object for App Clips detection
+              const conversationWithInbox = {
+                ...this.currentChat,
+                inbox: this.inbox,
+                inbox_id: this.inboxId,
+              };
+
+              const processedMessages = await processMessageForAppleMessages(
+                this.message,
+                conversationWithInbox
+              );
+
+              // Send processed messages (may be multiple: text + rich link)
+              /* eslint-disable no-await-in-loop */
+              for (let i = 0; i < processedMessages.length; i += 1) {
+                const messagePart = processedMessages[i];
+                const messagePayload = {
+                  conversationId: this.currentChat.id,
+                  message: messagePart.content,
+                  private: false,
+                  content_type: messagePart.content_type,
+                  content_attributes: messagePart.content_attributes || {},
+                };
+
+                await this.$store.dispatch(
+                  'createPendingMessageAndSend',
+                  messagePayload
+                );
+
+                // Brief delay between messages (per Apple MSP docs)
+                if (i < processedMessages.length - 1) {
+                  await new Promise(resolve => {
+                    setTimeout(resolve, 1500);
+                  });
+                }
+              }
+              /* eslint-enable no-await-in-loop */
+
+              if (!this.isPrivate) {
+                this.clearEmailField();
+              }
+
+              this.clearMessage();
+              this.hideEmojiPicker();
+              this.hideRichLinkPreview();
+              this.$emit('update:popOutReplyBox', false);
+              return;
+            } catch (error) {
+              // If URL processing fails, fall through to normal send
+            }
+          }
+        }
+
+        // Normal send flow (WhatsApp, Instagram, or Apple Messages without URLs)
         if ((isOnWhatsApp || isOnInstagram) && !this.isPrivate) {
           this.sendMessageAsMultipleMessages(this.message);
         } else {
@@ -893,9 +958,6 @@ export default {
     },
     async handleUnifiedTemplate(template) {
       try {
-        // eslint-disable-next-line no-console
-        console.log('🎯 handleUnifiedTemplate called with:', template);
-
         // Always fetch full template data to see content blocks
         const fullTemplate = await this.$store.dispatch(
           'messageTemplates/show',
@@ -904,29 +966,13 @@ export default {
           }
         );
 
-        // eslint-disable-next-line no-console
-        console.log('🎯 Full template fetched:', fullTemplate);
-
         // FIRST: Check if template has attachments
         // Templates with attachments should be sent as messages, not inserted as text
         const hasAttachments =
           fullTemplate.attachmentsSummary &&
           fullTemplate.attachmentsSummary.length > 0;
 
-        // eslint-disable-next-line no-console
-        console.log(
-          '🎯 Has attachments:',
-          hasAttachments,
-          fullTemplate.attachmentsSummary
-        );
-
         if (hasAttachments) {
-          // Template with attachments - send directly as a message
-          // eslint-disable-next-line no-console
-          console.log(
-            '📎 Template with attachments detected, sending directly'
-          );
-
           const messageData = {
             content: '', // Empty content - backend will handle placeholder text
             content_type: 'text',
@@ -947,32 +993,8 @@ export default {
         const contentAttrs =
           content?.content_attributes || content?.contentAttributes;
 
-        // eslint-disable-next-line no-console
-        console.log('🎯 Content:', content);
-        // eslint-disable-next-line no-console
-        console.log('🎯 ContentAttrs:', contentAttrs);
-        // eslint-disable-next-line no-console
-        console.log('🔍 Debug form/pages checks:');
-        // eslint-disable-next-line no-console
-        console.log('  - contentAttrs?.pages exists:', !!contentAttrs?.pages);
-        // eslint-disable-next-line no-console
-        console.log('  - contentAttrs?.form exists:', !!contentAttrs?.form);
-        // eslint-disable-next-line no-console
-        console.log('  - content.pages exists:', !!content?.pages);
-        // eslint-disable-next-line no-console
-        console.log('  - content.form exists:', !!content?.form);
-        // eslint-disable-next-line no-console
-        console.log('🎯 Supported channels:', fullTemplate.supportedChannels);
-        // eslint-disable-next-line no-console
-        console.log(
-          '🎯 Is Apple conversation:',
-          this.isAppleMessagesConversation
-        );
-
         // Check if content is an array (multi-block template)
         const isArrayContent = Array.isArray(content);
-        // eslint-disable-next-line no-console
-        console.log('🎯 Is array content:', isArrayContent);
 
         // For array content, check if any block is interactive
         let hasInteractiveBlock = false;
@@ -988,11 +1010,6 @@ export default {
               block.replies ||
               block.sections ||
               block.timeslots
-          );
-          // eslint-disable-next-line no-console
-          console.log(
-            '🎯 Has interactive block in array:',
-            hasInteractiveBlock
           );
         }
 
@@ -1024,40 +1041,18 @@ export default {
           ) // Forms with form in content_attributes
         );
 
-        // eslint-disable-next-line no-console
-        console.log('🎯 isAppleInteractive:', isAppleInteractive);
-
-        // eslint-disable-next-line no-console
-        console.log(
-          '🎯 isAppleMessagesConversation:',
-          this.isAppleMessagesConversation
-        );
-
         if (isAppleInteractive && this.isAppleMessagesConversation) {
-          // eslint-disable-next-line no-console
-          console.log('✅ Entering Apple interactive message handling block');
           // This is an Apple Messages interactive template - send it directly
 
           // Check if this is an array-based template (content is an array of blocks)
           if (isArrayContent) {
-            // eslint-disable-next-line no-console
-            console.log(
-              '📦 Processing array-based template with blocks:',
-              content
-            );
-
             // Process each block in sequence
             /* eslint-disable no-await-in-loop */
             for (let i = 0; i < content.length; i += 1) {
               const block = content[i];
-              // eslint-disable-next-line no-console
-              console.log(`📦 Processing block ${i}:`, block);
 
               // Show typing indicator before sending (except for first block)
               if (i > 0) {
-                // eslint-disable-next-line no-console
-                console.log('💬 Showing typing indicator...');
-
                 this.$store.dispatch('conversationTypingStatus/toggleTyping', {
                   conversationId: this.currentChat.id,
                   status: 'on',
@@ -1095,8 +1090,6 @@ export default {
                   message: block.content,
                   private: false,
                 };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending text block:', textPayload);
                 await this.sendMessage(textPayload);
 
                 // Longer delay after text message to let it render and be read
@@ -1133,8 +1126,6 @@ export default {
                       block.reply_subtitle || block.replySubtitle || '',
                   },
                 };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending quick reply block:', messageData);
                 await this.sendAppleMessage(messageData);
               } else if (block.type === 'list_picker' || block.sections) {
                 // List picker block
@@ -1143,8 +1134,6 @@ export default {
                   content_type: 'apple_list_picker',
                   content_attributes: block,
                 };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending list picker block:', messageData);
                 await this.sendAppleMessage(messageData);
               } else if (block.type === 'time_picker' || block.timeslots) {
                 // Time picker block
@@ -1153,8 +1142,6 @@ export default {
                   content_type: 'apple_time_picker',
                   content_attributes: block,
                 };
-                // eslint-disable-next-line no-console
-                console.log('📤 Sending time picker block:', messageData);
                 await this.sendAppleMessage(messageData);
               }
             }
@@ -1163,8 +1150,6 @@ export default {
           }
 
           // Single interactive message - detect the message type and wrap the content appropriately
-          // eslint-disable-next-line no-console
-          console.log('🔍 Detecting message type from content structure');
 
           let messageData;
           if (
@@ -1180,11 +1165,6 @@ export default {
               contentType === 'apple_form';
 
             if (needsRenderAPI) {
-              // eslint-disable-next-line no-console
-              console.log(
-                `🔄 Content type ${contentType} needs render API for image loading`
-              );
-
               // Call render API to fetch images and ensure proper format
               const rendered = await this.$store.dispatch(
                 'messageTemplates/render',
@@ -1198,8 +1178,6 @@ export default {
               );
 
               const renderedData = rendered.data || rendered;
-              // eslint-disable-next-line no-console
-              console.log('🔄 Render API response:', renderedData);
 
               if (renderedData?.content_attributes) {
                 messageData = {
@@ -1219,10 +1197,6 @@ export default {
               }
             } else {
               // Use content directly for non-template types
-              // eslint-disable-next-line no-console
-              console.log(
-                '✅ Branch 1: Content has content_type and content_attributes'
-              );
               messageData = {
                 content_type: contentType,
                 content_attributes:
@@ -1230,8 +1204,6 @@ export default {
                 type: content.type,
               };
             }
-            // eslint-disable-next-line no-console
-            console.log('📤 messageData created:', messageData);
           } else if (content.type) {
             // Content has explicit type - use it directly
             messageData = content;
@@ -1264,8 +1236,6 @@ export default {
           ) {
             // List picker structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted
-            // eslint-disable-next-line no-console
-            console.log('📋 Calling render API for list picker template');
 
             const rendered = await this.$store.dispatch(
               'messageTemplates/render',
@@ -1279,8 +1249,6 @@ export default {
             );
 
             const renderedData = rendered.data || rendered;
-            // eslint-disable-next-line no-console
-            console.log('📋 Render API response:', renderedData);
 
             if (renderedData?.content_attributes) {
               messageData = {
@@ -1395,9 +1363,6 @@ export default {
               };
             }
 
-            // eslint-disable-next-line no-console
-            console.log('⏰ Calling render API with parameters:', parameters);
-
             const rendered = await this.$store.dispatch(
               'messageTemplates/render',
               {
@@ -1410,8 +1375,6 @@ export default {
             );
 
             const renderedData = rendered.data || rendered;
-            // eslint-disable-next-line no-console
-            console.log('⏰ Render API response:', renderedData);
 
             if (renderedData?.content_attributes) {
               messageData = {
@@ -1460,18 +1423,6 @@ export default {
           ) {
             // Form structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted
-            // eslint-disable-next-line no-console
-            console.log('📝 Form detected! Details:');
-            // eslint-disable-next-line no-console
-            console.log('  - content.form:', !!content.form);
-            // eslint-disable-next-line no-console
-            console.log('  - content.pages:', !!content.pages);
-            // eslint-disable-next-line no-console
-            console.log('  - contentAttrs.form:', !!contentAttrs?.form);
-            // eslint-disable-next-line no-console
-            console.log('  - contentAttrs.pages:', !!contentAttrs?.pages);
-            // eslint-disable-next-line no-console
-            console.log('📝 Calling render API for form template');
 
             const rendered = await this.$store.dispatch(
               'messageTemplates/render',
@@ -1485,8 +1436,6 @@ export default {
             );
 
             const renderedData = rendered.data || rendered;
-            // eslint-disable-next-line no-console
-            console.log('📝 Render API response:', renderedData);
 
             if (renderedData?.content_attributes) {
               messageData = {
@@ -1518,56 +1467,27 @@ export default {
 
           // Clean up images array - remove base64 data and preview, keep only identifiers
           if (messageData.content_attributes?.images) {
-            // eslint-disable-next-line no-console
-            console.log(
-              '🖼️  Cleaning up images. Before:',
-              messageData.content_attributes.images
-            );
+            // Check if images is an object (dictionary) or array
+            const imagesData = messageData.content_attributes.images;
 
-            try {
-              // Check if images is an object (dictionary) or array
-              const imagesData = messageData.content_attributes.images;
+            if (Array.isArray(imagesData)) {
+              // Array format - map over items
+              messageData.content_attributes.images = imagesData.map(img => ({
+                identifier: img.identifier,
+                description: img.description || '',
+                data: img.data,
+              }));
+            } else if (typeof imagesData === 'object') {
+              // Object/dictionary format (keys are identifiers, values are base64 strings)
+              // Convert to array format expected by backend
 
-              if (Array.isArray(imagesData)) {
-                // Array format - map over items
-                messageData.content_attributes.images = imagesData.map(img => ({
-                  identifier: img.identifier,
-                  description: img.description || '',
-                  data: img.data,
-                }));
-              } else if (typeof imagesData === 'object') {
-                // Object/dictionary format (keys are identifiers, values are base64 strings)
-                // Convert to array format expected by backend
-                // eslint-disable-next-line no-console
-                console.log(
-                  '🖼️  Images is an object/dictionary - converting to array format'
-                );
-
-                messageData.content_attributes.images = Object.entries(
-                  imagesData
-                ).map(([identifier, data]) => ({
-                  identifier: identifier,
-                  description: '',
-                  data: data,
-                }));
-
-                // eslint-disable-next-line no-console
-                console.log(
-                  '🖼️  Converted to array with',
-                  messageData.content_attributes.images.length,
-                  'images'
-                );
-              }
-
-              // eslint-disable-next-line no-console
-              console.log(
-                '🖼️  After cleanup:',
-                messageData.content_attributes.images
-              );
-            } catch (error) {
-              // eslint-disable-next-line no-console
-              console.error('❌ Error cleaning up images:', error);
-              throw error;
+              messageData.content_attributes.images = Object.entries(
+                imagesData
+              ).map(([identifier, data]) => ({
+                identifier: identifier,
+                description: '',
+                data: data,
+              }));
             }
           }
 
@@ -1581,22 +1501,10 @@ export default {
             messageData.type === 'time_picker' &&
             messageData.content_attributes?.images
           ) {
-            // eslint-disable-next-line no-console
-            console.log(
-              '⏰ Removing images from time picker content_attributes (handled via template_id)'
-            );
             delete messageData.content_attributes.images;
           }
 
-          // eslint-disable-next-line no-console
-          console.log(
-            '🚀 About to call sendAppleMessage with messageData:',
-            messageData
-          );
-
           await this.sendAppleMessage(messageData);
-          // eslint-disable-next-line no-console
-          console.log('✅ sendAppleMessage completed successfully');
           return;
         }
 
@@ -1648,10 +1556,6 @@ export default {
           // TODO: Open a modal to collect parameters
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('❌ Error in handleUnifiedTemplate:', error);
-        // eslint-disable-next-line no-console
-        console.error('❌ Error stack:', error.stack);
         this.$store.dispatch('alerts/show', {
           message: error?.message || 'Failed to load template',
           type: 'error',
