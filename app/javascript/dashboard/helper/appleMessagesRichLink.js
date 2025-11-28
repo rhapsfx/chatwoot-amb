@@ -157,6 +157,26 @@ const isDirectVideoURL = url => {
   return videoExtensions.some(ext => lowerURL.endsWith(ext));
 };
 
+// Check if URL is an Apple Maps link
+// Apple Maps links should use manual rich link with location preview, not App Clips
+const isAppleMapsURL = url => {
+  if (!url || typeof url !== 'string') return false;
+
+  // Match Apple Maps patterns:
+  // - maps.apple.com/frame?... (frame URLs with parameters: center, span, distance, heading, pitch, map mode, tracking)
+  // - maps.apple.com/?... (with query params)
+  // - maps.apple/p/... (short URLs)
+  // - maps.apple.com/place/... (place URLs)
+  return (
+    url.includes('maps.apple.com') ||
+    url.includes('maps.apple/') ||
+    /maps\.apple\.com\/frame\?/.test(url) ||
+    /maps\.apple\.com\/\?/.test(url) ||
+    /maps\.apple\.com\/place\//.test(url) ||
+    /maps\.apple\/p\//.test(url)
+  );
+};
+
 export const createRichLinkPreview = async (url, conversation = null) => {
   try {
     // Normalize URL before processing
@@ -168,19 +188,29 @@ export const createRichLinkPreview = async (url, conversation = null) => {
       throw new Error('Account ID not found');
     }
 
-    // ⚠️ SKIP App Clips for direct video URLs
-    // Video URLs need manual rich link with video assets
-    const skipAppClips = isDirectVideoURL(normalizedURL);
+    // ⚠️ SKIP App Clips for:
+    // 1. Direct video URLs - they need manual rich link with video assets
+    // 2. Apple Maps URLs - they need manual rich link with location preview
+    const skipAppClips =
+      isDirectVideoURL(normalizedURL) || isAppleMapsURL(normalizedURL);
     if (skipAppClips) {
-      // eslint-disable-next-line no-console
-      console.log(
-        '[Rich Link] Direct video URL detected, skipping App Clips:',
-        normalizedURL
-      );
+      if (isDirectVideoURL(normalizedURL)) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[Rich Link] Direct video URL detected, skipping App Clips:',
+          normalizedURL
+        );
+      } else if (isAppleMapsURL(normalizedURL)) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[Rich Link] Apple Maps URL detected, skipping App Clips:',
+          normalizedURL
+        );
+      }
     }
 
     // ✅ PRIORITY 1: Try App Clips (Construct Payload API) if conversation available
-    // BUT skip for direct video URLs - they need manual rich link with video assets
+    // BUT skip for direct video URLs and Apple Maps URLs - they need manual rich link
     if (conversation?.inbox_id && !skipAppClips) {
       try {
         // Check if URL might support App Clips (basic HTTPS validation)
@@ -218,12 +248,19 @@ export const createRichLinkPreview = async (url, conversation = null) => {
     }
 
     // ✅ PRIORITY 2: Fallback to OpenGraph scraping (manual rich link)
-    // This is also used for direct video URLs (bypassing App Clips)
+    // This is also used for direct video URLs and Apple Maps URLs (bypassing App Clips)
     if (skipAppClips) {
-      // eslint-disable-next-line no-console
-      console.log(
-        '[Rich Link] Using manual rich link for video URL (video assets will be added by backend)'
-      );
+      if (isDirectVideoURL(normalizedURL)) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[Rich Link] Using manual rich link for video URL (video assets will be added by backend)'
+        );
+      } else if (isAppleMapsURL(normalizedURL)) {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[Rich Link] Using manual rich link for Apple Maps (location preview will be shown)'
+        );
+      }
     }
 
     const data = await ParseUrlAPI.parse(accountId, normalizedURL);
