@@ -6,7 +6,7 @@
 # ============================================
 FROM ruby:3.3.9-slim AS base
 
-# Install essential system packages
+# Install essential system packages including Node.js for ExecJS runtime
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
     build-essential \
@@ -21,6 +21,8 @@ RUN apt-get update -qq && \
     tzdata \
     shared-mime-info \
     git && \
+    curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Set production environment
@@ -66,7 +68,8 @@ COPY tailwind.config.js ./
 COPY postcss.config.js ./
 
 # Build frontend assets with Vite directly (with increased memory limit)
-RUN NODE_OPTIONS="--max-old-space-size=2048" npx vite build --mode=production
+# Using 4GB heap size since server has 3.7GB RAM + 4GB swap available
+RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --mode=production
 
 # ============================================
 # Stage 4: Ruby Dependencies
@@ -76,8 +79,9 @@ FROM base AS ruby-builder
 # Copy Gemfile
 COPY Gemfile Gemfile.lock ./
 
-# Install Ruby gems
-RUN gem install bundler:2.5.23 && \
+# Install Ruby gems (using bundler version from Gemfile.lock)
+# Updated 2025-12-02 to fix bundler version mismatch
+RUN gem install bundler:2.5.16 && \
     bundle config set --local deployment 'true' && \
     bundle config set --local without 'development test' && \
     bundle install --jobs=4 --retry=3
@@ -89,6 +93,7 @@ FROM base AS production
 
 # Copy installed gems from ruby-builder
 COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
+COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
 
 # Copy built assets from asset-builder
 COPY --from=asset-builder /app/public /app/public

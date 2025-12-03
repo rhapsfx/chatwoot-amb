@@ -414,14 +414,58 @@ class AppleMessagesForBusiness::SendRichLinkService
       return nil
     end
 
+    # Resize Apple Maps directions icon to 150x150 (icon format)
+    image_data = response.body
+    if apple_maps_directions_icon?(image_url)
+      Rails.logger.info '🔍 Rich Link - Resizing Apple Maps directions icon to 150x150'
+      image_data = resize_image_to_icon_format(image_data)
+    end
+
     # Encode to base64
-    encoded = Base64.strict_encode64(response.body)
+    encoded = Base64.strict_encode64(image_data)
     Rails.logger.info "✅ Rich Link - Successfully encoded image (#{encoded.length} chars)"
     encoded
   rescue StandardError => e
     log_error "❌ Rich Link - Failed to download image #{image_url}: #{e.message}"
     log_error "❌ Rich Link - Backtrace: #{e.backtrace.first(3).join("\n")}"
     nil
+  end
+
+  # Check if this is the Apple Maps directions default icon
+  def apple_maps_directions_icon?(image_url)
+    image_url.include?('maps.apple.com') && image_url.include?('maps-app-icon')
+  end
+
+  # Resize image to 150x150 (icon format for rich links)
+  def resize_image_to_icon_format(image_data)
+    require 'image_processing/mini_magick'
+
+    # Create a temporary file from the image data
+    tempfile = Tempfile.new(['apple_maps_icon', '.png'])
+    tempfile.binmode
+    tempfile.write(image_data)
+    tempfile.rewind
+
+    # Resize to 150x150 using ImageProcessing
+    processed = ImageProcessing::MiniMagick
+                .source(tempfile)
+                .resize_to_fill(150, 150)
+                .call
+
+    # Read the resized image
+    resized_data = File.binread(processed.path)
+
+    Rails.logger.info "✅ Rich Link - Resized Apple Maps icon from #{image_data.bytesize} to #{resized_data.bytesize} bytes"
+
+    resized_data
+  rescue StandardError => e
+    Rails.logger.error "❌ Rich Link - Failed to resize image: #{e.message}"
+    # Return original image if resize fails
+    image_data
+  ensure
+    tempfile&.close
+    tempfile&.unlink
+    processed&.unlink if processed
   end
 
   def extract_title_from_url(url)

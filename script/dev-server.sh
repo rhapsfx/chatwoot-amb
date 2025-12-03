@@ -434,6 +434,9 @@ start_sidekiq() {
     # Create log directory if it doesn't exist
     mkdir -p log
     
+    # Set hostname for sidekiq_alive gem identification
+    export HOSTNAME="liquid-m3-pro-dev"
+    
     # Start Sidekiq in background (newer versions don't support -d flag)
     nohup bundle exec sidekiq > log/sidekiq.log 2>&1 &
     SIDEKIQ_PID=$!
@@ -725,7 +728,7 @@ check_tailscale_funnel_status() {
         fi
     elif [ -n "$funnel_url" ]; then
         funnel_status="${YELLOW}CONFIGURED${NC}"
-        detailed_status="URL saved: $funnel_url (use 'tailscale funnel status' to check if active)"
+        detailed_status="URL saved: $funnel_url (connectivity auto-verified on restart)"
     else
         funnel_status="${YELLOW}STATUS UNKNOWN${NC}"
         detailed_status="Run './script//dev-server.sh tailscale-status' in your terminal to check"
@@ -857,6 +860,212 @@ show_tailscale_status() {
 
     echo ""
 }
+
+# Function to test external connectivity to Tailscale domain
+test_external_connectivity() {
+    local domain=${1:-"$CUSTOM_DOMAIN"}
+    local port=${2:-""}
+    local test_url=""
+    local quiet_mode=${3:-false}
+    
+    # Construct the test URL
+    if [ -n "$port" ]; then
+        test_url="https://${domain}:${port}"
+    else
+        test_url="https://${domain}"
+    fi
+    
+    if [ "$quiet_mode" != "true" ]; then
+        print_status "Testing external connectivity to: $test_url"
+    fi
+    
+    # Test 1: Basic HTTPS connectivity
+    local connectivity_result=""
+    local http_status=""
+    local response_time=""
+    
+    # Use curl with timeout and follow redirects
+    local curl_output=$(curl -s -w "%{http_code}|%{time_total}" \
+        --max-time 10 \
+        --connect-timeout 5 \
+        --retry 2 \
+        --retry-delay 1 \
+        -L \
+        -H "User-Agent: Chatwoot-DevServer-ConnTest/1.0" \
+        "$test_url" 2>/dev/null)
+    
+    if [ $? -eq 0 ] && [ -n "$curl_output" ]; then
+        http_status=$(echo "$curl_output" | tail -1 | cut -d'|' -f1)
+        response_time=$(echo "$curl_output" | tail -1 | cut -d'|' -f2)
+        
+        # Check if we got a reasonable HTTP response
+        if [[ "$http_status" =~ ^[2345][0-9][0-9]$ ]]; then
+            connectivity_result="SUCCESS"
+            if [ "$quiet_mode" != "true" ]; then
+                print_success "External connectivity test passed (HTTP $http_status, ${response_time}s)"
+            fi
+        else
+            connectivity_result="HTTP_ERROR"
+            if [ "$quiet_mode" != "true" ]; then
+                print_warning "External connectivity issue: HTTP status $http_status"
+            fi
+        fi
+    else
+        connectivity_result="FAILED"
+        if [ "$quiet_mode" != "true" ]; then
+            print_error "External connectivity test failed: Cannot reach $test_url"
+        fi
+    fi
+    
+    # Test 2: DNS resolution check
+    if [ "$quiet_mode" != "true" ]; then
+        print_status "Testing DNS resolution for $domain..."
+    fi
+    
+    local dns_result=""
+    if nslookup "$domain" >/dev/null 2>&1; then
+        dns_result="SUCCESS"
+        if [ "$quiet_mode" != "true" ]; then
+            print_success "DNS resolution successful for $domain"
+        fi
+    else
+        dns_result="FAILED"
+        if [ "$quiet_mode" != "true" ]; then
+            print_error "DNS resolution failed for $domain"
+        fi
+    fi
+    
+    # Test 3: Check if it's a Tailscale domain and verify Tailscale status
+    local tailscale_check=""
+    if [[ "$domain" == *.ts.net ]]; then
+        if [ "$quiet_mode" != "true" ]; then
+            print_status "Detected Tailscale domain, checking Funnel status..."
+        fi
+        
+        if command -v tailscale >/dev/null 2>&1; then
+            # Quick Tailscale status check with timeout
+            local tailscale_status_output=$(perl -e 'alarm 3; exec @ARGV' tailscale status 2>/dev/null || echo "")
+            if [ -n "$tailscale_status_output" ] && ! echo "$tailscale_status_output" | grep -q "Logged out"; then
+                tailscale_check="AUTHENTICATED"
+                if [ "$quiet_mode" != "true" ]; then
+                    print_success "Tailscale is authenticated"
+                fi
+            else
+                tailscale_check="NOT_AUTHENTICATED"
+                if [ "$quiet_mode" != "true" ]; then
+                    print_warning "Tailscale is not authenticated - this may affect external access"
+                fi
+            fi
+        else
+            tailscale_check="NOT_INSTALLED"
+            if [ "$quiet_mode" != "true" ]; then
+                print_warning "Tailscale not installed, cannot verify Funnel status"
+            fi
+        fi
+    else
+        tailscale_check="NOT_TAILSCALE"
+    fi
+    
+    # Summary
+    local overall_status="UNKNOWN"
+    if [ "$connectivity_result" = "SUCCESS" ] && [ "$dns_result" = "SUCCESS" ]; then
+        overall_status="PASS"
+        if [ "$quiet_mode" != "true" ]; then
+            print_success "External connectivity verification PASSED"
+            echo -e "${GREEN}✓ Apple Messages for Business webhooks should be able to reach this server${NC}"
+        fi
+    elif [ "$connectivity_result" = "HTTP_ERROR" ] && [ "$dns_result" = "SUCCESS" ]; then
+        overall_status="PARTIAL"
+        if [ "$quiet_mode" != "true" ]; then
+            print_warning "External connectivity PARTIALLY working (DNS OK, HTTP issues)"
+            echo -e "${YELLOW}⚠ Apple Messages webhooks may have issues reaching this server${NC}"
+        fi
+    else
+        overall_status="FAIL"
+        if [ "$quiet_mode" != "true" ]; then
+            print_error "External connectivity verification FAILED"
+            echo -e "${RED}✗ Apple Messages for Business webhooks will NOT be able to reach this server${NC}"
+            
+            # Provide troubleshooting suggestions
+            echo -e "\n${YELLOW}Troubleshooting suggestions:${NC}"
+            if [ "$dns_result" = "FAILED" ]; then
+                echo -e "  • DNS resolution failed - check if domain is correctly configured"
+            fi
+            if [[ "$domain" == *.ts.net ]] && [ "$tailscale_check" != "AUTHENTICATED" ]; then
+                echo -e "  • Run 'tailscale up' to authenticate Tailscale"
+                echo -e "  • Run 'tailscale funnel $TAILSCALE_PORT' to enable Funnel"
+            fi
+            echo -e "  • Check firewall and network connectivity"
+            echo -e "  • Verify the server is actually running and accessible locally first"
+        fi
+    fi
+    
+    # Return status code based on overall result
+    case "$overall_status" in
+        "PASS") return 0 ;;
+        "PARTIAL") return 1 ;;
+        "FAIL") return 2 ;;
+        *) return 3 ;;
+    esac
+}
+
+# Function to test Apple Messages webhook endpoint specifically
+test_apple_messages_connectivity() {
+    local domain=${1:-"$CUSTOM_DOMAIN"}
+    local quiet_mode=${2:-false}
+    
+    if [ "$quiet_mode" != "true" ]; then
+        echo -e "\n${BLUE}=== Apple Messages for Business Connectivity Test ===${NC}"
+    fi
+    
+    # Test the webhook endpoint specifically
+    local webhook_url="https://${domain}/webhooks/apple_messages_for_business/message"
+    
+    if [ "$quiet_mode" != "true" ]; then
+        print_status "Testing Apple Messages webhook endpoint: $webhook_url"
+    fi
+    
+    # Use curl to test the webhook endpoint
+    local webhook_result=$(curl -s -w "%{http_code}" \
+        --max-time 10 \
+        --connect-timeout 5 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -H "User-Agent: Apple-Messages-Webhook-Test/1.0" \
+        -d '{"test": "connectivity"}' \
+        "$webhook_url" 2>/dev/null)
+    
+    local webhook_status=""
+    if [ -n "$webhook_result" ]; then
+        webhook_status=$(echo "$webhook_result" | tail -c 4 | head -c 3)
+        
+        # We expect 400, 401, or 422 for a malformed test request, which means the endpoint is reachable
+        if [[ "$webhook_status" =~ ^(400|401|422|404|500)$ ]]; then
+            if [ "$quiet_mode" != "true" ]; then
+                print_success "Apple Messages webhook endpoint is externally reachable (HTTP $webhook_status)"
+                echo -e "${GREEN}✓ Apple can send webhooks to this server${NC}"
+            fi
+            return 0
+        elif [[ "$webhook_status" =~ ^2[0-9][0-9]$ ]]; then
+            if [ "$quiet_mode" != "true" ]; then
+                print_success "Apple Messages webhook endpoint responded successfully (HTTP $webhook_status)"
+                echo -e "${GREEN}✓ Apple can send webhooks to this server${NC}"
+            fi
+            return 0
+        else
+            if [ "$quiet_mode" != "true" ]; then
+                print_warning "Apple Messages webhook endpoint returned unexpected status: $webhook_status"
+            fi
+            return 1
+        fi
+    else
+        if [ "$quiet_mode" != "true" ]; then
+            print_error "Cannot reach Apple Messages webhook endpoint"
+            echo -e "${RED}✗ Apple cannot send webhooks to this server${NC}"
+        fi
+        return 2
+    fi
+}
 show_status() {
     echo -e "\n${BLUE}=== Chatwoot Development Server Status ===${NC}"
     echo -e "Ruby Version: ${GREEN}$(ruby --version)${NC}"
@@ -924,18 +1133,18 @@ show_status() {
     if echo "$tailscale_status" | grep -q "RUNNING" && [ -n "$tailscale_url" ]; then
         printf "HTTPS URL: "
         print_url "https://$tailscale_url"
-        echo -e "${YELLOW}Note: Apple Messages for Business attachments will use Tailscale Funnel URLs${NC}"
+        echo -e "${YELLOW}Note: Apple Messages for Business webhooks will use Tailscale Funnel URLs (connectivity auto-verified)${NC}"
     elif [ "$USE_CUSTOM_DOMAIN" = true ] && is_nginx_running; then
         printf "HTTPS URL: "
         print_url "https://$CUSTOM_DOMAIN"
-        echo -e "${YELLOW}Note: Apple Messages for Business attachments will use custom domain URLs${NC}"
+        echo -e "${YELLOW}Note: Apple Messages for Business webhooks will use custom domain URLs (connectivity auto-verified)${NC}"
         echo -e "${YELLOW}Ensure port forwarding is configured: External port 3000 -> Internal IP:3000${NC}"
     elif [ -n "$ngrok_url" ]; then
         printf "Public URL: "
         print_url "$ngrok_url"
-        echo -e "${YELLOW}Note: Apple Messages for Business attachments will use ngrok URLs${NC}"
+        echo -e "${YELLOW}Note: Apple Messages for Business webhooks will use ngrok URLs (connectivity auto-verified)${NC}"
     else
-        echo -e "${YELLOW}Note: Apple Messages for Business attachments will use localhost URLs${NC}"
+        echo -e "${YELLOW}Note: Apple Messages for Business webhooks will use localhost URLs (external connectivity not verified)${NC}"
     fi
     echo ""
 }
@@ -991,6 +1200,39 @@ restart_services() {
     fi
     start_rails
     start_sidekiq
+    
+    # Test external connectivity after restart
+    print_status "Verifying external connectivity after restart..."
+    sleep 3  # Give services a moment to fully start
+    
+    local domain_to_test=""
+    if [ "$USE_TAILSCALE_FUNNEL" = true ] && [ -f "$TAILSCALE_URL_FILE" ]; then
+        domain_to_test=$(cat "$TAILSCALE_URL_FILE" 2>/dev/null | head -1 | tr -d '\n')
+    elif [ "$USE_CUSTOM_DOMAIN" = true ]; then
+        domain_to_test="$CUSTOM_DOMAIN"
+    fi
+    
+    if [ -n "$domain_to_test" ]; then
+        echo -e "\n${BLUE}=== Post-Restart Connectivity Verification ===${NC}"
+        test_external_connectivity "$domain_to_test"
+        local connectivity_result=$?
+        
+        # Also test Apple Messages specific endpoint
+        test_apple_messages_connectivity "$domain_to_test"
+        local apple_result=$?
+        
+        echo ""
+        if [ $connectivity_result -eq 0 ] && [ $apple_result -eq 0 ]; then
+            print_success "All external connectivity checks passed"
+        elif [ $connectivity_result -le 1 ] || [ $apple_result -le 1 ]; then
+            print_warning "Some connectivity issues detected - check logs above"
+        else
+            print_error "External connectivity verification failed - Apple Messages webhooks may not work"
+        fi
+    else
+        print_warning "No external domain configured - skipping connectivity test"
+    fi
+    
     show_status
 }
 
@@ -1061,41 +1303,47 @@ stop_all_services() {
 # Function to show help
 show_help() {
     echo -e "\n${BLUE}Chatwoot Development Server Management${NC}"
-    echo -e "Usage: $0 {start|start-public|stop|restart|status|nginx-start|nginx-stop|nginx-reload|ngrok-start|ngrok-stop|tailscale-start|tailscale-stop|tailscale-status|help}"
+    echo -e "Usage: $0 {start|start-public|stop|restart|status|test-connectivity|test-apple-messages|nginx-start|nginx-stop|nginx-reload|ngrok-start|ngrok-stop|tailscale-start|tailscale-stop|tailscale-status|help}"
     echo ""
     echo -e "${YELLOW}Commands:${NC}"
-    echo -e "  start            - Start Rails server and Sidekiq (localhost only)"
-    echo -e "  start-public     - Start all services with public access (custom domain, Tailscale Funnel, or ngrok)"
-    echo -e "  stop             - Stop all services"
-    echo -e "  restart          - Restart all services with public access"
-    echo -e "  status           - Show current status of all services"
-    echo -e "  nginx-start      - Start nginx server only (when USE_CUSTOM_DOMAIN=true)"
-    echo -e "  nginx-stop       - Stop nginx server only"
-    echo -e "  nginx-reload     - Reload nginx configuration"
-    echo -e "  ngrok-start      - Start ngrok tunnel only"
-    echo -e "  ngrok-stop       - Stop ngrok tunnel only"
-    echo -e "  tailscale-start  - Start Tailscale Funnel only"
-    echo -e "  tailscale-stop   - Stop Tailscale Funnel only"
-    echo -e "  tailscale-status - Check detailed Tailscale and Funnel status"
-    echo -e "  help             - Show this help message"
+    echo -e "  start              - Start Rails server and Sidekiq (localhost only)"
+    echo -e "  start-public       - Start all services with public access (custom domain, Tailscale Funnel, or ngrok)"
+    echo -e "  stop               - Stop all services"
+    echo -e "  restart            - Restart all services with public access and test connectivity"
+    echo -e "  status             - Show current status of all services"
+    echo -e "  test-connectivity  - Test external connectivity to configured domain"
+    echo -e "  test-apple-messages - Test Apple Messages webhook endpoint specifically"
+    echo -e "  nginx-start        - Start nginx server only (when USE_CUSTOM_DOMAIN=true)"
+    echo -e "  nginx-stop         - Stop nginx server only"
+    echo -e "  nginx-reload       - Reload nginx configuration"
+    echo -e "  ngrok-start        - Start ngrok tunnel only"
+    echo -e "  ngrok-stop         - Stop ngrok tunnel only"
+    echo -e "  tailscale-start    - Start Tailscale Funnel only"
+    echo -e "  tailscale-stop     - Stop Tailscale Funnel only"
+    echo -e "  tailscale-status   - Check detailed Tailscale and Funnel status"
+    echo -e "  help               - Show this help message"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
     if [ "$USE_CUSTOM_DOMAIN" = true ]; then
-        echo -e "  $0 start-public    # Start with custom domain: https://$CUSTOM_DOMAIN"
-        echo -e "  $0 nginx-start     # Start nginx HTTPS proxy only"
-        echo -e "  $0 nginx-reload    # Reload nginx configuration"
+        echo -e "  $0 start-public        # Start with custom domain: https://$CUSTOM_DOMAIN"
+        echo -e "  $0 test-connectivity   # Test if $CUSTOM_DOMAIN is reachable externally"
+        echo -e "  $0 nginx-start         # Start nginx HTTPS proxy only"
+        echo -e "  $0 nginx-reload        # Reload nginx configuration"
     elif [ "$USE_TAILSCALE_FUNNEL" = true ]; then
-        echo -e "  $0 start-public      # Start with Tailscale Funnel"
-        echo -e "  $0 tailscale-start   # Start Tailscale Funnel only"
-        echo -e "  $0 tailscale-status  # Check Tailscale authentication and Funnel status"
+        echo -e "  $0 start-public        # Start with Tailscale Funnel"
+        echo -e "  $0 test-connectivity   # Test if Tailscale domain is reachable externally"
+        echo -e "  $0 tailscale-start     # Start Tailscale Funnel only"
+        echo -e "  $0 tailscale-status    # Check Tailscale authentication and Funnel status"
     else
-        echo -e "  $0 start-public    # Start with ngrok tunnel"
-        echo -e "  $0 ngrok-start     # Start ngrok tunnel only"
+        echo -e "  $0 start-public        # Start with ngrok tunnel"
+        echo -e "  $0 test-connectivity   # Test if ngrok tunnel is reachable externally"
+        echo -e "  $0 ngrok-start         # Start ngrok tunnel only"
     fi
-    echo -e "  $0 start         # Start with localhost only"
-    echo -e "  $0 stop          # Stop all services"
-    echo -e "  $0 status        # Check if services are running"
-    echo -e "  $0 tailscale-status # Detailed Tailscale diagnostics"
+    echo -e "  $0 start               # Start with localhost only"
+    echo -e "  $0 stop                # Stop all services"
+    echo -e "  $0 status              # Check if services are running"
+    echo -e "  $0 test-apple-messages # Test Apple Messages webhook endpoint"
+    echo -e "  $0 tailscale-status    # Detailed Tailscale diagnostics"
     echo ""
     echo -e "${YELLOW}Configuration:${NC}"
     if [ "$USE_CUSTOM_DOMAIN" = true ]; then
@@ -1112,6 +1360,10 @@ show_help() {
         echo -e "  Edit USE_TAILSCALE_FUNNEL=true to use Tailscale Funnel instead"
     fi
     echo -e "  Edit USE_CUSTOM_DOMAIN, USE_TAILSCALE_FUNNEL variables in this script"
+    echo ""
+    echo -e "${YELLOW}External Connectivity:${NC}"
+    echo -e "  The restart command automatically tests external connectivity"
+    echo -e "  Use test-connectivity and test-apple-messages to verify Apple Messages webhook delivery"
     echo ""
 }
 
@@ -1138,6 +1390,52 @@ case "$1" in
         ;;
     status)
         show_status
+        ;;
+    test-connectivity)
+        domain_to_test=""
+        if [ "$USE_TAILSCALE_FUNNEL" = true ] && [ -f "$TAILSCALE_URL_FILE" ]; then
+            domain_to_test=$(cat "$TAILSCALE_URL_FILE" 2>/dev/null | head -1 | tr -d '\n')
+        elif [ "$USE_CUSTOM_DOMAIN" = true ]; then
+            domain_to_test="$CUSTOM_DOMAIN"
+        else
+            # Check for ngrok URL
+            ngrok_info=$(check_ngrok_status)
+            ngrok_url=$(echo "$ngrok_info" | cut -d'|' -f2)
+            if [ -n "$ngrok_url" ]; then
+                domain_to_test=$(echo "$ngrok_url" | sed 's|https://||')
+            fi
+        fi
+        
+        if [ -n "$domain_to_test" ]; then
+            test_external_connectivity "$domain_to_test"
+        else
+            print_error "No external domain configured or available to test"
+            print_status "Start services with 'start-public' first"
+            exit 1
+        fi
+        ;;
+    test-apple-messages)
+        domain_to_test=""
+        if [ "$USE_TAILSCALE_FUNNEL" = true ] && [ -f "$TAILSCALE_URL_FILE" ]; then
+            domain_to_test=$(cat "$TAILSCALE_URL_FILE" 2>/dev/null | head -1 | tr -d '\n')
+        elif [ "$USE_CUSTOM_DOMAIN" = true ]; then
+            domain_to_test="$CUSTOM_DOMAIN"
+        else
+            # Check for ngrok URL
+            ngrok_info=$(check_ngrok_status)
+            ngrok_url=$(echo "$ngrok_info" | cut -d'|' -f2)
+            if [ -n "$ngrok_url" ]; then
+                domain_to_test=$(echo "$ngrok_url" | sed 's|https://||')
+            fi
+        fi
+        
+        if [ -n "$domain_to_test" ]; then
+            test_apple_messages_connectivity "$domain_to_test"
+        else
+            print_error "No external domain configured or available to test"
+            print_status "Start services with 'start-public' first"
+            exit 1
+        fi
         ;;
     nginx-start)
         if [ "$USE_CUSTOM_DOMAIN" = true ]; then

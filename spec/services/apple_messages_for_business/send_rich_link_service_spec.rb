@@ -4,7 +4,10 @@ require 'rails_helper'
 
 RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
   let(:account) { create(:account) }
-  let(:channel) { create(:channel_apple_messages_for_business, account: account) }
+  let(:channel) do
+    allow_any_instance_of(Channel::AppleMessagesForBusiness).to receive(:validate_jwt_credentials).and_return(nil)
+    create(:channel_apple_messages_for_business, account: account)
+  end
   let(:inbox) { channel.inbox }
   let(:conversation) { create(:conversation, account: account, inbox: inbox) }
   let(:message) { create(:message, conversation: conversation, account: account, content: 'https://www.example.com') }
