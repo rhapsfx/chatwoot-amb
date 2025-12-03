@@ -200,6 +200,9 @@ class MessageTemplate < ApplicationRecord
 
   # Returns detailed JSON representation for API responses
   def detailed_json(include_content_blocks: false)
+    # Build content first to catch any errors early
+    content_data = build_content_safely
+
     result = {
       id: id,
       name: name,
@@ -212,11 +215,11 @@ class MessageTemplate < ApplicationRecord
       status: status,
       version: version,
       metadata: metadata || {},
-      content: build_content,  # Add assembled content
+      content: content_data,  # Use safely built content
       attachmentsSummary: attachments_summary(camel_case: true),  # Add attachments summary in camelCase
       createdAt: created_at,
       updatedAt: updated_at
-    }
+    }.compact  # Remove nil values
 
     if include_content_blocks
       result[:contentBlocks] = content_blocks.order(:order_index).map do |block|
@@ -248,10 +251,14 @@ class MessageTemplate < ApplicationRecord
   # Returns all AppleListPickerImage records referenced in content blocks
   # Extracts image identifiers from time_picker and form blocks and loads the images
   def referenced_images
+    # Return empty array if template isn't persisted or has no account
+    return [] unless persisted?
+    return [] if account_id.nil?
+
     identifiers = extract_image_identifiers_from_blocks
     return [] if identifiers.empty?
 
-    # Load images by identifier
+    # Load images by identifier with error handling
     # AppleListPickerImage records are scoped to the account
     images = AppleListPickerImage.where(account_id: account_id, identifier: identifiers)
 
@@ -267,12 +274,19 @@ class MessageTemplate < ApplicationRecord
         updatedAt: image.updated_at
       }
     end
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::RecordNotFound => e
+    # Log error but don't break template serialization
+    Rails.logger.warn "[MessageTemplate] Failed to load referenced images: #{e.message}"
+    []
   end
 
   # Extracts all image identifiers from content block properties
   # Looks for common image identifier fields in time_picker and form blocks
   def extract_image_identifiers_from_blocks
     identifiers = Set.new
+
+    # Return empty set if content_blocks association isn't loaded or empty
+    return identifiers unless content_blocks.loaded? || persisted?
 
     content_blocks.each do |block|
       properties = block.properties || {}
@@ -387,6 +401,33 @@ class MessageTemplate < ApplicationRecord
     end
 
     identifiers.to_a.compact
+  end
+
+  # Safe wrapper around build_content with error handling
+  def build_content_safely
+    content = build_content
+    # Recursively remove nil values from content
+    deep_compact(content)
+  rescue StandardError => e
+    Rails.logger.error "[MessageTemplate] build_content failed for template #{id}: #{e.message}"
+    Rails.logger.error e.backtrace.first(5).join("\n")
+    # Return empty hash instead of raising error
+    {}
+  end
+
+  # Recursively remove nil values from hashes and arrays
+  def deep_compact(obj)
+    case obj
+    when Hash
+      obj.each_with_object({}) do |(key, value), result|
+        compacted_value = deep_compact(value)
+        result[key] = compacted_value unless compacted_value.nil?
+      end
+    when Array
+      obj.map { |item| deep_compact(item) }.compact
+    else
+      obj
+    end
   end
 
   # Build content from metadata or content blocks

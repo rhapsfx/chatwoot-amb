@@ -308,6 +308,8 @@ class AppleMessagesForBusiness::SendMessageService
     case @message.content_type
     when 'apple_quick_reply'
       base_data[:data]['quick-reply'] = build_quick_reply_data
+      base_data[:receivedMessage] = build_received_message
+      base_data[:replyMessage] = build_reply_message
     when 'apple_list_picker'
       list_picker_data = build_list_picker_data
       base_data[:data][:listPicker] = list_picker_data

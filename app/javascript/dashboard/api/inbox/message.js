@@ -41,7 +41,29 @@ export const buildCreatePayload = ({
         '🔥 buildCreatePayload: Images in content_attributes:',
         contentAttributes.images?.length || 'NO IMAGES'
       );
-      const serializedContentAttributes = JSON.stringify(contentAttributes);
+
+      // Sanitize contentAttributes to remove undefined values before serialization
+      // This prevents JavaScript undefined from being serialized as the string "undefined"
+      const sanitizeObject = obj => {
+        if (Array.isArray(obj)) {
+          return obj
+            .map(item => sanitizeObject(item))
+            .filter(item => item !== undefined);
+        }
+        if (obj && typeof obj === 'object') {
+          return Object.fromEntries(
+            Object.entries(obj)
+              .filter(([, value]) => value !== undefined)
+              .map(([key, value]) => [key, sanitizeObject(value)])
+          );
+        }
+        return obj;
+      };
+
+      const sanitizedContentAttributes = sanitizeObject(contentAttributes);
+      const serializedContentAttributes = JSON.stringify(
+        sanitizedContentAttributes
+      );
       console.log(
         '🔥 buildCreatePayload: Serialized content_attributes length:',
         serializedContentAttributes.length
@@ -55,11 +77,32 @@ export const buildCreatePayload = ({
       payload.append('template_id', templateId);
     }
   } else {
+    // Sanitize contentAttributes for regular JSON payloads too
+    const sanitizeObject = obj => {
+      if (Array.isArray(obj)) {
+        return obj
+          .map(item => sanitizeObject(item))
+          .filter(item => item !== undefined);
+      }
+      if (obj && typeof obj === 'object') {
+        return Object.fromEntries(
+          Object.entries(obj)
+            .filter(([, value]) => value !== undefined)
+            .map(([key, value]) => [key, sanitizeObject(value)])
+        );
+      }
+      return obj;
+    };
+
+    const sanitizedContentAttributes = contentAttributes
+      ? sanitizeObject(contentAttributes)
+      : undefined;
+
     payload = {
       content: message,
       private: isPrivate,
       echo_id: echoId,
-      content_attributes: contentAttributes,
+      content_attributes: sanitizedContentAttributes,
       content_type: contentType,
       cc_emails: ccEmails,
       bcc_emails: bccEmails,

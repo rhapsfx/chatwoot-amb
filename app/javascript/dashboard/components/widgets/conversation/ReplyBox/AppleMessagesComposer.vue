@@ -108,8 +108,8 @@ watch(
   () => listPickerData.value.sections,
   (newSections, oldSections) => {
     console.log('[DEBUG] listPickerData.sections changed:', {
-      newSections: JSON.parse(JSON.stringify(newSections)),
-      oldSections: oldSections ? JSON.parse(JSON.stringify(oldSections)) : null,
+      newSections: newSections,
+      oldSections: oldSections || null,
     });
   },
   { deep: true }
@@ -1027,7 +1027,7 @@ const sendAppleMessage = () => {
       // DEBUG: Log sections before conversion
       console.log(
         '[DEBUG] listPickerData.value.sections BEFORE conversion:',
-        JSON.parse(JSON.stringify(listPickerData.value.sections))
+        listPickerData.value.sections
       );
 
       // Transform sections to use snake_case for backend
@@ -1075,7 +1075,7 @@ const sendAppleMessage = () => {
       // DEBUG: Log sections after conversion
       console.log(
         '[DEBUG] content_attributes.sections AFTER conversion:',
-        JSON.parse(JSON.stringify(content_attributes.sections))
+        content_attributes.sections
       );
 
       // Debug: log items with image_identifier
@@ -1111,9 +1111,29 @@ const sendAppleMessage = () => {
       break;
     case 'quick_reply':
       content_type = 'apple_quick_reply';
-      // Add default reply message fields for Quick Reply
+
+      // Clean items array - ensure no undefined values
+      const cleanItems = (quickReplyData.value?.items || [])
+        .map(item => {
+          const cleanItem = {
+            title: item?.title || 'Option',
+            value: item?.value || item?.title || 'Option',
+          };
+          // Only add identifier if it exists and is not undefined
+          if (item?.identifier && item.identifier !== undefined) {
+            cleanItem.identifier = item.identifier;
+          }
+          return cleanItem;
+        })
+        .filter(item => item.title && item.title !== undefined); // Remove any items without valid title
+
+      // Build content_attributes ensuring NO undefined values
+      // Only add fields that have actual values (not undefined)
+      const summaryText = quickReplyData.value?.summary_text;
+
       content_attributes = {
-        ...quickReplyData.value,
+        summary_text: summaryText || 'Quick Reply Question',
+        items: cleanItems,
         received_title: 'Please select an option',
         received_subtitle: '',
         received_style: 'small',
@@ -1121,7 +1141,13 @@ const sendAppleMessage = () => {
         reply_subtitle: '',
         reply_style: 'icon',
       };
-      content = quickReplyData.value.summary_text || 'Quick Reply Message';
+
+      // Remove any undefined values from content_attributes
+      content_attributes = Object.fromEntries(
+        Object.entries(content_attributes).filter(([_, value]) => value !== undefined)
+      );
+
+      content = summaryText || 'Quick Reply Message';
       break;
     case 'time_picker': {
       content_type = 'apple_time_picker';
@@ -1259,15 +1285,17 @@ const sendAppleMessage = () => {
 
   console.log('[DEBUG AppleMessagesComposer] About to emit - full payload:', {
     content_type,
-    sections: JSON.parse(JSON.stringify(content_attributes.sections)),
+    sections: content_attributes.sections ? JSON.parse(JSON.stringify(content_attributes.sections)) : 'N/A',
     content_attributes_full: JSON.parse(JSON.stringify(content_attributes)),
   });
-  console.log(
-    '[DEBUG AppleMessagesComposer] CRITICAL - multiple_selection values:',
-    content_attributes.sections
-      .map((s, i) => `Section ${i}: ${s.multiple_selection}`)
-      .join(', ')
-  );
+  if (content_attributes.sections) {
+    console.log(
+      '[DEBUG AppleMessagesComposer] CRITICAL - multiple_selection values:',
+      content_attributes.sections
+        .map((s, i) => `Section ${i}: ${s.multiple_selection}`)
+        .join(', ')
+    );
+  }
 
   emit('send', {
     content_type,
