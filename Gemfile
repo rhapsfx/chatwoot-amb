@@ -240,6 +240,8 @@ group :test do
   # test profiling
   gem 'test-prof'
   gem 'simplecov_json_formatter', require: false
+  # parallel test execution
+  gem 'parallel_tests'
 end
 
 group :development, :test do

@@ -3,6 +3,11 @@
         "chatwoot",
         "dompurify"
     ],
+    "terminal.integrated.cursorBlinking": true,
+        "workbench.colorCustomizations": {
+        "terminalCursor.foreground": "#00ffaa"
+    },
+
     // Log file colorization and auto-refresh settings
     "[Log]": {
         "editor.wordWrap": "off",

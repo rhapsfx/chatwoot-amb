@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class AppleMessagesForBusiness::AcousticHouseBotService
-  include AppleMessagesForBusiness::Concerns::Utf8Logging
-
   IDLE_TIMEOUT = 30.minutes
 
   # Template dependencies for deployment automation
@@ -53,7 +51,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Typing indicator configuration
   # Set to false during development for faster testing
   # Set to true in production for better user experience
-  TYPING_INDICATORS_ENABLED = false
+  TYPING_INDICATORS_ENABLED = true
   TYPING_INDICATOR_DELAY = 1.5 # seconds
 
   # Keyword message routing
@@ -63,10 +61,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'listpicker' => :handle_list_picker_demo,
     'guitar' => :handle_list_picker_demo,
     'guitars' => :handle_list_picker_demo,
-    'time picker' => :handle_schedule_lesson,
-    'timepicker' => :handle_schedule_lesson,
-    'appointment' => :handle_schedule_lesson,
-    'time' => :handle_schedule_lesson,
+    'time picker' => :handle_time_picker_demo,
+    'timepicker' => :handle_time_picker_demo,
     'apple pay' => :handle_apple_pay_demo,
     'payment' => :handle_apple_pay_demo,
     'pay' => :handle_apple_pay_demo,
@@ -80,7 +76,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'imessage extension' => :handle_imessage_app,
     'authentication' => :handle_authentication_menu,
     'auth' => :handle_authentication_menu,
-    'shazam' => :handle_imessage_app
+    'shazam' => :handle_imessage_app,
+    'appclip' => :handle_app_clip_demo
   }.freeze
 
   # Keywords that control flow (reset, navigation, etc.)
@@ -96,7 +93,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'skip' => :handle_skip_payment,
     'schedule' => :handle_schedule_lesson,
     'schedule lesson' => :handle_schedule_lesson,
-    'lesson' => :handle_schedule_lesson
+    'lesson' => :handle_schedule_lesson,
+    'appointment' => :handle_schedule_lesson,
+    'time' => :handle_schedule_lesson
   }.freeze
 
   # Combined keyword handlers for backward compatibility
@@ -257,6 +256,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if handler_method
       log_info "[Bot] ✅ Found handler: #{handler_method}"
       send(handler_method, interactive_data)
+
+      # After handling the interactive response, process the updated state
+      # This allows state transitions to continue (e.g., AHC1 → AHC2 → handle_ar_introduction)
+      log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
+      process_state
     else
       log_warn "[Bot] ❌ No handler for requestId: #{request_id}"
       log_warn "[Bot] 📝 Available handlers: #{INTERACTIVE_HANDLERS.keys.inspect}"
@@ -264,6 +268,39 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   private
+
+  # UTF-8 safe logging methods (inlined from Utf8Logging concern for deployment compatibility)
+  def utf8_encode(obj)
+    case obj
+    when String
+      obj.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    when Hash
+      obj.transform_keys { |k| utf8_encode(k) }
+         .transform_values { |v| utf8_encode(v) }
+    when Array
+      obj.map { |item| utf8_encode(item) }
+    when NilClass
+      nil
+    else
+      obj.to_s.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
+  end
+
+  def log_info(message)
+    Rails.logger.info(utf8_encode(message))
+  end
+
+  def log_warn(message)
+    Rails.logger.warn(utf8_encode(message))
+  end
+
+  def log_error(message)
+    Rails.logger.error(utf8_encode(message))
+  end
+
+  def log_debug(message)
+    Rails.logger.debug(utf8_encode(message))
+  end
 
   # Ensure UTF-8 encoding for log output to prevent mojibake
   def utf8_encode(obj)
@@ -705,7 +742,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         auto_select_guitar('Martin DC28E Dreadnought')
         reset_retry_count
         update_bot_state('AHC2')
-        handle_ar_introduction
+        # Don't call handle_ar_introduction directly - let state machine handle it
       else
         send_text_message('Still waiting for your guitar selection...')
       end
@@ -792,9 +829,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       return
     end
 
-    # Normal flow: continue to AR introduction
+    # Normal flow: update state to AHC2, AR will be sent via process_state
     update_bot_state('AHC2')
-    handle_ar_introduction
+    # Don't call handle_ar_introduction directly - let state machine handle it
   end
 
   def auto_select_guitar(guitar_name)
@@ -810,10 +847,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     update_bot_state('AHC3')
 
-    # Wait for AR file to fully upload and be delivered before asking question
-    # AR file has 2s delay in after_commit + upload time + network latency + device rendering
-    # Increased to 15s to ensure AR file is fully visible before question appears
-    sleep(15.0)
+    # NOTE: Removed blocking sleep(15.0) that was causing Rack timeouts
+    # AR question will be sent immediately - user may see question before AR file fully loads
+    # This is acceptable as the AR file will load in background
     handle_ar_first_question
   end
 
@@ -854,13 +890,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - User didn't see AR view
 
-    # Wait a moment before asking the next question
-    sleep(2.0)
-
-    # Send the AR placement question
-    send_ar_place_question
-
+    # Send AR placement question immediately - brief delay not critical
     update_bot_state('AHE1')
+    send_ar_place_question
   end
 
   def handle_ar_place_response(interactive_data)
@@ -1365,11 +1397,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if @bot_state == 'DEMO_MODE'
       send_document('document.pdf')
 
-      # Wait for documents to be delivered before sending restart message
-      sleep(2.0)
-
-      log_info '[Bot] 📄 In DEMO_MODE - stopping after documents sent'
-      #send_text_message("Type 'startover' to restart the conversation.")
+      log_info '[Bot] 📄 In DEMO_MODE - documents sent, conversation complete'
       return
     end
 
@@ -1412,9 +1440,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_summary_list_picker
     update_bot_state('AHK2')
 
-    # Wait for list picker to be delivered before sending final message
-    # List picker needs time to be sent and rendered on device
-    sleep(3.0)
+    # Send final message immediately - list picker renders in background
     handle_final_message
   end
 
@@ -1510,7 +1536,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_time_picker_demo
-    send_text_message('Time picker demo coming soon!')
+    # Demo mode: send time picker with default location (Apple Park)
+    send_text_message('Here\'s a time picker demo:')
+
+    # Use Apple Park as default location for demo
+    location = LOCATION_DATABASE['95014']
+    send_lesson_time_picker(location)
+
+    # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_apple_pay_demo
@@ -1574,6 +1607,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
+  def handle_app_clip_demo
+    # Demo mode: send App Clip using richLinkDataRef
+    send_text_message('📱 App Clip Demo')
+    send_text_message('Tap the link below to experience an App Clip!')
+
+    # Send App Clip using richLinkDataRef format
+    # This tells Apple MSP to display it as an App Clip invocation instead of a standard rich link
+    send_app_clip(url: 'https://chibi.app')
+
+    # State will be set to DEMO_MODE by handle_keyword_message
+  end
+
   def handle_menu_selection(interactive_data)
     log_info '[Bot] 📋 handle_menu_selection called'
     log_info "[Bot] 📋 interactive_data keys: #{utf8_encode(interactive_data.keys).inspect}"
@@ -1614,15 +1659,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         '2. Send a List Picker' => '2',
         '3. Receive an AR Image' => '3',
         '4. Apple Pay' => '4',
-        '5. Schedule a Guitar Lesson' => '5',
+        '5. Send a Time Picker' => '5',
         '6. Fill in a Form' => '6',
         '7. Send an Image' => '7',
         '8. Send Documents' => '8',
-        '9. Large Form' => '9',
-        '10. Authentication' => '10',
-        '11. iMessage App' => '11',
-        '12. Apple Wallet' => '12',
-        '13. Rich Link Locator' => '13'
+        '9. Authentication' => '9',
+        '10. iMessage App' => '10',
+        '11. Rich Link Locator' => '11',
+        '12. App Clip Example' => '12',
+        'Time Picker' => '5',
+        'Send a Time Picker' => '5',
+        'Schedule a Guitar Lesson' => '5'
       }
 
       log_info '[Bot] 📋 Attempting exact match against menu_map keys...'
@@ -1718,15 +1765,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           '2. Send a List Picker' => '2',
           '3. Receive an AR Image' => '3',
           '4. Apple Pay' => '4',
-          '5. Schedule a Guitar Lesson' => '5',
+          '5. Send a Time Picker' => '5',
           '6. Fill in a Form' => '6',
           '7. Send an Image' => '7',
           '8. Send Documents' => '8',
-          '9. Large Form' => '9',
-          '10. Authentication' => '10',
-          '11. iMessage App' => '11',
-          '12. Apple Wallet' => '12',
-          '13. Rich Link Locator' => '13'
+          '9. Authentication' => '9',
+          '10. iMessage App' => '10',
+          '11. Rich Link Locator' => '11',
+          '12. App Clip Example' => '12',
+          'Time Picker' => '5',
+          'Send a Time Picker' => '5',
+          'Schedule a Guitar Lesson' => '5'
         }
 
         # Try exact match
@@ -1788,9 +1837,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       log_info '[Bot] 📋 Menu: Apple Pay'
       handle_apple_pay_demo
     when '5'
-      # 5. Schedule a Guitar Lesson
-      log_info '[Bot] 📋 Menu: Schedule a Guitar Lesson'
-      handle_schedule_lesson
+      # 5. Send a Time Picker
+      log_info '[Bot] 📋 Menu: Send a Time Picker'
+      handle_time_picker_demo
+      update_bot_state('DEMO_MODE')
     when '6'
       # 6. Fill in a Form
       log_info '[Bot] 📋 Menu: Fill in a Form'
@@ -1806,36 +1856,30 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       send_text_message('Document sharing demo:')
       handle_documents_intro
     when '9'
-      # 9. Large Form
-      log_info '[Bot] 📋 Menu: Large Form'
-      handle_large_form_demo
-    when '10'
-      # 10. Authentication
+      # 9. Authentication
       log_info '[Bot] 📋 Menu: Authentication'
       handle_authentication_menu
-    when '11'
-      # 11. iMessage App - TODO: Implement custom iMessage app demo
-      log_info '[Bot] 📋 Menu: iMessage App (not implemented)'
+    when '10'
+      # 10. iMessage App
+      log_info '[Bot] 📋 Menu: iMessage App'
       send_text_message('📱 iMessage App Demo')
       send_text_message('This feature demonstrates custom iMessage app extensions.')
       handle_imessage_app
-      #send_text_message('Implementation coming soon! Type \'menu\' to see other options.')
       update_bot_state('DEMO_MODE')
-    when '12'
-      # 12. Apple Wallet
-      log_info '[Bot] 📋 Menu: Apple Wallet (not implemented)'
-      send_text_message('Apple Wallet demo is not yet implemented.')
-      send_text_message('Type \'menu\' to see other options.')
-      update_bot_state('DEMO_MODE')
-    when '13'
-      # 13. Rich Link Locator
+    when '11'
+      # 11. Rich Link Locator
       log_info '[Bot] 📋 Menu: Rich Link Locator'
       send_text_message('Here\'s a rich link demo:')
       send_apple_messages_rich_link
       update_bot_state('DEMO_MODE')
+    when '12'
+      # 12. App Clip Example
+      log_info '[Bot] 📋 Menu: App Clip Example'
+      handle_app_clip_demo
+      update_bot_state('DEMO_MODE')
     else
       log_warn "[Bot] ❌ Unknown menu selection identifier: '#{selection_identifier}'"
-      log_warn "[Bot] ❌ This should be a number 1-13, got: #{selection_identifier.class} with value #{utf8_encode(selection_identifier).inspect}"
+      log_warn "[Bot] ❌ This should be a number 1-12, got: #{selection_identifier.class} with value #{utf8_encode(selection_identifier).inspect}"
       send_text_message('Invalid selection. Type \'menu\' to try again.')
       update_bot_state('DEMO_MODE')
     end
@@ -1861,27 +1905,37 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     if selection&.match?(/yes/i)
       # User wants to learn more - show documents and rich link
       send_text_message('Let me show you what else we can do.')
-      sleep(1.0)
 
-      # Send documents
-      send_text_message('In Messages for Business, we can also share documents like these forms.')
-      send_document('metrics.numbers')
-      send_document('document.pdf')
-
-      # Wait longer for documents to be fully sent and delivered (6 seconds)
-      # Documents need time to: upload to ActiveStorage → send to Apple MSP → deliver to device
-      sleep(6.0)
-
-      # Then show rich link (handle_rich_link_display sends its own intro message)
-      handle_rich_link_display
-      sleep(1.0)
-      send_text_message('Please connect with your Apple rep for more information.')
+      # Schedule the document sending sequence after a brief delay
+      schedule_delayed_action(:send_learn_more_documents, delay: 1.0)
     else
       # User doesn't want to learn more - skip to summary
       send_text_message('No problem!')
+      update_bot_state('AHK1')
+      handle_summary
     end
+  end
 
-    # Go to summary at the end
+  def send_learn_more_documents
+    # Send documents
+    send_text_message('In Messages for Business, we can also share documents like these forms.')
+    send_document('metrics.numbers')
+    send_document('document.pdf')
+
+    # Schedule rich link display after documents have time to upload and deliver
+    schedule_delayed_action(:show_rich_link_and_summary, delay: 6.0)
+  end
+
+  def show_rich_link_and_summary
+    # Show rich link (handle_rich_link_display sends its own intro message)
+    handle_rich_link_display
+
+    # Schedule final message and summary after rich link is displayed
+    schedule_delayed_action(:send_final_learn_more_message, delay: 1.0)
+  end
+
+  def send_final_learn_more_message
+    send_text_message('Please connect with your Apple rep for more information.')
     update_bot_state('AHK1')
     handle_summary
   end
@@ -2728,6 +2782,43 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send rich link: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+  end
+
+  def send_app_clip(url:)
+    # Send an App Clip using richLinkDataRef format
+    # This triggers App Clip invocation instead of standard rich link
+    #
+    # IMPORTANT: The URL must have a properly configured App Clip:
+    # 1. App Clip must be registered in App Store Connect
+    # 2. AASA file must exist at: https://domain/.well-known/apple-app-site-association
+    # 3. App Clip must be associated with the domain
+    #
+    # If these requirements aren't met, iOS will display it as a regular rich link
+    log_info "[Bot] Sending App Clip: #{utf8_encode(url)}"
+
+    with_typing_indicator do
+      # Create message with App Clip content
+      # NOTE: Message will be automatically sent via after_commit callback
+      # SendRichLinkService will use richLinkDataRef mode (lines 207-212)
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: url,
+          content_type: 'apple_rich_link',
+          content_attributes: {
+            'url' => url,
+            'rich_link_data_ref' => {
+              'url' => url
+            }
+          }
+        )
+      ).perform
+    end
+  rescue StandardError => e
+    Rails.logger.error utf8_encode("[Bot] Failed to send App Clip: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 

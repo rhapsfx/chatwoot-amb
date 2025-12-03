@@ -111,8 +111,9 @@ services:
   worker:
     image: chatwoot:production
     container_name: chatwoot-worker
+    hostname: chatwoot-worker
     ports:
-      - "7433:7433" 
+      - "7433:7433"
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,6 +124,7 @@ services:
     environment:
       # Same environment as web service
       RAILS_ENV: production
+      HOSTNAME: chatwoot-worker
       SECRET_KEY_BASE: "${SECRET_KEY_BASE:-dummy_secret_key_base_for_testing_only_replace_in_production}"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432

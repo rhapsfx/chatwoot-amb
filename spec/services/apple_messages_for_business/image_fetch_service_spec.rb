@@ -81,7 +81,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(['shared_img_1'])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('shared_img_1')
         expect(result[0][:source]).to eq('shared_system')
         expect(result[0][:data]).to be_a(String)
@@ -131,7 +131,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
       it 'fetches and returns embedded image' do
         result = service.fetch_and_encode(['embedded_img_1'])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('embedded_img_1')
         expect(result[0][:data]).to eq('base64encodeddata==')
         expect(result[0][:source]).to eq('embedded')
@@ -253,7 +253,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(%w[found_img missing_img])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('found_img')
       end
     end
@@ -328,7 +328,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service_local.fetch_and_encode(%w[error_img safe_img])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('safe_img')
       end
 
@@ -342,13 +342,14 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service_local.fetch_and_encode(%w[img1 img2])
 
-        expect(result).to have_length(2)
+        expect(result.length).to eq(2)
       end
     end
 
     context 'with logging' do
       it 'logs image fetch initiation' do
-        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] Looking for/).at_least(:once)
+        allow(Rails.logger).to receive(:info).and_call_original
+        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] Looking for/).at_least(:once).and_call_original
 
         service.fetch_and_encode(['test_img'])
       end
@@ -356,7 +357,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
       it 'logs inbox image found' do
         create(:apple_list_picker_image, inbox: inbox, identifier: 'inbox_img')
 
-        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in inbox/)
+        allow(Rails.logger).to receive(:info).and_call_original
+        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in inbox/).and_call_original
 
         service.fetch_and_encode(['inbox_img'])
       end
@@ -364,7 +366,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
       it 'logs shared image found' do
         create(:shared_apple_image, account: account, identifier: 'shared_img')
 
-        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in shared/)
+        allow(Rails.logger).to receive(:info).and_call_original
+        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in shared/).and_call_original
 
         service.fetch_and_encode(['shared_img'])
       end
@@ -375,13 +378,15 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         ]
         service_local = described_class.new(account_id: account.id, inbox_id: inbox.id, embedded_images: embedded_images_local)
 
-        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in embedded/)
+        allow(Rails.logger).to receive(:info).and_call_original
+        expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] ✅ Found in embedded/).and_call_original
 
         service_local.fetch_and_encode(['embedded_img'])
       end
 
       it 'logs image not found warning' do
-        expect(Rails.logger).to receive(:warn).with(/\[ImageFetch\] ⚠️  Image not found/)
+        allow(Rails.logger).to receive(:warn).and_call_original
+        expect(Rails.logger).to receive(:warn).with(/\[ImageFetch\] ⚠️  Image not found/).and_call_original
 
         service.fetch_and_encode(['nonexistent_img'])
       end
@@ -390,7 +395,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         create(:shared_apple_image, account: account, identifier: 'img1')
         create(:shared_apple_image, account: account, identifier: 'img2')
 
-        expect(Rails.logger).to receive(:info).with(%r{\[ImageFetch\] Found 2/2 images})
+        allow(Rails.logger).to receive(:info).and_call_original
+        expect(Rails.logger).to receive(:info).with(%r{\[ImageFetch\] Found 2/2 images}).and_call_original
 
         service.fetch_and_encode(%w[img1 img2])
       end

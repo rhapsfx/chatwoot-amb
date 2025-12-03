@@ -80,6 +80,41 @@ Practical checklist for any change impacting core logic or public APIs
 
 ## Apple Messages for Business (AMB) - Critical Implementation Notes
 
+### 📚 Complete Integration Documentation
+
+**🎯 For comprehensive system overview, architecture, and all dependencies, see**:
+- **`docs/apple-messages/AMB_INTEGRATION_STATUS_REPORT.md`** - Complete status report with:
+  - 40+ backend services inventory
+  - 25+ frontend components
+  - Complete circular system architecture (15-step data flow)
+  - Database schema (5 tables)
+  - All API endpoints (15+)
+  - Interactive message types (10+)
+  - Case normalization system
+  - Image architecture (two-tier hybrid)
+  - Template system
+  - All dependencies (Apple Pay, Apple Maps, OAuth2, etc.)
+  - Security & compliance
+  - Performance optimizations
+  - Testing coverage
+  - Deployment guide
+
+- **`docs/apple-messages/AMB_DEPENDENCY_MAP.md`** - Visual dependency guide with:
+  - Component dependency graph
+  - Message flow dependencies (outgoing & incoming)
+  - Template system dependencies
+  - Image system dependencies
+  - Bot service dependencies
+  - Validation chain
+  - Cross-cutting concerns
+  - Environment variable dependencies
+  - Critical path analysis
+  - Testing dependencies
+
+**These documents serve as the definitive reference for the entire AMB integration.**
+
+---
+
 ### 🚨 MANDATORY: CaseTransformer for All AMB Features
 
 **Status**: ✅ **Case normalization complete** (Phases 1-3 deployed Oct 2025)
@@ -216,6 +251,10 @@ ruby test_case_transformer.rb
 **RSpec tests**: `spec/services/apple_messages_for_business/case_transformer_spec.rb`
 
 #### Documentation
+
+**🎯 START HERE - Comprehensive Status Reports**:
+- `docs/apple-messages/AMB_INTEGRATION_STATUS_REPORT.md` - **Complete status report** with circular architecture view, all components, dependencies, and implementation details
+- `docs/apple-messages/AMB_DEPENDENCY_MAP.md` - **Visual dependency guide** showing all component relationships and data flows
 
 **Technical Specs**:
 - `docs/apple-messages/case-normalization-specification.md` - Complete technical specification
@@ -654,6 +693,10 @@ Frontend (camelCase)
 
 ### Documentation
 
+**🎯 Complete System Documentation**:
+- `docs/apple-messages/AMB_INTEGRATION_STATUS_REPORT.md` - **Complete status report** including image architecture, all components, and circular data flows
+- `docs/apple-messages/AMB_DEPENDENCY_MAP.md` - **Visual dependency guide** with image system integration points
+
 **Complete Documentation**:
 - `docs/apple-messages/IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md` - Complete architecture plan
 - `docs/apple-messages/IMAGE_MIGRATION_GUIDE.md` - Migration guide for existing installations
@@ -766,18 +809,169 @@ Rails commands can modify database state, trigger side effects, or perform opera
 ✅ GOOD: Create script/operation.rb and say "Please run: rails runner script/operation.rb"
 ```
 
-## Deployment Scripts
+## Remote Server Deployment
 
-- **NEVER run deployment scripts through Claude Code** - SSH and rsync are blocked by sandbox
-- **ALWAYS ask user to run deployment scripts manually** in their terminal:
-  - `./script/deploy-backend-changes-safe.sh` - Deploy backend code to production
-  - `./script/deploy-assets-only.sh` - Build and deploy frontend assets
-  - `./script/enable_custom_roles_production.sh` - Enable feature flags on production
-- **Claude Code can**: Prepare code, create commits, push to git
-- **User must**: Run deployment and server management scripts directly
+**Production Server**: msp.rhaps.net (Docker-based deployment)
+**Development Server**: liquid-m3-pro.tail367da4.ts.net (Tailscale Funnel via `script/dev-server.sh`)
+
+### 📖 Complete Deployment Documentation
+
+**🎯 For comprehensive deployment workflows, troubleshooting, and best practices, see**:
+- **[`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)** - Complete deployment guide with:
+  - When to use each deployment script (decision flowchart)
+  - 5 real-world scenario examples
+  - Common issues and solutions
+  - Verification steps
+  - Best practices
+- **[`docs/DOCKER_BUILD_TROUBLESHOOTING.md`](docs/DOCKER_BUILD_TROUBLESHOOTING.md)** - Docker build troubleshooting
+- **[`script/README.md`](script/README.md)** - Scripts directory documentation
+
+### Deployment Scripts Overview
+
+We have two primary deployment scripts for different scenarios:
+
+#### 1. `script/quick_rebuild.sh` - Full Docker Image Rebuild
+
+**Use when:**
+- ✅ Modified `Dockerfile.production` or Docker infrastructure
+- ✅ Updated dependencies (`Gemfile`, `Gemfile.lock`)
+- ✅ Changed frontend code (JavaScript/TypeScript/CSS)
+- ✅ Modified Node.js or Ruby versions
+- ✅ Initial deployment or major refactoring
+
+**Usage:**
+```bash
+# Standard rebuild (uses cache)
+./script/quick_rebuild.sh
+
+# Clean rebuild (no cache, for infrastructure changes)
+./script/quick_rebuild.sh --no-cache
+```
+
+**Time**: 5-15 minutes | **Requirements**: 4GB+ heap, 3.7GB RAM + 4GB swap
+
+#### 2. `script/deploy-backend-enhanced.sh` - Hot-Patch Backend Deployment
+
+**Use when:**
+- ✅ Modified Ruby code only (services, controllers, models, jobs)
+- ✅ Updated routes or initializers
+- ✅ Added/modified API endpoints
+- ✅ Need to run database migrations
+- ✅ Quick iteration on backend features
+
+**Usage:**
+```bash
+./script/deploy-backend-enhanced.sh
+```
+
+**Time**: 1-3 minutes | **Requirements**: Containers must be running
+
+### Quick Reference - Common Scenarios
+
+**Fix backend bug (Ruby code only):**
+```bash
+./script/deploy-backend-enhanced.sh
+```
+
+**Add new gem dependency:**
+```bash
+./script/quick_rebuild.sh
+```
+
+**Update frontend UI:**
+```bash
+./script/quick_rebuild.sh
+```
+
+**Update Dockerfile configuration:**
+```bash
+./script/quick_rebuild.sh --no-cache
+```
+
+**Deploy with database migration:**
+```bash
+./script/deploy-backend-enhanced.sh  # Runs migrations automatically
+```
+
+### Deployment Workflow
+
+1. **Make changes locally**
+2. **Test thoroughly**:
+   ```bash
+   bundle exec rspec                    # Run tests
+   bundle exec rubocop -a               # Check/fix Ruby style
+   pnpm eslint:fix                      # Check/fix JS style
+   ./script/dev-server.sh start         # Test locally
+   ```
+3. **Commit changes**:
+   ```bash
+   git add .
+   git commit -m "Fix: Description of change"
+   git push
+   ```
+4. **Choose appropriate deployment script** (see decision tree in [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md))
+5. **Verify deployment**:
+   ```bash
+   # Check container status
+   ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml ps'
+   
+   # Check application health
+   curl https://msp.rhaps.net/health
+   
+   # View logs
+   ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs --tail=50 web'
+   ```
+
+### Important Notes
+
+- **NEVER run deployment scripts through Claude** - SSH and rsync are blocked by sandbox
+- **ALWAYS ask user to run deployment scripts manually** in their terminal
+- **Always commit before deploying** - Version control is critical for rollbacks
+- **Choose the right script** - Using `quick_rebuild.sh` for simple code changes wastes 10+ minutes
+- **Monitor during deployment** - Watch logs in separate terminal to catch issues early
+- **Verify after deployment** - Check container health, application endpoints, and feature functionality
+- **Environment-specific configs**:
+  - Production uses `docker-compose.production.yml`
+  - Local dev uses `script/dev-server.sh` with Tailscale Funnel
+  - Sidekiq workers require `HOSTNAME` env var for proper identification
+
+### Container Management
+
+**Check running containers:**
+```bash
+ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml ps'
+```
+
+**Restart specific service:**
+```bash
+ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml restart worker'
+```
+
+**View service logs:**
+```bash
+ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs -f web'
+```
+
+**Update and recreate service:**
+```bash
+# After updating docker-compose.production.yml
+ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml up -d --force-recreate worker'
+```
+
+### Local Development Server
+
+**Script**: `script/dev-server.sh`
+**Domain**: liquid-m3-pro.tail367da4.ts.net (Tailscale Funnel)
+**Management**: `./script/dev-server.sh {start|start-public|stop|restart|status|help}`
+
+The dev server automatically:
+- Sets `HOSTNAME="liquid-m3-pro-dev"` for Sidekiq identification
+- Manages Rails web server and Sidekiq worker
+- Provides public access via Tailscale Funnel when using `start-public`
 
 ## Other Notes
 
 - **Apple Messages for Business**: ALWAYS use CaseTransformer for case conversions (see AMB section above)
 - Remember that any tailscale command requires privilege - ask user to execute them directly
 - Do not push changes to git until user approves
+- Keep tests fast and isolated

@@ -6,7 +6,10 @@ RSpec.describe 'Apple Construct Payload Controller API', type: :request do
   let(:account) { create(:account) }
   let(:admin_user) { create(:user, account: account, role: :administrator) }
   let(:agent_user) { create(:user, account: account, role: :agent) }
-  let(:amb_channel) { create(:channel_apple_messages_for_business, account: account) }
+  let(:amb_channel) do
+    allow_any_instance_of(Channel::AppleMessagesForBusiness).to receive(:validate_jwt_credentials).and_return(nil)
+    create(:channel_apple_messages_for_business, account: account)
+  end
   let(:amb_inbox) { amb_channel.inbox }
 
   describe 'POST /api/v1/accounts/{account_id}/inboxes/{inbox_id}/apple_construct_payload' do
