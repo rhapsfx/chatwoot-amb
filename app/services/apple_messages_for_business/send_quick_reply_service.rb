@@ -27,7 +27,7 @@ class AppleMessagesForBusiness::SendQuickReplyService < AppleMessagesForBusiness
       subtitle: content_attributes['received_subtitle'],
       imageIdentifier: content_attributes['received_image_identifier'],
       style: content_attributes['received_style'] || 'small'
-    }
+    }.compact
   end
 
   def build_reply_message
@@ -36,7 +36,7 @@ class AppleMessagesForBusiness::SendQuickReplyService < AppleMessagesForBusiness
       subtitle: content_attributes['reply_subtitle'],
       imageIdentifier: content_attributes['reply_image_identifier'],
       style: content_attributes['reply_style'] || 'icon'
-    }
+    }.compact
   end
 
   def default_items
