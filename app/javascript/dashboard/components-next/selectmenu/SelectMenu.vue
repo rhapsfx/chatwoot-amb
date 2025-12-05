@@ -46,6 +46,7 @@ const handleSelect = value => {
     class="relative flex flex-col gap-1 w-fit"
   >
     <Button
+      type="button"
       icon="i-lucide-chevron-down"
       size="sm"
       trailing-icon
@@ -70,6 +71,7 @@ const handleSelect = value => {
       <Button
         v-for="option in options"
         :key="option.value"
+        type="button"
         :label="option.label"
         :icon="option.value === modelValue ? 'i-lucide-check' : ''"
         size="sm"

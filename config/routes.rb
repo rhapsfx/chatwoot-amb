@@ -93,6 +93,28 @@ Rails.application.routes.draw do
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
             delete :avatar, on: :member
             post :reset_access_token, on: :member
+
+            # Nested version management
+            resources :versions, controller: 'agent_bots/versions', only: [:index, :show, :create] do
+              member do
+                post :activate
+                post :archive
+                post :restore
+                get 'compare/:other_id', action: :compare
+              end
+            end
+
+            # Nested inbox association management
+            resources :inboxes, controller: 'agent_bots/inboxes' do
+              member do
+                post :assign_version
+                post :clear_version
+                patch :config_override, action: :update_config_override
+              end
+              collection do
+                post :bulk_assign
+              end
+            end
           end
           # Template endpoints for CRUD operations
           resources :templates, only: [:index, :show, :create, :update, :destroy] do

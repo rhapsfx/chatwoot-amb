@@ -56,6 +56,23 @@ const store = useStore();
 
 const activeTab = ref('quick_reply');
 
+// Theme detection for tab icons
+const isDarkMode = ref(false);
+const updateTheme = () => {
+  isDarkMode.value = document.body.classList.contains('dark');
+};
+
+// Initialize theme and watch for changes
+onMounted(() => {
+  updateTheme();
+  // Watch for theme changes
+  const observer = new MutationObserver(updateTheme);
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+});
+
 // Template selector state
 const showTemplateSelector = ref(false);
 const templateSearchKey = ref('');
@@ -1109,7 +1126,7 @@ const sendAppleMessage = () => {
 
       content = listPickerData.value.received_title || 'List Picker Message';
       break;
-    case 'quick_reply':
+    case 'quick_reply': {
       content_type = 'apple_quick_reply';
 
       // Clean items array - ensure no undefined values
@@ -1149,6 +1166,7 @@ const sendAppleMessage = () => {
 
       content = summaryText || 'Quick Reply Message';
       break;
+    }
     case 'time_picker': {
       content_type = 'apple_time_picker';
 
@@ -2031,14 +2049,78 @@ watch(
       <div class="flex flex-wrap space-x-1 gap-y-1">
         <button
           v-for="tab in [
-            { id: 'quick_reply', emoji: '💬', label: 'Quick Reply' },
-            { id: 'list_picker', emoji: '📋', label: 'List Picker' },
-            { id: 'time_picker', emoji: '🕐', label: 'Time Picker' },
-            { id: 'forms', emoji: '📝', label: 'Forms' },
-            { id: 'imessage_apps', emoji: '📱', label: 'iMessage Apps' },
-            { id: 'oauth', emoji: '🔐', label: 'OAuth' },
-            { id: 'apple_pay', emoji: '💳', label: 'Apple Pay' },
-            { id: 'custom_payload', emoji: '🔧', label: 'Custom Payload' },
+            {
+              id: 'quick_reply',
+              emoji: '💬',
+              label: 'Quick Reply',
+              imagePath: {
+                light: '/apple-messages/light/list-circle.png',
+                dark: '/apple-messages/list-circle.png',
+              },
+            },
+            {
+              id: 'list_picker',
+              emoji: '📋',
+              label: 'List Picker',
+              imagePath: {
+                light: '/apple-messages/light/list-circle.png',
+                dark: '/apple-messages/list-circle.png',
+              },
+            },
+            {
+              id: 'time_picker',
+              emoji: '🕐',
+              label: 'Time Picker',
+              imagePath: {
+                light: '/apple-messages/light/calendar-circle.png',
+                dark: '/apple-messages/calendar-circle.png',
+              },
+            },
+            {
+              id: 'forms',
+              emoji: '📝',
+              label: 'Forms',
+              imagePath: {
+                light: '/apple-messages/light/form-circle.png',
+                dark: '/apple-messages/form-circle.png',
+              },
+            },
+            {
+              id: 'imessage_apps',
+              emoji: '📱',
+              label: 'iMessage Apps',
+              imagePath: {
+                light: '/apple-messages/light/appstrore-circle.png',
+                dark: '/apple-messages/appstrore-circle.png',
+              },
+            },
+            {
+              id: 'oauth',
+              emoji: '🔐',
+              label: 'OAuth',
+              imagePath: {
+                light: '/apple-messages/light/auth-circle.png',
+                dark: '/apple-messages/auth-circle.png',
+              },
+            },
+            {
+              id: 'apple_pay',
+              emoji: '💳',
+              label: 'Apple Pay',
+              imagePath: {
+                light: '/apple-messages/light/wallet-circle.png',
+                dark: '/apple-messages/wallet-circle.png',
+              },
+            },
+            {
+              id: 'custom_payload',
+              emoji: '🔧',
+              label: 'Custom Payload',
+              imagePath: {
+                light: '/apple-messages/light/debug-circle.png',
+                dark: '/apple-messages/debug-circle.png',
+              },
+            },
           ]"
           :key="tab.id"
           class="px-3 py-2 text-xl border-b-2 transition-colors"
@@ -2050,7 +2132,13 @@ watch(
           :title="tab.label"
           @click="activeTab = tab.id"
         >
-          {{ tab.emoji }}
+          <img
+            v-if="tab.imagePath"
+            :src="isDarkMode ? tab.imagePath.dark : tab.imagePath.light"
+            :alt="tab.label"
+            class="w-8 h-8 inline-block"
+          />
+          <span v-else>{{ tab.emoji }}</span>
         </button>
       </div>
     </div>

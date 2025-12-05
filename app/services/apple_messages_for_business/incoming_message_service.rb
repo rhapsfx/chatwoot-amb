@@ -1274,12 +1274,25 @@ class AppleMessagesForBusiness::IncomingMessageService
       return
     end
 
-    Rails.logger.info '[Bot] 🚀 Triggering bot for incoming message'
+    # Check for configured AMB bot via AgentBotInbox
+    bot_inbox = @inbox.agent_bot_inbox
+    if bot_inbox&.active? && bot_inbox.agent_bot&.apple_messages_for_business?
+      configured_bot = bot_inbox.agent_bot
+      Rails.logger.info "[Bot] 🤖 Using configured AMB bot: #{configured_bot.name} (ID: #{configured_bot.id})"
 
-    bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
-      @conversation,
-      @message
-    )
+      bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
+        @conversation,
+        @message,
+        configured_bot,
+        configured_bot.bot_config
+      )
+    else
+      Rails.logger.info '[Bot] ⚠️  No active configured AMB bot found - skipping bot processing'
+      Rails.logger.info "[Bot] 📋 Inbox ID: #{@inbox.id}, Agent Bot Inbox: #{bot_inbox.present? ? 'present' : 'nil'}, Active: #{bot_inbox&.active?}, Bot Type: #{bot_inbox&.agent_bot&.bot_type}"
+      return
+    end
+
+    Rails.logger.info '[Bot] 🚀 Triggering configured bot for incoming message'
 
     # Form responses should go through process_message (where content_type is checked)
     # Other interactive responses (quick replies, list pickers, time pickers) go through process_interactive_response

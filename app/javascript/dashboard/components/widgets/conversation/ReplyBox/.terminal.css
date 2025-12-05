@@ -1,0 +1,7 @@
+.terminal.focus {
+  border-left: 4px solid #00ffaa;
+  padding-left: 1em;
+}
+.terminal:not(.focus) {
+  opacity: 0.7;
+}

@@ -14,6 +14,7 @@ import Input from 'dashboard/components-next/input/Input.vue';
 import TextArea from 'dashboard/components-next/textarea/TextArea.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import AccessToken from 'dashboard/routes/dashboard/settings/profile/AccessToken.vue';
+import SelectMenu from 'dashboard/components-next/selectmenu/SelectMenu.vue';
 
 const props = defineProps({
   type: {
@@ -40,13 +41,37 @@ const uiFlags = useMapGetter('agentBots/getUIFlags');
 const formState = reactive({
   botName: '',
   botDescription: '',
+  botType: 'webhook',
   botUrl: '',
+  botConfig: '{}',
   botAvatar: null,
   botAvatarUrl: '',
 });
 
 const [showAccessToken, toggleAccessToken] = useToggle();
 const accessToken = ref('');
+const jsonError = ref('');
+
+// Bot type options
+const botTypeOptions = computed(() => [
+  { value: 'webhook', label: t('AGENT_BOTS.FORM.BOT_TYPE.WEBHOOK') },
+  {
+    value: 'apple_messages_for_business',
+    label: t('AGENT_BOTS.FORM.BOT_TYPE.AMB'),
+  },
+]);
+
+const selectedBotTypeLabel = computed(() => {
+  const option = botTypeOptions.value.find(
+    opt => opt.value === formState.botType
+  );
+  return option?.label || '';
+});
+
+const showWebhookUrl = computed(() => formState.botType === 'webhook');
+const showBotConfig = computed(
+  () => formState.botType === 'apple_messages_for_business'
+);
 
 // Custom URL validator that accepts localhost, IP addresses, and standard URLs
 const isValidWebhookUrl = value => {
@@ -56,6 +81,20 @@ const isValidWebhookUrl = value => {
   const urlPattern =
     /^https?:\/\/(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w.-]+\.[\w.-]+)(:\d+)?(\/.*)?$/i;
   return urlPattern.test(value);
+};
+
+// JSON validator
+const isValidJSON = () => {
+  if (formState.botType === 'webhook') return true;
+
+  try {
+    JSON.parse(formState.botConfig);
+    jsonError.value = '';
+    return true;
+  } catch (e) {
+    jsonError.value = t('AGENT_BOTS.FORM.ERRORS.INVALID_JSON');
+    return false;
+  }
 };
 
 const v$ = useVuelidate(
@@ -71,6 +110,12 @@ const v$ = useVuelidate(
       isValidWebhookUrl: helpers.withMessage(
         () => t('AGENT_BOTS.FORM.ERRORS.VALID_URL'),
         isValidWebhookUrl
+      ),
+    },
+    botConfig: {
+      isValidJSON: helpers.withMessage(
+        () => t('AGENT_BOTS.FORM.ERRORS.INVALID_JSON'),
+        isValidJSON
       ),
     },
   },
@@ -125,10 +170,13 @@ const resetForm = () => {
   Object.assign(formState, {
     botName: '',
     botDescription: '',
+    botType: 'webhook',
     botUrl: '',
+    botConfig: '{}',
     botAvatar: null,
     botAvatarUrl: '',
   });
+  jsonError.value = '';
   v$.value.$reset();
 };
 
@@ -164,10 +212,21 @@ const handleSubmit = async () => {
   const botData = {
     name: formState.botName,
     description: formState.botDescription,
-    outgoing_url: formState.botUrl,
-    bot_type: 'webhook',
+    bot_type: formState.botType,
     avatar: formState.botAvatar,
   };
+
+  // Add type-specific fields
+  if (formState.botType === 'webhook') {
+    botData.outgoing_url = formState.botUrl;
+  } else if (formState.botType === 'apple_messages_for_business') {
+    try {
+      botData.bot_config = JSON.parse(formState.botConfig);
+    } catch (e) {
+      useAlert(t('AGENT_BOTS.FORM.ERRORS.INVALID_JSON'));
+      return;
+    }
+  }
 
   const isCreate = props.type === MODAL_TYPES.CREATE;
 
@@ -215,6 +274,7 @@ const initializeForm = () => {
     const {
       name,
       description,
+      bot_type: botType,
       outgoing_url: botUrl,
       thumbnail,
       bot_config: botConfig,
@@ -222,7 +282,9 @@ const initializeForm = () => {
     } = props.selectedBot;
     formState.botName = name || '';
     formState.botDescription = description || '';
+    formState.botType = botType || 'webhook';
     formState.botUrl = botUrl || botConfig?.webhook_url || '';
+    formState.botConfig = botConfig ? JSON.stringify(botConfig, null, 2) : '{}';
     formState.botAvatarUrl = thumbnail || '';
 
     if (botAccessToken && props.type === MODAL_TYPES.EDIT) {
@@ -314,7 +376,22 @@ defineExpose({ dialogRef });
           :placeholder="$t('AGENT_BOTS.FORM.DESCRIPTION.PLACEHOLDER')"
         />
 
+        <!-- Bot Type Selector -->
+        <div class="flex flex-col gap-2" @click.stop>
+          <label class="text-sm font-medium text-n-slate-12">
+            {{ $t('AGENT_BOTS.FORM.BOT_TYPE.LABEL') }}
+          </label>
+          <SelectMenu
+            v-model="formState.botType"
+            :options="botTypeOptions"
+            :label="selectedBotTypeLabel"
+            sub-menu-position="bottom"
+          />
+        </div>
+
+        <!-- Webhook URL (only for webhook type) -->
         <Input
+          v-if="showWebhookUrl"
           id="bot-url"
           v-model="formState.botUrl"
           :label="$t('AGENT_BOTS.FORM.WEBHOOK_URL.LABEL')"
@@ -323,6 +400,26 @@ defineExpose({ dialogRef });
           :message-type="botUrlError ? 'error' : 'info'"
           @blur="v$.botUrl.$touch()"
         />
+
+        <!-- Bot Config (only for AMB type) -->
+        <div v-if="showBotConfig" class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-n-slate-12">
+            {{ $t('AGENT_BOTS.FORM.BOT_CONFIG.LABEL') }}
+          </label>
+          <textarea
+            v-model="formState.botConfig"
+            class="w-full px-3 py-2 text-sm font-mono bg-n-slate-1 dark:bg-n-slate-2 border border-n-weak rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-8 min-h-[200px] max-h-[400px]"
+            :class="{ 'border-ruby-8': jsonError }"
+            :placeholder="$t('AGENT_BOTS.FORM.BOT_CONFIG.PLACEHOLDER')"
+            @blur="v$.botConfig.$touch()"
+          />
+          <p v-if="jsonError" class="text-xs text-ruby-11">
+            {{ jsonError }}
+          </p>
+          <p v-else class="text-xs text-n-slate-11">
+            {{ $t('AGENT_BOTS.FORM.BOT_CONFIG.HELP') }}
+          </p>
+        </div>
       </div>
 
       <div v-if="showAccessTokenInput" class="flex flex-col gap-1">

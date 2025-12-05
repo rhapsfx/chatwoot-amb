@@ -9,6 +9,8 @@ import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import AgentBotModal from './components/AgentBotModal.vue';
+import BotVersionHistoryDialog from './components/BotVersionHistoryDialog.vue';
+import BotInboxManagerDialog from './components/BotInboxManagerDialog.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 
 const MODAL_TYPES = {
@@ -27,6 +29,8 @@ const loading = ref({});
 const modalType = ref(MODAL_TYPES.CREATE);
 const agentBotModalRef = ref(null);
 const agentBotDeleteDialogRef = ref(null);
+const versionHistoryDialogRef = ref(null);
+const inboxManagerDialogRef = ref(null);
 
 const tableHeaders = computed(() => {
   return [
@@ -70,6 +74,21 @@ const confirmDeletion = () => {
   loading.value[selectedBot.value.id] = true;
   deleteAgentBot(selectedBot.value.id);
   agentBotDeleteDialogRef.value.close();
+};
+
+const openVersionHistory = bot => {
+  selectedBot.value = bot;
+  versionHistoryDialogRef.value.open();
+};
+
+const openInboxManager = bot => {
+  selectedBot.value = bot;
+  inboxManagerDialogRef.value.open();
+};
+
+const duplicateBot = async () => {
+  // TODO: Implement duplicate functionality when backend endpoint is ready
+  useAlert(t('AGENT_BOTS.DUPLICATE.NOT_IMPLEMENTED'));
 };
 
 onMounted(() => {
@@ -124,16 +143,57 @@ onMounted(() => {
                 <div>
                   <span class="block font-medium break-words">
                     {{ bot.name }}
+                    <!-- System bot badge -->
                     <span
                       v-if="bot.system_bot"
                       class="text-xs text-n-slate-12 bg-n-blue-5 inline-block rounded-md py-0.5 px-1 ltr:ml-1 rtl:mr-1"
                     >
                       {{ $t('AGENT_BOTS.GLOBAL_BOT_BADGE') }}
                     </span>
+                    <!-- Bot type badge -->
+                    <span
+                      class="text-xs inline-block rounded-md py-0.5 px-1 ltr:ml-1 rtl:mr-1"
+                      :class="{
+                        'bg-n-blue-5 text-n-slate-12':
+                          bot.bot_type === 'apple_messages_for_business',
+                        'bg-n-slate-5 text-n-slate-11':
+                          bot.bot_type === 'webhook',
+                      }"
+                    >
+                      {{
+                        bot.bot_type === 'apple_messages_for_business'
+                          ? $t('AGENT_BOTS.TYPES.AMB')
+                          : $t('AGENT_BOTS.TYPES.WEBHOOK')
+                      }}
+                    </span>
                   </span>
                   <span class="text-sm text-n-slate-11">
                     {{ bot.description }}
                   </span>
+                  <!-- Version and Inbox Info (for AMB bots only) -->
+                  <div
+                    v-if="bot.bot_type === 'apple_messages_for_business'"
+                    class="flex gap-2 mt-1 text-xs text-n-slate-11"
+                  >
+                    <span
+                      v-if="bot.active_version"
+                      class="flex items-center gap-1"
+                    >
+                      <i class="i-lucide-git-branch w-3 h-3" />
+                      {{
+                        $t('AGENT_BOTS.VERSION', {
+                          version: bot.active_version.version_tag,
+                        })
+                      }}
+                    </span>
+                    <span
+                      v-if="bot.inbox_count"
+                      class="flex items-center gap-1"
+                    >
+                      <i class="i-lucide-inbox w-3 h-3" />
+                      {{ bot.inbox_count }} {{ $t('AGENT_BOTS.INBOXES') }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </td>
@@ -142,6 +202,43 @@ onMounted(() => {
             </td>
             <td class="py-4 min-w-xs">
               <div class="flex gap-1 justify-end">
+                <!-- Version history button (AMB bots only) -->
+                <Button
+                  v-if="
+                    bot.bot_type === 'apple_messages_for_business' &&
+                    !bot.system_bot
+                  "
+                  v-tooltip.top="t('AGENT_BOTS.VERSION_HISTORY')"
+                  icon="i-lucide-history"
+                  slate
+                  xs
+                  faded
+                  @click="openVersionHistory(bot)"
+                />
+                <!-- Inbox manager button (AMB bots only) -->
+                <Button
+                  v-if="
+                    bot.bot_type === 'apple_messages_for_business' &&
+                    !bot.system_bot
+                  "
+                  v-tooltip.top="t('AGENT_BOTS.MANAGE_INBOXES')"
+                  icon="i-lucide-inbox"
+                  slate
+                  xs
+                  faded
+                  @click="openInboxManager(bot)"
+                />
+                <!-- Duplicate button -->
+                <Button
+                  v-if="!bot.system_bot"
+                  v-tooltip.top="t('AGENT_BOTS.DUPLICATE')"
+                  icon="i-lucide-copy"
+                  slate
+                  xs
+                  faded
+                  @click="duplicateBot(bot)"
+                />
+                <!-- Edit button -->
                 <Button
                   v-if="!bot.system_bot"
                   v-tooltip.top="t('AGENT_BOTS.EDIT.BUTTON_TEXT')"
@@ -152,6 +249,7 @@ onMounted(() => {
                   :is-loading="loading[bot.id]"
                   @click="openEditModal(bot)"
                 />
+                <!-- Delete button -->
                 <Button
                   v-if="!bot.system_bot"
                   v-tooltip.top="t('AGENT_BOTS.DELETE.BUTTON_TEXT')"
@@ -174,6 +272,10 @@ onMounted(() => {
       :type="modalType"
       :selected-bot="selectedBot"
     />
+
+    <BotVersionHistoryDialog ref="versionHistoryDialogRef" :bot="selectedBot" />
+
+    <BotInboxManagerDialog ref="inboxManagerDialogRef" :bot="selectedBot" />
 
     <Dialog
       ref="agentBotDeleteDialogRef"
