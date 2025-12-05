@@ -79,6 +79,16 @@
         "LABEL": "Description",
         "PLACEHOLDER": "What does this bot do?"
       },
+      "BOT_TYPE": {
+        "LABEL": "Bot Type",
+        "WEBHOOK": "Webhook Bot",
+        "AMB": "Apple Messages Bot"
+      },
+      "BOT_CONFIG": {
+        "LABEL": "Bot Configuration",
+        "PLACEHOLDER": "Enter bot configuration as JSON",
+        "HELP": "Advanced configuration for Apple Messages bot behavior"
+      },
       "WEBHOOK_URL": {
         "LABEL": "Webhook URL (optional)",
         "PLACEHOLDER": "https://example.com/webhook",
@@ -98,6 +108,70 @@
     },
     "TYPES": {
       "WEBHOOK": "Webhook bot"
+    },
+    "VERSION_HISTORY": "Version History",
+    "MANAGE_INBOXES": "Manage Inboxes",
+    "DUPLICATE": "Duplicate Bot",
+    "INBOXES": "inboxes",
+    "VERSIONS": {
+      "TITLE": "Bot Versions",
+      "CREATE_NEW": "Save New Version",
+      "CREATE_SUCCESS": "Version created successfully",
+      "CREATE_ERROR": "Failed to create version",
+      "ACTIVATE": "Activate This Version",
+      "ACTIVATE_SUCCESS": "Version activated successfully",
+      "ACTIVATE_ERROR": "Failed to activate version",
+      "COMPARE": "Compare Versions",
+      "ARCHIVE": "Archive Version",
+      "ARCHIVE_SUCCESS": "Version archived successfully",
+      "ARCHIVE_ERROR": "Failed to archive version",
+      "RESTORE": "Restore Version",
+      "ACTIVE": "Active",
+      "ARCHIVED": "Archived",
+      "VERSION": "Version",
+      "NAME": "Name",
+      "TAG": "Tag",
+      "CREATED_BY": "Created by",
+      "CREATED_AT": "Created At",
+      "ACTIONS": "Actions",
+      "LOAD_ERROR": "Failed to load versions",
+      "COMPARE_ERROR": "Failed to compare versions",
+      "NO_VERSIONS": "No versions found. Create a version to get started.",
+      "INCLUDE_ARCHIVED": "Include archived versions",
+      "VERSION_NAME": "Version Name",
+      "VERSION_NAME_PLACEHOLDER": "e.g., 1.0.0, Release Candidate",
+      "DESCRIPTION": "Description",
+      "DESCRIPTION_PLACEHOLDER": "What changed in this version?",
+      "TAG": "Tag",
+      "TAG_PLACEHOLDER": "e.g., stable, beta, experimental"
+    },
+    "INBOX_MANAGER": {
+      "TITLE": "Inbox Assignments",
+      "SUBTITLE": "Manage inbox assignments for {name}",
+      "ASSIGN_INBOXES": "Assign to Inboxes",
+      "ASSIGN_DIALOG_TITLE": "Assign Bot to Inboxes",
+      "SELECT_INBOXES": "Select Inboxes",
+      "SELECT_VERSION": "Select Version",
+      "USE_CURRENT": "Use Current Version",
+      "VERSION": "Version",
+      "CURRENT": "Current",
+      "PRIORITY": "Priority",
+      "INBOX": "Inbox",
+      "STATUS": "Status",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "TOGGLE_STATUS": "Toggle Status",
+      "UNASSIGN": "Remove Assignment",
+      "NO_INBOXES": "This bot is not assigned to any inboxes yet",
+      "ASSIGN_SUCCESS": "Bot assigned to inboxes successfully",
+      "ASSIGN_ERROR": "Failed to assign bot to inboxes",
+      "SELECT_INBOXES_ERROR": "Please select at least one inbox",
+      "UNASSIGN_SUCCESS": "Bot removed from inbox successfully",
+      "UNASSIGN_ERROR": "Failed to remove bot from inbox",
+      "VERSION_CHANGED": "Inbox version changed successfully",
+      "VERSION_CHANGE_ERROR": "Failed to change inbox version",
+      "STATUS_TOGGLE_ERROR": "Failed to toggle bot status",
+      "LOAD_ERROR": "Failed to load inbox assignments"
     }
   }
 }

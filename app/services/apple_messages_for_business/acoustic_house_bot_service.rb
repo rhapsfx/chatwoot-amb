@@ -122,12 +122,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'qr_oauth_provider' => :handle_oauth_provider_selection
   }.freeze
 
-  def initialize(conversation, message)
+  def initialize(conversation, message, bot = nil, config = nil)
     @conversation = conversation
     @message = message
+    @bot = bot
+    @config = build_config(bot, config)
     @contact = conversation.contact
     @bot_state = get_bot_state
     @lang = detect_language
+
+    # Validate configuration if bot is provided
+    validate_config! if @bot.present?
   end
 
   def process_message
@@ -268,6 +273,100 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   private
+
+  # === Configuration Management ===
+
+  def build_config(bot, config)
+    if bot.present?
+      # Use provided config or bot's config
+      (config || bot.bot_config).with_indifferent_access
+    else
+      # Legacy mode: use default hardcoded configuration
+      Rails.logger.warn '[AcousticHouseBot] Running in legacy mode (hardcoded config)'
+      default_hardcoded_config
+    end
+  end
+
+  def validate_config!
+    required_keys = %w[conversation_flow keyword_mappings interactive_handlers required_templates]
+    missing_keys = required_keys - @config.keys
+
+    return unless missing_keys.any?
+
+    raise StandardError, "Missing required config keys: #{missing_keys.join(', ')}"
+  end
+
+  def validate_templates!
+    return unless @config.dig('required_templates', 'validation', 'enabled')
+
+    result = self.class.verify_templates_exist(@conversation.account_id)
+
+    if !result[:all_present] && @config.dig('required_templates', 'validation', 'fail_on_missing')
+      raise StandardError, "Missing required templates: #{result[:missing].join(', ')}"
+    end
+
+    return unless result[:missing].any?
+
+    Rails.logger.warn "[AcousticHouseBot] Missing templates: #{result[:missing].join(', ')}"
+  end
+
+  def default_hardcoded_config
+    {
+      'conversation_flow' => {
+        'initial_state' => 'AHA1',
+        'idle_timeout_minutes' => 30
+      },
+      'keyword_mappings' => {
+        'demo_keywords' => DEMO_KEYWORDS.stringify_keys,
+        'flow_control_keywords' => FLOW_CONTROL_KEYWORDS.stringify_keys
+      },
+      'interactive_handlers' => INTERACTIVE_HANDLERS.stringify_keys,
+      'required_templates' => {
+        'list' => REQUIRED_TEMPLATES,
+        'validation' => {
+          'enabled' => false
+        }
+      },
+      'typing_indicators' => {
+        'enabled' => TYPING_INDICATORS_ENABLED,
+        'delay_seconds' => TYPING_INDICATOR_DELAY
+      },
+      'idempotency' => {
+        'enabled' => true,
+        'ttl_minutes' => 2,
+        'redis_key_prefix' => 'amb_bot'
+      }
+    }.with_indifferent_access
+  end
+
+  # Config accessor methods (for gradual migration from hardcoded constants)
+  def idle_timeout
+    @config.dig('conversation_flow', 'idle_timeout_minutes')&.minutes || IDLE_TIMEOUT
+  end
+
+  def demo_keywords
+    @config.dig('keyword_mappings', 'demo_keywords') || DEMO_KEYWORDS
+  end
+
+  def flow_control_keywords
+    @config.dig('keyword_mappings', 'flow_control_keywords') || FLOW_CONTROL_KEYWORDS
+  end
+
+  def interactive_handlers
+    @config['interactive_handlers'] || INTERACTIVE_HANDLERS
+  end
+
+  def required_templates
+    @config.dig('required_templates', 'list') || REQUIRED_TEMPLATES
+  end
+
+  def typing_indicators_enabled?
+    @config.dig('typing_indicators', 'enabled') != false
+  end
+
+  def typing_indicator_delay
+    @config.dig('typing_indicators', 'delay_seconds') || TYPING_INDICATOR_DELAY
+  end
 
   # UTF-8 safe logging methods (inlined from Utf8Logging concern for deployment compatibility)
   def utf8_encode(obj)

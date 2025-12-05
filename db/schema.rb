@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
+ActiveRecord::Schema[7.1].define(version: 2025_12_04_120002) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -119,6 +119,28 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.integer "account_id"
+    t.integer "priority", default: 10, null: false
+    t.jsonb "config_overrides", default: {}, null: false
+    t.bigint "version_id"
+    t.text "notes"
+    t.index ["inbox_id", "priority"], name: "index_agent_bot_inboxes_on_inbox_and_priority"
+    t.index ["version_id"], name: "index_agent_bot_inboxes_on_version_id"
+  end
+
+  create_table "agent_bot_versions", force: :cascade do |t|
+    t.bigint "agent_bot_id", null: false
+    t.string "version_tag", limit: 50, null: false
+    t.text "description"
+    t.jsonb "config", default: {}, null: false
+    t.boolean "is_active", default: false, null: false
+    t.boolean "is_default", default: false, null: false
+    t.datetime "activated_at"
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["agent_bot_id", "is_active"], name: "index_agent_bot_versions_on_bot_and_active"
+    t.index ["agent_bot_id", "version_tag"], name: "index_agent_bot_versions_on_bot_and_tag", unique: true
+    t.index ["agent_bot_id"], name: "index_agent_bot_versions_on_agent_bot_id"
   end
 
   create_table "agent_bots", force: :cascade do |t|
@@ -128,7 +150,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.bigint "account_id"
-    t.integer "bot_type", default: 0
+    t.integer "bot_type", default: 0, comment: "Bot type: 0 = webhook, 1 = apple_messages_for_business (AMB)"
     t.jsonb "bot_config", default: {}
     t.index ["account_id"], name: "index_agent_bots_on_account_id"
   end
@@ -1400,6 +1422,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "agent_bot_inboxes", "agent_bot_versions", column: "version_id", on_delete: :nullify
+  add_foreign_key "agent_bot_versions", "agent_bots"
   add_foreign_key "apple_list_picker_images", "accounts"
   add_foreign_key "apple_list_picker_images", "inboxes"
   add_foreign_key "inboxes", "portals"
