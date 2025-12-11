@@ -242,7 +242,6 @@ defineExpose({ open: () => dialogRef.value?.open(), close });
     :show-cancel-button="false"
     :show-confirm-button="false"
     width="2xl"
-    overflow-y-auto
   >
     <div class="flex flex-col gap-4">
       <!-- Header actions -->
@@ -362,7 +361,7 @@ defineExpose({ open: () => dialogRef.value?.open(), close });
       </div>
 
       <!-- Assigned inboxes table -->
-      <div v-else class="overflow-x-auto">
+      <div v-else class="max-h-[60vh] overflow-y-auto overflow-x-auto">
         <table class="min-w-full divide-y divide-n-weak">
           <thead class="bg-n-slate-2">
             <tr>
