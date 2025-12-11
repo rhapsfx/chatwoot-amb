@@ -59,6 +59,12 @@
         "ERROR_MESSAGE": "Could not update bot. Please try again."
       }
     },
+    "DUPLICATE": {
+      "BUTTON_TEXT": "Duplicate",
+      "TITLE": "Duplicate bot",
+      "SUCCESS": "Bot duplicated successfully.",
+      "ERROR": "Could not duplicate bot. Please try again."
+    },
     "ACCESS_TOKEN": {
       "TITLE": "Access Token",
       "DESCRIPTION": "Copy the access token and save it securely",
@@ -87,7 +93,21 @@
       "BOT_CONFIG": {
         "LABEL": "Bot Configuration",
         "PLACEHOLDER": "Enter bot configuration as JSON",
-        "HELP": "Advanced configuration for Apple Messages bot behavior"
+        "HELP": "Configure typing indicators, conversation timeout, and other bot behavior settings",
+        "HELP_LINK": "View configuration guide",
+        "TYPING_INDICATORS": {
+          "TITLE": "Typing Indicators",
+          "ENABLED": "Enable typing indicators",
+          "DELAY": "Typing delay (seconds)",
+          "DELAY_HELP": "Time to show 'typing...' indicator before sending message (0.1-5 seconds, recommended: 1.5)"
+        },
+        "CONVERSATION": {
+          "TITLE": "Conversation Settings",
+          "TIMEOUT": "Conversation timeout (minutes)",
+          "TIMEOUT_HELP": "Reset conversation after this many minutes of inactivity (default: 30 minutes)"
+        },
+        "ADVANCED_CONFIG": "Advanced Configuration (JSON)",
+        "ADVANCED_CONFIG_HELP": "Manually edit the complete bot configuration as JSON. Use this for advanced settings like keyword mappings and handler methods."
       },
       "WEBHOOK_URL": {
         "LABEL": "Webhook URL (optional)",
@@ -97,7 +117,8 @@
       "ERRORS": {
         "NAME": "Bot name is required",
         "URL": "Webhook URL is required",
-        "VALID_URL": "Please enter a valid URL starting with http:// or https://"
+        "VALID_URL": "Please enter a valid URL starting with http:// or https://",
+        "INVALID_JSON": "Invalid JSON format. Please check your configuration."
       },
       "CANCEL": "Cancel",
       "CREATE": "Create Bot",
@@ -107,7 +128,8 @@
       "DESCRIPTION": "Configure a webhook bot to integrate with your custom services. The bot will receive and process events from conversations and can respond to them."
     },
     "TYPES": {
-      "WEBHOOK": "Webhook bot"
+      "WEBHOOK": "Webhook bot",
+      "AMB": "Apple Messages"
     },
     "VERSION_HISTORY": "Version History",
     "MANAGE_INBOXES": "Manage Inboxes",
@@ -172,6 +194,86 @@
       "VERSION_CHANGE_ERROR": "Failed to change inbox version",
       "STATUS_TOGGLE_ERROR": "Failed to toggle bot status",
       "LOAD_ERROR": "Failed to load inbox assignments"
+    },
+    "OPEN_STUDIO": "Open Visual Studio",
+    "STUDIO": {
+      "TITLE": "Visual Bot Studio",
+      "SUBTITLE": "Design bot conversation flows visually",
+      "BACK_TO_BOTS": "Back to Bots",
+      "COMPILE_TEST": "Compile & Test",
+      "SAVE": "Save Flow",
+      "IMPORT_FROM_JSON": "Import from JSON",
+      "EXPORT_TO_JSON": "Export to JSON",
+      "FLOW_SAVED": "Flow saved successfully",
+      "FLOW_COMPILED": "Flow compiled successfully",
+      "FLOW_IMPORTED": "Flow imported successfully from bot config",
+      "ERROR_LOADING_BOT": "Failed to load bot",
+      "ERROR_SAVING_FLOW": "Failed to save flow",
+      "ERROR_COMPILING_FLOW": "Failed to compile flow",
+      "ERROR_IMPORTING_FLOW": "Failed to import flow from bot config",
+      "NODE_PALETTE": "Nodes",
+      "DRAG_TO_CANVAS": "Drag nodes to canvas to build your flow",
+      "PALETTE_TIP": "Drag and drop nodes onto the canvas",
+      "NODE_PROPERTIES": "Node Properties",
+      "NODE_TYPE": "Type",
+      "NODE_ID": "ID",
+      "SELECT_NODE": "Select a node to view its properties"
+    },
+    "BOT_STUDIO": {
+      "TITLE": "Visual Bot Studio",
+      "BACK_TO_BOTS": "Back to Bots",
+      "COMPILE_TEST": "Compile & Test",
+      "SAVE_FLOW": "Save Flow",
+      "FLOW_SAVED": "Flow saved successfully",
+      "FLOW_COMPILED": "Flow compiled successfully",
+      "FLOW_COMPILE_ERROR": "Failed to compile flow",
+      "NODE_PALETTE": {
+        "TITLE": "Add Nodes",
+        "STATE": "State",
+        "INTENT": "Intent",
+        "ACTION": "Action",
+        "TEMPLATE": "Template",
+        "CONDITION": "Condition"
+      },
+      "CONFIG_PANEL": {
+        "TITLE": "Configure Node",
+        "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "STATE": {
+          "STATE_ID": "State ID",
+          "STATE_ID_PLACEHOLDER": "e.g., AHA1",
+          "STATE_ID_HELP": "Unique identifier for this state",
+          "LABEL": "Label",
+          "LABEL_PLACEHOLDER": "e.g., Welcome Message",
+          "DESCRIPTION": "Description",
+          "DESCRIPTION_PLACEHOLDER": "Describe what happens in this state",
+          "ACTIONS": "Actions",
+          "ADD_ACTION": "Add Action",
+          "ACTION_TYPE": "Action Type",
+          "TEMPLATE_NAME": "Template Name",
+          "TEMPLATE_NAME_PLACEHOLDER": "e.g., ah_main_menu",
+          "REMOVE_ACTION": "Remove"
+        },
+        "INTENT": {
+          "KEYWORDS": "Keywords",
+          "KEYWORDS_PLACEHOLDER": "Enter keywords (comma-separated)",
+          "EXACT_MATCH": "Exact Match",
+          "CASE_SENSITIVE": "Case Sensitive"
+        },
+        "TEMPLATE": {
+          "TEMPLATE_NAME": "Template Name",
+          "TEMPLATE_TYPE": "Template Type"
+        },
+        "ACTION": {
+          "ACTION_TYPE": "Action Type",
+          "LABEL": "Label"
+        },
+        "CONDITION": {
+          "EXPRESSION": "Condition Expression",
+          "TRUE_LABEL": "True Branch Label",
+          "FALSE_LABEL": "False Branch Label"
+        }
+      }
     }
   }
 }
