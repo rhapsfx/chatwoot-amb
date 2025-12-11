@@ -6,6 +6,7 @@
 #
 #  id           :bigint           not null, primary key
 #  activated_at :datetime
+#  archived_at  :datetime
 #  config       :jsonb            not null
 #  description  :text
 #  is_active    :boolean          default(FALSE), not null
@@ -19,6 +20,7 @@
 # Indexes
 #
 #  index_agent_bot_versions_on_agent_bot_id    (agent_bot_id)
+#  index_agent_bot_versions_on_archived_at     (archived_at)
 #  index_agent_bot_versions_on_bot_and_active  (agent_bot_id,is_active)
 #  index_agent_bot_versions_on_bot_and_tag     (agent_bot_id,version_tag) UNIQUE
 #
@@ -46,6 +48,20 @@ class AgentBotVersion < ApplicationRecord
   scope :active, -> { where(is_active: true) }
   scope :inactive, -> { where(is_active: false) }
   scope :default_versions, -> { where(is_default: true) }
+  scope :archived, lambda {
+    if column_names.include?('archived_at')
+      where.not(archived_at: nil)
+    else
+      none
+    end
+  }
+  scope :not_archived, lambda {
+    if column_names.include?('archived_at')
+      where(archived_at: nil)
+    else
+      all
+    end
+  }
   scope :recent, -> { order(created_at: :desc) }
 
   def activate!
@@ -68,7 +84,45 @@ class AgentBotVersion < ApplicationRecord
     end
   end
 
+  def archive!
+    update!(archived_at: Time.current, is_active: false)
+  end
+
+  def restore!
+    update!(archived_at: nil)
+  end
+
+  def archived?
+    return false unless respond_to?(:archived_at)
+
+    archived_at.present?
+  end
+
+  # For JSON serialization
+  def archived
+    archived?
+  end
+
+  def compare_with(other_version)
+    {
+      config_diff: config_differences(other_version),
+      version_tag_changed: version_tag != other_version.version_tag,
+      description_changed: description != other_version.description,
+      notes_changed: notes != other_version.notes
+    }
+  end
+
   private
+
+  def config_differences(other_version)
+    return {} if config == other_version.config
+
+    {
+      added_keys: other_version.config.keys - config.keys,
+      removed_keys: config.keys - other_version.config.keys,
+      modified_keys: config.keys.select { |key| config[key] != other_version.config[key] }
+    }
+  end
 
   def only_one_active_default_version
     existing = agent_bot.versions.active.default_versions.where.not(id: id)

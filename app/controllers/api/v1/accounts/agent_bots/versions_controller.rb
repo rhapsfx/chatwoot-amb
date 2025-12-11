@@ -7,27 +7,21 @@ class Api::V1::Accounts::AgentBots::VersionsController < Api::V1::Accounts::Base
 
   # GET /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/versions
   def index
-    @versions = @agent_bot.versions.recent.includes(:created_by)
-    @versions = @versions.where(is_archived: false) unless params[:include_archived]
+    @versions = if params[:include_archived] == 'true'
+                  @agent_bot.versions.recent
+                else
+                  @agent_bot.versions.not_archived.recent
+                end
 
     render json: {
-      versions: @versions.as_json(
-        include: {
-          created_by: { only: [:id, :name, :email] }
-        },
-        methods: [:config_summary]
-      )
+      versions: @versions.as_json(methods: [:archived])
     }
   end
 
   # GET /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/versions/:id
   def show
     render json: {
-      version: @version.as_json(
-        include: {
-          created_by: { only: [:id, :name, :email] }
-        }
-      )
+      version: @version.as_json
     }
   end
 
