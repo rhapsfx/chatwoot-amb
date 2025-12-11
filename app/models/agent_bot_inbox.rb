@@ -16,8 +16,8 @@
 #
 # Indexes
 #
-#  index_agent_bot_inboxes_on_inbox_and_priority  (inbox_id,priority)
-#  index_agent_bot_inboxes_on_version_id          (version_id)
+#  index_agent_bot_inboxes_on_inbox_and_priority_unique  (inbox_id,priority) UNIQUE WHERE (status = 0)
+#  index_agent_bot_inboxes_on_version_id                 (version_id)
 #
 # Foreign Keys
 #
@@ -28,6 +28,7 @@ class AgentBotInbox < ApplicationRecord
   validates :inbox_id, presence: true
   validates :agent_bot_id, presence: true
   validates :priority, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: 100 }
+  validate :unique_priority_per_inbox
   before_validation :ensure_account_id
 
   belongs_to :inbox
@@ -77,5 +78,19 @@ class AgentBotInbox < ApplicationRecord
 
   def ensure_account_id
     self.account_id = inbox&.account_id
+  end
+
+  def unique_priority_per_inbox
+    return unless inbox_id && priority
+
+    # Check for other active bots with same priority in same inbox
+    duplicate = AgentBotInbox.active
+                             .where(inbox_id: inbox_id, priority: priority)
+                             .where.not(id: id) # Exclude self for updates
+                             .exists?
+
+    return unless duplicate
+
+    errors.add(:priority, 'is already assigned to another active bot in this inbox. Please choose a different priority.')
   end
 end
