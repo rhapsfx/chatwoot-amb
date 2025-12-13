@@ -4,36 +4,52 @@ This guide explains the deployment workflows for the Chatwoot production environ
 
 ## Overview
 
-We have two primary deployment scripts for different scenarios:
+We have three primary deployment scripts for different scenarios:
 
-1. **`script/quick_rebuild.sh`** - Full Docker image rebuild
-2. **`script/deploy-backend-enhanced.sh`** - Hot-patch backend code to running containers
+1. **`script/deploy-local-build.sh`** - Build Docker image locally and deploy (RECOMMENDED for frontend changes)
+2. **`script/quick_rebuild.sh`** - Full Docker image rebuild on server (deprecated - server has limited memory)
+3. **`script/deploy-backend-enhanced.sh`** - Hot-patch backend code to running containers
 
 ## When to Use Each Script
 
-### Use `quick_rebuild.sh` When:
+### Use `deploy-local-build.sh` When: ✅ RECOMMENDED
+
+✅ **Frontend Changes:**
+- Modified JavaScript/TypeScript files
+- Changed CSS/SCSS files
+- Updated Vue components
+- Modified Vite configuration
+- Any changes to `app/javascript/`
+
+✅ **Combined Frontend + Backend Changes:**
+- Modified both Vue components and Rails services
+- Added new features with UI + API changes
+
+✅ **Dependency Changes:**
+- Updated `Gemfile` or `Gemfile.lock`
+- Changed `package.json` or `pnpm-lock.yaml`
+- Added/removed Ruby or Node.js dependencies
 
 ✅ **Docker Infrastructure Changes:**
 - Modified `Dockerfile.production`
 - Changed system dependencies (apt packages)
 - Updated Node.js or Ruby versions
-- Modified build process or multi-stage build steps
 
-✅ **Dependency Changes:**
-- Updated `Gemfile` or `Gemfile.lock`
-- Changed gem versions
-- Added/removed Ruby dependencies
+**Why this script?**
+- Builds Docker image on your local Mac (has plenty of memory)
+- Production server has limited memory and cannot reliably build images
+- Transfers pre-built image to server and loads it
+- Ensures frontend assets are compiled correctly
 
-✅ **Frontend Changes:**
-- Modified JavaScript/TypeScript files
-- Changed CSS/SCSS files
-- Updated Vite configuration
-- Modified frontend build process
+### Use `quick_rebuild.sh` When: ⚠️ DEPRECATED
 
-✅ **Initial Deployment:**
-- First time deploying the application
-- After major refactoring
-- When containers are not running
+**⚠️ NOT RECOMMENDED:** This script builds on the production server which has limited memory (can fail with OOM errors).
+
+**Use `deploy-local-build.sh` instead** for all cases that previously used this script.
+
+**Only use if:**
+- Testing quick server-side builds in development
+- You've verified server has sufficient memory at the time
 
 ### Use `deploy-backend-enhanced.sh` When:
 
@@ -59,7 +75,44 @@ We have two primary deployment scripts for different scenarios:
 
 ## Script Usage
 
-### quick_rebuild.sh
+### deploy-local-build.sh ✅ RECOMMENDED
+
+**Basic usage:**
+```bash
+./script/deploy-local-build.sh
+```
+
+**Clean rebuild (no cache):**
+```bash
+./script/deploy-local-build.sh --no-cache
+```
+
+**What it does:**
+1. Builds Docker image locally on your Mac (has sufficient memory)
+2. Saves image to tar file (~2GB)
+3. Transfers tar file to production server via rsync
+4. Loads image on production server
+5. Stops existing containers
+6. Starts containers with new image
+7. Verifies container health
+
+**Typical execution time:** 25-40 minutes total
+- Local build: 10-15 minutes (with cache) or 15-20 minutes (no cache)
+- Save to tar: 5-10 minutes
+- Transfer: 5-10 minutes (network dependent)
+- Load + restart: 1-2 minutes
+
+**Memory requirements:**
+- Local: Your Mac (plenty of memory for builds)
+- Server: Only needs memory to load image and run containers
+
+**Advantages:**
+- ✅ No memory constraints (builds locally)
+- ✅ Reliable for frontend changes
+- ✅ Consistent build environment
+- ✅ Can build offline (before transferring)
+
+### quick_rebuild.sh ⚠️ DEPRECATED
 
 **Basic usage:**
 ```bash
@@ -107,7 +160,7 @@ We have two primary deployment scripts for different scenarios:
 
 ## Deployment Workflow Examples
 
-### Scenario 1: Fixing a Bot Timeout Issue
+### Scenario 1: Fixing a Bot Timeout Issue (Backend Only)
 
 You've fixed blocking `sleep()` calls in the bot service.
 
@@ -123,7 +176,28 @@ You've fixed blocking `sleep()` calls in the bot service.
 
 ---
 
-### Scenario 2: Adding New Gem Dependency
+### Scenario 2: Adding Custom Payload Copy Button (Frontend + Backend)
+
+You've added a new "Copy for Custom Payload" button to the Apple Messages payload modal.
+
+**Changes:**
+- Modified `app/javascript/dashboard/components-next/message/modals/ApplePayloadModal.vue`
+- Modified `app/javascript/dashboard/components-next/message/MessageList.vue`
+- Updated `app/services/apple_messages_for_business/send_custom_payload_service.rb`
+- Updated `app/views/api/v1/models/_message.json.jbuilder`
+
+**Deployment:**
+```bash
+./script/deploy-local-build.sh
+```
+
+**Why:** Frontend Vue component changes require Vite build, which is baked into Docker image. Backend changes are included in the same image build.
+
+**Expected time:** 25-40 minutes
+
+---
+
+### Scenario 3: Adding New Gem Dependency
 
 You've added a new gem to process images.
 
@@ -134,14 +208,14 @@ You've added a new gem to process images.
 
 **Deployment:**
 ```bash
-./script/quick_rebuild.sh
+./script/deploy-local-build.sh
 ```
 
-**Why:** Gemfile changes require rebuilding the Docker image to install new dependencies.
+**Why:** Gemfile changes require rebuilding the Docker image to install new dependencies. Build locally to avoid server memory issues.
 
 ---
 
-### Scenario 3: Memory Configuration Update
+### Scenario 4: Memory Configuration Update
 
 You need to increase Node.js heap size for builds.
 
@@ -150,14 +224,14 @@ You need to increase Node.js heap size for builds.
 
 **Deployment:**
 ```bash
-./script/quick_rebuild.sh --no-cache
+./script/deploy-local-build.sh --no-cache
 ```
 
-**Why:** Dockerfile change requires rebuild. Use `--no-cache` to ensure build changes take effect.
+**Why:** Dockerfile change requires rebuild. Use `--no-cache` to ensure build changes take effect. Build locally to avoid OOM on server.
 
 ---
 
-### Scenario 4: Adding New API Endpoint
+### Scenario 5: Adding New API Endpoint
 
 You've created a new controller and route.
 
@@ -174,7 +248,7 @@ You've created a new controller and route.
 
 ---
 
-### Scenario 5: Frontend UI Update
+### Scenario 6: Frontend UI Update
 
 You've modified the dashboard interface.
 
@@ -184,10 +258,10 @@ You've modified the dashboard interface.
 
 **Deployment:**
 ```bash
-./script/quick_rebuild.sh
+./script/deploy-local-build.sh
 ```
 
-**Why:** Frontend assets require Vite build, which happens during Docker image build.
+**Why:** Frontend assets require Vite build, which happens during Docker image build. Build locally to ensure reliable compilation.
 
 ## Troubleshooting
 
@@ -411,8 +485,9 @@ COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
 
 ## Additional Resources
 
-- **Quick rebuild script:** `script/quick_rebuild.sh`
-- **Backend deployment script:** `script/deploy-backend-enhanced.sh`
+- **Local build + deploy script:** `script/deploy-local-build.sh` ✅ RECOMMENDED
+- **Backend-only deployment script:** `script/deploy-backend-enhanced.sh`
+- **Server rebuild script:** `script/quick_rebuild.sh` ⚠️ DEPRECATED (server memory limited)
 - **Dockerfile:** `Dockerfile.production`
 - **Docker Compose:** `docker-compose.production.yml`
 
@@ -427,6 +502,12 @@ If you encounter issues not covered in this guide:
 
 ## Changelog
 
+- **2024-12-13**: Added deploy-local-build.sh workflow
+  - New recommended script for building locally and deploying
+  - Solves server memory constraints (cannot build on server)
+  - Deprecated quick_rebuild.sh due to server OOM issues
+  - Updated all scenarios to use local build approach
+  - Added Scenario 2: Frontend + Backend deployment example
 - **2024-12-02**: Initial deployment guide created
   - Documented quick_rebuild.sh and deploy-backend-enhanced.sh
   - Added troubleshooting for bot timeout deployment
