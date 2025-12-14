@@ -22,7 +22,30 @@ const errorMessage = computed(() => {
   );
 });
 
-const debugInfo = computed(() => {
+// Extract the actual payload from the wrapped structure
+const actualPayload = computed(() => {
+  // The appleMspPayload prop from backend has structure:
+  // { payload: {...actual Apple MSP payload...}, debug: {...} }
+  // We need to extract the inner payload for display
+  if (props.payload) {
+    // Check if it's wrapped (from database)
+    if (props.payload.payload) {
+      return props.payload.payload;
+    }
+    // Otherwise return as-is (direct payload)
+    return props.payload;
+  }
+  return null;
+});
+
+// Extract debug info from the wrapped payload if present
+const actualDebugInfo = computed(() => {
+  // Extract debug info from the wrapped payload if present
+  if (props.payload?.debug) {
+    return props.payload.debug;
+  }
+
+  // Otherwise create basic debug info
   const info = {
     status: props.status,
     timestamp: new Date().toISOString(),
@@ -35,11 +58,14 @@ const debugInfo = computed(() => {
   return info;
 });
 
+const debugInfo = computed(() => actualDebugInfo.value);
+
 const formattedPayload = computed(() => {
-  // For sent messages, show the payload
-  if (props.payload) {
+  // For sent messages, show the actual payload sent to Apple
+  if (actualPayload.value) {
     try {
-      return JSON.stringify(props.payload, null, 2);
+      // The actualPayload is the complete Apple MSP payload
+      return JSON.stringify(actualPayload.value, null, 2);
     } catch (e) {
       return 'Error formatting payload';
     }
@@ -61,10 +87,17 @@ const formattedPayload = computed(() => {
 });
 
 const payloadLabel = computed(() => {
-  if (props.payload) {
-    return 'Request Payload (Sent to Apple)';
+  if (actualPayload.value) {
+    return 'Request Payload (Sent to Apple MSP Gateway)';
   }
   return 'Received Payload (From Apple)';
+});
+
+const payloadDescription = computed(() => {
+  if (actualPayload.value) {
+    return 'This is the exact JSON structure sent to mspgw.push.apple.com/v1. Fields v, id, sourceId, destinationId are auto-populated by the system.';
+  }
+  return 'This is the payload received from Apple Messages for Business.';
 });
 
 const formattedDebugInfo = computed(() => {
@@ -77,10 +110,15 @@ const formattedDebugInfo = computed(() => {
 
 const copyToClipboard = async () => {
   try {
+    // For sent messages: copy the actual payload sent to Apple (unwrapped)
+    // For received messages: copy the content attributes
+    const dataToCopy = actualPayload.value || props.contentAttributes;
+
     const fullData = {
-      payload: props.payload || props.contentAttributes,
-      debug: debugInfo.value,
+      debug: actualDebugInfo.value,
+      payload: dataToCopy,
     };
+
     await navigator.clipboard.writeText(JSON.stringify(fullData, null, 2));
     useAlert('Payload copied to clipboard');
   } catch (err) {
@@ -98,7 +136,8 @@ const stripBase64Data = obj => {
 
   if (typeof obj === 'object') {
     const cleaned = {};
-    for (const [key, value] of Object.entries(obj)) {
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
       // Remove 'data' field if it appears to be base64 (starts with / or contains base64 indicators)
       if (
         key === 'data' &&
@@ -111,20 +150,62 @@ const stripBase64Data = obj => {
       } else {
         cleaned[key] = stripBase64Data(value);
       }
-    }
+    });
     return cleaned;
   }
 
   return obj;
 };
 
+const copyPayloadOnly = async () => {
+  try {
+    // Copy ONLY the interactiveData field for use in Custom Payload textarea
+    const payload = actualPayload.value || props.contentAttributes;
+
+    if (!payload) {
+      useAlert('No payload to copy');
+      return;
+    }
+
+    // Extract just the interactiveData (the part needed for custom payload)
+    const interactiveData = payload.interactiveData || payload.interactive_data;
+
+    if (interactiveData) {
+      // CRITICAL: Strip base64 image data to keep payload manageable
+      // Images will be automatically fetched from storage when sending
+      const strippedInteractiveData = stripBase64Data(interactiveData);
+
+      // Copy only the interactiveData object wrapped in root object
+      const customPayloadFormat = {
+        interactiveData: strippedInteractiveData,
+      };
+      await navigator.clipboard.writeText(
+        JSON.stringify(customPayloadFormat, null, 2)
+      );
+      useAlert(
+        'Interactive data copied (images removed - will auto-fetch on send)'
+      );
+    } else {
+      // For non-interactive messages, copy the whole payload
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      useAlert('Payload copied');
+    }
+  } catch (err) {
+    useAlert('Failed to copy payload');
+  }
+};
+
 const copyToClipboardLight = async () => {
   try {
-    const payload = props.payload || props.contentAttributes;
+    // For sent messages: copy the actual payload sent to Apple (unwrapped, without base64)
+    // For received messages: copy the content attributes (without base64)
+    const dataToCopy = actualPayload.value || props.contentAttributes;
+
     const lightData = {
-      payload: stripBase64Data(payload),
-      debug: debugInfo.value,
+      debug: actualDebugInfo.value,
+      payload: stripBase64Data(dataToCopy),
     };
+
     await navigator.clipboard.writeText(JSON.stringify(lightData, null, 2));
     useAlert('Light payload copied (base64 data removed)');
   } catch (err) {
@@ -164,12 +245,20 @@ const closeModal = () => {
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <button
+            class="px-3 py-1.5 text-xs font-medium text-white bg-n-blue-9 hover:bg-n-blue-10 rounded-md transition-colors flex items-center gap-1.5"
+            title="Copy interactiveData only (for Custom Payload textarea)"
+            @click="copyPayloadOnly"
+          >
+            <fluent-icon icon="copy" size="14" />
+            Copy for Custom Payload
+          </button>
+          <button
             class="px-3 py-1.5 text-xs font-medium text-n-slate-12 bg-n-alpha-2 hover:bg-n-alpha-3 rounded-md transition-colors flex items-center gap-1.5"
-            title="Copy full payload with all image data"
+            title="Copy full payload with debug info and all image data"
             @click="copyToClipboard"
           >
             <fluent-icon icon="copy" size="14" />
-            Copy
+            Copy All
           </button>
           <button
             class="px-3 py-1.5 text-xs font-medium text-n-slate-11 bg-n-alpha-1 hover:bg-n-alpha-2 rounded-md transition-colors flex items-center gap-1.5 border border-n-weak"
@@ -224,20 +313,27 @@ const closeModal = () => {
           </div>
           <pre
             class="p-3 bg-n-slate-2 rounded-md text-xs font-mono text-n-slate-12 overflow-x-auto border border-n-weak"
-            >{{ formattedDebugInfo }}</pre>
+            >{{ formattedDebugInfo }}</pre
+          >
         </div>
 
         <!-- Payload -->
         <div>
-          <div class="flex items-center gap-2 mb-2">
-            <fluent-icon icon="code" size="14" class="text-n-slate-11" />
-            <h4 class="text-xs font-semibold text-n-slate-12">
-              {{ payloadLabel }}
-            </h4>
+          <div class="flex items-start gap-2 mb-2">
+            <fluent-icon icon="code" size="14" class="text-n-slate-11 mt-0.5" />
+            <div class="flex-1 min-w-0">
+              <h4 class="text-xs font-semibold text-n-slate-12">
+                {{ payloadLabel }}
+              </h4>
+              <p class="text-xs text-n-slate-10 mt-0.5">
+                {{ payloadDescription }}
+              </p>
+            </div>
           </div>
           <pre
             class="p-4 bg-n-slate-2 rounded-md text-xs font-mono text-n-slate-12 overflow-x-auto border border-n-weak leading-relaxed"
-            >{{ formattedPayload }}</pre>
+            >{{ formattedPayload }}</pre
+          >
         </div>
       </div>
     </div>

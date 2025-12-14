@@ -1,433 +1,469 @@
 # Chatwoot Deployment Guide
 
-This guide explains the deployment workflows for the Chatwoot production environment.
+This guide explains the **simplified deployment workflow** for the Chatwoot production environment after cleanup and optimization.
 
 ## Overview
 
-We have two primary deployment scripts for different scenarios:
+We have **2 primary deployment scripts** for different scenarios:
 
-1. **`script/quick_rebuild.sh`** - Full Docker image rebuild
-2. **`script/deploy-backend-enhanced.sh`** - Hot-patch backend code to running containers
+1. **`script/quick_rebuild.sh`** - Full Docker image rebuild (Dockerfile/dependencies/frontend changes)
+2. **`script/deploy-backend-enhanced.sh`** - Hot-patch backend code (Ruby-only changes)
 
-## When to Use Each Script
+Plus **2 specialized utilities**:
+3. **`script/deploy-backend-changes-safe.sh`** - Comprehensive backend + Apple Pay + n8n + bots
+4. **`script/deploy-apple-pay-certs.sh`** - Apple Pay certificate deployment
 
-### Use `quick_rebuild.sh` When:
+---
 
-✅ **Docker Infrastructure Changes:**
-- Modified `Dockerfile.production`
-- Changed system dependencies (apt packages)
-- Updated Node.js or Ruby versions
-- Modified build process or multi-stage build steps
+## Decision Flowchart
 
-✅ **Dependency Changes:**
-- Updated `Gemfile` or `Gemfile.lock`
-- Changed gem versions
-- Added/removed Ruby dependencies
-
-✅ **Frontend Changes:**
-- Modified JavaScript/TypeScript files
-- Changed CSS/SCSS files
-- Updated Vite configuration
-- Modified frontend build process
-
-✅ **Initial Deployment:**
-- First time deploying the application
-- After major refactoring
-- When containers are not running
-
-### Use `deploy-backend-enhanced.sh` When:
-
-✅ **Backend Code Changes Only:**
-- Modified Ruby services, controllers, models
-- Updated background jobs
-- Changed business logic
-- Added/modified API endpoints
-
-✅ **Configuration Changes:**
-- Updated routes (`config/routes.rb`)
-- Modified initializers
-- Changed application configuration (non-Docker)
-
-✅ **Database Changes:**
-- New migrations to run
-- Schema updates
-
-✅ **Quick Iteration:**
-- Developing and testing backend features
-- Hot-fixing production issues
-- Rapid deployment cycles
-
-## Script Usage
-
-### quick_rebuild.sh
-
-**Basic usage:**
-```bash
-./script/quick_rebuild.sh
+```
+Need to deploy changes?
+│
+├─ Changed Dockerfile.production? ────────────────────────→ quick_rebuild.sh
+├─ Changed Gemfile/package.json dependencies? ────────────→ quick_rebuild.sh
+├─ Changed Vue/JavaScript/CSS (frontend)? ────────────────→ quick_rebuild.sh
+├─ Changed Node.js or Ruby versions? ─────────────────────→ quick_rebuild.sh
+│
+├─ Changed Ruby code ONLY (services/controllers/models)? ─→ deploy-backend-enhanced.sh
+├─ Changed routes or initializers? ───────────────────────→ deploy-backend-enhanced.sh
+├─ Need to run database migrations? ──────────────────────→ deploy-backend-enhanced.sh
+│
+├─ Deploying Apple Pay/n8n/bot templates together? ───────→ deploy-backend-changes-safe.sh
+└─ Updating Apple Pay certificates? ──────────────────────→ deploy-apple-pay-certs.sh
 ```
 
-**Clean rebuild (no cache):**
+---
+
+## 1. quick_rebuild.sh - Full Docker Rebuild
+
+### When to Use
+
+Use this when you've changed:
+- ✅ `Dockerfile.production` (any Docker configuration)
+- ✅ Dependencies (`Gemfile`, `Gemfile.lock`, `package.json`, `pnpm-lock.yaml`)
+- ✅ Frontend code (Vue components, JavaScript, TypeScript, CSS)
+- ✅ Vite configuration or build process
+- ✅ System packages (Node.js, Ruby versions)
+- ✅ **Any code that affects the Docker image**
+
+### Usage
+
 ```bash
+# Standard rebuild (uses Docker layer cache)
+./script/quick_rebuild.sh
+
+# Clean rebuild (no cache - for infrastructure changes)
 ./script/quick_rebuild.sh --no-cache
 ```
 
-**What it does:**
-1. Connects to remote server (msp.rhaps.net)
-2. Stops running containers
-3. Rebuilds Docker image from Dockerfile.production
-4. Starts containers with new image
-5. Verifies container health
-6. Reports deployment status
+### What It Does
 
-**Typical execution time:** 5-15 minutes (depending on cache)
+1. Syncs `Dockerfile.production` to production server
+2. Builds Docker image **on the server** (AMD64 architecture)
+3. Compiles frontend assets with Vite
+4. Installs Ruby gems and Node.js packages
+5. Stops existing containers
+6. Removes old containers
+7. Starts new containers with fresh image
+8. Verifies container health
 
-**Memory requirements:**
-- Build needs 4GB+ heap for Node.js/Vite
-- Server should have 3.7GB RAM + 4GB swap minimum
+### Execution Time
 
-### deploy-backend-enhanced.sh
+- **With cache**: 5-10 minutes
+- **Without cache** (`--no-cache`): 15-20 minutes
 
-**Basic usage:**
+### Server Requirements
+
+- **Memory**: 2.0GB free RAM + 3.5GB free swap (currently available)
+- **Disk**: 11GB available (currently at 86% usage)
+- **Note**: Builds on server because it's AMD64 architecture (Mac is ARM64)
+
+### Important Notes
+
+⚠️ **Volume Mounts**: The production server uses bind mounts for `/app/public/vite`. After rebuilding, you may need to extract new assets from the image to the host if the button or assets don't appear:
+
+```bash
+# If assets don't update after rebuild, run this on server:
+ssh root@msp.rhaps.net 'bash -s' << 'SCRIPT'
+cd /opt/chatwoot
+docker run --rm --user root -v /opt/chatwoot/public:/host_public chatwoot:production \
+  bash -c "cp -r /app/public/vite /host_public/ && chown -R $(stat -c '%u:%g' /opt/chatwoot/public) /host_public/vite"
+docker compose -f docker-compose.production.yml restart web worker
+SCRIPT
+```
+
+---
+
+## 2. deploy-backend-enhanced.sh - Hot-Patch Backend
+
+### When to Use
+
+Use this when you've changed **Ruby code ONLY**:
+- ✅ Services (`app/services/`)
+- ✅ Controllers (`app/controllers/`)
+- ✅ Models (`app/models/`)
+- ✅ Background jobs (`app/jobs/`)
+- ✅ Routes (`config/routes.rb`)
+- ✅ Initializers (`config/initializers/`)
+- ✅ Database migrations (`.rb` files in `db/migrate/`)
+
+### Usage
+
 ```bash
 ./script/deploy-backend-enhanced.sh
 ```
 
-**What it does:**
-1. Syncs backend code to remote server via rsync
+### What It Does
+
+1. Syncs Ruby code to production server via rsync
 2. Copies code into running containers (hot-patch)
-3. Runs database migrations
-4. Restarts containers to apply changes
+3. Runs pending database migrations
+4. Restarts web and worker containers
 5. Verifies deployment
 
-**Typical execution time:** 1-3 minutes
+### Execution Time
 
-**Requirements:**
+- **Typical**: 1-3 minutes
+
+### Requirements
+
 - Containers must already be running
 - Docker image must be up-to-date with dependencies
 
+### When NOT to Use
+
+❌ **Do NOT use for**:
+- Frontend changes (Vue/JS/CSS)
+- Dependency changes (Gemfile/package.json)
+- Dockerfile changes
+- Node.js or Ruby version updates
+
+---
+
+## 3. deploy-backend-changes-safe.sh - Comprehensive Deployment
+
+### When to Use
+
+Use this for **complex deployments** involving multiple subsystems:
+- ✅ Backend code changes + Apple Pay configuration
+- ✅ Backend code changes + n8n custom nodes
+- ✅ Backend code changes + Acoustic House Bot templates
+- ✅ Backend code changes + Apple Maps tokens
+- ✅ **Any feature requiring multiple component updates**
+
+### Usage
+
+```bash
+./script/deploy-backend-changes-safe.sh
+```
+
+### What It Does
+
+Everything in `deploy-backend-enhanced.sh` PLUS:
+- Deploys Apple Pay certificates and configuration
+- Updates n8n custom AMB nodes
+- Syncs bot templates
+- Updates Apple Maps API tokens
+- Comprehensive verification checks
+
+### Execution Time
+
+- **Typical**: 3-5 minutes
+
+---
+
+## 4. deploy-apple-pay-certs.sh - Certificate Management
+
+### When to Use
+
+Use this **only** when updating Apple Pay certificates:
+- ✅ Renewing Apple Pay merchant certificates
+- ✅ Updating payment processing certificates
+
+### Usage
+
+```bash
+./script/deploy-apple-pay-certs.sh
+```
+
+---
+
 ## Deployment Workflow Examples
 
-### Scenario 1: Fixing a Bot Timeout Issue
+### Scenario 1: Added "Copy for Custom Payload" Button
 
-You've fixed blocking `sleep()` calls in the bot service.
+**Changes**:
+- Modified `ApplePayloadModal.vue` (frontend Vue component)
+- Modified `MessageList.vue` (frontend Vue component)
+- Added 8 circle.png images to `public/apple-messages/`
 
-**Changes:**
+**Script**: `quick_rebuild.sh`
+
+**Why**: Frontend (Vue) changes require Vite build, which is baked into Docker image.
+
+**Time**: 15-20 minutes (no-cache recommended for Dockerfile fixes)
+
+```bash
+# Ensure circle.png images are committed
+git add public/apple-messages/*.png
+git commit -m "feat: add circle.png images for Apple Messages modal"
+
+# Deploy
+./script/quick_rebuild.sh --no-cache
+```
+
+**Post-deployment**:
+- Hard refresh browser: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Windows)
+- Verify button appears in modal
+- Verify images load without 404 errors
+
+---
+
+### Scenario 2: Fixed Bot Timeout Issue
+
+**Changes**:
 - Modified `app/services/apple_messages_for_business/acoustic_house_bot_service.rb`
 
-**Deployment:**
+**Script**: `deploy-backend-enhanced.sh`
+
+**Why**: Ruby service change only, no Docker or frontend changes.
+
+**Time**: 1-3 minutes
+
 ```bash
 ./script/deploy-backend-enhanced.sh
 ```
 
-**Why:** Pure Ruby code change, no dependencies or Docker changes needed.
-
 ---
 
-### Scenario 2: Adding New Gem Dependency
+### Scenario 3: Added New Gem Dependency
 
-You've added a new gem to process images.
-
-**Changes:**
-- Added gem to `Gemfile`
-- Updated `Gemfile.lock`
+**Changes**:
+- Added `gem 'new_gem'` to `Gemfile`
+- Ran `bundle install` (updated `Gemfile.lock`)
 - Created new service using the gem
 
-**Deployment:**
+**Script**: `quick_rebuild.sh`
+
+**Why**: Gemfile changes require rebuilding Docker image to install dependencies.
+
+**Time**: 5-10 minutes (with cache)
+
 ```bash
 ./script/quick_rebuild.sh
 ```
 
-**Why:** Gemfile changes require rebuilding the Docker image to install new dependencies.
-
 ---
 
-### Scenario 3: Memory Configuration Update
+### Scenario 4: Updated Dockerfile Memory Settings
 
-You need to increase Node.js heap size for builds.
+**Changes**:
+- Modified `Dockerfile.production` line 72: `NODE_OPTIONS="--max-old-space-size=4096"`
 
-**Changes:**
-- Modified `Dockerfile.production` line 70: `NODE_OPTIONS="--max-old-space-size=4096"`
+**Script**: `quick_rebuild.sh --no-cache`
 
-**Deployment:**
+**Why**: Dockerfile infrastructure change requires clean rebuild.
+
+**Time**: 15-20 minutes
+
 ```bash
 ./script/quick_rebuild.sh --no-cache
 ```
 
-**Why:** Dockerfile change requires rebuild. Use `--no-cache` to ensure build changes take effect.
-
 ---
 
-### Scenario 4: Adding New API Endpoint
+### Scenario 5: Added New API Endpoint
 
-You've created a new controller and route.
-
-**Changes:**
+**Changes**:
 - Added `app/controllers/api/v1/new_feature_controller.rb`
 - Updated `config/routes.rb`
 
-**Deployment:**
+**Script**: `deploy-backend-enhanced.sh`
+
+**Why**: Backend code and routes only, no Docker or dependency changes.
+
+**Time**: 1-3 minutes
+
 ```bash
 ./script/deploy-backend-enhanced.sh
 ```
 
-**Why:** Backend code and route changes, no Docker or dependency changes.
-
 ---
-
-### Scenario 5: Frontend UI Update
-
-You've modified the dashboard interface.
-
-**Changes:**
-- Updated Vue components in `app/javascript/dashboard/`
-- Modified CSS styles
-
-**Deployment:**
-```bash
-./script/quick_rebuild.sh
-```
-
-**Why:** Frontend assets require Vite build, which happens during Docker image build.
 
 ## Troubleshooting
 
-### Common Issues and Solutions
+### Issue: Frontend Changes Don't Appear After `quick_rebuild.sh`
 
-#### Issue: "Container not running" error with deploy-backend-enhanced.sh
+**Cause**: Docker bind mount `/app/public/vite` is overriding image assets with old host files.
 
-**Cause:** Containers aren't running when attempting hot-patch deployment.
+**Solution**: Extract new Vite assets from image to host:
 
-**Solution:**
 ```bash
-# Option 1: Start containers if they stopped
+ssh root@msp.rhaps.net 'bash -s' << 'SCRIPT'
+cd /opt/chatwoot
+# Backup old assets
+[ -d "public/vite" ] && mv public/vite public/vite.backup.$(date +%Y%m%d_%H%M%S)
+# Extract from image
+docker run --rm --user root -v /opt/chatwoot/public:/host_public chatwoot:production \
+  bash -c "cp -r /app/public/vite /host_public/ && chown -R $(stat -c '%u:%g' /opt/chatwoot/public) /host_public/vite"
+# Restart
+docker compose -f docker-compose.production.yml restart web worker
+SCRIPT
+```
+
+Then hard refresh browser: `Cmd+Shift+R`
+
+---
+
+### Issue: "Container not running" with `deploy-backend-enhanced.sh`
+
+**Cause**: Containers aren't running.
+
+**Solution**:
+```bash
+# Start containers
 ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml up -d'
 
-# Option 2: Full rebuild if containers are problematic
+# Or rebuild if image is missing
 ./script/quick_rebuild.sh
 ```
 
 ---
 
-#### Issue: Docker build fails with "exit code 134" (Out of Memory)
+### Issue: Build fails with "exit code 134" (Out of Memory)
 
-**Cause:** Node.js build process exceeds available memory.
+**Cause**: Server ran out of memory during build.
 
-**Solution:**
-1. Check current memory allocation in `Dockerfile.production` line 70
-2. Verify server has enough RAM + swap (need 4GB+ for heap)
-3. Increase swap if needed:
+**Solution**:
 ```bash
-ssh root@msp.rhaps.net 'free -h'  # Check available memory
-```
+# Check memory
+ssh root@msp.rhaps.net 'free -h'
 
-Current configuration uses 4096MB heap size, which requires:
-- 3.7GB physical RAM + 4GB swap = 7.7GB total (sufficient)
+# If low, restart containers to free memory
+ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml restart web worker'
 
----
-
-#### Issue: Bundler version mismatch errors
-
-**Cause:** Dockerfile installs different bundler version than Gemfile.lock specifies.
-
-**Solution:**
-1. Check required version: `grep "BUNDLED WITH" -A 1 Gemfile.lock`
-2. Update `Dockerfile.production` line 82 to match:
-```dockerfile
-RUN gem install bundler:2.5.16  # Match your Gemfile.lock version
+# Then rebuild
+./script/quick_rebuild.sh
 ```
 
 ---
-
-#### Issue: "Could not find JavaScript runtime" error
-
-**Cause:** Container missing Node.js for asset compilation.
-
-**Solution:**
-Node.js installation is in `Dockerfile.production` lines 21-23. If missing:
-```dockerfile
-curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
-apt-get install -y nodejs
-```
-
----
-
-#### Issue: Gems not found at runtime
-
-**Cause:** Deployment mode installs gems to `./vendor/bundle`, but Docker only copied system gems.
-
-**Solution:**
-Ensure `Dockerfile.production` line 94 includes:
-```dockerfile
-COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
-```
-
----
-
-#### Issue: Docker layer caching preventing updates
-
-**Cause:** Cached build layers not detecting dependency changes.
-
-**Solution:**
-```bash
-# Force clean rebuild
-./script/quick_rebuild.sh --no-cache
-```
-
-Or add cache-breaking comment in Dockerfile:
-```dockerfile
-# Cache breaker: 2024-12-02-001
-RUN bundle install
-```
-
----
-
-#### Issue: Containers show "Started" but crash immediately
-
-**Cause:** Runtime errors in application code or configuration.
-
-**Solution:**
-```bash
-# Check logs
-ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web'
-
-# Check container health
-ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml ps'
-```
 
 ## Verification Steps
 
-After any deployment, verify the application is working:
+After ANY deployment:
 
 ### 1. Check Container Status
+
 ```bash
 ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml ps'
 ```
 
-Expected output:
-- `web`: Up, healthy (if health checks defined)
+**Expected**:
+- `web`: Up, healthy
 - `worker`: Up
 - `postgres`: Up, healthy
 - `redis`: Up, healthy
 
 ### 2. Check Application Health
+
 ```bash
 curl https://msp.rhaps.net/health
 ```
 
-Expected: `{"status":"ok"}` or similar health response
+**Expected**: `{"status":"ok"}` or similar
 
 ### 3. View Recent Logs
+
 ```bash
 ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs --tail=50 web'
 ```
 
-Look for:
+**Look for**:
 - ✅ No error messages
 - ✅ Application started successfully
 - ❌ Exceptions or error traces
 
 ### 4. Test Specific Features
 
-For the bot timeout fix example:
-1. Access Apple Messages for Business bot
-2. Trigger AR file sending in conversation flow
-3. Verify no Rack timeout errors occur
-4. Confirm AR files are sent successfully without delays
+- Access the deployed feature
+- Verify functionality works
+- Check browser console for errors
+- Verify no 404 errors for assets
+
+---
 
 ## Best Practices
 
 1. **Always commit changes before deploying**
    ```bash
    git add .
-   git commit -m "Fix: Remove blocking sleep calls from bot service"
+   git commit -m "feat: description of changes"
    git push
    ```
 
-2. **Test locally first**
+2. **Test locally first** (when possible)
    ```bash
-   # Run tests
    bundle exec rspec
-   
-   # Start dev server
-   foreman start -f Procfile.dev
+   pnpm test
+   ./script/dev-server.sh start
    ```
 
 3. **Monitor logs during deployment**
    ```bash
-   # In a separate terminal while deploying
+   # In separate terminal
    ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs -f web'
    ```
 
-4. **Keep deployment scripts updated**
-   - Document any manual fixes in script comments
-   - Update scripts when infrastructure changes
-   - Test scripts after major updates
+4. **Use appropriate script for change type**
+   - Dockerfile/dependencies/frontend → `quick_rebuild.sh`
+   - Ruby code only → `deploy-backend-enhanced.sh`
+   - Don't use rebuild for simple code changes
 
-5. **Use appropriate script for change type**
-   - Don't use `quick_rebuild.sh` for simple code changes
-   - Don't use `deploy-backend-enhanced.sh` for dependency changes
+5. **Hard refresh browser after frontend deployments**
+   - Mac: `Cmd+Shift+R`
+   - Windows: `Ctrl+Shift+R`
+   - Or use incognito/private window
 
-## Docker Image Build Process
+---
 
-Understanding the build process helps troubleshoot issues:
+## Server Specifications
 
-### Multi-stage Build
+**Production Server**: `msp.rhaps.net` (root@msp.rhaps.net)
 
-1. **asset-builder stage** (lines 6-76):
-   - Installs Node.js dependencies
-   - Runs Vite build for frontend assets
-   - Uses 4096MB heap size for large builds
+### Resources
 
-2. **ruby-builder stage** (lines 78-86):
-   - Installs Ruby gems with bundler 2.5.16
-   - Deploys to `./vendor/bundle`
-
-3. **Final stage** (lines 88-110):
-   - Copies assets from asset-builder
-   - Copies gems from ruby-builder (both system and vendor)
-   - Sets up runtime environment
-   - Exposes port 3000
-
-### Key Configuration Points
-
-**Memory allocation (line 70):**
-```dockerfile
-NODE_OPTIONS="--max-old-space-size=4096"
+```
+Memory:  3.7GB RAM (2.0GB free)
+Swap:    4.0GB (3.5GB free)
+Disk:    75GB total (11GB available, 86% used)
 ```
 
-**Bundler configuration (lines 82-85):**
-```dockerfile
-RUN gem install bundler:2.5.16 && \
-    bundle config set --local deployment 'true' && \
-    bundle config set --local without 'development test' && \
-    bundle install --jobs=4 --retry=3
-```
+### Architecture
 
-**Gem copy (lines 93-94):**
-```dockerfile
-COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
-COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
-```
+- **Server**: AMD64 (Intel x86_64)
+- **Docker**: Standard Docker (not vessel/buildx)
+- **Build Location**: On server (local Mac is ARM64)
 
-## Additional Resources
+### Bind Mounts
 
-- **Quick rebuild script:** `script/quick_rebuild.sh`
-- **Backend deployment script:** `script/deploy-backend-enhanced.sh`
-- **Dockerfile:** `Dockerfile.production`
-- **Docker Compose:** `docker-compose.production.yml`
+The production setup uses bind mounts:
+- `./storage:/app/storage`
+- `./log:/app/log`
+- `./tmp:/app/tmp`
+- `./public/vite:/app/public/vite:ro` ⚠️ **Can cause asset issues**
 
-## Support
-
-If you encounter issues not covered in this guide:
-
-1. Check container logs for detailed error messages
-2. Verify server resources (memory, disk space)
-3. Review recent code changes for issues
-4. Consider rolling back to last known good state
+---
 
 ## Changelog
 
+- **2024-12-14**: Complete rewrite after deployment workflow optimization
+  - Removed 28 deprecated scripts (vessel/container experiments)
+  - Established `quick_rebuild.sh` + `deploy-backend-enhanced.sh` as core workflow
+  - Documented bind mount asset extraction workaround
+  - Added comprehensive troubleshooting section
+  - Aligned with actual working deployment process
+
+- **2024-12-13**: Added deploy-local-build.sh workflow (deprecated - vessel issues)
+
 - **2024-12-02**: Initial deployment guide created
-  - Documented quick_rebuild.sh and deploy-backend-enhanced.sh
-  - Added troubleshooting for bot timeout deployment
-  - Included memory configuration guidance
