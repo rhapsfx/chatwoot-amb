@@ -68,8 +68,8 @@ COPY tailwind.config.js ./
 COPY postcss.config.js ./
 
 # Build frontend assets with Vite directly (with increased memory limit)
-# Using 4GB heap size since server has 3.7GB RAM + 4GB swap available
-RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --mode=production
+# Using 3GB heap size for local builds (adjust for server environment)
+RUN NODE_OPTIONS="--max-old-space-size=3072" npx vite build --mode=production
 
 # ============================================
 # Stage 4: Ruby Dependencies
@@ -91,30 +91,35 @@ RUN gem install bundler:2.5.16 && \
 # ============================================
 FROM base AS production
 
+# Create non-root user first
+RUN useradd -m -u 1000 -s /bin/bash chatwoot
+
 # Copy installed gems from ruby-builder
 COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
 COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
 
-# Copy built assets from asset-builder
-COPY --from=asset-builder /app/public /app/public
-
-# Copy application code
+# Copy application code FIRST (includes all source files)
 COPY . .
 
-# Create required directories
+# Copy ONLY the built Vite assets (not the entire public directory)
+# This preserves public/apple-messages/ and other static files from COPY . .
+# Note: public/packs is created by Rails precompile later, not by Vite
+COPY --from=asset-builder /app/public/vite /app/public/vite
+
+# Create required directories and set ownership in one step
 RUN mkdir -p /app/tmp/pids \
     /app/tmp/cache \
     /app/log \
     /app/storage \
     /app/public/packs && \
-    chmod -R 755 /app/tmp /app/log /app/storage /app/public
+    chmod -R 755 /app/tmp /app/log /app/storage /app/public && \
+    chown -R chatwoot:chatwoot /app/tmp /app/log /app/storage
 
 # Precompile Rails assets (if any remaining)
 RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile || true
 
-# Create non-root user for security
-RUN useradd -m -u 1000 -s /bin/bash chatwoot && \
-    chown -R chatwoot:chatwoot /app
+# Set ownership only for directories that need write access
+RUN chown -R chatwoot:chatwoot /app/public/packs /app/public/vite
 
 # Switch to non-root user
 USER chatwoot
