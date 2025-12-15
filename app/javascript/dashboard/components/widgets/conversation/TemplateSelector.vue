@@ -151,11 +151,7 @@ export default {
     },
     handleSelect(item = {}) {
       this.$emit('select', item);
-
-      // DIRECT WORKAROUND: Use global event bus
-      if (item.type === 'template' && window.handleAppleTemplateSelect) {
-        window.handleAppleTemplateSelect(item);
-      }
+      // Removed global handler call - parent component (ReplyBox) handles all template selection
     },
     handleKeyDown(event) {
       if (!this.hasItems) return;
