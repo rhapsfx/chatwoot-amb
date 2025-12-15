@@ -107,12 +107,19 @@ echo ""
 
 # Run migrations
 echo "→ Running database migrations..."
-if docker exec \$WEB_CONTAINER bundle exec rails db:migrate RAILS_ENV=production 2>&1 | grep -q "migrated"; then
-    echo "  ✅ Migrations completed"
-elif docker exec \$WEB_CONTAINER bundle exec rails db:migrate RAILS_ENV=production 2>&1 | grep -q "up to date"; then
-    echo "  ✅ Database already up to date"
+MIGRATION_OUTPUT=\$(docker exec \$WEB_CONTAINER bundle exec rails db:migrate RAILS_ENV=production 2>&1)
+MIGRATION_EXIT=\$?
+
+if [ \$MIGRATION_EXIT -eq 0 ]; then
+    if echo "\$MIGRATION_OUTPUT" | grep -qE "migrated|Migrating"; then
+        echo "  ✅ Migrations completed successfully"
+    else
+        echo "  ✅ Database already up to date (no pending migrations)"
+    fi
 else
-    echo "  ⚠️  Migration status unclear - check logs if needed"
+    echo "  ❌ Migration failed - check output:"
+    echo "\$MIGRATION_OUTPUT" | tail -10
+    exit 1
 fi
 echo ""
 
