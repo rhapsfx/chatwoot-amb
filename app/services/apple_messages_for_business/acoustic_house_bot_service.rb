@@ -260,8 +260,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
       # After handling the interactive response, process the updated state
       # This allows state transitions to continue (e.g., AHC1 → AHC2 → handle_ar_introduction)
-      log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
-      process_state
+      # However, skip process_state for states that are explicitly waiting for new user input
+      waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
+
+      if waiting_states.include?(@bot_state)
+        log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
+      else
+        log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
+        process_state
+      end
     else
       log_warn "[Bot] ❌ No handler for requestId: #{request_id}"
       log_warn "[Bot] 📝 Available handlers: #{INTERACTIVE_HANDLERS.keys.inspect}"
