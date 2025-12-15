@@ -1109,7 +1109,7 @@ const sendAppleMessage = () => {
 
       content = listPickerData.value.received_title || 'List Picker Message';
       break;
-    case 'quick_reply':
+    case 'quick_reply': {
       content_type = 'apple_quick_reply';
 
       // Clean items array - ensure no undefined values
@@ -1149,6 +1149,7 @@ const sendAppleMessage = () => {
 
       content = summaryText || 'Quick Reply Message';
       break;
+    }
     case 'time_picker': {
       content_type = 'apple_time_picker';
 
@@ -1565,12 +1566,22 @@ const handleTemplateSelect = async item => {
       // Extract data from response
       const renderedData = response.data || response;
 
-      // Send the rendered message
-      if (
-        renderedData &&
-        renderedData.content_type &&
-        renderedData.content_attributes
-      ) {
+      // FIX: Only send as Apple Message if it's truly an interactive template
+      // Check if this is an actual Apple Messages interactive template type
+      const isInteractiveTemplate =
+        renderedData?.content_type &&
+        (renderedData.content_type === 'apple_quick_reply' ||
+          renderedData.content_type === 'apple_list_picker' ||
+          renderedData.content_type === 'apple_time_picker' ||
+          renderedData.content_type === 'apple_form' ||
+          renderedData.content_type === 'apple_pay' ||
+          renderedData.content_type === 'rich_link');
+
+      console.log('[AMB Templates] Is interactive template:', isInteractiveTemplate);
+      console.log('[AMB Templates] Content type:', renderedData?.content_type);
+
+      // Send the rendered message only if it's an interactive template
+      if (isInteractiveTemplate && renderedData.content_attributes) {
         const messageData = {
           content_type: renderedData.content_type,
           content_attributes: renderedData.content_attributes,
@@ -1592,8 +1603,10 @@ const handleTemplateSelect = async item => {
         emit('send', messageData);
         emit('sendAppleMessage', messageData);
       } else {
-        console.error('[AMB Templates] Invalid response format:', renderedData);
-        alert('Error: Invalid template response format');
+        // This is a simple text template - let ReplyBox.vue handle it
+        console.log('[AMB Templates] Simple text template - letting ReplyBox handle it');
+        // Don't close the selector or emit events - ReplyBox will handle insertion
+        return;
       }
     } catch (error) {
       console.error('[AMB Templates] Error rendering template:', error);
@@ -2031,17 +2044,57 @@ watch(
       <div class="flex flex-wrap space-x-1 gap-y-1">
         <button
           v-for="tab in [
-            { id: 'quick_reply', emoji: '💬', label: 'Quick Reply' },
-            { id: 'list_picker', emoji: '📋', label: 'List Picker' },
-            { id: 'time_picker', emoji: '🕐', label: 'Time Picker' },
-            { id: 'forms', emoji: '📝', label: 'Forms' },
-            { id: 'imessage_apps', emoji: '📱', label: 'iMessage Apps' },
-            { id: 'oauth', emoji: '🔐', label: 'OAuth' },
-            { id: 'apple_pay', emoji: '💳', label: 'Apple Pay' },
-            { id: 'custom_payload', emoji: '🔧', label: 'Custom Payload' },
+            {
+              id: 'quick_reply',
+              icon: '/apple-messages/light/messages-circle.png',
+              iconDark: '/apple-messages/messages-circle.png',
+              label: 'Quick Reply',
+            },
+            {
+              id: 'list_picker',
+              icon: '/apple-messages/light/list-circle.png',
+              iconDark: '/apple-messages/list-circle.png',
+              label: 'List Picker',
+            },
+            {
+              id: 'time_picker',
+              icon: '/apple-messages/light/calendar-circle.png',
+              iconDark: '/apple-messages/calendar-circle.png',
+              label: 'Time Picker',
+            },
+            {
+              id: 'forms',
+              icon: '/apple-messages/light/form-circle.png',
+              iconDark: '/apple-messages/form-circle.png',
+              label: 'Forms',
+            },
+            {
+              id: 'imessage_apps',
+              icon: '/apple-messages/light/appstrore-circle.png',
+              iconDark: '/apple-messages/appstrore-circle.png',
+              label: 'iMessage Apps',
+            },
+            {
+              id: 'oauth',
+              icon: '/apple-messages/light/auth-circle.png',
+              iconDark: '/apple-messages/auth-circle.png',
+              label: 'OAuth',
+            },
+            {
+              id: 'apple_pay',
+              icon: '/apple-messages/light/wallet-circle.png',
+              iconDark: '/apple-messages/wallet-circle.png',
+              label: 'Apple Pay',
+            },
+            {
+              id: 'custom_payload',
+              icon: '/apple-messages/light/debug-circle.png',
+              iconDark: '/apple-messages/debug-circle.png',
+              label: 'Custom Payload',
+            },
           ]"
           :key="tab.id"
-          class="px-3 py-2 text-xl border-b-2 transition-colors"
+          class="px-3 py-2 border-b-2 transition-colors flex items-center justify-center"
           :class="
             activeTab === tab.id
               ? 'border-n-blue-8 text-n-blue-11 dark:text-n-blue-10'
@@ -2050,7 +2103,19 @@ watch(
           :title="tab.label"
           @click="activeTab = tab.id"
         >
-          {{ tab.emoji }}
+          <img
+            v-if="tab.icon"
+            :src="tab.icon"
+            :alt="tab.label"
+            class="w-6 h-6 object-contain dark:hidden"
+          />
+          <img
+            v-if="tab.iconDark"
+            :src="tab.iconDark"
+            :alt="tab.label"
+            class="w-6 h-6 object-contain hidden dark:block"
+          />
+          <span v-else class="text-xl">{{ tab.emoji }}</span>
         </button>
       </div>
     </div>
