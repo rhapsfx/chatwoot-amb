@@ -635,6 +635,9 @@ class AppleMessagesForBusiness::IncomingMessageService
     attachment.file.blob.update!(analyzed: true)
     Rails.logger.info "[AMB] Attachment saved successfully. ID: #{attachment.id}, File attached: #{attachment.file.attached?}"
 
+    # Trigger audio transcription if enabled (Enterprise feature)
+    enqueue_audio_transcription(attachment) if attachment.file_type.to_sym == :audio
+
   ensure
     if temp_file
       temp_file.close
@@ -705,6 +708,9 @@ class AppleMessagesForBusiness::IncomingMessageService
     # Ensure the attachment is saved
     attachment.save!
     Rails.logger.info "Direct attachment saved successfully: #{attachment.id}, file attached: #{attachment.file.attached?}"
+
+    # Trigger audio transcription if enabled (Enterprise feature)
+    enqueue_audio_transcription(attachment) if attachment.file_type.to_sym == :audio
   end
 
   def get_file_extension(attachment_params)
@@ -715,6 +721,7 @@ class AppleMessagesForBusiness::IncomingMessageService
     when 'image/gif' then '.gif'
     when 'video/mp4' then '.mp4'
     when 'audio/mpeg' then '.mp3'
+    when 'audio/amr' then '.amr'
     else ''
     end
   end
@@ -1369,5 +1376,16 @@ class AppleMessagesForBusiness::IncomingMessageService
     else
       Rails.logger.error "[Bot] ❌ Authentication failed with status: #{status}"
     end
+  end
+
+  # Enqueue audio transcription job for Apple Messages attachments
+  # This is called after the file is fully attached and ready
+  def enqueue_audio_transcription(attachment)
+    return unless defined?(Messages::AudioTranscriptionJob)
+
+    Rails.logger.info "[AMB] Enqueuing audio transcription for attachment: #{attachment.id}"
+    Messages::AudioTranscriptionJob.perform_later(attachment.id)
+  rescue StandardError => e
+    Rails.logger.error "[AMB] Failed to enqueue audio transcription: #{e.message}"
   end
 end
