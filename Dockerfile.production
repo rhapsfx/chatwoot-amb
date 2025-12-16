@@ -91,6 +91,9 @@ RUN gem install bundler:2.5.16 && \
 # ============================================
 FROM base AS production
 
+# Install pnpm for ViteRuby (needed during asset precompilation)
+RUN npm install -g pnpm@10.2.0
+
 # Create non-root user first
 RUN useradd -m -u 1000 -s /bin/bash chatwoot
 
