@@ -83,6 +83,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Keywords that control flow (reset, navigation, etc.)
   FLOW_CONTROL_KEYWORDS = {
     'menu' => :handle_menu,
+    'start' => :handle_start_over,
     'startover' => :handle_start_over,
     'start over' => :handle_start_over,
     'restart' => :handle_start_over,
@@ -264,8 +265,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
       # After handling the interactive response, process the updated state
       # This allows state transitions to continue (e.g., AHC1 → AHC2 → handle_ar_introduction)
-      log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
-      process_state
+      # However, skip process_state for states that are explicitly waiting for new user input
+      waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
+
+      if waiting_states.include?(@bot_state)
+        log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
+      else
+        log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
+        process_state
+      end
     else
       log_warn "[Bot] ❌ No handler for requestId: #{request_id}"
       log_warn "[Bot] 📝 Available handlers: #{INTERACTIVE_HANDLERS.keys.inspect}"
@@ -456,8 +464,24 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def reset_to_welcome
+    log_info '[Bot] 🔄 reset_to_welcome - Clearing all flow attributes'
+
+    # Clear all flow-related conversation attributes
+    # This ensures a truly fresh start without cached data
+    @conversation.custom_attributes ||= {}
+    @conversation.custom_attributes.delete('region')
+    @conversation.custom_attributes.delete('customer_name')
+    @conversation.custom_attributes.delete('stage_name')
+    @conversation.custom_attributes.delete('delivery_address')
+    @conversation.custom_attributes.delete('selected_guitar')
+    @conversation.custom_attributes.delete('selected_timeslot')
+    @conversation.custom_attributes.delete('selected_store')
+
+    # Reset state and retry count
     update_bot_state('AHA1')
     reset_retry_count
+
+    log_info '[Bot] ✅ Flow attributes cleared, ready for fresh start'
   end
 
   def handle_keyword_message
@@ -493,6 +517,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # State machine flow
   def process_state
     log_info "[Bot] ⚙️ process_state - Handling state: #{@bot_state}"
+
+    # If bot is stopped, don't process state - wait for start/startover keyword
+    if @bot_state == 'STOPPED'
+      log_info '[Bot] 🛑 Bot is stopped, waiting for start/startover command'
+      return
+    end
 
     # If in demo mode, don't process state - wait for reset keyword
     if @bot_state == 'DEMO_MODE'
@@ -1604,14 +1634,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_start_over
+    log_info '[Bot] 🔄 Starting over - resetting conversation'
     reset_to_welcome
-    send_text_message('Restarting conversation...')
+    send_text_message('🔄 Restarting conversation...')
     handle_welcome
   end
 
   def handle_stop
+    log_info '[Bot] 🛑 Stop command received - halting bot flow'
     update_bot_state('STOPPED')
-    send_text_message("Bot stopped. Type 'startover' to restart.")
+    send_text_message('🛑 Bot stopped. The conversation has been paused.')
+    send_text_message("Type 'start' or 'startover' to resume the conversation at any time.")
   end
 
   def handle_schedule_lesson

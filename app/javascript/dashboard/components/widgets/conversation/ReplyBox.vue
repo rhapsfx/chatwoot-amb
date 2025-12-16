@@ -930,6 +930,9 @@ export default {
       this.hideContentTemplatesModal();
     },
     replaceText(message) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Called with message:', message);
+
       if (this.sendWithSignature && !this.private) {
         // if signature is enabled, append it to the message
         // appendSignature ensures that the signature is not duplicated
@@ -942,12 +945,36 @@ export default {
         variables: this.messageVariables,
       });
 
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Updated message:', updatedMessage);
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG replaceText] Current this.message before update:',
+        this.message
+      );
+
       setTimeout(() => {
         useTrack(CONVERSATION_EVENTS.INSERTED_A_CANNED_RESPONSE);
         this.message = updatedMessage;
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG replaceText] this.message after update:',
+          this.message
+        );
+
+        // Hide the slash command menu after inserting text
+        this.hideMentions();
       }, 100);
     },
     handleTemplateSelect(item) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG handleTemplateSelect] Received item:', item);
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG handleTemplateSelect] Current message before handling:',
+        this.message
+      );
+
       if (item.type === 'canned') {
         // Handle canned response - just replace text
         this.replaceText(item.content);
@@ -955,9 +982,18 @@ export default {
         // Handle unified template - need to render and send
         this.handleUnifiedTemplate(item.template);
       }
+
+      // Hide the mentions menu immediately when a template is selected
+      this.hideMentions();
     },
     async handleUnifiedTemplate(template) {
       try {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Starting with template:',
+          template
+        );
+
         // Always fetch full template data to see content blocks
         const fullTemplate = await this.$store.dispatch(
           'messageTemplates/show',
@@ -966,11 +1002,23 @@ export default {
           }
         );
 
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Full template fetched:',
+          fullTemplate
+        );
+
         // FIRST: Check if template has attachments
         // Templates with attachments should be sent as messages, not inserted as text
         const hasAttachments =
           fullTemplate.attachmentsSummary &&
           fullTemplate.attachmentsSummary.length > 0;
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] hasAttachments:',
+          hasAttachments
+        );
 
         if (hasAttachments) {
           const messageData = {
@@ -993,8 +1041,22 @@ export default {
         const contentAttrs =
           content?.content_attributes || content?.contentAttributes;
 
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG handleUnifiedTemplate] content:', content);
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] contentAttrs:',
+          contentAttrs
+        );
+
         // Check if content is an array (multi-block template)
         const isArrayContent = Array.isArray(content);
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isArrayContent:',
+          isArrayContent
+        );
 
         // For array content, check if any block is interactive
         let hasInteractiveBlock = false;
@@ -1037,11 +1099,28 @@ export default {
                     contentAttrs.timeslots.length > 0) || // Time picker in content_attributes
                   contentAttrs?.event || // Time picker with event in content_attributes
                   contentAttrs?.pages || // Forms with pages in content_attributes
-                  contentAttrs?.form)))
-          ) // Forms with form in content_attributes
+                  contentAttrs?.form || // Forms with form in content_attributes
+                  contentAttrs?.replies || // Quick reply in content_attributes
+                  contentAttrs?.items)))
+          ) // Quick reply items in content_attributes
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isAppleInteractive:',
+          isAppleInteractive
+        );
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] this.isAppleMessagesConversation:',
+          this.isAppleMessagesConversation
         );
 
         if (isAppleInteractive && this.isAppleMessagesConversation) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] SENDING as Apple Interactive template'
+          );
           // This is an Apple Messages interactive template - send it directly
 
           // Check if this is an array-based template (content is an array of blocks)
@@ -1207,22 +1286,36 @@ export default {
           } else if (content.type) {
             // Content has explicit type - use it directly
             messageData = content;
-          } else if (content.items || content.replies) {
+          } else if (
+            content.items ||
+            content.replies ||
+            contentAttrs?.items ||
+            contentAttrs?.replies
+          ) {
             // Quick reply structure - normalize to the format backend expects
-            const items = content.items || content.replies;
+            // Check both top-level and content_attributes for items/replies
+            const items =
+              content.items ||
+              content.replies ||
+              contentAttrs?.items ||
+              contentAttrs?.replies ||
+              [];
+            const summaryText =
+              content.summaryText ||
+              content.summary_text ||
+              contentAttrs?.text ||
+              '';
+
             messageData = {
               type: 'quick_reply',
               content_type: 'apple_quick_reply',
               content_attributes: {
-                summary_text: content.summaryText || content.summary_text || '',
+                summary_text: summaryText,
                 items: items.map((item, index) => ({
                   title: item.title,
                   identifier: item.identifier || `reply_${index}`,
                 })),
-                received_title:
-                  content.summaryText ||
-                  content.summary_text ||
-                  'Please select an option',
+                received_title: summaryText || 'Please select an option',
                 received_subtitle: '',
                 reply_title: '',
                 reply_subtitle: '',
@@ -1508,6 +1601,11 @@ export default {
           return;
         }
 
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] NOT sending as interactive - will render and insert as text'
+        );
+
         // For templates without parameters, render and insert
         const hasParameters =
           fullTemplate.parameters &&
@@ -1533,6 +1631,11 @@ export default {
         if (!hasParameters || allParametersHaveDefaults) {
           // Simple template without parameters OR all parameters have defaults
           // Render and insert as text
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Rendering template for text insertion'
+          );
+
           const response = await this.$store.dispatch(
             'messageTemplates/render',
             {
@@ -1542,8 +1645,24 @@ export default {
             }
           );
 
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Render response:',
+            response
+          );
+
           if (response.data.content) {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] Calling replaceText with:',
+              response.data.content
+            );
             this.replaceText(response.data.content);
+          } else {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] NO CONTENT in response.data.content'
+            );
           }
         } else {
           // Template with parameters that need user input

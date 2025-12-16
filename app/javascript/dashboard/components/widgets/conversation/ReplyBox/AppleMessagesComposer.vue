@@ -1583,12 +1583,22 @@ const handleTemplateSelect = async item => {
       // Extract data from response
       const renderedData = response.data || response;
 
-      // Send the rendered message
-      if (
-        renderedData &&
-        renderedData.content_type &&
-        renderedData.content_attributes
-      ) {
+      // FIX: Only send as Apple Message if it's truly an interactive template
+      // Check if this is an actual Apple Messages interactive template type
+      const isInteractiveTemplate =
+        renderedData?.content_type &&
+        (renderedData.content_type === 'apple_quick_reply' ||
+          renderedData.content_type === 'apple_list_picker' ||
+          renderedData.content_type === 'apple_time_picker' ||
+          renderedData.content_type === 'apple_form' ||
+          renderedData.content_type === 'apple_pay' ||
+          renderedData.content_type === 'rich_link');
+
+      console.log('[AMB Templates] Is interactive template:', isInteractiveTemplate);
+      console.log('[AMB Templates] Content type:', renderedData?.content_type);
+
+      // Send the rendered message only if it's an interactive template
+      if (isInteractiveTemplate && renderedData.content_attributes) {
         const messageData = {
           content_type: renderedData.content_type,
           content_attributes: renderedData.content_attributes,
@@ -1610,8 +1620,10 @@ const handleTemplateSelect = async item => {
         emit('send', messageData);
         emit('sendAppleMessage', messageData);
       } else {
-        console.error('[AMB Templates] Invalid response format:', renderedData);
-        alert('Error: Invalid template response format');
+        // This is a simple text template - let ReplyBox.vue handle it
+        console.log('[AMB Templates] Simple text template - letting ReplyBox handle it');
+        // Don't close the selector or emit events - ReplyBox will handle insertion
+        return;
       }
     } catch (error) {
       console.error('[AMB Templates] Error rendering template:', error);
@@ -2051,79 +2063,55 @@ watch(
           v-for="tab in [
             {
               id: 'quick_reply',
-              emoji: '💬',
+              icon: '/apple-messages/light/messages-circle.png',
+              iconDark: '/apple-messages/messages-circle.png',
               label: 'Quick Reply',
-              imagePath: {
-                light: '/apple-messages/light/list-circle.png',
-                dark: '/apple-messages/list-circle.png',
-              },
             },
             {
               id: 'list_picker',
-              emoji: '📋',
+              icon: '/apple-messages/light/list-circle.png',
+              iconDark: '/apple-messages/list-circle.png',
               label: 'List Picker',
-              imagePath: {
-                light: '/apple-messages/light/list-circle.png',
-                dark: '/apple-messages/list-circle.png',
-              },
             },
             {
               id: 'time_picker',
-              emoji: '🕐',
+              icon: '/apple-messages/light/calendar-circle.png',
+              iconDark: '/apple-messages/calendar-circle.png',
               label: 'Time Picker',
-              imagePath: {
-                light: '/apple-messages/light/calendar-circle.png',
-                dark: '/apple-messages/calendar-circle.png',
-              },
             },
             {
               id: 'forms',
-              emoji: '📝',
+              icon: '/apple-messages/light/form-circle.png',
+              iconDark: '/apple-messages/form-circle.png',
               label: 'Forms',
-              imagePath: {
-                light: '/apple-messages/light/form-circle.png',
-                dark: '/apple-messages/form-circle.png',
-              },
             },
             {
               id: 'imessage_apps',
-              emoji: '📱',
+              icon: '/apple-messages/light/appstrore-circle.png',
+              iconDark: '/apple-messages/appstrore-circle.png',
               label: 'iMessage Apps',
-              imagePath: {
-                light: '/apple-messages/light/appstrore-circle.png',
-                dark: '/apple-messages/appstrore-circle.png',
-              },
             },
             {
               id: 'oauth',
-              emoji: '🔐',
+              icon: '/apple-messages/light/auth-circle.png',
+              iconDark: '/apple-messages/auth-circle.png',
               label: 'OAuth',
-              imagePath: {
-                light: '/apple-messages/light/auth-circle.png',
-                dark: '/apple-messages/auth-circle.png',
-              },
             },
             {
               id: 'apple_pay',
-              emoji: '💳',
+              icon: '/apple-messages/light/wallet-circle.png',
+              iconDark: '/apple-messages/wallet-circle.png',
               label: 'Apple Pay',
-              imagePath: {
-                light: '/apple-messages/light/wallet-circle.png',
-                dark: '/apple-messages/wallet-circle.png',
-              },
             },
             {
               id: 'custom_payload',
-              emoji: '🔧',
+              icon: '/apple-messages/light/debug-circle.png',
+              iconDark: '/apple-messages/debug-circle.png',
               label: 'Custom Payload',
-              imagePath: {
-                light: '/apple-messages/light/debug-circle.png',
-                dark: '/apple-messages/debug-circle.png',
-              },
             },
           ]"
           :key="tab.id"
-          class="px-3 py-2 text-xl border-b-2 transition-colors"
+          class="px-3 py-2 border-b-2 transition-colors flex items-center justify-center"
           :class="
             activeTab === tab.id
               ? 'border-n-blue-8 text-n-blue-11 dark:text-n-blue-10'
@@ -2133,12 +2121,18 @@ watch(
           @click="activeTab = tab.id"
         >
           <img
-            v-if="tab.imagePath"
-            :src="isDarkMode ? tab.imagePath.dark : tab.imagePath.light"
+            v-if="tab.icon"
+            :src="tab.icon"
             :alt="tab.label"
-            class="w-8 h-8 inline-block"
+            class="w-6 h-6 object-contain dark:hidden"
           />
-          <span v-else>{{ tab.emoji }}</span>
+          <img
+            v-if="tab.iconDark"
+            :src="tab.iconDark"
+            :alt="tab.label"
+            class="w-6 h-6 object-contain hidden dark:block"
+          />
+          <span v-else class="text-xl">{{ tab.emoji }}</span>
         </button>
       </div>
     </div>
