@@ -34,6 +34,7 @@ class AgentBot < ApplicationRecord
                                     dependent: :nullify,
                                     inverse_of: :assignee_agent_bot
   has_many :versions, class_name: 'AgentBotVersion', dependent: :destroy, inverse_of: :agent_bot
+  has_many :bot_flows, dependent: :destroy
   belongs_to :account, optional: true
 
   enum bot_type: { webhook: 0, apple_messages_for_business: 1 }

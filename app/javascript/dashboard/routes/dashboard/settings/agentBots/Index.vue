@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useMapGetter, useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 
 import SettingsLayout from '../SettingsLayout.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
@@ -19,6 +20,7 @@ const MODAL_TYPES = {
 };
 
 const store = useStore();
+const router = useRouter();
 const { t } = useI18n();
 
 const agentBots = useMapGetter('agentBots/getBots');
@@ -86,9 +88,31 @@ const openInboxManager = bot => {
   inboxManagerDialogRef.value.open();
 };
 
-const duplicateBot = async () => {
-  // TODO: Implement duplicate functionality when backend endpoint is ready
-  useAlert(t('AGENT_BOTS.DUPLICATE.NOT_IMPLEMENTED'));
+const openStudio = bot => {
+  const { accountId } = router.currentRoute.value.params;
+  router.push({
+    name: 'bot_studio',
+    params: {
+      accountId: accountId,
+      botId: bot.id,
+    },
+  });
+};
+
+const duplicateBot = async bot => {
+  loading.value[bot.id] = true;
+  try {
+    const duplicatedBot = await store.dispatch('agentBots/duplicate', bot.id);
+    if (duplicatedBot) {
+      useAlert(t('AGENT_BOTS.DUPLICATE.SUCCESS'));
+    } else {
+      useAlert(t('AGENT_BOTS.DUPLICATE.ERROR'));
+    }
+  } catch (error) {
+    useAlert(t('AGENT_BOTS.DUPLICATE.ERROR'));
+  } finally {
+    loading.value[bot.id] = false;
+  }
 };
 
 onMounted(() => {
@@ -202,6 +226,19 @@ onMounted(() => {
             </td>
             <td class="py-4 min-w-xs">
               <div class="flex gap-1 justify-end">
+                <!-- Studio button (AMB bots only) -->
+                <Button
+                  v-if="
+                    bot.bot_type === 'apple_messages_for_business' &&
+                    !bot.system_bot
+                  "
+                  v-tooltip.top="t('AGENT_BOTS.OPEN_STUDIO')"
+                  icon="i-lucide-workflow"
+                  slate
+                  xs
+                  faded
+                  @click="openStudio(bot)"
+                />
                 <!-- Version history button (AMB bots only) -->
                 <Button
                   v-if="

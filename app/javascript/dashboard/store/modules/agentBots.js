@@ -6,6 +6,7 @@ import { throwErrorMessage } from '../utils/api';
 
 export const state = {
   records: [],
+  flows: [],
   uiFlags: {
     isFetching: false,
     isFetchingItem: false,
@@ -16,6 +17,11 @@ export const state = {
     isFetchingAgentBot: false,
     isSettingAgentBot: false,
     isDisconnecting: false,
+    isFetchingFlows: false,
+    isCreatingFlow: false,
+    isUpdatingFlow: false,
+    isDeletingFlow: false,
+    isCompilingFlow: false,
   },
   agentBotInbox: {},
 };
@@ -34,6 +40,13 @@ export const getters = {
   getActiveAgentBot: $state => inboxId => {
     const associatedAgentBotId = $state.agentBotInbox[Number(inboxId)];
     return getters.getBot($state)(associatedAgentBotId);
+  },
+  getFlows($state) {
+    return $state.flows;
+  },
+  getFlow: $state => flowId => {
+    const [flow] = $state.flows.filter(f => f.id === Number(flowId));
+    return flow || {};
   },
 };
 
@@ -199,6 +212,20 @@ export const actions = {
     } catch (error) {
       throwErrorMessage(error);
       return null;
+    }
+  },
+
+  duplicate: async ({ commit }, botId) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isCreating: true });
+    try {
+      const response = await AgentBotsAPI.duplicate(botId);
+      commit(types.ADD_AGENT_BOT, response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isCreating: false });
     }
   },
 
@@ -368,6 +395,148 @@ export const actions = {
       return null;
     }
   },
+
+  // Flow Management Actions
+  getFlows: async ({ commit }, botId) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isFetchingFlows: true });
+    try {
+      const response = await AgentBotsAPI.getFlows(botId);
+      commit(types.SET_FLOWS, response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isFetchingFlows: false });
+    }
+  },
+
+  getFlow: async (_, { botId, flowId }) => {
+    try {
+      const response = await AgentBotsAPI.getFlow(botId, flowId);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
+
+  createFlow: async ({ commit }, { botId, ...flowData }) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isCreatingFlow: true });
+    try {
+      const response = await AgentBotsAPI.createFlow(botId, flowData);
+      commit(types.ADD_FLOW, response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isCreatingFlow: false });
+    }
+  },
+
+  updateFlow: async ({ commit }, { botId, flowId, ...flowData }) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isUpdatingFlow: true });
+    try {
+      const response = await AgentBotsAPI.updateFlow(botId, flowId, flowData);
+      commit(types.UPDATE_FLOW, response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isUpdatingFlow: false });
+    }
+  },
+
+  deleteFlow: async ({ commit }, { botId, flowId }) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isDeletingFlow: true });
+    try {
+      await AgentBotsAPI.deleteFlow(botId, flowId);
+      commit(types.DELETE_FLOW, flowId);
+      return true;
+    } catch (error) {
+      throwErrorMessage(error);
+      return false;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isDeletingFlow: false });
+    }
+  },
+
+  compileFlow: async ({ commit }, { botId, flowId }) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isCompilingFlow: true });
+    try {
+      const response = await AgentBotsAPI.compileFlow(botId, flowId);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isCompilingFlow: false });
+    }
+  },
+
+  validateFlow: async (_, { botId, flowId }) => {
+    try {
+      const response = await AgentBotsAPI.validateFlow(botId, flowId);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
+
+  simulateFlow: async (_, { botId, flowId, message, session }) => {
+    try {
+      const response = await AgentBotsAPI.simulateFlow(botId, flowId, {
+        message,
+        session,
+      });
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
+
+  previewFlow: async (_, { botId, flowId }) => {
+    try {
+      const response = await AgentBotsAPI.previewFlow(botId, flowId);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
+
+  importFlowFromBotConfig: async ({ commit }, botId) => {
+    commit(types.SET_AGENT_BOT_UI_FLAG, { isCreatingFlow: true });
+    try {
+      const response = await AgentBotsAPI.importFlowFromBotConfig(botId);
+      commit(types.ADD_FLOW, response.data.flow);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    } finally {
+      commit(types.SET_AGENT_BOT_UI_FLAG, { isCreatingFlow: false });
+    }
+  },
+
+  updateNode: async (_, { botId, flowId, nodeId, nodeData }) => {
+    try {
+      const response = await AgentBotsAPI.updateNode(
+        botId,
+        flowId,
+        nodeId,
+        nodeData
+      );
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
 };
 
 export const mutations = {
@@ -392,6 +561,36 @@ export const mutations = {
     if (botIndex !== -1) {
       $state.records[botIndex].thumbnail = thumbnail || '';
     }
+  },
+  // Flow Management Mutations
+  [types.SET_FLOWS]($state, data) {
+    // Handle both { flows: [...] } and direct array formats
+    $state.flows = Array.isArray(data) ? data : data?.flows || [];
+  },
+  [types.ADD_FLOW]($state, data) {
+    // Extract flow from response if needed
+    const flow = data?.flow || data;
+    if (!Array.isArray($state.flows)) {
+      $state.flows = [];
+    }
+    $state.flows.push(flow);
+  },
+  [types.UPDATE_FLOW]($state, data) {
+    // Extract flow from response if needed
+    const flow = data?.flow || data;
+    if (!Array.isArray($state.flows)) {
+      $state.flows = [];
+    }
+    const index = $state.flows.findIndex(f => f.id === flow.id);
+    if (index !== -1) {
+      $state.flows.splice(index, 1, flow);
+    } else {
+      // If not found, add it
+      $state.flows.push(flow);
+    }
+  },
+  [types.DELETE_FLOW]($state, flowId) {
+    $state.flows = $state.flows.filter(f => f.id !== flowId);
   },
 };
 

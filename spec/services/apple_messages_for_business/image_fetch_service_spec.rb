@@ -50,7 +50,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(['inbox_img_1'])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('inbox_img_1')
         expect(result[0][:source]).to eq('inbox')
         expect(result[0][:data]).to be_a(String)
@@ -164,7 +164,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(['priority_img'])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:source]).to eq('inbox')
         expect(result[0][:description]).to eq('Inbox')
       end
@@ -209,7 +209,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service_local.fetch_and_encode(%w[inbox_img shared_img embedded_img])
 
-        expect(result).to have_length(3)
+        expect(result.length).to eq(3)
 
         inbox_result = result.find { |r| r[:identifier] == 'inbox_img' }
         expect(inbox_result[:source]).to eq('inbox')
@@ -226,7 +226,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(%w[inbox_img missing_img also_missing])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('inbox_img')
       end
 
@@ -311,7 +311,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(%w[error_img safe_img])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('safe_img')
       end
 
@@ -432,7 +432,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service.fetch_and_encode(['img'])
 
-        expect(result).to have_length(1)
+        expect(result.length).to eq(1)
         expect(result[0][:source]).to eq('inbox')
       end
     end
