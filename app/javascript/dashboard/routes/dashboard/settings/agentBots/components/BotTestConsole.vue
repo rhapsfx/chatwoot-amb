@@ -14,7 +14,10 @@ const emit = defineEmits(['nodeExecuted']);
 
 const { t } = useI18n();
 const input = ref('');
-const simulator = ref(null);
+
+// Create simulator directly without wrapping in ref
+// This prevents Vue from unwrapping the composable's refs
+let simulator = null;
 
 // Initialize simulator when flowId changes
 watch(
@@ -28,14 +31,14 @@ watch(
       props.botId
     );
     if (newFlowId && props.botId) {
-      simulator.value = useBotSimulator(props.botId, newFlowId);
+      simulator = useBotSimulator(props.botId, newFlowId);
       // eslint-disable-next-line no-console
-      console.log('[BotTestConsole] Simulator initialized:', !!simulator.value);
+      console.log('[BotTestConsole] Simulator initialized:', !!simulator);
       // eslint-disable-next-line no-console
-      console.log('[BotTestConsole] Simulator object keys:', {
-        keys: simulator.value ? Object.keys(simulator.value) : [],
-        isProcessing: simulator.value?.isProcessing,
-        isProcessingValue: simulator.value?.isProcessing?.value,
+      console.log('[BotTestConsole] Simulator structure:', {
+        keys: simulator ? Object.keys(simulator) : [],
+        isProcessingRef: simulator?.isProcessing,
+        isProcessingValue: simulator?.isProcessing?.value,
       });
     }
   },
@@ -44,8 +47,8 @@ watch(
 
 const canSend = computed(() => {
   const hasInput = input.value.trim();
-  const hasSimulator = !!simulator?.value;
-  const isProc = simulator?.value ? simulator.value.isProcessing.value : null;
+  const hasSimulator = !!simulator;
+  const isProc = simulator?.isProcessing?.value;
 
   // eslint-disable-next-line no-console
   console.log('[BotTestConsole] canSend check:', {
@@ -55,16 +58,12 @@ const canSend = computed(() => {
     result: hasInput && hasSimulator && !isProc,
   });
 
-  return (
-    input.value.trim() &&
-    simulator?.value &&
-    !simulator.value.isProcessing.value
-  );
+  return input.value.trim() && simulator && !simulator.isProcessing.value;
 });
 
 // Watch for changes in input disabled state
 const isInputDisabled = computed(
-  () => !simulator?.value || simulator.value.isProcessing.value
+  () => !simulator || simulator.isProcessing.value
 );
 
 watch(
@@ -72,10 +71,8 @@ watch(
   newValue => {
     // eslint-disable-next-line no-console
     console.log('[BotTestConsole] Input disabled:', newValue, {
-      hasSimulator: !!simulator?.value,
-      isProcessing: simulator?.value
-        ? simulator.value.isProcessing.value
-        : 'N/A',
+      hasSimulator: !!simulator,
+      isProcessing: simulator?.isProcessing?.value,
     });
   },
   { immediate: true }
@@ -84,21 +81,21 @@ watch(
 const send = async () => {
   if (!canSend.value) return;
 
-  await simulator.value.sendMessage(input.value);
+  await simulator.sendMessage(input.value);
   input.value = '';
 
   // Emit executed nodes for canvas highlighting
   if (
-    simulator.value?.executedNodes?.value &&
-    simulator.value.executedNodes.value.length > 0
+    simulator?.executedNodes?.value &&
+    simulator.executedNodes.value.length > 0
   ) {
-    emit('nodeExecuted', simulator.value.executedNodes.value);
+    emit('nodeExecuted', simulator.executedNodes.value);
   }
 };
 
 const handleReset = () => {
-  if (simulator.value) {
-    simulator.value.reset();
+  if (simulator) {
+    simulator.reset();
     emit('nodeExecuted', []);
   }
 };
@@ -131,9 +128,9 @@ const handleReset = () => {
       <!-- Empty State -->
       <div
         v-if="
-          !simulator?.value ||
-          !simulator.value.messages.value ||
-          simulator.value.messages.value.length === 0
+          !simulator ||
+          !simulator.messages.value ||
+          simulator.messages.value.length === 0
         "
         class="flex flex-col items-center justify-center h-full text-center text-n-slate-11"
       >
@@ -148,9 +145,7 @@ const handleReset = () => {
 
       <!-- Messages -->
       <div
-        v-for="(msg, i) in simulator?.value
-          ? simulator.value.messages.value
-          : []"
+        v-for="(msg, i) in simulator ? simulator.messages.value : []"
         :key="i"
         class="flex"
         :class="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
@@ -207,7 +202,7 @@ const handleReset = () => {
 
       <!-- Processing indicator -->
       <div
-        v-if="simulator?.value && simulator.value.isProcessing.value"
+        v-if="simulator && simulator.isProcessing.value"
         class="flex justify-start"
       >
         <div class="bg-n-slate-3 rounded-lg px-3 py-2 flex items-center gap-2">
@@ -231,7 +226,7 @@ const handleReset = () => {
 
     <!-- Current State Display -->
     <div
-      v-if="simulator?.value && simulator.value.currentState.value"
+      v-if="simulator && simulator.currentState.value"
       class="px-4 py-2 border-t border-n-soft bg-n-slate-1"
     >
       <div class="flex items-center gap-2 text-xs text-n-slate-11">
@@ -239,7 +234,7 @@ const handleReset = () => {
         <span>
           {{ t('AGENT_BOTS.TEST_CONSOLE.CURRENT_STATE') }}:
           <strong class="text-n-slate-12">{{
-            simulator.value.currentState.value
+            simulator.currentState.value
           }}</strong>
         </span>
       </div>
@@ -259,7 +254,7 @@ const handleReset = () => {
         <Button
           icon="i-lucide-send"
           :disabled="!canSend"
-          :is-loading="simulator?.value && simulator.value.isProcessing.value"
+          :is-loading="simulator && simulator.isProcessing.value"
           @click="send"
         >
           {{ t('AGENT_BOTS.TEST_CONSOLE.SEND') }}
