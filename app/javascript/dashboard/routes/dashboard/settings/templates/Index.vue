@@ -324,6 +324,7 @@ watch(
     </BaseSettingsHeader>
 
     <!-- Bot API Information Banner -->
+    <!-- eslint-disable vue/no-bare-strings-in-template, @intlify/vue-i18n/no-raw-text -->
     <div class="mx-4 mt-4 p-4 bg-n-blue-1 border border-n-blue-7 rounded-lg">
       <div class="flex items-start gap-3">
         <i class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5" />
@@ -335,7 +336,8 @@ watch(
             Templates marked with
             <span
               class="px-2 py-0.5 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
-              >🤖 Bot API</span>
+              >🤖 Bot API</span
+            >
             are designed for programmatic use via webhooks, Dialogflow, Rasa, or
             custom bots.
           </p>
