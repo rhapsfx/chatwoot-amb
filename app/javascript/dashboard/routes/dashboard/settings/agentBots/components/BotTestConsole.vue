@@ -20,8 +20,17 @@ const simulator = ref(null);
 watch(
   () => props.flowId,
   newFlowId => {
+    // eslint-disable-next-line no-console
+    console.log(
+      '[BotTestConsole] flowId changed to:',
+      newFlowId,
+      'botId:',
+      props.botId
+    );
     if (newFlowId && props.botId) {
       simulator.value = useBotSimulator(props.botId, newFlowId);
+      // eslint-disable-next-line no-console
+      console.log('[BotTestConsole] Simulator initialized:', !!simulator.value);
     }
   },
   { immediate: true }
@@ -31,7 +40,7 @@ const canSend = computed(() => {
   return (
     input.value.trim() &&
     simulator?.value &&
-    !simulator.value?.isProcessing?.value
+    !simulator.value.isProcessing.value
   );
 });
 
@@ -86,7 +95,7 @@ const handleReset = () => {
       <div
         v-if="
           !simulator?.value ||
-          !simulator.value.messages?.value ||
+          !simulator.value.messages.value ||
           simulator.value.messages.value.length === 0
         "
         class="flex flex-col items-center justify-center h-full text-center text-n-slate-11"
@@ -102,7 +111,9 @@ const handleReset = () => {
 
       <!-- Messages -->
       <div
-        v-for="(msg, i) in simulator?.value?.messages?.value || []"
+        v-for="(msg, i) in simulator?.value
+          ? simulator.value.messages.value
+          : []"
         :key="i"
         class="flex"
         :class="msg.sender === 'user' ? 'justify-end' : 'justify-start'"
@@ -159,7 +170,7 @@ const handleReset = () => {
 
       <!-- Processing indicator -->
       <div
-        v-if="simulator?.value?.isProcessing?.value"
+        v-if="simulator?.value && simulator.value.isProcessing.value"
         class="flex justify-start"
       >
         <div class="bg-n-slate-3 rounded-lg px-3 py-2 flex items-center gap-2">
@@ -183,7 +194,7 @@ const handleReset = () => {
 
     <!-- Current State Display -->
     <div
-      v-if="simulator?.value?.currentState?.value"
+      v-if="simulator?.value && simulator.value.currentState.value"
       class="px-4 py-2 border-t border-n-soft bg-n-slate-1"
     >
       <div class="flex items-center gap-2 text-xs text-n-slate-11">
@@ -191,7 +202,7 @@ const handleReset = () => {
         <span>
           {{ t('AGENT_BOTS.TEST_CONSOLE.CURRENT_STATE') }}:
           <strong class="text-n-slate-12">{{
-            simulator?.value?.currentState?.value
+            simulator.value.currentState.value
           }}</strong>
         </span>
       </div>
@@ -204,14 +215,14 @@ const handleReset = () => {
           v-model="input"
           type="text"
           :placeholder="t('AGENT_BOTS.TEST_CONSOLE.INPUT_PLACEHOLDER')"
-          :disabled="!simulator?.value || simulator?.value?.isProcessing?.value"
+          :disabled="!simulator?.value || simulator.value.isProcessing.value"
           class="flex-1 px-3 py-2 text-sm border border-n-soft rounded-md focus:outline-none focus:ring-2 focus:ring-n-blue-8 focus:border-transparent disabled:bg-n-slate-2 disabled:cursor-not-allowed"
           @keyup.enter="send"
         />
         <Button
           icon="i-lucide-send"
           :disabled="!canSend"
-          :is-loading="simulator?.value?.isProcessing?.value"
+          :is-loading="simulator?.value && simulator.value.isProcessing.value"
           @click="send"
         >
           {{ t('AGENT_BOTS.TEST_CONSOLE.SEND') }}
