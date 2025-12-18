@@ -23,16 +23,19 @@ export default {
             permissions: ['administrator', AGENT_BOT_PERMISSIONS],
           },
         },
-        {
-          path: ':botId/studio',
-          name: 'bot_studio',
-          component: BotStudio,
-          meta: {
-            featureFlag: FEATURE_FLAGS.AGENT_BOTS,
-            permissions: ['administrator', AGENT_BOT_PERMISSIONS],
-          },
-        },
       ],
+    },
+    // Bot Studio as standalone route (full-screen, no SettingsWrapper)
+    {
+      path: frontendURL(
+        'accounts/:accountId/settings/agent-bots/:botId/studio'
+      ),
+      name: 'bot_studio',
+      component: BotStudio,
+      meta: {
+        featureFlag: FEATURE_FLAGS.AGENT_BOTS,
+        permissions: ['administrator', AGENT_BOT_PERMISSIONS],
+      },
     },
   ],
 };
