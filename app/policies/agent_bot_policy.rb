@@ -55,6 +55,10 @@ class AgentBotPolicy < ApplicationPolicy
     @account_user.administrator? || @account_user.agent?
   end
 
+  def simulate?
+    @account_user.administrator? || @account_user.agent?
+  end
+
   # Version management permissions
   def activate?
     @account_user.administrator?
