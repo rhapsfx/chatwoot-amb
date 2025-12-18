@@ -621,6 +621,33 @@
         "VIEW_FULL_REFERENCE": "View Full Reference",
         "DOCUMENTATION": "Documentation",
         "API_REFERENCE": "API Reference"
+      },
+      "BROWSER": {
+        "TITLE": "Browse Handler Methods",
+        "DESCRIPTION": "Browse and search available handler methods for your bot service. Select a handler to view details or insert into your flow.",
+        "SEARCH_PLACEHOLDER": "Search handlers by name, description, or tags...",
+        "LOADING_HANDLERS": "Loading handlers...",
+        "RETRY": "Retry",
+        "NO_HANDLERS_FOUND": "No handlers found matching your criteria",
+        "CLEAR_FILTERS_BUTTON": "Clear Filters",
+        "ALL_TYPES": "All Types",
+        "ALL_STATUS": "All Status",
+        "SORT_BY": "Sort By",
+        "SORT_ALPHABETICAL": "Alphabetical",
+        "TRIGGERS_SUFFIX": "triggers",
+        "DEPENDENCIES_SUFFIX": "deps",
+        "MATCH_SUFFIX": "match",
+        "STATES_LABEL": "States:",
+        "KEYWORDS_LABEL": "Keywords:",
+        "INTERACTIVE_IDS_LABEL": "Interactive IDs:",
+        "TEMPLATES_LABEL": "Templates:",
+        "ATTRIBUTES_LABEL": "Attributes:",
+        "SERVICES_LABEL": "Services:",
+        "METHOD_LABEL": "Method",
+        "HANDLERS_SHOWN": "{count} handlers shown",
+        "OF_TOTAL": "of {total} total",
+        "SELECT_HANDLER_BUTTON": "Select Handler",
+        "CANCEL": "Cancel"
       }
     },
     "HANDLER_SELECTOR": {
