@@ -1022,7 +1022,7 @@ export default {
 
         if (hasAttachments) {
           const messageData = {
-            content: '', // Empty content - backend will handle placeholder text
+            content: fullTemplate.name || 'Attachment', // Use template name or default
             content_type: 'text',
             content_attributes: {},
             template_id: fullTemplate.id,
@@ -1092,9 +1092,9 @@ export default {
                   content.form || // Form structure (legacy nested format)
                   content.pages || // Form structure (new block editor format)
                   content.apple_pay || // Apple Pay structure
-                  (content.sections && content.images) || // List picker structure (direct)
+                  content.sections || // List picker structure (direct) - images are optional
                   (content.timeslots && content.timeslots.length > 0) || // Time picker structure (direct)
-                  (contentAttrs?.sections && contentAttrs?.images) || // List picker in content_attributes
+                  contentAttrs?.sections || // List picker in content_attributes - images are optional
                   (contentAttrs?.timeslots &&
                     contentAttrs.timeslots.length > 0) || // Time picker in content_attributes
                   contentAttrs?.event || // Time picker with event in content_attributes
@@ -1324,8 +1324,8 @@ export default {
           } else if (
             content.list_picker ||
             content.listPicker ||
-            (content.sections && content.images) ||
-            (contentAttrs?.sections && contentAttrs?.images)
+            content.sections ||
+            contentAttrs?.sections
           ) {
             // List picker structure - use render API to fetch images from database
             // This ensures images are base64-encoded and properly formatted
