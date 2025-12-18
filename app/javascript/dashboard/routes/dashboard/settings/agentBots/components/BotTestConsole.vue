@@ -37,12 +37,43 @@ watch(
 );
 
 const canSend = computed(() => {
+  const hasInput = input.value.trim();
+  const hasSimulator = !!simulator?.value;
+  const isProc = simulator?.value ? simulator.value.isProcessing.value : null;
+
+  // eslint-disable-next-line no-console
+  console.log('[BotTestConsole] canSend check:', {
+    hasInput,
+    hasSimulator,
+    isProcessing: isProc,
+    result: hasInput && hasSimulator && !isProc,
+  });
+
   return (
     input.value.trim() &&
     simulator?.value &&
     !simulator.value.isProcessing.value
   );
 });
+
+// Watch for changes in input disabled state
+const isInputDisabled = computed(
+  () => !simulator?.value || simulator.value.isProcessing.value
+);
+
+watch(
+  isInputDisabled,
+  newValue => {
+    // eslint-disable-next-line no-console
+    console.log('[BotTestConsole] Input disabled:', newValue, {
+      hasSimulator: !!simulator?.value,
+      isProcessing: simulator?.value
+        ? simulator.value.isProcessing.value
+        : 'N/A',
+    });
+  },
+  { immediate: true }
+);
 
 const send = async () => {
   if (!canSend.value) return;
@@ -215,7 +246,7 @@ const handleReset = () => {
           v-model="input"
           type="text"
           :placeholder="t('AGENT_BOTS.TEST_CONSOLE.INPUT_PLACEHOLDER')"
-          :disabled="!simulator?.value || simulator.value.isProcessing.value"
+          :disabled="isInputDisabled"
           class="flex-1 px-3 py-2 text-sm border border-n-soft rounded-md focus:outline-none focus:ring-2 focus:ring-n-blue-8 focus:border-transparent disabled:bg-n-slate-2 disabled:cursor-not-allowed"
           @keyup.enter="send"
         />
