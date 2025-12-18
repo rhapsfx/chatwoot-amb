@@ -1,4 +1,6 @@
+<!-- eslint-disable vue/no-bare-strings-in-template, @intlify/vue-i18n/no-raw-text -->
 <script setup>
+/* eslint-disable no-console */
 import { ref } from 'vue';
 import EnhancedTimePickerModal from './EnhancedTimePickerModal.vue';
 
@@ -37,6 +39,7 @@ const handlePreview = data => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-bare-strings-in-template, @intlify/vue-i18n/no-raw-text -->
   <div class="p-6 max-w-4xl mx-auto">
     <div class="mb-8">
       <h1 class="text-2xl font-bold text-n-slate-12 dark:text-n-slate-1 mb-2">
@@ -120,7 +123,8 @@ const handlePreview = data => {
       >
         <pre
           class="text-sm text-n-slate-12 dark:text-n-slate-11 overflow-x-auto"
-          >{{ JSON.stringify(timePickerResult, null, 2) }}</pre>
+          >{{ JSON.stringify(timePickerResult, null, 2) }}</pre
+        >
       </div>
 
       <div class="mt-4 text-sm text-n-green-10 dark:text-n-green-9">

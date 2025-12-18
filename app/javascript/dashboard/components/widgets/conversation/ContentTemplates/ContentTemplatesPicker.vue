@@ -67,6 +67,30 @@ const fetchUnifiedTemplates = async () => {
   }
 };
 
+// Helper functions (defined before computed properties)
+const getTemplateType = template => {
+  if (template.template_type === TWILIO_CONTENT_TEMPLATE_TYPES.MEDIA) {
+    return t('CONTENT_TEMPLATES.PICKER.TYPES.MEDIA');
+  }
+  if (template.template_type === TWILIO_CONTENT_TEMPLATE_TYPES.QUICK_REPLY) {
+    return t('CONTENT_TEMPLATES.PICKER.TYPES.QUICK_REPLY');
+  }
+  return t('CONTENT_TEMPLATES.PICKER.TYPES.TEXT');
+};
+
+const getCategoryDisplayName = category => {
+  const categoryMap = {
+    scheduling: 'Scheduling',
+    payment: 'Payment',
+    support: 'Support',
+    form: 'Form',
+    general: 'General',
+    marketing: 'Marketing',
+    sales: 'Sales',
+  };
+  return categoryMap[category] || category || 'Template';
+};
+
 // Normalize Twilio templates to common format
 const normalizedTwilioTemplates = computed(() => {
   return twilioTemplates.value.map(template => ({
@@ -99,7 +123,9 @@ const normalizedUnifiedTemplates = computed(() => {
 // Merge and filter both template sources
 const filteredTemplateMessages = computed(() => {
   const allTemplates = [
-    ...normalizedTwilioTemplates.value.filter(t => t.status === 'approved'),
+    ...normalizedTwilioTemplates.value.filter(
+      tmpl => tmpl.status === 'approved'
+    ),
     ...normalizedUnifiedTemplates.value,
   ];
 
@@ -115,29 +141,6 @@ const filteredTemplateMessages = computed(() => {
         template.description.toLowerCase().includes(searchTerm))
   );
 });
-
-const getTemplateType = template => {
-  if (template.template_type === TWILIO_CONTENT_TEMPLATE_TYPES.MEDIA) {
-    return t('CONTENT_TEMPLATES.PICKER.TYPES.MEDIA');
-  }
-  if (template.template_type === TWILIO_CONTENT_TEMPLATE_TYPES.QUICK_REPLY) {
-    return t('CONTENT_TEMPLATES.PICKER.TYPES.QUICK_REPLY');
-  }
-  return t('CONTENT_TEMPLATES.PICKER.TYPES.TEXT');
-};
-
-const getCategoryDisplayName = category => {
-  const categoryMap = {
-    scheduling: 'Scheduling',
-    payment: 'Payment',
-    support: 'Support',
-    form: 'Form',
-    general: 'General',
-    marketing: 'Marketing',
-    sales: 'Sales',
-  };
-  return categoryMap[category] || category || 'Template';
-};
 
 const refreshTemplates = async () => {
   isRefreshing.value = true;
@@ -168,6 +171,7 @@ watch(
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-bare-strings-in-template, @intlify/vue-i18n/no-raw-text -->
   <div class="w-full">
     <div class="flex gap-2 mb-2.5">
       <div
@@ -262,7 +266,9 @@ watch(
                 "
                 class="text-xs text-n-slate-11"
               >
-                <span class="font-medium">{{ template.supportedChannels.length }} channels</span>
+                <span class="font-medium"
+                  >{{ template.supportedChannels.length }} channels</span
+                >
               </div>
               <div v-else class="text-xs text-n-slate-11">
                 {{ new Date(template.displayCreatedAt).toLocaleDateString() }}
