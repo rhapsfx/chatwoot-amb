@@ -43,7 +43,7 @@ const loadVersions = async () => {
       botId: props.bot.id,
       includeArchived: includeArchived.value,
     });
-    versions.value = response || [];
+    versions.value = response?.versions || [];
   } catch (error) {
     useAlert(t('AGENT_BOTS.VERSIONS.LOAD_ERROR'));
     versions.value = [];

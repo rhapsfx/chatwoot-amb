@@ -64,6 +64,35 @@ class Api::V1::Accounts::AgentBotsController < Api::V1::Accounts::BaseController
     @agent_bot.reload
   end
 
+  def duplicate
+    # Create a copy of the bot with "(Copy)" suffix
+    duplicate_bot = @agent_bot.dup
+    duplicate_bot.name = "#{@agent_bot.name} (Copy)"
+    duplicate_bot.bot_config = @agent_bot.bot_config&.deep_dup
+    duplicate_bot.save!
+
+    # Copy avatar if exists
+    if @agent_bot.avatar.attached?
+      duplicate_bot.avatar.attach(
+        io: @agent_bot.avatar.download,
+        filename: @agent_bot.avatar.filename,
+        content_type: @agent_bot.avatar.content_type
+      )
+    end
+
+    # Copy flows
+    @agent_bot.bot_flows.each do |flow|
+      duplicate_flow = flow.dup
+      duplicate_flow.agent_bot = duplicate_bot
+      duplicate_flow.flow_data = flow.flow_data&.deep_dup
+      duplicate_flow.metadata = flow.metadata&.deep_dup
+      duplicate_flow.save!
+    end
+
+    @agent_bot = duplicate_bot
+    render :show
+  end
+
   private
 
   def agent_bot

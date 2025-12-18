@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require Rails.root.join('app/services/apple_messages_for_business/concerns/bot_service_interface')
+
 class AppleMessagesForBusiness::AcousticHouseBotService
+  include AppleMessagesForBusiness::BotServiceInterface
+
   IDLE_TIMEOUT = 30.minutes
 
   # Template dependencies for deployment automation
@@ -16,7 +20,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   ].freeze
 
   # Returns array of required template names
-  def self.required_template_names
+  def self.required_template_namesd
     REQUIRED_TEMPLATES
   end
 
@@ -122,6 +126,166 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'act_imessage_app' => :handle_imessage_app,
     'qr_oauth_provider' => :handle_oauth_provider_selection
   }.freeze
+
+  # Handler methods metadata for Bot Studio integration
+  # Provides discovery, validation, and documentation of available handler methods
+  def self.handler_methods_metadata
+    {
+      handle_welcome: {
+        handler_type: :state,
+        display_name: 'Welcome Handler',
+        description: 'Sends initial welcome message and prompts for region selection',
+        category: 'onboarding',
+        status: :stable,
+        triggers: {
+          state_ids: %w[AHA1 AH-restart],
+          keywords: [],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_main_menu'],
+          attributes: []
+        },
+        tags: %w[welcome onboarding region]
+      },
+      handle_menu: {
+        handler_type: :keyword,
+        display_name: 'Main Menu',
+        description: 'Shows the main menu with available demo options',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['menu'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_main_menu'],
+          attributes: []
+        },
+        tags: %w[menu navigation]
+      },
+      handle_start_over: {
+        handler_type: :keyword,
+        display_name: 'Start Over',
+        description: 'Resets conversation and returns to welcome state',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['start', 'startover', 'start over', 'restart', 'begin', 'reset'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: [],
+          attributes: []
+        },
+        tags: %w[reset restart navigation]
+      },
+      handle_region_selection: {
+        handler_type: :interactive,
+        display_name: 'Region Selection',
+        description: 'Handles user region/travel selection from quick reply',
+        category: 'onboarding',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: [],
+          interactive_ids: ['qr_travel']
+        },
+        dependencies: {
+          templates: [],
+          attributes: ['customer_region']
+        },
+        tags: %w[region selection onboarding]
+      },
+      handle_guitar_selection: {
+        handler_type: :interactive,
+        display_name: 'Guitar Selection',
+        description: 'Handles guitar selection from list picker',
+        category: 'product',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: [],
+          interactive_ids: ['lp_guitar_0319']
+        },
+        dependencies: {
+          templates: %w[ah_guitar_list_picker ah_guitar_info_form],
+          attributes: ['selected_guitar']
+        },
+        tags: %w[guitar product list-picker]
+      },
+      handle_list_picker_demo: {
+        handler_type: :keyword,
+        display_name: 'List Picker Demo',
+        description: 'Shows standalone list picker demo with guitar selection',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['list picker', 'listpicker', 'guitar', 'guitars'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_guitar_list_picker'],
+          attributes: []
+        },
+        tags: %w[demo list-picker guitar]
+      },
+      handle_time_picker_demo: {
+        handler_type: :keyword,
+        display_name: 'Time Picker Demo',
+        description: 'Shows standalone time picker demo for scheduling',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['time picker', 'timepicker'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: [],
+          attributes: []
+        },
+        tags: %w[demo time-picker scheduling]
+      },
+      handle_form_demo: {
+        handler_type: :keyword,
+        display_name: 'Form Demo',
+        description: 'Shows standalone form demo for data collection',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['form', 'help me decide'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_guitar_info_form'],
+          attributes: []
+        },
+        tags: %w[demo form data-collection]
+      },
+      handle_summary: {
+        handler_type: :keyword,
+        display_name: 'Summary',
+        description: 'Shows conversation summary with selected options',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['summary'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_summary'],
+          attributes: []
+        },
+        tags: %w[summary review]
+      }
+    }
+  end
 
   def initialize(conversation, message, bot = nil, config = nil)
     @conversation = conversation

@@ -26,6 +26,10 @@ class AgentBotsAPI extends ApiClient {
     return axios.post(`${this.url}/${botId}/reset_access_token`);
   }
 
+  duplicate(botId) {
+    return axios.post(`${this.url}/${botId}/duplicate`);
+  }
+
   // Version Management
   getVersions(botId, includeArchived = false) {
     return axios.get(`${this.url}/${botId}/versions`, {
@@ -92,6 +96,76 @@ class AgentBotsAPI extends ApiClient {
 
   bulkAssignInboxes(botId, data) {
     return axios.post(`${this.url}/${botId}/inboxes/bulk_assign`, data);
+  }
+
+  // Flow Management
+  getFlows(botId) {
+    return axios.get(`${this.url}/${botId}/flows`);
+  }
+
+  getFlow(botId, flowId) {
+    return axios.get(`${this.url}/${botId}/flows/${flowId}`);
+  }
+
+  createFlow(botId, flowData) {
+    return axios.post(`${this.url}/${botId}/flows`, flowData);
+  }
+
+  updateFlow(botId, flowId, flowData) {
+    return axios.patch(`${this.url}/${botId}/flows/${flowId}`, flowData);
+  }
+
+  deleteFlow(botId, flowId) {
+    return axios.delete(`${this.url}/${botId}/flows/${flowId}`);
+  }
+
+  compileFlow(botId, flowId) {
+    return axios.post(`${this.url}/${botId}/flows/${flowId}/compile`);
+  }
+
+  validateFlow(botId, flowId) {
+    return axios.post(`${this.url}/${botId}/flows/${flowId}/validate`);
+  }
+
+  simulateFlow(botId, flowId, payload) {
+    return axios.post(`${this.url}/${botId}/flows/${flowId}/simulate`, payload);
+  }
+
+  previewFlow(botId, flowId) {
+    return axios.get(`${this.url}/${botId}/flows/${flowId}/preview`);
+  }
+
+  importFlowFromBotConfig(botId) {
+    return axios.post(`${this.url}/${botId}/flows/import_from_bot_config`);
+  }
+
+  updateNode(botId, flowId, nodeId, nodeData) {
+    return axios.patch(
+      `${this.url}/${botId}/flows/${flowId}/nodes/${nodeId}`,
+      nodeData
+    );
+  }
+
+  // Handler Methods
+  getHandlerMethods(botId, params = {}) {
+    return axios.get(`${this.url}/${botId}/handler_methods`, { params });
+  }
+
+  getHandlerMethod(botId, methodName) {
+    return axios.get(`${this.url}/${botId}/handler_methods/${methodName}`);
+  }
+
+  searchHandlerMethods(botId, query, params = {}) {
+    return axios.get(`${this.url}/${botId}/handler_methods/search`, {
+      params: { q: query, ...params },
+    });
+  }
+
+  validateHandlerMethod(botId, methodName, params = {}) {
+    return axios.post(`${this.url}/${botId}/handler_methods/validate`, {
+      method_name: methodName,
+      ...params,
+    });
   }
 }
 
