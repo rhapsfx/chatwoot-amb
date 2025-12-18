@@ -29,7 +29,9 @@ watch(
 
 const canSend = computed(() => {
   return (
-    input.value.trim() && simulator.value && !simulator.value.isProcessing.value
+    input.value.trim() &&
+    simulator?.value &&
+    !simulator.value?.isProcessing?.value
   );
 });
 
@@ -209,7 +211,7 @@ const handleReset = () => {
         <Button
           icon="i-lucide-send"
           :disabled="!canSend"
-          :is-loading="simulator?.isProcessing.value"
+          :is-loading="simulator?.value?.isProcessing?.value"
           @click="send"
         >
           {{ t('AGENT_BOTS.TEST_CONSOLE.SEND') }}
