@@ -9,6 +9,12 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  // eslint-disable-next-line vue/no-unused-properties
+  botId: {
+    type: Number,
+    required: false,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['save', 'cancel']);
