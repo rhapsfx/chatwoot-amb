@@ -31,6 +31,12 @@ watch(
       simulator.value = useBotSimulator(props.botId, newFlowId);
       // eslint-disable-next-line no-console
       console.log('[BotTestConsole] Simulator initialized:', !!simulator.value);
+      // eslint-disable-next-line no-console
+      console.log('[BotTestConsole] Simulator object keys:', {
+        keys: simulator.value ? Object.keys(simulator.value) : [],
+        isProcessing: simulator.value?.isProcessing,
+        isProcessingValue: simulator.value?.isProcessing?.value,
+      });
     }
   },
   { immediate: true }
