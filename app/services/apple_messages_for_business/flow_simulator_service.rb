@@ -66,8 +66,15 @@ class AppleMessagesForBusiness::FlowSimulatorService
     initial_node = @nodes.find { |n| n['type'] == 'state' && n.dig('data', 'is_initial') == true }
     return initial_node.dig('data', 'state_id') if initial_node
 
-    # Fallback: first state node
-    first_state = @nodes.find { |n| n['type'] == 'state' }
+    # Filter out test nodes (nodes with id containing 'test')
+    non_test_nodes = @nodes.reject { |n| n['id']&.to_s&.downcase&.include?('test') }
+
+    # Fallback: first non-test state node with state_id matching AHA pattern
+    aha_state = non_test_nodes.find { |n| n['type'] == 'state' && n.dig('data', 'state_id')&.match?(/^AHA\d+$/i) }
+    return aha_state.dig('data', 'state_id') if aha_state
+
+    # Final fallback: any non-test state node
+    first_state = non_test_nodes.find { |n| n['type'] == 'state' }
     return first_state.dig('data', 'state_id') if first_state
 
     'AHA1' # Default fallback
@@ -168,12 +175,24 @@ class AppleMessagesForBusiness::FlowSimulatorService
       end
     end
 
-    # Check for transitions
-    transitions = state_data['transitions'] || {}
-    if transitions['default']
-      response_parts << "\n[Will transition to: #{transitions['default']}]"
-    elsif transitions.any?
-      response_parts << "\n[Available transitions: #{transitions.keys.join(', ')}]"
+    # Check for automatic transitions via edges
+    outgoing_edge = @edges.find { |e| e['source'] == node['id'] }
+    if outgoing_edge
+      target_node = find_node_by_id(outgoing_edge['target'])
+      if target_node && target_node['type'] == 'state'
+        next_state = target_node.dig('data', 'state_id') || target_node['id']
+        @current_state = next_state
+        response_parts << "\n[Auto-transitioned to: #{next_state}]"
+      end
+    else
+      # Check for transitions in state data (fallback)
+      transitions = state_data['transitions'] || {}
+      if transitions['default']
+        @current_state = transitions['default']
+        response_parts << "\n[Transitioned to: #{transitions['default']}]"
+      elsif transitions.any?
+        response_parts << "\n[Available transitions: #{transitions.keys.join(', ')}]"
+      end
     end
 
     build_response(response_parts.join("\n"))
