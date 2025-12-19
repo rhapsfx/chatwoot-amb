@@ -8,7 +8,6 @@ RSpec.describe 'Api::V1::Accounts::AgentBots::FlowsController', type: :request d
   let(:agent_bot) { create(:agent_bot, account: account) }
 
   before do
-    create(:account_user, account: account, user: user, role: :administrator)
     sign_in(user)
   end
 
@@ -382,7 +381,6 @@ RSpec.describe 'Api::V1::Accounts::AgentBots::FlowsController', type: :request d
       let(:agent_user) { create(:user, account: account, role: :agent) }
 
       before do
-        create(:account_user, account: account, user: agent_user, role: :agent)
         sign_out(user)
         sign_in(agent_user)
       end
