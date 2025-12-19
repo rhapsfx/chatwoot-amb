@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useBotSimulator } from '../composables/useBotSimulator';
 import Button from 'dashboard/components-next/button/Button.vue';
+import TemplatePreviewCard from './TemplatePreviewCard.vue';
 
 const props = defineProps({
   botId: { type: Number, required: true },
@@ -163,6 +164,18 @@ const handleReset = () => {
             ]"
           >
             <div class="whitespace-pre-wrap">{{ msg.text }}</div>
+
+            <!-- Template Previews -->
+            <div
+              v-if="msg.templatePreviews && msg.templatePreviews.length > 0"
+              class="space-y-2 mt-2"
+            >
+              <TemplatePreviewCard
+                v-for="(template, idx) in msg.templatePreviews"
+                :key="idx"
+                :template="template"
+              />
+            </div>
           </div>
 
           <!-- Metadata (for bot messages) -->
