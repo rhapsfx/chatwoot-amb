@@ -146,32 +146,46 @@ class AppleMessagesForBusiness::FlowSimulatorService
   def process_state_node(node)
     state_data = node['data'] || {}
     state_label = state_data['label'] || 'Unknown State'
+    state_id = state_data['state_id']
+    handler = state_data['handler']
     actions = state_data['actions'] || []
 
     # Build response from state
     response_parts = []
-    response_parts << "[State: #{state_label}]"
+    response_parts << "📍 State: #{state_label} (#{state_id})"
 
-    # Process actions
-    actions.each do |action|
-      case action['type']
-      when 'send_template'
-        template_name = action['template_name']
-        response_parts << "Sending template: #{template_name}"
+    # Show handler method if present
+    if handler.present?
+      response_parts << "🔧 Handler: #{handler}"
+      response_parts << ''
+      response_parts << "💬 Bot would execute: AcousticHouseBotService.#{handler}"
+      response_parts << '(In real conversation, this would send the appropriate message/template)'
+    end
 
-        # Find template node or use action data
-        template_node = @nodes.find do |n|
-          n['type'] == 'template' && n.dig('data', 'template_name') == template_name
+    # Process actions if any
+    if actions.any?
+      response_parts << ''
+      response_parts << '⚡ Actions:'
+      actions.each do |action|
+        case action['type']
+        when 'send_template'
+          template_name = action['template_name']
+          response_parts << "  • Template: #{template_name}"
+
+          # Find template node or use action data
+          template_node = @nodes.find do |n|
+            n['type'] == 'template' && n.dig('data', 'template_name') == template_name
+          end
+
+          if template_node
+            @executed_nodes << template_node['id']
+            response_parts << "    #{describe_template(template_node)}"
+          end
+        when 'send_text'
+          response_parts << "  • Text: #{action['text']}"
+        else
+          response_parts << "  • Action: #{action['type']}"
         end
-
-        if template_node
-          @executed_nodes << template_node['id']
-          response_parts << describe_template(template_node)
-        end
-      when 'send_text'
-        response_parts << action['text']
-      else
-        response_parts << "Action: #{action['type']}"
       end
     end
 
@@ -181,17 +195,21 @@ class AppleMessagesForBusiness::FlowSimulatorService
       target_node = find_node_by_id(outgoing_edge['target'])
       if target_node && target_node['type'] == 'state'
         next_state = target_node.dig('data', 'state_id') || target_node['id']
+        next_label = target_node.dig('data', 'label')
         @current_state = next_state
-        response_parts << "\n[Auto-transitioned to: #{next_state}]"
+        response_parts << ''
+        response_parts << "➡️ Auto-transition → #{next_state} (#{next_label})"
       end
     else
       # Check for transitions in state data (fallback)
       transitions = state_data['transitions'] || {}
       if transitions['default']
         @current_state = transitions['default']
-        response_parts << "\n[Transitioned to: #{transitions['default']}]"
+        response_parts << ''
+        response_parts << "➡️ Transition → #{transitions['default']}"
       elsif transitions.any?
-        response_parts << "\n[Available transitions: #{transitions.keys.join(', ')}]"
+        response_parts << ''
+        response_parts << "🔀 Available transitions: #{transitions.keys.join(', ')}"
       end
     end
 
