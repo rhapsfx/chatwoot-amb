@@ -159,7 +159,15 @@ class AppleMessagesForBusiness::FlowSimulatorService
       response_parts << "🔧 Handler: #{handler}"
       response_parts << ''
       response_parts << "💬 Bot would execute: AcousticHouseBotService.#{handler}"
-      response_parts << '(In real conversation, this would send the appropriate message/template)'
+
+      # Show template preview for this handler
+      template_preview = get_handler_template_preview(handler)
+      if template_preview.present?
+        response_parts << ''
+        response_parts << template_preview
+      else
+        response_parts << '(In real conversation, this would send the appropriate message/template)'
+      end
     end
 
     # Process actions if any
@@ -353,6 +361,109 @@ class AppleMessagesForBusiness::FlowSimulatorService
   # Helper: Find node by ID
   def find_node_by_id(node_id)
     @nodes.find { |n| n['id'] == node_id }
+  end
+
+  # Get template preview for a handler method
+  def get_handler_template_preview(handler_name)
+    # Get handler metadata from AcousticHouseBotService
+    return nil unless defined?(AppleMessagesForBusiness::AcousticHouseBotService)
+
+    handler_metadata = AppleMessagesForBusiness::AcousticHouseBotService.handler_methods_metadata[handler_name.to_sym]
+    return nil unless handler_metadata
+
+    # Get template names from dependencies
+    template_names = handler_metadata.dig(:dependencies, :templates) || []
+    return nil if template_names.empty?
+
+    # Load templates and build preview
+    account = @flow.agent_bot.account
+    previews = []
+
+    template_names.each do |template_name|
+      template = MessageTemplate.find_by(account: account, name: template_name, template_type: :apple_interactive_message)
+      next unless template
+
+      preview = build_template_preview(template)
+      previews << preview if preview.present?
+    end
+
+    return nil if previews.empty?
+
+    previews.join("\n\n")
+  end
+
+  # Build preview for a single template
+  def build_template_preview(template)
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    preview_parts = []
+
+    case template.content_type
+    when 'list_picker'
+      data = facade.load_data('list_picker')
+      preview_parts << "📋 Template: #{template.name} (List Picker)"
+
+      if data['received_message']
+        title = data['received_message']['title']
+        preview_parts << "  Title: #{title}" if title.present?
+      end
+
+      sections = data['sections'] || []
+      if sections.any?
+        preview_parts << "  Sections: #{sections.count}"
+        sections.first(2).each do |section|
+          section_title = section['title']
+          items_count = (section['items'] || []).count
+          preview_parts << "    • #{section_title} (#{items_count} items)"
+        end
+        preview_parts << "    • ... (#{sections.count - 2} more sections)" if sections.count > 2
+      end
+
+    when 'time_picker'
+      data = facade.load_data('time_picker')
+      preview_parts << "📅 Template: #{template.name} (Time Picker)"
+
+      if data['received_message']
+        title = data['received_message']['title']
+        preview_parts << "  Title: #{title}" if title.present?
+      end
+
+      if data['reply_message']
+        reply_title = data['reply_message']['title']
+        preview_parts << "  Reply: #{reply_title}" if reply_title.present?
+      end
+
+    when 'form', 'apple_form'
+      data = facade.load_data('apple_form')
+      preview_parts << "📝 Template: #{template.name} (Form)"
+
+      if data['received_message']
+        title = data['received_message']['title']
+        preview_parts << "  Title: #{title}" if title.present?
+      end
+
+      pages = data['pages'] || []
+      if pages.any?
+        preview_parts << "  Pages: #{pages.count}"
+        total_questions = pages.sum { |p| (p['questions'] || []).count }
+        preview_parts << "  Total Questions: #{total_questions}"
+      end
+
+    when 'rich_link'
+      data = facade.load_data('rich_link')
+      preview_parts << "🔗 Template: #{template.name} (Rich Link)"
+
+      preview_parts << "  URL: #{data['url']}" if data['url']
+
+      preview_parts << "  Title: #{data['title']}" if data['title']
+
+    else
+      preview_parts << "📄 Template: #{template.name} (#{template.content_type})"
+    end
+
+    preview_parts.join("\n")
+  rescue StandardError => e
+    Rails.logger.error "[FlowSimulator] Error building template preview: #{e.message}"
+    nil
   end
 
   # Build final response
