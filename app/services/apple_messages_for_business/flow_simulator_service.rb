@@ -18,7 +18,8 @@ class AppleMessagesForBusiness::FlowSimulatorService
     @flow_data = flow.flow_data || {}
     @nodes = @flow_data['nodes'] || []
     @edges = @flow_data['edges'] || []
-    @session = session.symbolize_keys
+    # Convert ActionController::Parameters to hash if needed
+    @session = session.is_a?(ActionController::Parameters) ? session.to_h.symbolize_keys : session.symbolize_keys
     @current_state = @session[:current_state] || find_initial_state
     @executed_nodes = []
   end
