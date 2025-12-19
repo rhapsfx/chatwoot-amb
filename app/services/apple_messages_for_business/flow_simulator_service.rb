@@ -160,11 +160,11 @@ class AppleMessagesForBusiness::FlowSimulatorService
       response_parts << ''
       response_parts << "💬 Bot would execute: AcousticHouseBotService.#{handler}"
 
-      # Show template preview for this handler
-      template_preview = get_handler_template_preview(handler)
-      if template_preview.present?
+      # Get template preview (both text and structured data)
+      template_preview_text = get_handler_template_preview(handler)
+      if template_preview_text.present?
         response_parts << ''
-        response_parts << template_preview
+        response_parts << template_preview_text
       else
         response_parts << '(In real conversation, this would send the appropriate message/template)'
       end
@@ -378,6 +378,7 @@ class AppleMessagesForBusiness::FlowSimulatorService
     # Load templates and build preview
     account = @flow.agent_bot.account
     previews = []
+    @template_previews ||= []
 
     template_names.each do |template_name|
       # Find templates that support Apple Messages for Business channel
@@ -387,13 +388,40 @@ class AppleMessagesForBusiness::FlowSimulatorService
                  .first
       next unless template
 
+      # Build text preview
       preview = build_template_preview(template)
       previews << preview if preview.present?
+
+      # Add structured template data for frontend rendering
+      add_template_preview_data(template)
     end
 
     return nil if previews.empty?
 
     previews.join("\n\n")
+  end
+
+  # Add structured template data for frontend visual preview
+  def add_template_preview_data(template)
+    @template_previews ||= []
+
+    # Detect template type
+    block_type = if template.content_blocks.any?
+                   template.content_blocks.first.block_type
+                 else
+                   template.send(:detect_block_type_from_metadata)
+                 end
+
+    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+    template_data = facade.load_data(block_type)
+
+    @template_previews << {
+      name: template.name,
+      type: block_type,
+      data: template_data
+    }
+  rescue StandardError => e
+    Rails.logger.error "[FlowSimulator] Error adding template preview data: #{e.message}"
   end
 
   # Build preview for a single template
@@ -483,6 +511,7 @@ class AppleMessagesForBusiness::FlowSimulatorService
       bot_response: bot_response,
       current_state: @current_state,
       executed_nodes: @executed_nodes,
+      template_previews: @template_previews || [],  # Add template preview data
       session: {
         current_state: @current_state,
         message_count: (@session[:message_count] || 0) + 1,

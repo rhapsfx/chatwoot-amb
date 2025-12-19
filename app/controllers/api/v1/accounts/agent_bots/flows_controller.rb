@@ -334,6 +334,7 @@ class Api::V1::Accounts::AgentBots::FlowsController < Api::V1::Accounts::BaseCon
       bot_response: result[:bot_response],
       current_state: result[:current_state],
       executed_nodes: result[:executed_nodes],
+      template_previews: result[:template_previews] || [],
       session: result[:session],
       message: 'Message processed successfully'
     }
