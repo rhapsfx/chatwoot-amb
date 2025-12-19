@@ -323,8 +323,12 @@ class Api::V1::Accounts::AgentBots::FlowsController < Api::V1::Accounts::BaseCon
     user_message = params[:message] || params.dig(:flow, :message)
     session_data = params[:session] || params.dig(:flow, :session) || {}
 
+    Rails.logger.info "[FlowSimulator] user_message: #{user_message.inspect}, session_data: #{session_data.inspect}"
+
     simulator = AppleMessagesForBusiness::FlowSimulatorService.new(@flow, session_data)
     result = simulator.process_message(user_message)
+
+    Rails.logger.info "[FlowSimulator] result: #{result.inspect}"
 
     render json: {
       bot_response: result[:bot_response],
@@ -334,6 +338,8 @@ class Api::V1::Accounts::AgentBots::FlowsController < Api::V1::Accounts::BaseCon
       message: 'Message processed successfully'
     }
   rescue StandardError => e
+    Rails.logger.error "[FlowSimulator] Error: #{e.class} - #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
     render json: {
       error: e.message,
       message: 'Failed to simulate message'
