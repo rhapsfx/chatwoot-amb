@@ -251,6 +251,150 @@ RSpec.describe 'Api::V1::Accounts::AgentBots::FlowsController', type: :request d
     end
   end
 
+  describe 'POST /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/flows/:id/simulate' do
+    let(:flow) do
+      create(:bot_flow,
+             agent_bot: agent_bot,
+             flow_data: {
+               'nodes' => [
+                 { 'id' => 'state_1', 'type' => 'state',
+                   'data' => { 'state_id' => 'AHA1', 'label' => 'Welcome', 'handler' => 'handle_welcome', 'is_initial' => true } },
+                 { 'id' => 'state_2', 'type' => 'state',
+                   'data' => { 'state_id' => 'AHA2', 'label' => 'Next State', 'handler' => 'handle_next' } }
+               ],
+               'edges' => [
+                 { 'id' => 'e1', 'source' => 'state_1', 'target' => 'state_2' }
+               ]
+             })
+    end
+
+    it 'simulates message processing' do
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { message: 'hi', session: {} },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      json_response = response.parsed_body
+
+      expect(json_response['bot_response']).to be_present
+      expect(json_response['current_state']).to eq('AHA2')
+      expect(json_response['executed_nodes']).to include('state_1')
+      expect(json_response['session']).to be_present
+    end
+
+    it 'preserves session state across messages' do
+      # First message
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { message: 'hi', session: {} },
+           as: :json
+
+      first_response = response.parsed_body
+      expect(first_response['current_state']).to eq('AHA2')
+
+      # Second message with updated session
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { message: 'next', session: first_response['session'] },
+           as: :json
+
+      second_response = response.parsed_body
+      expect(second_response['session']['message_count']).to eq(2)
+    end
+
+    it 'handles nested flow parameters' do
+      # Rails wraps params in 'flow' key for nested routes
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { flow: { message: 'hi', session: {} } },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      json_response = response.parsed_body
+
+      expect(json_response['bot_response']).to be_present
+      expect(json_response['current_state']).to eq('AHA2')
+    end
+
+    it 'returns error for missing message' do
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { session: {} },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'handles ActionController::Parameters session' do
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { message: 'hi', session: { current_state: 'AHA1', custom_data: 'test' } },
+           as: :json
+
+      expect(response).to have_http_status(:success)
+      json_response = response.parsed_body
+
+      expect(json_response['session']).to be_present
+    end
+
+    it 'includes execution metadata in response' do
+      post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+           params: { message: 'hi', session: {} },
+           as: :json
+
+      json_response = response.parsed_body
+
+      expect(json_response).to have_key('bot_response')
+      expect(json_response).to have_key('current_state')
+      expect(json_response).to have_key('executed_nodes')
+      expect(json_response).to have_key('session')
+      expect(json_response).to have_key('message')
+      expect(json_response['message']).to eq('Message processed successfully')
+    end
+
+    context 'with intent matching' do
+      let(:flow) do
+        create(:bot_flow,
+               agent_bot: agent_bot,
+               flow_data: {
+                 'nodes' => [
+                   { 'id' => 'state_1', 'type' => 'state',
+                     'data' => { 'state_id' => 'AHA1', 'is_initial' => true } },
+                   { 'id' => 'intent_1', 'type' => 'intent',
+                     'data' => { 'keywords' => %w[hello hi], 'label' => 'Greeting' } },
+                   { 'id' => 'state_2', 'type' => 'state',
+                     'data' => { 'state_id' => 'AHA2', 'label' => 'Greeted' } }
+                 ],
+                 'edges' => [
+                   { 'id' => 'e1', 'source' => 'intent_1', 'target' => 'state_2' }
+                 ]
+               })
+      end
+
+      it 'matches intent keywords' do
+        post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+             params: { message: 'hello', session: {} },
+             as: :json
+
+        json_response = response.parsed_body
+        expect(json_response['executed_nodes']).to include('intent_1')
+        expect(json_response['current_state']).to eq('AHA2')
+      end
+    end
+
+    context 'with agent role' do
+      let(:agent_user) { create(:user, account: account, role: :agent) }
+
+      before do
+        sign_out(user)
+        sign_in(agent_user)
+      end
+
+      it 'allows agents to simulate flows' do
+        post "/api/v1/accounts/#{account.id}/agent_bots/#{agent_bot.id}/flows/#{flow.id}/simulate",
+             params: { message: 'hi', session: {} },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+    end
+  end
+
   describe 'Authorization' do
     let(:flow) { create(:bot_flow, agent_bot: agent_bot) }
     let(:other_account) { create(:account) }
