@@ -63,6 +63,7 @@ export function useBotSimulator(botId, flowId) {
           sender: 'bot',
           text: result.bot_response || 'No response',
           time: new Date(),
+          templatePreviews: result.template_previews || [],
           metadata: {
             state: result.current_state,
             executedNodes: result.executed_nodes,
