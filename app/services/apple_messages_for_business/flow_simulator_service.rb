@@ -19,7 +19,14 @@ class AppleMessagesForBusiness::FlowSimulatorService
     @nodes = @flow_data['nodes'] || []
     @edges = @flow_data['edges'] || []
     # Convert ActionController::Parameters to hash if needed
-    @session = session.is_a?(ActionController::Parameters) ? session.to_h.symbolize_keys : session.symbolize_keys
+    # Use to_unsafe_h for ActionController::Parameters to bypass strong params
+    @session = if session.is_a?(ActionController::Parameters)
+                 session.to_unsafe_h.symbolize_keys
+               elsif session.respond_to?(:symbolize_keys)
+                 session.symbolize_keys
+               else
+                 {}
+               end
     @current_state = @session[:current_state] || find_initial_state
     @executed_nodes = []
   end
