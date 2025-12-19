@@ -380,7 +380,11 @@ class AppleMessagesForBusiness::FlowSimulatorService
     previews = []
 
     template_names.each do |template_name|
-      template = MessageTemplate.find_by(account: account, name: template_name, template_type: :apple_interactive_message)
+      # Find templates that support Apple Messages for Business channel
+      template = MessageTemplate
+                 .where(account: account, name: template_name)
+                 .where('? = ANY(supported_channels)', 'apple_messages_for_business')
+                 .first
       next unless template
 
       preview = build_template_preview(template)
@@ -397,7 +401,14 @@ class AppleMessagesForBusiness::FlowSimulatorService
     facade = AppleMessagesForBusiness::TemplateFacade.new(template)
     preview_parts = []
 
-    case template.content_type
+    # Detect template type from content blocks or metadata
+    block_type = if template.content_blocks.any?
+                   template.content_blocks.first.block_type
+                 else
+                   template.send(:detect_block_type_from_metadata)
+                 end
+
+    case block_type
     when 'list_picker'
       data = facade.load_data('list_picker')
       preview_parts << "📋 Template: #{template.name} (List Picker)"
@@ -457,7 +468,7 @@ class AppleMessagesForBusiness::FlowSimulatorService
       preview_parts << "  Title: #{data['title']}" if data['title']
 
     else
-      preview_parts << "📄 Template: #{template.name} (#{template.content_type})"
+      preview_parts << "📄 Template: #{template.name} (#{block_type})"
     end
 
     preview_parts.join("\n")
