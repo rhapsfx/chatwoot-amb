@@ -76,6 +76,26 @@ class AgentBotPolicy < ApplicationPolicy
     @account_user.administrator? || @account_user.agent?
   end
 
+  def create_version?
+    @account_user.administrator?
+  end
+
+  def publish?
+    @account_user.administrator?
+  end
+
+  def unpublish?
+    @account_user.administrator?
+  end
+
+  def versions?
+    @account_user.administrator? || @account_user.agent?
+  end
+
+  def version_tree?
+    @account_user.administrator? || @account_user.agent?
+  end
+
   # Handler methods permissions
   def handler_methods?
     @account_user.administrator? || @account_user.agent?
