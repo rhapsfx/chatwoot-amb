@@ -318,8 +318,10 @@ class Api::V1::Accounts::AgentBots::FlowsController < Api::V1::Accounts::BaseCon
 
   # POST /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/flows/:id/simulate
   def simulate
-    user_message = params[:message]
-    session_data = params[:session] || {}
+    # Rails wraps the request body in a 'flow' parameter
+    # Check both root level and nested level for backwards compatibility
+    user_message = params[:message] || params.dig(:flow, :message)
+    session_data = params[:session] || params.dig(:flow, :session) || {}
 
     simulator = AppleMessagesForBusiness::FlowSimulatorService.new(@flow, session_data)
     result = simulator.process_message(user_message)
