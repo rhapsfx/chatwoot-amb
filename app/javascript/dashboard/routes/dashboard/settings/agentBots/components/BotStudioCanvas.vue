@@ -46,6 +46,7 @@ const {
   getSelectedNodes,
   getSelectedEdges,
   removeNodes,
+  project,
 } = useVueFlow();
 
 const nodes = ref([]);
@@ -53,6 +54,88 @@ const edges = ref([]);
 const isInteractive = ref(true);
 const searchQuery = ref('');
 const highlightedNodeIds = ref([]);
+const currentSearchIndex = ref(0); // Track which search result we're viewing
+
+// ========================================
+// Node Validation (Warnings & Errors)
+// ========================================
+
+// Detect nodes with warnings (orange) or errors (red)
+const getNodeValidationStatus = nodeId => {
+  const node = nodes.value.find(n => n.id === nodeId);
+  if (!node) return null;
+
+  const outgoingEdges = edges.value.filter(e => e.source === nodeId);
+  const hasOutgoingEdge = outgoingEdges.length > 0;
+
+  // Check for warnings (orange)
+  const warnings = [];
+
+  // Intent nodes without outgoing edges
+  if (node.type === 'intent' && !hasOutgoingEdge) {
+    warnings.push('Intent has no outgoing connection');
+  }
+
+  // State nodes with missing handler
+  if (node.type === 'state') {
+    const handler = node.data?.handler;
+    if (handler && handler.trim() !== '') {
+      // Handler specified but might not exist
+      // We'll show this as a warning since we can't check existence here
+      // The FlowExecutorService will handle it gracefully via delegation
+    }
+  }
+
+  // Intent nodes with no keywords
+  if (node.type === 'intent') {
+    const keywords = node.data?.keywords || [];
+    if (keywords.length === 0) {
+      warnings.push('No keywords defined');
+    }
+  }
+
+  // Check for errors (red)
+  const errors = [];
+
+  // State nodes without state_id
+  if (node.type === 'state' && !node.data?.state_id) {
+    errors.push('Missing state_id');
+  }
+
+  // Template nodes without template_name
+  if (node.type === 'template' && !node.data?.template_name) {
+    errors.push('Missing template_name');
+  }
+
+  // Return validation status
+  if (errors.length > 0) {
+    return { level: 'error', messages: errors };
+  }
+  if (warnings.length > 0) {
+    return { level: 'warning', messages: warnings };
+  }
+  return null;
+};
+
+// Apply validation status to nodes directly
+const updateNodeValidation = () => {
+  nodes.value.forEach(node => {
+    const validation = getNodeValidationStatus(node.id);
+
+    // Update node class for styling
+    if (validation?.level === 'error') {
+      node.class = 'node-error';
+    } else if (validation?.level === 'warning') {
+      node.class = 'node-warning';
+    } else {
+      node.class = '';
+    }
+
+    // Pass validation to node component
+    if (!node.data) node.data = {};
+    node.data._validation = validation;
+  });
+};
 
 // Platform detection for keyboard shortcuts display
 const isMac = computed(
@@ -404,21 +487,11 @@ const searchNodes = () => {
   });
 
   highlightedNodeIds.value = matchedNodes.map(n => n.id);
+  currentSearchIndex.value = 0; // Reset to first result
 
   // Focus on first matched node
   if (matchedNodes.length > 0) {
-    const firstNode = matchedNodes[0];
-    const padding = 100;
-
-    fitBounds(
-      {
-        x: firstNode.position.x - padding,
-        y: firstNode.position.y - padding,
-        width: 400,
-        height: 300,
-      },
-      { duration: 300 }
-    );
+    focusOnSearchResult(0);
   }
 
   // eslint-disable-next-line no-console
@@ -429,10 +502,51 @@ const searchNodes = () => {
   );
 };
 
+// Focus on a specific search result by index
+const focusOnSearchResult = index => {
+  const matchedNodeId = highlightedNodeIds.value[index];
+  if (!matchedNodeId) return;
+
+  const node = nodes.value.find(n => n.id === matchedNodeId);
+  if (!node) return;
+
+  const padding = 100;
+  fitBounds(
+    {
+      x: node.position.x - padding,
+      y: node.position.y - padding,
+      width: 400,
+      height: 300,
+    },
+    { duration: 300 }
+  );
+
+  // eslint-disable-next-line no-console
+  console.log(`[BotStudioCanvas] Focused on search result ${index + 1}/${highlightedNodeIds.value.length}`);
+};
+
+// Navigate to next search result
+const nextSearchResult = () => {
+  if (highlightedNodeIds.value.length === 0) return;
+
+  currentSearchIndex.value = (currentSearchIndex.value + 1) % highlightedNodeIds.value.length;
+  focusOnSearchResult(currentSearchIndex.value);
+};
+
+// Navigate to previous search result
+const prevSearchResult = () => {
+  if (highlightedNodeIds.value.length === 0) return;
+
+  currentSearchIndex.value =
+    (currentSearchIndex.value - 1 + highlightedNodeIds.value.length) % highlightedNodeIds.value.length;
+  focusOnSearchResult(currentSearchIndex.value);
+};
+
 // Clear search
 const clearSearch = () => {
   searchQuery.value = '';
   highlightedNodeIds.value = [];
+  currentSearchIndex.value = 0;
 };
 
 // Auto-layout nodes using dagre algorithm
@@ -531,6 +645,13 @@ const nodeTypes = {
 // Drag and drop support
 let nextNodeId = 1;
 
+// Grid snapping helper
+const GRID_SIZE = 20;
+const snapToGrid = (x, y) => ({
+  x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+  y: Math.round(y / GRID_SIZE) * GRID_SIZE,
+});
+
 const getDefaultNodeData = type => {
   const currentId = nextNodeId;
   switch (type) {
@@ -546,6 +667,7 @@ const getDefaultNodeData = type => {
         keywords: [],
         exact_match: false,
         case_sensitive: false,
+        scope: 'global', // global: always checked, contextual: state-specific
       };
     case 'template':
       return {
@@ -587,15 +709,21 @@ const onDrop = event => {
     return;
   }
 
-  // Get the VueFlow viewport for proper coordinate conversion
-  const vueFlowElement = event.currentTarget;
-  const { left, top } = vueFlowElement.getBoundingClientRect();
+  // Use VueFlow's project() to convert screen coordinates to flow coordinates
+  // This properly accounts for zoom and pan transformations
+  const projectedPosition = project({
+    x: event.clientX,
+    y: event.clientY,
+  });
 
-  // Calculate position relative to canvas
-  const position = {
-    x: event.clientX - left - 100, // Offset to center the node
-    y: event.clientY - top - 50,
+  // Offset to center the node at cursor position
+  const centeredPosition = {
+    x: projectedPosition.x - 100,
+    y: projectedPosition.y - 50,
   };
+
+  // Snap position to grid for clean alignment
+  const position = snapToGrid(centeredPosition.x, centeredPosition.y);
 
   // Create new node with default data
   const newNode = {
@@ -608,8 +736,13 @@ const onDrop = event => {
   nextNodeId += 1;
 
   // eslint-disable-next-line no-console
-  console.log('Creating node:', newNode);
+  console.log('Creating node:', newNode, 'snapped from', centeredPosition, 'to', position);
   nodes.value.push(newNode);
+
+  // Update validation for new node
+  nextTick(() => {
+    updateNodeValidation();
+  });
 
   // Save to history
   saveToHistory('add_node');
@@ -622,8 +755,9 @@ onConnect(params => {
 
   addEdges([params]);
 
-  // Save to history after adding edge
+  // Update validation after edge added
   nextTick(() => {
+    updateNodeValidation();
     saveToHistory('add_edge');
   });
 });
@@ -659,18 +793,45 @@ const loadFlow = async () => {
       nodes.value = flowData.nodes || [];
       edges.value = flowData.edges || [];
 
-      // Add a test node at origin to verify VueFlow is working
-      if (nodes.value.length > 0) {
-        const testNode = {
-          id: 'test-node-origin',
-          type: 'state',
-          position: { x: 0, y: 0 },
-          data: { label: 'TEST NODE AT ORIGIN', state_id: 'TEST' },
-        };
-        nodes.value.unshift(testNode);
+      // Initialize nextNodeId to prevent duplicate IDs
+      // Find the highest node_N id in existing nodes
+      const nodeNumbers = nodes.value
+        .filter(n => n.id && n.id.startsWith('node_'))
+        .map(n => {
+          const match = n.id.match(/node_(\d+)/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter(n => !isNaN(n));
+
+      if (nodeNumbers.length > 0) {
+        nextNodeId = Math.max(...nodeNumbers) + 1;
         // eslint-disable-next-line no-console
-        console.log('Added test node at (0,0)');
+        console.log('[BotStudioCanvas] Initialized nextNodeId to:', nextNodeId);
       }
+
+      // Remove duplicate nodes (same ID)
+      const seenIds = new Set();
+      const uniqueNodes = [];
+      nodes.value.forEach(node => {
+        if (!seenIds.has(node.id)) {
+          seenIds.add(node.id);
+          uniqueNodes.push(node);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn('[BotStudioCanvas] 🗑️  Removed duplicate node:', node.id);
+        }
+      });
+
+      if (uniqueNodes.length < nodes.value.length) {
+        nodes.value = uniqueNodes;
+        // eslint-disable-next-line no-console
+        console.log(`[BotStudioCanvas] ✅ Cleaned ${nodes.value.length - uniqueNodes.length} duplicate nodes`);
+      }
+
+      // Update validation for loaded nodes
+      nextTick(() => {
+        updateNodeValidation();
+      });
 
       // eslint-disable-next-line no-console
       console.log(
@@ -729,8 +890,10 @@ const loadFlowData = flowData => {
   nodes.value = flowData.nodes;
   edges.value = flowData.edges;
 
-  // Fit view after loading
+  // Update validation and fit view after loading
   nextTick(() => {
+    updateNodeValidation();
+
     if (nodes.value.length > 0) {
       setTimeout(() => {
         fitView({ padding: 0.2, duration: 300 });
@@ -770,6 +933,38 @@ const focusNode = nodeId => {
 
   // eslint-disable-next-line no-console
   console.log('[BotStudioCanvas] Focused on node:', nodeId);
+};
+
+// Handle nodes changes (position, dimensions, etc.)
+const onNodesChange = changes => {
+  // Don't process changes if we're applying history
+  if (isApplyingHistory.value) return;
+
+  // Apply changes to underlying nodes ref
+  changes.forEach(change => {
+    if (change.type === 'position') {
+      // Position changed (during drag or at end)
+      const node = nodes.value.find(n => n.id === change.id);
+      if (node && change.position) {
+        node.position = change.position;
+      }
+    } else if (change.type === 'dimensions') {
+      // Dimensions changed
+      const node = nodes.value.find(n => n.id === change.id);
+      if (node && change.dimensions) {
+        node.width = change.dimensions.width;
+        node.height = change.dimensions.height;
+      }
+    }
+  });
+
+  // Save to history only when drag ends (not during dragging)
+  const hasPositionChange = changes.some(
+    c => c.type === 'position' && c.dragging === false
+  );
+  if (hasPositionChange) {
+    saveToHistory('node_moved');
+  }
 };
 
 // Handle node selection
@@ -829,6 +1024,8 @@ defineExpose({
   // Methods
   searchNodes,
   clearSearch,
+  nextSearchResult,
+  prevSearchResult,
   undo,
   redo,
   copyNodes,
@@ -858,13 +1055,16 @@ defineExpose({
       :elements-selectable="isInteractive"
       :zoom-on-scroll="isInteractive"
       :pan-on-scroll="isInteractive"
+      :snap-to-grid="true"
+      :snap-grid="[20, 20]"
       fit-view-on-init
       class="vue-flow-container"
       @node-click="onNodeClick"
       @dragover="onDragOver"
       @drop="onDrop"
+      @nodes-change="onNodesChange"
     >
-      <Background pattern-color="#aaa" :gap="16" />
+      <Background pattern-color="#aaa" :gap="20" />
       <Controls
         show-zoom
         show-fit-view
