@@ -101,12 +101,20 @@
 
 ### Testing Your Bot
 
-**Quick Test**:
+**Test Console (In-Studio Testing)**:
 1. Open Bot Studio
-2. Make changes to flow
-3. Click "Save Flow"
-4. Click "Compile & Test"
-5. Test in Apple Messages channel
+2. Click "Test" button to open test console
+3. Send test messages to simulate user interaction
+4. View visual template previews
+5. Monitor executed nodes and state transitions
+6. Safe testing without sending actual messages
+
+**Production Testing**:
+1. Publish flow to production (set `is_published: true`)
+2. Ensure flow is active (`is_active: true`)
+3. Test with real device on test inbox
+4. Monitor logs for execution flow
+5. Verify messages received on device
 
 **Detailed Testing**:
 1. **Test Each State**: Verify handler methods work correctly
@@ -114,6 +122,45 @@
 3. **Test Interactive Elements**: Click List Picker items, Time Picker, etc.
 4. **Test Error Cases**: Invalid input, missing templates, etc.
 5. **Test Timeout**: Wait 30+ minutes to verify conversation reset
+
+### Deploying to Production
+
+**Flow Executor Service**: Bot Studio flows run via `FlowExecutorService` in production.
+
+**Prerequisites**:
+1. Bot is assigned to inbox (via AgentBotInbox)
+2. Bot has an active published flow
+3. Flow has valid flow_data (nodes and edges)
+
+**Deployment Steps**:
+1. **Design Flow**: Create flow in Bot Studio
+2. **Test in Console**: Use test console to verify behavior
+3. **Publish Flow**: Click "Publish" button (sets `is_published: true`)
+4. **Activate Flow**: Ensure `is_active: true` (default for published flows)
+5. **Test on Device**: Send test messages from real device
+6. **Monitor Logs**: Check execution logs for any issues
+
+**Automatic Routing**:
+```ruby
+# In incoming_message_service.rb
+active_flow = bot.bot_flows.active.published.first
+
+if active_flow
+  # Use FlowExecutorService for visual flows
+  FlowExecutorService.new(flow, conversation, message).execute
+else
+  # Fall back to legacy AcousticHouseBotService
+  # (will be deprecated)
+end
+```
+
+**Migration Path**:
+- **Phase 1** ✅ Complete: Parallel operation (flows or legacy)
+- **Phase 2** ✅ Complete: Visual flows created in Bot Studio
+- **Phase 3** (Current): Publishing flows to production
+- **Phase 4** (Future): Deprecate legacy service, flows only
+
+**Documentation**: See [FlowExecutorService Guide](./FLOW_EXECUTOR_SERVICE.md)
 
 ## Node Types Reference
 
@@ -245,7 +292,7 @@ await store.dispatch('agentBots/updateFlow', {
 
 ## Version History
 
-### Current Version: Phase 6 (Version Management)
+### Current Version: Phase 6+ (Production Deployment)
 
 **Features**:
 - ✅ Visual flow editor with drag-and-drop
@@ -254,11 +301,22 @@ await store.dispatch('agentBots/updateFlow', {
 - ✅ Flow compilation to bot config
 - ✅ Flow validation
 - ✅ Version management (create, activate, archive, compare)
+- ✅ **Production Flow Executor** (FlowExecutorService) - **NEW**
+- ✅ **Test Console with Visual Previews** - **NEW**
 - ✅ Dark mode support
 
+**Production Deployment**:
+- ✅ FlowExecutorService for production message execution
+- ✅ Automatic routing (flows or legacy service)
+- ✅ Session state management
+- ✅ Handler method integration
+- ✅ Template sending via existing services
+
 **Documentation**:
-- ✅ Handler Methods Reference (this release)
-- ✅ Bot Configuration Guide (this release)
+- ✅ Handler Methods Reference
+- ✅ Bot Configuration Guide
+- ✅ **Flow Executor Service Guide** - **NEW**
+- ✅ **Test Console Implementation** - **NEW**
 - ✅ Architecture documentation
 - ✅ Integration plan
 - ✅ Implementation plan
@@ -279,6 +337,8 @@ await store.dispatch('agentBots/updateFlow', {
 
 - **Handler Methods**: [HANDLER_METHODS_REFERENCE.md](./HANDLER_METHODS_REFERENCE.md)
 - **Configuration**: [BOT_CONFIGURATION_GUIDE.md](./BOT_CONFIGURATION_GUIDE.md)
+- **Flow Executor**: [FLOW_EXECUTOR_SERVICE.md](./FLOW_EXECUTOR_SERVICE.md) - **Production deployment**
+- **Test Console**: [TEST_CONSOLE_IMPLEMENTATION.md](./TEST_CONSOLE_IMPLEMENTATION.md)
 - **Architecture**: [BOT_STUDIO_ARCHITECTURE.md](./BOT_STUDIO_ARCHITECTURE.md)
 - **Integration**: [BOT_STUDIO_INTEGRATION_PLAN.md](./BOT_STUDIO_INTEGRATION_PLAN.md)
 - **Implementation**: [VISUAL_BOT_STUDIO_IMPLEMENTATION_PLAN.md](./VISUAL_BOT_STUDIO_IMPLEMENTATION_PLAN.md)
@@ -293,7 +353,9 @@ await store.dispatch('agentBots/updateFlow', {
 ### Code Reference
 
 **Bot Service Classes**:
-- `app/services/apple_messages_for_business/acoustic_house_bot_service.rb` - Main bot service
+- `app/services/apple_messages_for_business/flow_executor_service.rb` - **Production flow executor** ⭐
+- `app/services/apple_messages_for_business/flow_simulator_service.rb` - Test console simulator
+- `app/services/apple_messages_for_business/acoustic_house_bot_service.rb` - Legacy bot service (will be deprecated)
 - `app/services/apple_messages_for_business/bot_service.rb` - Base bot service
 - `app/services/apple_messages_for_business/send_message_service.rb` - Message sending
 - `app/services/apple_messages_for_business/send_*_service.rb` - Template services
@@ -366,6 +428,6 @@ When adding features:
 
 ---
 
-**Last Updated**: 2025-12-09
-**Bot Studio Version**: Phase 6 (Version Management)
-**Documentation Version**: 1.0
+**Last Updated**: 2025-12-19
+**Bot Studio Version**: Phase 6+ (Production Deployment)
+**Documentation Version**: 2.0
