@@ -252,9 +252,9 @@ class AppleMessagesForBusiness::HandlerMethodsRegistry
     def validate_service_class!(service_class)
       raise ArgumentError, "Expected a Class, got #{service_class.class}" unless service_class.is_a?(Class)
 
-      return if service_class.include?(BotServiceInterface)
+      return if service_class.include?(AppleMessagesForBusiness::Concerns::BotServiceInterface)
 
-      raise ArgumentError, "#{service_class.name} must include BotServiceInterface"
+      raise ArgumentError, "#{service_class.name} must include AppleMessagesForBusiness::Concerns::BotServiceInterface"
     end
 
     # Enrich metadata with runtime information

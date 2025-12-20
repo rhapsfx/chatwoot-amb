@@ -1283,9 +1283,39 @@ class AppleMessagesForBusiness::IncomingMessageService
 
     # Check for configured AMB bot via AgentBotInbox
     bot_inbox = @inbox.agent_bot_inbox
-    if bot_inbox&.active? && bot_inbox.agent_bot&.apple_messages_for_business?
-      configured_bot = bot_inbox.agent_bot
-      Rails.logger.info "[Bot] 🤖 Using configured AMB bot: #{configured_bot.name} (ID: #{configured_bot.id})"
+    unless bot_inbox&.active? && bot_inbox.agent_bot&.apple_messages_for_business?
+      Rails.logger.info '[Bot] ⚠️  No active configured AMB bot found - skipping bot processing'
+      Rails.logger.info "[Bot] 📋 Inbox ID: #{@inbox.id}, Agent Bot Inbox: #{bot_inbox.present? ? 'present' : 'nil'}, Active: #{bot_inbox&.active?}, Bot Type: #{bot_inbox&.agent_bot&.bot_type}"
+      return
+    end
+
+    configured_bot = bot_inbox.agent_bot
+    Rails.logger.info "[Bot] 🤖 Using configured AMB bot: #{configured_bot.name} (ID: #{configured_bot.id})"
+
+    # Check if bot has an active published flow (Bot Studio)
+    active_flow = configured_bot.bot_flows.active.published.first
+
+    if active_flow
+      # NEW: Use visual flow executor
+      Rails.logger.info "[Bot] 🎨 Bot has active flow: '#{active_flow.name}' (ID: #{active_flow.id})"
+      Rails.logger.info '[Bot] 🚀 Using FlowExecutorService for visual bot flow'
+
+      executor = AppleMessagesForBusiness::FlowExecutorService.new(
+        active_flow,
+        @conversation,
+        @message
+      )
+      result = executor.execute
+
+      if result[:success]
+        Rails.logger.info "[Bot] ✅ Flow executed successfully. Nodes: #{result[:nodes_executed].count}, Messages: #{result[:messages_sent]}"
+      else
+        Rails.logger.error "[Bot] ❌ Flow execution failed: #{result[:error]}"
+      end
+    else
+      # LEGACY: Use old service (will be deprecated)
+      Rails.logger.info '[Bot] 📜 No active flow found - using legacy AcousticHouseBotService'
+      Rails.logger.warn '[Bot] ⚠️  Consider creating a visual flow in Bot Studio for this bot'
 
       bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
         @conversation,
@@ -1293,28 +1323,20 @@ class AppleMessagesForBusiness::IncomingMessageService
         configured_bot,
         configured_bot.bot_config
       )
-    else
-      Rails.logger.info '[Bot] ⚠️  No active configured AMB bot found - skipping bot processing'
-      Rails.logger.info "[Bot] 📋 Inbox ID: #{@inbox.id}, Agent Bot Inbox: #{bot_inbox.present? ? 'present' : 'nil'}, Active: #{bot_inbox&.active?}, Bot Type: #{bot_inbox&.agent_bot&.bot_type}"
-      return
-    end
 
-    Rails.logger.info '[Bot] 🚀 Triggering configured bot for incoming message'
-
-    # Form responses should go through process_message (where content_type is checked)
-    # Other interactive responses (quick replies, list pickers, time pickers) go through process_interactive_response
-    if @message.content_type == 'apple_form_response'
-      Rails.logger.info '[Bot] Form response detected - using process_message'
-      bot_service.process_message
-    elsif @idr_data.present? || @params['interactiveData'].present?
-      Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
-      # CRITICAL: Prioritize direct interactiveData (contains form selections) over IDR (display only)
-      interactive_data = @params['interactiveData'].presence || @idr_data
-      Rails.logger.info "[Bot] Using #{@params['interactiveData'].present? ? 'direct interactiveData' : 'IDR data'}"
-      bot_service.process_interactive_response(interactive_data)
-    else
-      Rails.logger.info '[Bot] Regular message - using process_message'
-      bot_service.process_message
+      # Form responses should go through process_message (where content_type is checked)
+      # Other interactive responses go through process_interactive_response
+      if @message.content_type == 'apple_form_response'
+        Rails.logger.info '[Bot] Form response detected - using process_message'
+        bot_service.process_message
+      elsif @idr_data.present? || @params['interactiveData'].present?
+        Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
+        interactive_data = @params['interactiveData'].presence || @idr_data
+        bot_service.process_interactive_response(interactive_data)
+      else
+        Rails.logger.info '[Bot] Regular message - using process_message'
+        bot_service.process_message
+      end
     end
   rescue StandardError => e
     log_error "[Bot] ❌ Error processing message: #{e.message}"
