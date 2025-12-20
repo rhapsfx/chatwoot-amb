@@ -1,43 +1,45 @@
 # frozen_string_literal: true
 
-module AppleMessagesForBusiness::BotServiceInterface
-  # BotServiceInterface provides a standardized contract for bot services to expose
-  # handler methods metadata and enable dynamic discovery, validation, and documentation
-  # of handler methods across different bot service implementations.
-  #
-  # This interface enables:
-  # - Runtime discovery of available handler methods
-  # - Type-safe handler method validation
-  # - Rich metadata for UI components (Bot Studio)
-  # - Service-agnostic handler method management
-  #
-  # @example Including in a bot service
-  #   class AppleMessagesForBusiness::AcousticHouseBotService
-  #     include AppleMessagesForBusiness::BotServiceInterface
-  #
-  #     def self.handler_methods_metadata
-  #       {
-  #         handle_welcome: {
-  #           handler_type: :state,
-  #           display_name: 'Welcome Handler',
-  #           description: 'Sends initial welcome message',
-  #           category: 'onboarding',
-  #           status: :stable
-  #         }
-  #       }
-  #     end
-  #   end
-  #
-  # @see docs/bot-studio/HANDLER_METHODS_ARCHITECTURE.md
-  extend ActiveSupport::Concern
+module AppleMessagesForBusiness
+  module Concerns
+    module BotServiceInterface
+      # BotServiceInterface provides a standardized contract for bot services to expose
+      # handler methods metadata and enable dynamic discovery, validation, and documentation
+      # of handler methods across different bot service implementations.
+      #
+      # This interface enables:
+      # - Runtime discovery of available handler methods
+      # - Type-safe handler method validation
+      # - Rich metadata for UI components (Bot Studio)
+      # - Service-agnostic handler method management
+      #
+      # @example Including in a bot service
+      #   class AppleMessagesForBusiness::AcousticHouseBotService
+      #     include AppleMessagesForBusiness::Concerns::BotServiceInterface
+      #
+      #     def self.handler_methods_metadata
+      #       {
+      #         handle_welcome: {
+      #           handler_type: :state,
+      #           display_name: 'Welcome Handler',
+      #           description: 'Sends initial welcome message',
+      #           category: 'onboarding',
+      #           status: :stable
+      #         }
+      #       }
+      #     end
+      #   end
+      #
+      # @see docs/bot-studio/HANDLER_METHODS_ARCHITECTURE.md
+      extend ActiveSupport::Concern
 
-  # Custom error classes for handler method operations
-  class HandlerMethodNotImplementedError < StandardError; end
-  class HandlerMethodNotFoundError < StandardError; end
-  class InvalidHandlerTypeError < StandardError; end
+      # Custom error classes for handler method operations
+      class HandlerMethodNotImplementedError < StandardError; end
+      class HandlerMethodNotFoundError < StandardError; end
+      class InvalidHandlerTypeError < StandardError; end
 
-  # Valid handler types
-  HANDLER_TYPES = %i[state keyword interactive action].freeze
+      # Valid handler types
+      HANDLER_TYPES = %i[state keyword interactive action].freeze
 
   # rubocop:disable Metrics/BlockLength
   class_methods do
@@ -306,5 +308,7 @@ module AppleMessagesForBusiness::BotServiceInterface
   included do
     # This block runs when the module is included in a class
     # Can be used for instance-level setup if needed in the future
+  end
+    end
   end
 end

@@ -3,7 +3,7 @@
 require Rails.root.join('app/services/apple_messages_for_business/concerns/bot_service_interface')
 
 class AppleMessagesForBusiness::AcousticHouseBotService
-  include AppleMessagesForBusiness::BotServiceInterface
+  include AppleMessagesForBusiness::Concerns::BotServiceInterface
 
   IDLE_TIMEOUT = 30.minutes
 
