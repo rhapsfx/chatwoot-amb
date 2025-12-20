@@ -153,3 +153,6 @@ script/*
 *_SUMMARY.md
 CLEANUP_LIST.md
 
+
+# Code analysis cache
+.zingerv3/
