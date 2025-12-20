@@ -143,24 +143,24 @@ const handleNodeSelected = node => {
 const handleSaveNode = async nodeData => {
   if (!selectedNode.value || !flowId.value) return;
 
-  isUpdatingNode.value = true;
-  try {
-    await store.dispatch('agentBots/updateNode', {
-      botId: botId.value,
-      flowId: flowId.value,
-      nodeId: selectedNode.value.id,
-      nodeData,
-    });
+  // Update local node data immediately (no API call)
+  // The entire flow will be saved when user clicks "Save" button
+  selectedNode.value.data = { ...selectedNode.value.data, ...nodeData };
 
-    // Update local node data
-    selectedNode.value.data = { ...selectedNode.value.data, ...nodeData };
+  // Mark flow as having unsaved changes
+  hasUnsavedChanges.value = true;
 
-    useAlert('Node updated successfully');
-  } catch (error) {
-    useAlert('Failed to update node');
-  } finally {
-    isUpdatingNode.value = false;
+  // Update the node in the canvas
+  if (canvasRef.value) {
+    const flowData = canvasRef.value.getFlowData();
+    const node = flowData.nodes.find(n => n.id === selectedNode.value.id);
+    if (node) {
+      node.data = { ...node.data, ...nodeData };
+    }
   }
+
+  // eslint-disable-next-line no-console
+  console.log('[BotStudio] Node updated locally:', selectedNode.value.id, nodeData);
 };
 
 // Handle cancel edit
@@ -177,6 +177,17 @@ const handleSaveFlow = async () => {
   }
 
   const flowData = canvasRef.value.getFlowData();
+
+  // Debug: Log all state nodes to help find duplicates
+  const stateNodes = flowData.nodes.filter(n => n.type === 'state');
+  const stateIds = stateNodes.map(n => ({ id: n.id, state_id: n.data?.state_id }));
+  // eslint-disable-next-line no-console
+  console.log('[BotStudio] All state nodes:', stateIds);
+
+  // Debug: Log the specific node we just edited
+  const editedNode = flowData.nodes.find(n => n.id === 'node_1');
+  // eslint-disable-next-line no-console
+  console.log('[BotStudio] DEBUG - node_1 data being saved:', editedNode?.data);
 
   // eslint-disable-next-line no-console
   console.log('[BotStudio] Saving flow with data:', {
@@ -419,6 +430,16 @@ const validateFlow = async () => {
 
     // eslint-disable-next-line no-console
     console.log('[BotStudio] Validation result:', result);
+
+    // Debug: Log specific errors
+    if (result?.errors && result.errors.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log('[BotStudio] ❌ Validation errors:', result.errors);
+    }
+    if (result?.warnings && result.warnings.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log('[BotStudio] ⚠️  Validation warnings (count):', result.warnings.length);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[BotStudio] Validation error:', error);
@@ -430,20 +451,41 @@ const validateFlow = async () => {
 
 // Handle validation error/warning click - highlight the node
 const handleValidationIssueClick = issue => {
-  if (!issue.node_id || !canvasRef.value) return;
+  if (!canvasRef.value) return;
+
+  let nodeId = issue.node_id;
+
+  // If no node_id but we have a state_id (duplicate state_id error), search for it
+  if (!nodeId && issue.state_id) {
+    const flowData = canvasRef.value.getFlowData();
+    const matchingNode = flowData.nodes.find(
+      n => n.type === 'state' && n.data?.state_id === issue.state_id
+    );
+    if (matchingNode) {
+      nodeId = matchingNode.id;
+      // eslint-disable-next-line no-console
+      console.log(`[BotStudio] Found node for state_id '${issue.state_id}': ${nodeId}`);
+    }
+  }
+
+  if (!nodeId) {
+    // eslint-disable-next-line no-console
+    console.warn('[BotStudio] Could not find node for validation issue:', issue);
+    return;
+  }
 
   // Focus and highlight the node on canvas
-  canvasRef.value.focusNode(issue.node_id);
+  canvasRef.value.focusNode(nodeId);
 
   // Find and select the node
   const flowData = canvasRef.value.getFlowData();
-  const node = flowData.nodes.find(n => n.id === issue.node_id);
+  const node = flowData.nodes.find(n => n.id === nodeId);
   if (node) {
     selectedNode.value = node;
   }
 
   // eslint-disable-next-line no-console
-  console.log('[BotStudio] Focused on node:', issue.node_id);
+  console.log('[BotStudio] Focused on node:', nodeId);
 };
 
 // Handle node execution from test console
@@ -557,7 +599,6 @@ onMounted(async () => {
             :label="t('AGENT_BOTS.STUDIO.SAVE')"
             slate
             :is-loading="isSaving"
-            :disabled="hasCriticalErrors"
             @click="handleSaveFlow"
           />
           <Button
