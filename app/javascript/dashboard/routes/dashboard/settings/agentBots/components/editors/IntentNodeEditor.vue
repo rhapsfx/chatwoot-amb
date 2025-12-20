@@ -26,6 +26,7 @@ const editedData = ref({
   keywords: [],
   exact_match: false,
   case_sensitive: false,
+  scope: 'global', // global or contextual
 });
 
 const newKeyword = ref('');
@@ -39,6 +40,7 @@ watch(
         keywords: newNode.data.keywords || [],
         exact_match: newNode.data.exact_match || false,
         case_sensitive: newNode.data.case_sensitive || false,
+        scope: newNode.data.scope || 'global', // default to global for backward compatibility
       };
     }
   },
@@ -130,6 +132,49 @@ const handleCancel = () => {
             <span class="text-sm text-n-slate-11">{{
               t('AGENT_BOTS.NODE_CONFIG.CASE_SENSITIVE')
             }}</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Intent Scope -->
+      <div>
+        <label class="block text-sm font-medium text-n-slate-11 mb-2">
+          {{ t('AGENT_BOTS.EDITORS.INTENT_SCOPE') }}
+        </label>
+        <div class="space-y-2">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input
+              v-model="editedData.scope"
+              type="radio"
+              value="global"
+              class="mt-0.5"
+            />
+            <div class="flex-1">
+              <div class="flex items-center gap-1">
+                <i class="i-lucide-globe text-n-blue-11 w-4 h-4" />
+                <span class="text-sm font-medium text-n-slate-12">Global</span>
+              </div>
+              <p class="text-xs text-n-slate-10 mt-0.5">
+                Always checked on every message (for startover, stop, menu, help, reset)
+              </p>
+            </div>
+          </label>
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input
+              v-model="editedData.scope"
+              type="radio"
+              value="contextual"
+              class="mt-0.5"
+            />
+            <div class="flex-1">
+              <div class="flex items-center gap-1">
+                <i class="i-lucide-git-branch text-n-purple-11 w-4 h-4" />
+                <span class="text-sm font-medium text-n-slate-12">Contextual</span>
+              </div>
+              <p class="text-xs text-n-slate-10 mt-0.5">
+                Only checked when connected to current state (for feature-specific intents)
+              </p>
+            </div>
           </label>
         </div>
       </div>
