@@ -4,13 +4,13 @@ import { useI18n } from 'vue-i18n';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Textarea from 'dashboard/components-next/textarea/Textarea.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import HandlerMethodSelector from '../HandlerMethodSelector.vue';
 
 const props = defineProps({
   node: {
     type: Object,
     required: true,
   },
-  // eslint-disable-next-line vue/no-unused-properties
   botId: {
     type: Number,
     required: false,
@@ -26,6 +26,7 @@ const { t } = useI18n();
 const editedData = ref({
   action_type: 'send_message',
   label: '',
+  handler: '', // Handler method to execute
   parameters: {},
 });
 
@@ -37,6 +38,7 @@ watch(
       editedData.value = {
         action_type: newNode.data.action_type || 'send_message',
         label: newNode.data.label || '',
+        handler: newNode.data.handler || '',
         parameters: newNode.data.parameters || {},
       };
     }
@@ -59,6 +61,13 @@ const updateParameters = () => {
     editedData.value.parameters = JSON.parse(parametersJson.value);
   } catch (e) {
     // Keep existing parameters if JSON is invalid
+  }
+};
+
+const handleHandlerSelected = handler => {
+  // Auto-fill label from handler metadata if not already set
+  if (!editedData.value.label && handler.display_name) {
+    editedData.value.label = handler.display_name;
   }
 };
 
@@ -89,6 +98,24 @@ const handleCancel = () => {
           placeholder="e.g., Send Welcome Message"
           class="w-full"
         />
+      </div>
+
+      <!-- Handler Method -->
+      <div>
+        <label class="block text-sm font-medium text-n-slate-11 mb-1">
+          {{ t('AGENT_BOTS.EDITORS.HANDLER_METHOD') }}
+        </label>
+        <HandlerMethodSelector
+          v-model="editedData.handler"
+          :bot-id="botId"
+          service-name="AcousticHouseBotService"
+          handler-type="action"
+          :required="false"
+          @handler-selected="handleHandlerSelected"
+        />
+        <p class="text-xs text-n-slate-10 mt-1">
+          {{ t('AGENT_BOTS.EDITORS.HANDLER_METHOD_ACTION_HELP') }}
+        </p>
       </div>
 
       <!-- Action Type -->

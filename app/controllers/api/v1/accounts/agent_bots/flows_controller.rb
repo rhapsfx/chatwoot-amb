@@ -18,6 +18,47 @@ class Api::V1::Accounts::AgentBots::FlowsController < Api::V1::Accounts::BaseCon
     }
   end
 
+  # GET /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/flows/templates
+  def templates
+    begin
+      # Find all flows marked as templates for this account
+      # Templates are stored in a special "Flow Templates Bot" agent bot
+      template_bots = Current.account.agent_bots.where("bot_config ->> 'is_template_bot' = ?", 'true')
+
+      if template_bots.empty?
+        # No template bots found, return empty array
+        return render json: { templates: [] }
+      end
+
+      @template_flows = BotFlow.where(agent_bot: template_bots)
+                               .where("metadata ->> 'is_template' = ?", 'true')
+                               .order(created_at: :desc)
+
+      render json: {
+        templates: @template_flows.map do |flow|
+          {
+            id: flow.id,
+            name: flow.name,
+            description: flow.description,
+            metadata: flow.metadata,
+            flow_data: flow.flow_data,
+            created_at: flow.created_at,
+            updated_at: flow.updated_at,
+            node_count: flow.flow_data&.dig('nodes')&.size || 0,
+            edge_count: flow.flow_data&.dig('edges')&.size || 0
+          }
+        end
+      }
+    rescue StandardError => e
+      Rails.logger.error "[FlowTemplates] Error loading templates: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      render json: {
+        error: e.message,
+        message: 'Failed to load flow templates'
+      }, status: :internal_server_error
+    end
+  end
+
   # GET /api/v1/accounts/:account_id/agent_bots/:agent_bot_id/flows/:id
   def show
     render json: {

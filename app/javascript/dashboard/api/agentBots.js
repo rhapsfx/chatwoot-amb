@@ -139,6 +139,10 @@ class AgentBotsAPI extends ApiClient {
     return axios.post(`${this.url}/${botId}/flows/import_from_bot_config`);
   }
 
+  getFlowTemplates(accountId, botId) {
+    return axios.get(`${this.url}/${botId}/flows/templates`);
+  }
+
   updateNode(botId, flowId, nodeId, nodeData) {
     return axios.patch(
       `${this.url}/${botId}/flows/${flowId}/nodes/${nodeId}`,

@@ -81,7 +81,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
       end
 
       it 'includes image attachment URL' do
-        image = create(:shared_apple_image, account: account)
+        create(:shared_apple_image, account: account)
 
         get "/api/v1/accounts/#{account.id}/shared_apple_images"
 
@@ -91,7 +91,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
       end
 
       it 'includes metadata' do
-        image = create(:shared_apple_image, account: account, metadata: { width: 500, height: 500 })
+        create(:shared_apple_image, account: account, metadata: { width: 500, height: 500 })
 
         get "/api/v1/accounts/#{account.id}/shared_apple_images"
 
@@ -119,7 +119,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
 
   describe 'GET /api/v1/accounts/:account_id/shared_apple_images/system_images' do
     it 'returns only system images' do
-      system_images = create_list(:shared_apple_image, 2, account: account, image_type: 'system')
+      create_list(:shared_apple_image, 2, account: account, image_type: 'system')
       create_list(:shared_apple_image, 2, account: account, image_type: 'branding')
       create_list(:shared_apple_image, 2, account: account, image_type: 'template')
 
@@ -145,7 +145,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
   describe 'GET /api/v1/accounts/:account_id/shared_apple_images/branding_images' do
     it 'returns only branding images' do
       create_list(:shared_apple_image, 2, account: account, image_type: 'system')
-      branding_images = create_list(:shared_apple_image, 3, account: account, image_type: 'branding')
+      create_list(:shared_apple_image, 3, account: account, image_type: 'branding')
       create_list(:shared_apple_image, 2, account: account, image_type: 'template')
 
       get "/api/v1/accounts/#{account.id}/shared_apple_images/branding_images"
@@ -171,7 +171,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
     it 'returns only template images' do
       create_list(:shared_apple_image, 2, account: account, image_type: 'system')
       create_list(:shared_apple_image, 2, account: account, image_type: 'branding')
-      template_images = create_list(:shared_apple_image, 4, account: account, image_type: 'template')
+      create_list(:shared_apple_image, 4, account: account, image_type: 'template')
 
       get "/api/v1/accounts/#{account.id}/shared_apple_images/template_images"
 
@@ -265,9 +265,9 @@ RSpec.describe 'SharedAppleImages API', type: :request do
           original_name: 'test.png'
         }
 
-        expect {
+        expect do
           post "/api/v1/accounts/#{account.id}/shared_apple_images", params: params
-        }.to change(SharedAppleImage, :count).by(1)
+        end.to change(SharedAppleImage, :count).by(1)
 
         expect(response).to have_http_status(:created)
         json = JSON.parse(response.body)
@@ -483,7 +483,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
       end
 
       it 'cannot update to duplicate identifier in same account' do
-        image1 = create(:shared_apple_image, account: account, identifier: 'id_1')
+        create(:shared_apple_image, account: account, identifier: 'id_1')
         image2 = create(:shared_apple_image, account: account, identifier: 'id_2')
         params = {
           identifier: 'id_1'
@@ -509,7 +509,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
       end
 
       it 'allows identifier that exists in other account' do
-        other_image = create(:shared_apple_image, account: other_account, identifier: 'shared_id')
+        create(:shared_apple_image, account: other_account, identifier: 'shared_id')
         image = create(:shared_apple_image, account: account, identifier: 'my_id')
         params = {
           identifier: 'shared_id'
@@ -551,16 +551,16 @@ RSpec.describe 'SharedAppleImages API', type: :request do
       it 'deletes shared image' do
         image = create(:shared_apple_image, account: account)
 
-        expect {
+        expect do
           delete "/api/v1/accounts/#{account.id}/shared_apple_images/#{image.id}"
-        }.to change(SharedAppleImage, :count).by(-1)
+        end.to change(SharedAppleImage, :count).by(-1)
 
         expect(response).to have_http_status(:no_content)
       end
 
       it 'removes image attachment' do
         image = create(:shared_apple_image, account: account)
-        image_id = image.image.blob.id
+        image.image.blob.id
 
         delete "/api/v1/accounts/#{account.id}/shared_apple_images/#{image.id}"
 
@@ -733,7 +733,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
         sign_out user
         image = create(:shared_apple_image, account: account)
 
-        expect {
+        expect do
           get "/api/v1/accounts/#{account.id}/shared_apple_images"
           expect(response).to have_http_status(:unauthorized)
 
@@ -748,7 +748,7 @@ RSpec.describe 'SharedAppleImages API', type: :request do
 
           delete "/api/v1/accounts/#{account.id}/shared_apple_images/#{image.id}"
           expect(response).to have_http_status(:unauthorized)
-        }.to avoid_changing(SharedAppleImage, :count)
+        end.to avoid_changing(SharedAppleImage, :count)
       end
     end
 
@@ -757,13 +757,13 @@ RSpec.describe 'SharedAppleImages API', type: :request do
         image = create(:shared_apple_image, account: account)
         sign_in other_user
 
-        expect {
+        expect do
           get "/api/v1/accounts/#{account.id}/shared_apple_images"
           expect(response).to have_http_status(:unauthorized)
 
           get "/api/v1/accounts/#{account.id}/shared_apple_images/#{image.id}"
           expect(response).to have_http_status(:unauthorized)
-        }.not_to change(SharedAppleImage, :count)
+        end.not_to change(SharedAppleImage, :count)
       end
     end
   end

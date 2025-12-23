@@ -120,6 +120,7 @@ Rails.application.routes.draw do
             # Nested flow management
             resources :flows, controller: 'agent_bots/flows' do
               collection do
+                get :templates
                 post :import_from_bot_config
               end
               member do

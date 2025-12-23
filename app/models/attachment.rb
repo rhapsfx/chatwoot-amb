@@ -331,9 +331,7 @@ class Attachment < ApplicationRecord
     limit_mb = 40 if limit_mb <= 0
 
     # Override for Apple Messages for Business - 100 MB per Apple MSP REST API v4.1.5
-    if message.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
-      limit_mb = 100
-    end
+    limit_mb = 100 if message.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
 
     errors.add(:file, 'size is too big') if byte_size > limit_mb.megabytes
   end

@@ -207,6 +207,7 @@
       "IMPORT_FROM_JSON": "Import JSON",
       "EXPORT_TO_JSON": "Export JSON",
       "BROWSE_TEMPLATES": "Templates",
+      "BROWSE_HANDLERS": "Handlers",
       "VALIDATE": "Validate",
       "TEST": "Test",
       "FLOW_SAVED": "Flow saved successfully",
@@ -257,6 +258,10 @@
       "FLOW_SAVED": "Flow saved successfully",
       "FLOW_COMPILED": "Flow compiled successfully",
       "FLOW_COMPILE_ERROR": "Failed to compile flow",
+      "SEARCH": {
+        "PREVIOUS_RESULT": "Previous result",
+        "NEXT_RESULT": "Next result"
+      },
       "NODE_PALETTE": {
         "TITLE": "Add Nodes",
         "STATE": "State",
@@ -417,6 +422,8 @@
       "NODES": "nodes",
       "CONNECTIONS": "connections",
       "SELECTED": "Selected",
+      "LOADING": "Loading templates...",
+      "RETRY": "Retry",
       "NO_TEMPLATES": "No templates found in this category",
       "FOOTER_TIP": "Templates can be edited after insertion",
       "INSERT": "Insert Template",
@@ -433,9 +440,12 @@
       "STATE_ID_HELP": "Unique identifier for this state (e.g., AHA1, WELCOME_STATE, MAIN_MENU)",
       "LABEL": "Label",
       "LABEL_HELP": "Human-readable name for this node (shown in the canvas)",
+      "LABEL_DESCRIPTION": "Descriptive name shown in the canvas",
       "DESCRIPTION": "Description",
       "HANDLER_METHOD": "Handler Method",
       "HANDLER_METHOD_HELP": "The method name in AcousticHouseBotService that will handle this state (e.g., handle_welcome, handle_region_prompt)",
+      "HANDLER_METHOD_INTENT_HELP": "Optional: Handler method to call when keywords match (e.g., handle_menu_request)",
+      "HANDLER_METHOD_ACTION_HELP": "Handler method to execute for this action",
       "VIEW_HANDLER_METHODS": "View Handler Methods Reference",
       "ACTIONS_FUTURE_PHASE": "Actions will be configurable in a future phase",
       "KEYWORDS": "Keywords",
@@ -650,6 +660,22 @@
         "CANCEL": "Cancel"
       }
     },
+    "HANDLER_TYPES": {
+      "STATE": "State Handler",
+      "KEYWORD": "Keyword Handler",
+      "INTERACTIVE": "Interactive Handler",
+      "ACTION": "Action Handler"
+    },
+    "HANDLER_CATEGORIES": {
+      "ONBOARDING": "Onboarding",
+      "NAVIGATION": "Navigation",
+      "FORMS": "Forms",
+      "DEMO": "Demo",
+      "PRODUCT": "Product",
+      "PAYMENTS": "Payments",
+      "AR": "Augmented Reality",
+      "UNCATEGORIZED": "Uncategorized"
+    },
     "HANDLER_SELECTOR": {
       "LABEL": "Handler Method",
       "PLACEHOLDER": "Search handler methods...",
@@ -659,6 +685,183 @@
       "SEARCH_ERROR": "Failed to search handler methods",
       "VALIDATION_ERROR": "Failed to validate handler method",
       "REQUIRED_ERROR": "Handler method is required"
+    },
+    "ACTION_TEMPLATES": {
+      "TYPES": {
+        "SEND_QUICK_REPLY": {
+          "PARAMETERS": {
+            "MESSAGE": "Message",
+            "MESSAGE_PLACEHOLDER": "Enter message text",
+            "REQUEST_ID": "Request ID",
+            "REQUEST_ID_PLACEHOLDER": "Enter request identifier",
+            "REQUEST_ID_HELP": "Unique identifier for tracking this quick reply request",
+            "ITEMS": "Quick Reply Items",
+            "NO_ITEMS": "No items added yet. Click 'Add Item' to create quick reply options.",
+            "ITEM_TITLE_PLACEHOLDER": "Display text",
+            "ITEM_VALUE_PLACEHOLDER": "Value",
+            "ADD_ITEM": "Add Item",
+            "REMOVE_ITEM": "Remove item"
+          }
+        },
+        "UPDATE_ATTRIBUTES": {
+          "PARAMETERS": {
+            "ATTRIBUTES": "Attributes (JSON)",
+            "ATTRIBUTES_PLACEHOLDER": "{\n  \"key\": \"value\"\n}",
+            "ATTRIBUTES_HELP": "JSON object containing attributes to update on the conversation",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          }
+        },
+        "SEND_LIST_PICKER": {
+          "PARAMETERS": {
+            "TEMPLATE": "List Picker Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved list picker template to send to the user",
+            "WAIT_FOR_RESPONSE": "Wait for user response before continuing",
+            "WAIT_FOR_RESPONSE_HELP": "If enabled, the bot will pause and wait for the user to select an option before proceeding to the next step"
+          },
+          "NO_TEMPLATES": "No list picker templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load list picker templates. Please try again.",
+          "LOADING": "Loading list picker templates...",
+          "RETRY": "Retry"
+        },
+        "SEND_TIME_PICKER": {
+          "PARAMETERS": {
+            "TEMPLATE": "Time Picker Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved time picker template to send to the user",
+            "TIMEZONE_OFFSET": "Timezone Offset",
+            "TIMEZONE_PLACEHOLDER": "Hours from UTC",
+            "TIMEZONE_HELP": "Example: -8 for PST (UTC-8), +1 for CET (UTC+1)",
+            "LOCATION": "Location (Optional)",
+            "LOCATION_NAME_PLACEHOLDER": "Location name",
+            "LATITUDE_PLACEHOLDER": "Latitude",
+            "LONGITUDE_PLACEHOLDER": "Longitude",
+            "LOCATION_HELP": "Add location context for the time picker (e.g., 'Apple Park, 37.334606, -122.009102')"
+          },
+          "NO_TEMPLATES": "No time picker templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load time picker templates. Please try again.",
+          "LOADING": "Loading time picker templates...",
+          "RETRY": "Retry"
+        },
+        "SEND_FORM": {
+          "PARAMETERS": {
+            "TEMPLATE": "Form Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved form template to send to the user",
+            "PRE_FILL_DATA": "Pre-fill Data (Optional)",
+            "PRE_FILL_PLACEHOLDER": "{\n  \"fieldName\": \"defaultValue\"\n}",
+            "PRE_FILL_HELP": "JSON object containing default values to pre-fill form fields",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          },
+          "NO_TEMPLATES": "No form templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load form templates. Please try again.",
+          "LOADING": "Loading form templates...",
+          "RETRY": "Retry"
+        },
+        "CONDITIONAL_BRANCH": {
+          "PARAMETERS": {
+            "CONDITION_TYPE": "Condition Type",
+            "SELECT_TYPE": "Select condition type...",
+            "TYPES": {
+              "ATTRIBUTE_EQUALS": "Attribute Equals",
+              "ATTRIBUTE_CONTAINS": "Attribute Contains",
+              "MESSAGE_CONTAINS": "Message Contains",
+              "CUSTOM_EXPRESSION": "Custom Expression"
+            },
+            "ATTRIBUTE_NAME": "Attribute Name",
+            "ATTRIBUTE_NAME_PLACEHOLDER": "custom_attribute_key",
+            "ATTRIBUTE_VALUE": "Expected Value",
+            "ATTRIBUTE_VALUE_PLACEHOLDER": "value to check",
+            "MESSAGE_TEXT": "Search Text",
+            "MESSAGE_TEXT_PLACEHOLDER": "text to search for in message",
+            "MESSAGE_TEXT_HELP": "Case-insensitive search",
+            "CUSTOM_EXPRESSION": "Ruby Expression",
+            "CUSTOM_EXPRESSION_PLACEHOLDER": "@conversation.custom_attributes['key'] == 'value'",
+            "CUSTOM_EXPRESSION_WARNING": "⚠️ Advanced: Use Ruby syntax. Has access to @conversation and @message variables.",
+            "TRUE_ACTION": "True Action (Optional)",
+            "TRUE_ACTION_PLACEHOLDER": "Template ID to execute if condition is true",
+            "TRUE_ACTION_HELP": "ID of BotActionTemplate to execute if condition evaluates to true",
+            "FALSE_ACTION": "False Action (Optional)",
+            "FALSE_ACTION_PLACEHOLDER": "Template ID to execute if condition is false",
+            "FALSE_ACTION_HELP": "ID of BotActionTemplate to execute if condition evaluates to false",
+            "PREVIEW": "Preview:"
+          },
+          "PREVIEW": {
+            "ATTRIBUTE_EQUALS": "If conversation attribute '{attribute}' equals '{value}'",
+            "ATTRIBUTE_CONTAINS": "If conversation attribute '{attribute}' contains '{value}'",
+            "MESSAGE_CONTAINS": "If message contains '{text}'",
+            "CUSTOM_EXPRESSION": "If custom expression evaluates to true: {expression}",
+            "SELECT_TYPE": "Select a condition type"
+          }
+        },
+        "API_CALL": {
+          "PARAMETERS": {
+            "URL": "API URL",
+            "URL_PLACEHOLDER": "https://api.example.com/endpoint",
+            "METHOD": "HTTP Method",
+            "SELECT_METHOD": "Select method...",
+            "HEADERS": "Headers (Optional)",
+            "HEADERS_PLACEHOLDER": "{ \"Authorization\": \"Bearer token\" }",
+            "HEADERS_HELP": "JSON object containing HTTP headers",
+            "BODY": "Request Body (Optional)",
+            "BODY_PLACEHOLDER": "{ \"key\": \"value\" }",
+            "BODY_HELP": "JSON object containing request body",
+            "STORE_RESPONSE_IN": "Store Response In (Optional)",
+            "STORE_RESPONSE_IN_PLACEHOLDER": "api_response",
+            "STORE_RESPONSE_IN_HELP": "Conversation attribute name to store the API response",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          }
+        },
+        "SEND_IMESSAGE_APP": {
+          "PARAMETERS": {
+            "APP_ID": "App Bundle ID",
+            "APP_ID_PLACEHOLDER": "com.example.app.MessagesExtension",
+            "APP_ID_HELP": "iMessage app bundle identifier (e.g., com.shazam.Shazam.MessagesExtension)",
+            "APP_NAME": "App Name",
+            "APP_NAME_PLACEHOLDER": "Guitar Tuner",
+            "APP_ICON_URL": "App Icon URL (Optional)",
+            "APP_ICON_URL_PLACEHOLDER": "https://example.com/icon.png",
+            "LAUNCH_URL": "Launch URL (Optional)",
+            "LAUNCH_URL_PLACEHOLDER": "imessage-app://open?feature=tuner",
+            "LAUNCH_URL_HELP": "Deep link URL to launch specific app feature",
+            "DATA": "App Data (Optional)",
+            "DATA_PLACEHOLDER": "{ \"mode\": \"tune\", \"instrument\": \"guitar\" }",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "KNOWN_APPS_TITLE": "Common iMessage Apps:",
+            "KNOWN_APPS": {
+              "SHAZAM": "• Shazam: com.shazam.Shazam.MessagesExtension",
+              "APPLE_MUSIC": "• Apple Music: com.apple.Music.MessagesExtension",
+              "PHOTOS": "• Photos: com.apple.mobileslideshow.PhotosMessagesApp"
+            }
+          }
+        },
+        "SEND_APP_CLIP": {
+          "PARAMETERS": {
+            "APP_CLIP_URL": "App Clip URL",
+            "APP_CLIP_URL_PLACEHOLDER": "https://example.com/clips/guitar-tuner",
+            "APP_CLIP_URL_HELP": "URL to invoke App Clip (must be registered in App Store Connect)",
+            "TITLE": "Title",
+            "TITLE_PLACEHOLDER": "Try our Guitar Tuner",
+            "SUBTITLE": "Subtitle (Optional)",
+            "SUBTITLE_PLACEHOLDER": "Tune your guitar without installing an app",
+            "IMAGE_URL": "Hero Image URL (Optional)",
+            "IMAGE_URL_PLACEHOLDER": "https://example.com/hero.png",
+            "IMAGE_URL_HELP": "Hero image displayed in App Clip card",
+            "ACTION_TITLE": "Button Text (Optional)",
+            "ACTION_TITLE_PLACEHOLDER": "Open",
+            "ACTION_TITLE_HELP": "Text shown on action button (default: \"Open\")",
+            "INFO_TITLE": "About App Clips:",
+            "INFO_TEXT": "App Clips are lightweight experiences (max 10MB) that let users access your app's functionality without installation. They're perfect for quick interactions like tuning a guitar, making a reservation, or viewing product details."
+          }
+        }
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { useAlert } from 'dashboard/composables';
+import { useMapGetter } from 'dashboard/composables/store';
 import { getAxios } from 'dashboard/helper/axios';
 
 /**
@@ -17,6 +18,9 @@ export function useHandlerMethods(botId, serviceName = null) {
   const isLoading = ref(false);
   const error = ref(null);
 
+  // Get account ID from store
+  const currentAccountId = useMapGetter('getCurrentAccountId');
+
   // Cache for handlers list with multiple cache keys
   const cache = ref(new Map());
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -28,7 +32,7 @@ export function useHandlerMethods(botId, serviceName = null) {
    * Build base API URL
    */
   const getBaseUrl = () => {
-    const accountId = window.chatwootConfig.accountId;
+    const accountId = currentAccountId.value;
     return `/api/v1/accounts/${accountId}/agent_bots/${botId}/handler_methods`;
   };
 
@@ -79,6 +83,13 @@ export function useHandlerMethods(botId, serviceName = null) {
    * @returns {Promise<Object>} Response with handler_methods and meta
    */
   const fetchHandlerMethods = async (filters = {}) => {
+    // Prevent concurrent fetches
+    if (isLoading.value) {
+      // eslint-disable-next-line no-console
+      console.warn('[useHandlerMethods] Fetch already in progress, skipping');
+      return { handler_methods: handlerMethods.value, meta: meta.value };
+    }
+
     isLoading.value = true;
     error.value = null;
 

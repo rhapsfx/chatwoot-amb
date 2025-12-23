@@ -1,3 +1,4 @@
+<!-- eslint-disable no-underscore-dangle, no-use-before-define, no-continue, no-restricted-globals, vue/prefer-true-attribute-shorthand -->
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useStore } from 'dashboard/composables/store';
@@ -522,14 +523,17 @@ const focusOnSearchResult = index => {
   );
 
   // eslint-disable-next-line no-console
-  console.log(`[BotStudioCanvas] Focused on search result ${index + 1}/${highlightedNodeIds.value.length}`);
+  console.log(
+    `[BotStudioCanvas] Focused on search result ${index + 1}/${highlightedNodeIds.value.length}`
+  );
 };
 
 // Navigate to next search result
 const nextSearchResult = () => {
   if (highlightedNodeIds.value.length === 0) return;
 
-  currentSearchIndex.value = (currentSearchIndex.value + 1) % highlightedNodeIds.value.length;
+  currentSearchIndex.value =
+    (currentSearchIndex.value + 1) % highlightedNodeIds.value.length;
   focusOnSearchResult(currentSearchIndex.value);
 };
 
@@ -538,7 +542,8 @@ const prevSearchResult = () => {
   if (highlightedNodeIds.value.length === 0) return;
 
   currentSearchIndex.value =
-    (currentSearchIndex.value - 1 + highlightedNodeIds.value.length) % highlightedNodeIds.value.length;
+    (currentSearchIndex.value - 1 + highlightedNodeIds.value.length) %
+    highlightedNodeIds.value.length;
   focusOnSearchResult(currentSearchIndex.value);
 };
 
@@ -549,88 +554,128 @@ const clearSearch = () => {
   currentSearchIndex.value = 0;
 };
 
-// Auto-layout nodes using dagre algorithm
+// Auto-layout nodes using flow-based grid algorithm
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
 
-  // Simple hierarchical layout algorithm
-  const nodeHeight = 100;
-  const horizontalSpacing = 250;
-  const verticalSpacing = 150;
+  const horizontalSpacing = 350;
+  const verticalSpacing = 180;
+  const maxNodesPerRow = 4; // Limit vertical stacking
 
-  // Group nodes by type for better organization
-  const stateNodes = nodes.value.filter(n => n.type === 'state');
-  const intentNodes = nodes.value.filter(n => n.type === 'intent');
-  const templateNodes = nodes.value.filter(n => n.type === 'template');
-  const actionNodes = nodes.value.filter(n => n.type === 'action');
-  const conditionNodes = nodes.value.filter(n => n.type === 'condition');
+  // Find the root node (initial state or first state node)
+  const rootNode =
+    nodes.value.find(n => n.type === 'state' && n.data?.is_initial) ||
+    nodes.value.find(n => n.type === 'state');
 
-  let currentY = 50;
+  if (!rootNode) {
+    // No state nodes, fall back to simple grid layout
+    layoutGrid();
+    return;
+  }
 
-  // Layout state nodes in first row
-  stateNodes.forEach((node, index) => {
-    // eslint-disable-next-line no-param-reassign
-    node.position = {
-      x: 50 + index * horizontalSpacing,
-      y: currentY,
-    };
+  // Build adjacency map from edges
+  const adjacency = new Map();
+  edges.value.forEach(edge => {
+    if (!adjacency.has(edge.source)) {
+      adjacency.set(edge.source, []);
+    }
+    adjacency.get(edge.source).push(edge.target);
   });
 
-  if (stateNodes.length > 0) currentY += nodeHeight + verticalSpacing;
+  // BFS to assign grid positions
+  const visited = new Set();
+  const positions = new Map();
+  const queue = [{ nodeId: rootNode.id, col: 0, row: 0 }];
 
-  // Layout intent nodes in second row
-  intentNodes.forEach((node, index) => {
-    // eslint-disable-next-line no-param-reassign
-    node.position = {
-      x: 50 + index * horizontalSpacing,
-      y: currentY,
-    };
+  let maxCol = 0;
+  let maxRow = 0;
+
+  while (queue.length > 0) {
+    const { nodeId, col, row } = queue.shift();
+    if (visited.has(nodeId)) continue;
+
+    visited.add(nodeId);
+    positions.set(nodeId, { col, row });
+    maxCol = Math.max(maxCol, col);
+    maxRow = Math.max(maxRow, row);
+
+    // Get children
+    const children = adjacency.get(nodeId) || [];
+
+    if (children.length === 0) continue;
+
+    // Distribute children horizontally and vertically to avoid tall stacks
+    children.forEach((childId, index) => {
+      if (visited.has(childId)) return;
+
+      // Spread children: alternate between moving right and down
+      const nextCol = col + 1 + Math.floor(index / maxNodesPerRow);
+      const nextRow = row + (index % maxNodesPerRow);
+
+      queue.push({ nodeId: childId, col: nextCol, row: nextRow });
+    });
+  }
+
+  // Position nodes based on grid positions
+  positions.forEach((pos, nodeId) => {
+    const node = nodes.value.find(n => n.id === nodeId);
+    if (node) {
+      // eslint-disable-next-line no-param-reassign
+      node.position = {
+        x: 50 + pos.col * horizontalSpacing,
+        y: 50 + pos.row * verticalSpacing,
+      };
+    }
   });
 
-  if (intentNodes.length > 0) currentY += nodeHeight + verticalSpacing;
+  // Handle orphaned nodes
+  const orphanNodes = nodes.value.filter(n => !visited.has(n.id));
+  if (orphanNodes.length > 0) {
+    const orphanY = 50 + (maxRow + 2) * verticalSpacing;
+    orphanNodes.forEach((node, index) => {
+      // eslint-disable-next-line no-param-reassign
+      node.position = {
+        x: 50 + index * horizontalSpacing,
+        y: orphanY,
+      };
+    });
+  }
 
-  // Layout template nodes in third row
-  templateNodes.forEach((node, index) => {
-    // eslint-disable-next-line no-param-reassign
-    node.position = {
-      x: 50 + index * horizontalSpacing,
-      y: currentY,
-    };
-  });
-
-  if (templateNodes.length > 0) currentY += nodeHeight + verticalSpacing;
-
-  // Layout action nodes in fourth row
-  actionNodes.forEach((node, index) => {
-    // eslint-disable-next-line no-param-reassign
-    node.position = {
-      x: 50 + index * horizontalSpacing,
-      y: currentY,
-    };
-  });
-
-  if (actionNodes.length > 0) currentY += nodeHeight + verticalSpacing;
-
-  // Layout condition nodes in fifth row
-  conditionNodes.forEach((node, index) => {
-    // eslint-disable-next-line no-param-reassign
-    node.position = {
-      x: 50 + index * horizontalSpacing,
-      y: currentY,
-    };
-  });
-
-  // Fit view to show all nodes
+  // Fit view
   setTimeout(() => {
     fitView({ padding: 0.2, duration: 300 });
   }, 100);
 
   // eslint-disable-next-line no-console
   console.log(
-    '[BotStudioCanvas] Auto-layout applied to',
-    nodes.value.length,
-    'nodes'
+    '[BotStudioCanvas] Flow-grid auto-layout:',
+    `${maxCol + 1} cols × ${maxRow + 1} rows,`,
+    orphanNodes.length,
+    'orphans'
   );
+
+  // Helper function for simple grid layout (fallback)
+  function layoutGrid() {
+    const cols = Math.ceil(Math.sqrt(nodes.value.length));
+
+    nodes.value.forEach((node, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+
+      // eslint-disable-next-line no-param-reassign
+      node.position = {
+        x: 50 + col * horizontalSpacing,
+        y: 50 + row * verticalSpacing,
+      };
+    });
+
+    setTimeout(() => {
+      fitView({ padding: 0.2, duration: 300 });
+    }, 100);
+
+    // eslint-disable-next-line no-console
+    console.log('[BotStudioCanvas] Grid auto-layout (fallback)');
+  }
 };
 
 // Node types registration
@@ -668,6 +713,8 @@ const getDefaultNodeData = type => {
         exact_match: false,
         case_sensitive: false,
         scope: 'global', // global: always checked, contextual: state-specific
+        handler: '', // Handler method to call when keywords match
+        label: 'New Intent',
       };
     case 'template':
       return {
@@ -678,6 +725,7 @@ const getDefaultNodeData = type => {
       return {
         action_type: 'send_message',
         label: 'New Action',
+        handler: '', // Handler method to execute
         parameters: {},
       };
     case 'condition':
@@ -736,7 +784,14 @@ const onDrop = event => {
   nextNodeId += 1;
 
   // eslint-disable-next-line no-console
-  console.log('Creating node:', newNode, 'snapped from', centeredPosition, 'to', position);
+  console.log(
+    'Creating node:',
+    newNode,
+    'snapped from',
+    centeredPosition,
+    'to',
+    position
+  );
   nodes.value.push(newNode);
 
   // Update validation for new node
@@ -818,14 +873,19 @@ const loadFlow = async () => {
           uniqueNodes.push(node);
         } else {
           // eslint-disable-next-line no-console
-          console.warn('[BotStudioCanvas] 🗑️  Removed duplicate node:', node.id);
+          console.warn(
+            '[BotStudioCanvas] 🗑️  Removed duplicate node:',
+            node.id
+          );
         }
       });
 
       if (uniqueNodes.length < nodes.value.length) {
         nodes.value = uniqueNodes;
         // eslint-disable-next-line no-console
-        console.log(`[BotStudioCanvas] ✅ Cleaned ${nodes.value.length - uniqueNodes.length} duplicate nodes`);
+        console.log(
+          `[BotStudioCanvas] ✅ Cleaned ${nodes.value.length - uniqueNodes.length} duplicate nodes`
+        );
       }
 
       // Update validation for loaded nodes
@@ -940,23 +1000,8 @@ const onNodesChange = changes => {
   // Don't process changes if we're applying history
   if (isApplyingHistory.value) return;
 
-  // Apply changes to underlying nodes ref
-  changes.forEach(change => {
-    if (change.type === 'position') {
-      // Position changed (during drag or at end)
-      const node = nodes.value.find(n => n.id === change.id);
-      if (node && change.position) {
-        node.position = change.position;
-      }
-    } else if (change.type === 'dimensions') {
-      // Dimensions changed
-      const node = nodes.value.find(n => n.id === change.id);
-      if (node && change.dimensions) {
-        node.width = change.dimensions.width;
-        node.height = change.dimensions.height;
-      }
-    }
-  });
+  // VueFlow already updates nodes via v-model, so we don't need to manually apply changes
+  // We only use this handler for history tracking
 
   // Save to history only when drag ends (not during dragging)
   const hasPositionChange = changes.some(
@@ -969,6 +1014,11 @@ const onNodesChange = changes => {
 
 // Handle node selection
 const onNodeClick = event => {
+  emit('nodeSelected', event.node);
+};
+
+// Handle node double-click (for editing)
+const onNodeDoubleClick = event => {
   emit('nodeSelected', event.node);
 };
 
@@ -1015,6 +1065,7 @@ defineExpose({
   // State
   searchQuery,
   highlightedNodeIds,
+  currentSearchIndex,
   canUndo,
   canRedo,
   canCopy,
@@ -1060,6 +1111,7 @@ defineExpose({
       fit-view-on-init
       class="vue-flow-container"
       @node-click="onNodeClick"
+      @node-double-click="onNodeDoubleClick"
       @dragover="onDragOver"
       @drop="onDrop"
       @nodes-change="onNodesChange"

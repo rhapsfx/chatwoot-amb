@@ -148,7 +148,9 @@ class AppleMessagesForBusiness::FlowExecutorService
       end
     end
 
-    log_info "[FlowExecutor] 🔍 Checking #{intents_to_check.length} intent nodes (#{global_intents.length} global + #{intents_to_check.length - global_intents.length} contextual)"
+    contextual_count = intents_to_check.length - global_intents.length
+    log_info "[FlowExecutor] 🔍 Checking #{intents_to_check.length} intent nodes " \
+             "(#{global_intents.length} global + #{contextual_count} contextual)"
 
     intents_to_check.find do |node|
       keywords = node.dig('data', 'keywords') || []
@@ -172,9 +174,7 @@ class AppleMessagesForBusiness::FlowExecutorService
                     message_str.match?(regex)
                   end
 
-        if matched
-          log_info "[FlowExecutor] ✅ Matched keyword '#{keyword}' in intent '#{node.dig('data', 'label')}'"
-        end
+        log_info "[FlowExecutor] ✅ Matched keyword '#{keyword}' in intent '#{node.dig('data', 'label')}'" if matched
 
         matched
       end
@@ -191,7 +191,7 @@ class AppleMessagesForBusiness::FlowExecutorService
     outgoing_edge = @edges.find { |e| e['source'] == node['id'] }
 
     unless outgoing_edge
-      log_warn "[FlowExecutor] ⚠️  Intent node has no outgoing edge!"
+      log_warn '[FlowExecutor] ⚠️  Intent node has no outgoing edge!'
       return 0
     end
 
@@ -216,11 +216,11 @@ class AppleMessagesForBusiness::FlowExecutorService
       messages_sent = execute_state_node(target_node)
     when 'template'
       # Send template
-      log_info "[FlowExecutor] 📤 Sending template from intent"
+      log_info '[FlowExecutor] 📤 Sending template from intent'
       messages_sent = execute_template_node(target_node)
     when 'action'
       # Execute action
-      log_info "[FlowExecutor] ⚙️  Executing action from intent"
+      log_info '[FlowExecutor] ⚙️  Executing action from intent'
       messages_sent = execute_action_node(target_node)
     else
       log_warn "[FlowExecutor] ⚠️  Unknown target node type: #{target_node['type']}"
@@ -232,9 +232,12 @@ class AppleMessagesForBusiness::FlowExecutorService
   # Execute state node
   def execute_state_node(node)
     state_data = node['data'] || {}
+    state_id = state_data['state_id'] || node['id']
     handler = state_data['handler']
     actions = state_data['actions'] || []
     messages_sent = 0
+
+    log_info "[FlowExecutor] 🎬 Executing state node: #{state_id}"
 
     # Execute handler method if present
     if handler.present?
@@ -242,13 +245,13 @@ class AppleMessagesForBusiness::FlowExecutorService
       messages_sent += execute_handler_method(handler)
     end
 
-    # Execute actions
+    # Execute actions (can contain template references)
     actions.each_with_index do |action, index|
       messages_sent += execute_action(action)
 
       # Add delay between actions (except after last action)
       if index < actions.length - 1
-        log_info "[FlowExecutor] ⏱️  Waiting between actions (1.5s delay)"
+        log_info '[FlowExecutor] ⏱️  Waiting between actions (1.5s delay)'
         sleep 1.5
       end
     end
@@ -266,23 +269,60 @@ class AppleMessagesForBusiness::FlowExecutorService
     messages_sent
   end
 
-  # Execute handler method from AcousticHouseBotService
+  # Execute handler method with 4-tier fallback system
+  # Priority 1: Template reference (format: "template:123")
+  # Priority 2: Template by name
+  # Priority 3: Handler metadata (existing system)
+  # Priority 4: Direct service call (deprecated)
   def execute_handler_method(handler_name)
     log_info "[FlowExecutor] 🔍 Looking for handler: #{handler_name}"
 
-    # Get handler metadata
-    handler_metadata = AppleMessagesForBusiness::AcousticHouseBotService.handler_methods_metadata[handler_name.to_sym]
+    # PRIORITY 1: Check if handler is a template reference (format: "template:123")
+    if handler_name.to_s.start_with?('template:')
+      template_id = handler_name.sub('template:', '').to_i
+      template = BotActionTemplate.find_by(id: template_id, account: @account)
 
-    if handler_metadata
-      # NEW APPROACH: Use metadata if available (template-based handlers)
-      log_info "[FlowExecutor] 📋 Handler metadata found"
-      execute_handler_via_metadata(handler_name, handler_metadata)
-    else
-      # FALLBACK: Call handler method directly on AcousticHouseBotService
-      # This allows us to use existing handlers even if not registered in metadata
-      log_info "[FlowExecutor] 🔄 Handler metadata not found, calling method directly via AcousticHouseBotService"
-      execute_handler_via_service(handler_name)
+      if template
+        log_info "[FlowExecutor] 📋 Found template reference: #{template.name} (ID: #{template_id})"
+        return execute_template(template)
+      else
+        log_error "[FlowExecutor] ❌ Template not found: #{template_id}"
+      end
     end
+
+    # PRIORITY 2: Check for template by name
+    template = BotActionTemplate.find_by(account: @account, name: handler_name)
+    if template
+      log_info "[FlowExecutor] 📋 Found template by name: #{template.name}"
+      return execute_template(template)
+    end
+
+    # PRIORITY 3: Check for handler metadata (existing system)
+    handler_metadata = AppleMessagesForBusiness::AcousticHouseBotService.handler_methods_metadata[handler_name.to_sym]
+    if handler_metadata
+      log_info '[FlowExecutor] 📋 Handler metadata found (legacy)'
+      return execute_handler_via_metadata(handler_name, handler_metadata)
+    end
+
+    # PRIORITY 4: Fallback to direct service call (deprecated)
+    log_warn "[FlowExecutor] ⚠️  Using deprecated handler method: #{handler_name}"
+    execute_handler_via_service(handler_name)
+  end
+
+  # Execute BotActionTemplate using TemplateExecutorService
+  def execute_template(template)
+    log_info "[FlowExecutor] 📋 Executing template: #{template.name} (Type: #{template.template_type})"
+
+    executor = AppleMessagesForBusiness::TemplateExecutorService.new(
+      template: template,
+      conversation: @conversation,
+      message: @message
+    )
+
+    messages_sent = executor.execute
+    log_info "[FlowExecutor] ✅ Template executed: #{template.name}, messages sent: #{messages_sent}"
+
+    messages_sent
   end
 
   # Execute handler using metadata (template-based)
@@ -312,7 +352,7 @@ class AppleMessagesForBusiness::FlowExecutorService
 
       # Add delay between messages to ensure proper delivery order
       if index < template_names.length - 1
-        log_info "[FlowExecutor] ⏱️  Waiting for message delivery (1.5s delay)"
+        log_info '[FlowExecutor] ⏱️  Waiting for message delivery (1.5s delay)'
         sleep 1.5
       end
     end
@@ -332,7 +372,7 @@ class AppleMessagesForBusiness::FlowExecutorService
     )
 
     # Check if method exists
-    unless bot_service.respond_to?(handler_name, true)
+    unless bot_service.respond_to?(handler_name.to_sym, true)
       log_error "[FlowExecutor] ❌ Handler method '#{handler_name}' not found in AcousticHouseBotService"
       return 0
     end
@@ -342,11 +382,11 @@ class AppleMessagesForBusiness::FlowExecutorService
 
     begin
       # Call the handler - it will send messages directly via its own methods
-      bot_service.send(handler_name)
+      bot_service.send(handler_name.to_sym)
 
       # Count messages sent by checking conversation messages created after this point
       # Note: This is approximate since we can't easily track messages from the service
-      log_info "[FlowExecutor] ✅ Handler executed successfully"
+      log_info '[FlowExecutor] ✅ Handler executed successfully'
       1 # Return 1 to indicate handler was called (actual message count may vary)
     rescue StandardError => e
       log_error "[FlowExecutor] ❌ Error calling handler: #{e.message}"
@@ -357,7 +397,46 @@ class AppleMessagesForBusiness::FlowExecutorService
 
   # Execute action
   def execute_action(action)
-    case action['type']
+    action_type = action['type']
+
+    case action_type
+    when 'execute_template'
+      # Action directly specifies a template ID
+      template_id = action['template_id']
+      template = BotActionTemplate.find_by(id: template_id, account: @account)
+
+      if template
+        execute_template(template)
+      else
+        log_error "[FlowExecutor] ❌ Template not found: #{template_id}"
+        0
+      end
+    when 'execute_templates'
+      # Execute multiple templates in sequence
+      template_ids = action['template_ids'] || []
+      messages_sent = 0
+
+      template_ids.each_with_index do |tmpl_id, index|
+        template = BotActionTemplate.find_by(id: tmpl_id, account: @account)
+
+        if template
+          messages_sent += execute_template(template)
+
+          # Add delay between templates (except after last)
+          if index < template_ids.length - 1
+            log_info '[FlowExecutor] ⏱️  Waiting between templates (1.5s delay)'
+            sleep 1.5
+          end
+        else
+          log_error "[FlowExecutor] ❌ Template not found: #{tmpl_id}"
+        end
+      end
+
+      messages_sent
+    when 'execute_handler'
+      # Legacy handler execution
+      handler_name = action['handler_name']
+      execute_handler_method(handler_name)
     when 'send_template'
       template_name = action['template_name']
       template = find_template(template_name)
@@ -366,7 +445,7 @@ class AppleMessagesForBusiness::FlowExecutorService
       messages_sent = send_template(template)
 
       # Add delay after sending template with potential attachments
-      log_info "[FlowExecutor] ⏱️  Waiting for message delivery (1.5s delay)"
+      log_info '[FlowExecutor] ⏱️  Waiting for message delivery (1.5s delay)'
       sleep 1.5
 
       messages_sent
@@ -375,7 +454,7 @@ class AppleMessagesForBusiness::FlowExecutorService
       # No delay for simple text messages
       1
     else
-      log_warn "[FlowExecutor] ⚠️ Unknown action type: #{action['type']}"
+      log_warn "[FlowExecutor] ⚠️ Unknown action type: #{action_type}"
       0
     end
   end
@@ -405,7 +484,7 @@ class AppleMessagesForBusiness::FlowExecutorService
 
   # Execute action node
   def execute_action_node(node)
-    action_data = node['data'] || {}
+    node['data'] || {}
     messages_sent = 0
 
     # For now, action nodes just transition to next node
@@ -439,7 +518,12 @@ class AppleMessagesForBusiness::FlowExecutorService
       log_info "[FlowExecutor] ✅ Found template: '#{template.name}' (ID: #{template.id})"
     else
       log_error "[FlowExecutor] ❌ Template '#{template_name}' not found in account #{@account.id}"
-      log_error "[FlowExecutor] 💡 Available templates: #{MessageTemplate.where(account: @account).where('? = ANY(supported_channels)', 'apple_messages_for_business').pluck(:name).join(', ')}"
+      available_templates = MessageTemplate
+                            .where(account: @account)
+                            .where('? = ANY(supported_channels)', 'apple_messages_for_business')
+                            .pluck(:name)
+                            .join(', ')
+      log_error "[FlowExecutor] 💡 Available templates: #{available_templates}"
     end
 
     template
@@ -478,7 +562,7 @@ class AppleMessagesForBusiness::FlowExecutorService
 
     # Create outgoing message via MessageBuilder
     # This will automatically trigger after_commit callbacks that send the message
-    log_info "[FlowExecutor] 🔨 Creating message via MessageBuilder..."
+    log_info '[FlowExecutor] 🔨 Creating message via MessageBuilder...'
 
     message = Messages::MessageBuilder.new(
       nil, # user (bot context, no specific user)

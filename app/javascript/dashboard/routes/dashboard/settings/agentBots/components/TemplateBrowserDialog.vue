@@ -1,6 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStoreGetters } from 'dashboard/composables/store';
+import agentBotsAPI from 'dashboard/api/agentBots';
 
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -8,525 +10,613 @@ import Button from 'dashboard/components-next/button/Button.vue';
 const emit = defineEmits(['insertTemplate']);
 
 const { t } = useI18n();
+const getters = useStoreGetters();
 
 const dialogRef = ref(null);
 const selectedTemplate = ref(null);
 const selectedCategory = ref('all');
+const templates = ref([]);
+const isLoading = ref(false);
+const loadError = ref(null);
 
-// Template definitions with pre-configured nodes and connections
-const templates = ref([
-  {
-    id: 'customer-support',
-    name: 'Customer Support Flow',
-    description:
-      'Handle common support inquiries with intent detection and routing',
-    category: 'support',
-    icon: 'i-lucide-headphones',
-    preview: {
-      nodes: 5,
-      connections: 6,
-    },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'Welcome',
-            stateId: 'welcome',
-            description: 'Initial greeting',
+const currentAccountId = computed(() => getters.getCurrentAccountId.value);
+
+// Category mapping for icons
+const categoryIcons = {
+  navigation: 'i-lucide-compass',
+  commerce: 'i-lucide-shopping-cart',
+  scheduling: 'i-lucide-calendar-check',
+  data_collection: 'i-lucide-clipboard-list',
+  support: 'i-lucide-headphones',
+  engagement: 'i-lucide-users',
+  sales: 'i-lucide-trending-up',
+};
+
+// Load templates from API
+const loadTemplates = async () => {
+  if (!currentAccountId.value) return;
+
+  isLoading.value = true;
+  loadError.value = null;
+
+  try {
+    // Use a temporary agent bot ID (1) - the templates endpoint doesn't actually use this
+    // since it queries all template bots for the account
+    const response = await agentBotsAPI.getFlowTemplates(
+      currentAccountId.value,
+      1
+    );
+
+    // Map API response to component format
+    templates.value = response.data.templates.map(apiTemplate => ({
+      id: apiTemplate.id,
+      name: apiTemplate.name,
+      description:
+        apiTemplate.description || apiTemplate.metadata?.description || '',
+      category: apiTemplate.metadata?.category || 'support',
+      icon: categoryIcons[apiTemplate.metadata?.category] || 'i-lucide-file',
+      preview: {
+        nodes: apiTemplate.node_count || 0,
+        connections: apiTemplate.edge_count || 0,
+      },
+      flowData: apiTemplate.flow_data || { nodes: [], edges: [] },
+    }));
+  } catch (error) {
+    console.error('Failed to load flow templates:', error);
+    loadError.value = error.message || 'Failed to load templates';
+    // Keep hardcoded fallback templates for backward compatibility
+    loadFallbackTemplates();
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Fallback to hardcoded templates if API fails
+const loadFallbackTemplates = () => {
+  templates.value = [
+    {
+      id: 'customer-support',
+      name: 'Customer Support Flow',
+      description:
+        'Handle common support inquiries with intent detection and routing',
+      category: 'support',
+      icon: 'i-lucide-headphones',
+      preview: {
+        nodes: 5,
+        connections: 6,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'Welcome',
+              stateId: 'welcome',
+              description: 'Initial greeting',
+            },
           },
-        },
-        {
-          id: 'intent-1',
-          type: 'intent',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Detect Intent',
-            keywords: ['help', 'support', 'issue', 'problem'],
+          {
+            id: 'intent-1',
+            type: 'intent',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Detect Intent',
+              keywords: ['help', 'support', 'issue', 'problem'],
+            },
           },
-        },
-        {
-          id: 'condition-1',
-          type: 'condition',
-          position: { x: 500, y: 100 },
-          data: {
-            label: 'Route by Priority',
-            expression: 'intent.confidence > 0.8',
+          {
+            id: 'condition-1',
+            type: 'condition',
+            position: { x: 500, y: 100 },
+            data: {
+              label: 'Route by Priority',
+              expression: 'intent.confidence > 0.8',
+            },
           },
-        },
-        {
-          id: 'action-1',
-          type: 'action',
-          position: { x: 700, y: 50 },
-          data: {
+          {
+            id: 'action-1',
+            type: 'action',
+            position: { x: 700, y: 50 },
+            data: {
+              label: 'High Priority',
+              actionType: 'assign_agent',
+            },
+          },
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 700, y: 150 },
+            data: {
+              label: 'Send FAQ',
+              templateName: 'faq_response',
+            },
+          },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'intent-1',
+            target: 'condition-1',
+            type: 'default',
+          },
+          {
+            id: 'e3',
+            source: 'condition-1',
+            target: 'action-1',
+            type: 'true',
             label: 'High Priority',
-            actionType: 'assign_agent',
           },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 700, y: 150 },
-          data: {
-            label: 'Send FAQ',
-            templateName: 'faq_response',
+          {
+            id: 'e4',
+            source: 'condition-1',
+            target: 'template-1',
+            type: 'false',
+            label: 'Standard',
           },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'intent-1',
-          target: 'condition-1',
-          type: 'default',
-        },
-        {
-          id: 'e3',
-          source: 'condition-1',
-          target: 'action-1',
-          type: 'true',
-          label: 'High Priority',
-        },
-        {
-          id: 'e4',
-          source: 'condition-1',
-          target: 'template-1',
-          type: 'false',
-          label: 'Standard',
-        },
-      ],
+        ],
+      },
     },
-  },
-  {
-    id: 'order-status',
-    name: 'Order Status Inquiry',
-    description:
-      'Let customers check their order status with automated responses',
-    category: 'commerce',
-    icon: 'i-lucide-package',
-    preview: {
-      nodes: 4,
-      connections: 4,
+    {
+      id: 'order-status',
+      name: 'Order Status Inquiry',
+      description:
+        'Let customers check their order status with automated responses',
+      category: 'commerce',
+      icon: 'i-lucide-package',
+      preview: {
+        nodes: 4,
+        connections: 4,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'Order Inquiry',
+              stateId: 'order_start',
+              description: 'Customer asks about order',
+            },
+          },
+          {
+            id: 'action-1',
+            type: 'action',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Fetch Order',
+              actionType: 'api_call',
+            },
+          },
+          {
+            id: 'condition-1',
+            type: 'condition',
+            position: { x: 500, y: 100 },
+            data: {
+              label: 'Order Found?',
+              expression: 'order.exists',
+            },
+          },
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 700, y: 100 },
+            data: {
+              label: 'Order Status',
+              templateName: 'order_status',
+            },
+          },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'action-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'action-1',
+            target: 'condition-1',
+            type: 'default',
+          },
+          {
+            id: 'e3',
+            source: 'condition-1',
+            target: 'template-1',
+            type: 'true',
+            label: 'Found',
+          },
+        ],
+      },
     },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'Order Inquiry',
-            stateId: 'order_start',
-            description: 'Customer asks about order',
+    {
+      id: 'faq-handler',
+      name: 'FAQ Handler',
+      description: 'Answer frequently asked questions automatically',
+      category: 'support',
+      icon: 'i-lucide-message-circle-question',
+      preview: {
+        nodes: 6,
+        connections: 7,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'FAQ Start',
+              stateId: 'faq_start',
+              description: 'User asks question',
+            },
           },
-        },
-        {
-          id: 'action-1',
-          type: 'action',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Fetch Order',
-            actionType: 'api_call',
+          {
+            id: 'intent-1',
+            type: 'intent',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Detect Question Type',
+              keywords: ['hours', 'location', 'pricing', 'shipping'],
+            },
           },
-        },
-        {
-          id: 'condition-1',
-          type: 'condition',
-          position: { x: 500, y: 100 },
-          data: {
-            label: 'Order Found?',
-            expression: 'order.exists',
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 500, y: 50 },
+            data: {
+              label: 'Hours Info',
+              templateName: 'business_hours',
+            },
           },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 700, y: 100 },
-          data: {
-            label: 'Order Status',
-            templateName: 'order_status',
+          {
+            id: 'template-2',
+            type: 'template',
+            position: { x: 500, y: 120 },
+            data: {
+              label: 'Location Info',
+              templateName: 'location_info',
+            },
           },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'action-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'action-1',
-          target: 'condition-1',
-          type: 'default',
-        },
-        {
-          id: 'e3',
-          source: 'condition-1',
-          target: 'template-1',
-          type: 'true',
-          label: 'Found',
-        },
-      ],
+          {
+            id: 'template-3',
+            type: 'template',
+            position: { x: 500, y: 190 },
+            data: {
+              label: 'Pricing Info',
+              templateName: 'pricing_info',
+            },
+          },
+          {
+            id: 'action-1',
+            type: 'action',
+            position: { x: 700, y: 100 },
+            data: {
+              label: 'Escalate to Agent',
+              actionType: 'assign_agent',
+            },
+          },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'intent-1',
+            target: 'template-1',
+            type: 'intent',
+            label: 'Hours',
+          },
+          {
+            id: 'e3',
+            source: 'intent-1',
+            target: 'template-2',
+            type: 'intent',
+            label: 'Location',
+          },
+          {
+            id: 'e4',
+            source: 'intent-1',
+            target: 'template-3',
+            type: 'intent',
+            label: 'Pricing',
+          },
+          {
+            id: 'e5',
+            source: 'template-1',
+            target: 'action-1',
+            type: 'default',
+          },
+          {
+            id: 'e6',
+            source: 'template-2',
+            target: 'action-1',
+            type: 'default',
+          },
+          {
+            id: 'e7',
+            source: 'template-3',
+            target: 'action-1',
+            type: 'default',
+          },
+        ],
+      },
     },
-  },
-  {
-    id: 'faq-handler',
-    name: 'FAQ Handler',
-    description: 'Answer frequently asked questions automatically',
-    category: 'support',
-    icon: 'i-lucide-message-circle-question',
-    preview: {
-      nodes: 6,
-      connections: 7,
+    {
+      id: 'appointment-booking',
+      name: 'Appointment Booking',
+      description: 'Guide customers through booking an appointment',
+      category: 'scheduling',
+      icon: 'i-lucide-calendar-check',
+      preview: {
+        nodes: 5,
+        connections: 5,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'Booking Start',
+              stateId: 'booking_start',
+              description: 'Customer wants to book',
+            },
+          },
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Show Time Picker',
+              templateName: 'time_picker',
+            },
+          },
+          {
+            id: 'condition-1',
+            type: 'condition',
+            position: { x: 500, y: 100 },
+            data: {
+              label: 'Time Available?',
+              expression: 'slot.available',
+            },
+          },
+          {
+            id: 'action-1',
+            type: 'action',
+            position: { x: 700, y: 50 },
+            data: {
+              label: 'Confirm Booking',
+              actionType: 'create_appointment',
+            },
+          },
+          {
+            id: 'template-2',
+            type: 'template',
+            position: { x: 700, y: 150 },
+            data: {
+              label: 'Suggest Alternative',
+              templateName: 'alternative_times',
+            },
+          },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'template-1',
+            target: 'condition-1',
+            type: 'default',
+          },
+          {
+            id: 'e3',
+            source: 'condition-1',
+            target: 'action-1',
+            type: 'true',
+            label: 'Available',
+          },
+          {
+            id: 'e4',
+            source: 'condition-1',
+            target: 'template-2',
+            type: 'false',
+            label: 'Unavailable',
+          },
+          {
+            id: 'e5',
+            source: 'template-2',
+            target: 'template-1',
+            type: 'default',
+          },
+        ],
+      },
     },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'FAQ Start',
-            stateId: 'faq_start',
-            description: 'User asks question',
+    {
+      id: 'feedback-collection',
+      name: 'Feedback Collection',
+      description: 'Collect customer feedback and ratings',
+      category: 'engagement',
+      icon: 'i-lucide-star',
+      preview: {
+        nodes: 4,
+        connections: 4,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'Feedback Start',
+              stateId: 'feedback_start',
+              description: 'Ask for feedback',
+            },
           },
-        },
-        {
-          id: 'intent-1',
-          type: 'intent',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Detect Question Type',
-            keywords: ['hours', 'location', 'pricing', 'shipping'],
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Rating Picker',
+              templateName: 'rating_picker',
+            },
           },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 500, y: 50 },
-          data: {
-            label: 'Hours Info',
-            templateName: 'business_hours',
+          {
+            id: 'condition-1',
+            type: 'condition',
+            position: { x: 500, y: 100 },
+            data: {
+              label: 'Positive Rating?',
+              expression: 'rating >= 4',
+            },
           },
-        },
-        {
-          id: 'template-2',
-          type: 'template',
-          position: { x: 500, y: 120 },
-          data: {
-            label: 'Location Info',
-            templateName: 'location_info',
+          {
+            id: 'template-2',
+            type: 'template',
+            position: { x: 700, y: 100 },
+            data: {
+              label: 'Thank You',
+              templateName: 'thank_you',
+            },
           },
-        },
-        {
-          id: 'template-3',
-          type: 'template',
-          position: { x: 500, y: 190 },
-          data: {
-            label: 'Pricing Info',
-            templateName: 'pricing_info',
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'template-1',
+            target: 'condition-1',
+            type: 'default',
           },
-        },
-        {
-          id: 'action-1',
-          type: 'action',
-          position: { x: 700, y: 100 },
-          data: {
-            label: 'Escalate to Agent',
-            actionType: 'assign_agent',
+          {
+            id: 'e3',
+            source: 'condition-1',
+            target: 'template-2',
+            type: 'true',
+            label: 'Positive',
           },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'intent-1',
-          target: 'template-1',
-          type: 'intent',
-          label: 'Hours',
-        },
-        {
-          id: 'e3',
-          source: 'intent-1',
-          target: 'template-2',
-          type: 'intent',
-          label: 'Location',
-        },
-        {
-          id: 'e4',
-          source: 'intent-1',
-          target: 'template-3',
-          type: 'intent',
-          label: 'Pricing',
-        },
-        { id: 'e5', source: 'template-1', target: 'action-1', type: 'default' },
-        { id: 'e6', source: 'template-2', target: 'action-1', type: 'default' },
-        { id: 'e7', source: 'template-3', target: 'action-1', type: 'default' },
-      ],
+          {
+            id: 'e4',
+            source: 'condition-1',
+            target: 'template-2',
+            type: 'false',
+            label: 'Negative',
+          },
+        ],
+      },
     },
-  },
-  {
-    id: 'appointment-booking',
-    name: 'Appointment Booking',
-    description: 'Guide customers through booking an appointment',
-    category: 'scheduling',
-    icon: 'i-lucide-calendar-check',
-    preview: {
-      nodes: 5,
-      connections: 5,
+    {
+      id: 'lead-qualification',
+      name: 'Lead Qualification',
+      description: 'Qualify leads and route to appropriate sales team',
+      category: 'sales',
+      icon: 'i-lucide-user-check',
+      preview: {
+        nodes: 6,
+        connections: 6,
+      },
+      flowData: {
+        nodes: [
+          {
+            id: 'start',
+            type: 'state',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'Lead Start',
+              stateId: 'lead_start',
+              description: 'New lead inquiry',
+            },
+          },
+          {
+            id: 'template-1',
+            type: 'template',
+            position: { x: 300, y: 100 },
+            data: {
+              label: 'Collect Info',
+              templateName: 'lead_form',
+            },
+          },
+          {
+            id: 'condition-1',
+            type: 'condition',
+            position: { x: 500, y: 100 },
+            data: {
+              label: 'Qualified Lead?',
+              expression: 'lead.score > 50',
+            },
+          },
+          {
+            id: 'action-1',
+            type: 'action',
+            position: { x: 700, y: 50 },
+            data: {
+              label: 'Route to Sales',
+              actionType: 'assign_to_sales',
+            },
+          },
+          {
+            id: 'action-2',
+            type: 'action',
+            position: { x: 700, y: 150 },
+            data: {
+              label: 'Add to Nurture',
+              actionType: 'add_to_campaign',
+            },
+          },
+          {
+            id: 'template-2',
+            type: 'template',
+            position: { x: 900, y: 100 },
+            data: {
+              label: 'Confirmation',
+              templateName: 'lead_confirmation',
+            },
+          },
+        ],
+        edges: [
+          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
+          {
+            id: 'e2',
+            source: 'template-1',
+            target: 'condition-1',
+            type: 'default',
+          },
+          {
+            id: 'e3',
+            source: 'condition-1',
+            target: 'action-1',
+            type: 'true',
+            label: 'High Score',
+          },
+          {
+            id: 'e4',
+            source: 'condition-1',
+            target: 'action-2',
+            type: 'false',
+            label: 'Low Score',
+          },
+          {
+            id: 'e5',
+            source: 'action-1',
+            target: 'template-2',
+            type: 'default',
+          },
+          {
+            id: 'e6',
+            source: 'action-2',
+            target: 'template-2',
+            type: 'default',
+          },
+        ],
+      },
     },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'Booking Start',
-            stateId: 'booking_start',
-            description: 'Customer wants to book',
-          },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Show Time Picker',
-            templateName: 'time_picker',
-          },
-        },
-        {
-          id: 'condition-1',
-          type: 'condition',
-          position: { x: 500, y: 100 },
-          data: {
-            label: 'Time Available?',
-            expression: 'slot.available',
-          },
-        },
-        {
-          id: 'action-1',
-          type: 'action',
-          position: { x: 700, y: 50 },
-          data: {
-            label: 'Confirm Booking',
-            actionType: 'create_appointment',
-          },
-        },
-        {
-          id: 'template-2',
-          type: 'template',
-          position: { x: 700, y: 150 },
-          data: {
-            label: 'Suggest Alternative',
-            templateName: 'alternative_times',
-          },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'template-1',
-          target: 'condition-1',
-          type: 'default',
-        },
-        {
-          id: 'e3',
-          source: 'condition-1',
-          target: 'action-1',
-          type: 'true',
-          label: 'Available',
-        },
-        {
-          id: 'e4',
-          source: 'condition-1',
-          target: 'template-2',
-          type: 'false',
-          label: 'Unavailable',
-        },
-        {
-          id: 'e5',
-          source: 'template-2',
-          target: 'template-1',
-          type: 'default',
-        },
-      ],
-    },
-  },
-  {
-    id: 'feedback-collection',
-    name: 'Feedback Collection',
-    description: 'Collect customer feedback and ratings',
-    category: 'engagement',
-    icon: 'i-lucide-star',
-    preview: {
-      nodes: 4,
-      connections: 4,
-    },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'Feedback Start',
-            stateId: 'feedback_start',
-            description: 'Ask for feedback',
-          },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Rating Picker',
-            templateName: 'rating_picker',
-          },
-        },
-        {
-          id: 'condition-1',
-          type: 'condition',
-          position: { x: 500, y: 100 },
-          data: {
-            label: 'Positive Rating?',
-            expression: 'rating >= 4',
-          },
-        },
-        {
-          id: 'template-2',
-          type: 'template',
-          position: { x: 700, y: 100 },
-          data: {
-            label: 'Thank You',
-            templateName: 'thank_you',
-          },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'template-1',
-          target: 'condition-1',
-          type: 'default',
-        },
-        {
-          id: 'e3',
-          source: 'condition-1',
-          target: 'template-2',
-          type: 'true',
-          label: 'Positive',
-        },
-        {
-          id: 'e4',
-          source: 'condition-1',
-          target: 'template-2',
-          type: 'false',
-          label: 'Negative',
-        },
-      ],
-    },
-  },
-  {
-    id: 'lead-qualification',
-    name: 'Lead Qualification',
-    description: 'Qualify leads and route to appropriate sales team',
-    category: 'sales',
-    icon: 'i-lucide-user-check',
-    preview: {
-      nodes: 6,
-      connections: 6,
-    },
-    flowData: {
-      nodes: [
-        {
-          id: 'start',
-          type: 'state',
-          position: { x: 100, y: 100 },
-          data: {
-            label: 'Lead Start',
-            stateId: 'lead_start',
-            description: 'New lead inquiry',
-          },
-        },
-        {
-          id: 'template-1',
-          type: 'template',
-          position: { x: 300, y: 100 },
-          data: {
-            label: 'Collect Info',
-            templateName: 'lead_form',
-          },
-        },
-        {
-          id: 'condition-1',
-          type: 'condition',
-          position: { x: 500, y: 100 },
-          data: {
-            label: 'Qualified Lead?',
-            expression: 'lead.score > 50',
-          },
-        },
-        {
-          id: 'action-1',
-          type: 'action',
-          position: { x: 700, y: 50 },
-          data: {
-            label: 'Route to Sales',
-            actionType: 'assign_to_sales',
-          },
-        },
-        {
-          id: 'action-2',
-          type: 'action',
-          position: { x: 700, y: 150 },
-          data: {
-            label: 'Add to Nurture',
-            actionType: 'add_to_campaign',
-          },
-        },
-        {
-          id: 'template-2',
-          type: 'template',
-          position: { x: 900, y: 100 },
-          data: {
-            label: 'Confirmation',
-            templateName: 'lead_confirmation',
-          },
-        },
-      ],
-      edges: [
-        { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-        {
-          id: 'e2',
-          source: 'template-1',
-          target: 'condition-1',
-          type: 'default',
-        },
-        {
-          id: 'e3',
-          source: 'condition-1',
-          target: 'action-1',
-          type: 'true',
-          label: 'High Score',
-        },
-        {
-          id: 'e4',
-          source: 'condition-1',
-          target: 'action-2',
-          type: 'false',
-          label: 'Low Score',
-        },
-        { id: 'e5', source: 'action-1', target: 'template-2', type: 'default' },
-        { id: 'e6', source: 'action-2', target: 'template-2', type: 'default' },
-      ],
-    },
-  },
-]);
+  ];
+};
+
+// Load templates on component mount
+onMounted(() => {
+  loadTemplates();
+});
 
 const categories = computed(() => [
   {
@@ -599,7 +689,7 @@ defineExpose({
     :title="t('AGENT_BOTS.TEMPLATES.TITLE')"
     :show-cancel-button="false"
     :show-confirm-button="false"
-    width="6xl"
+    width="7xl"
     overflow-y-auto
   >
     <div class="flex flex-col gap-4">
@@ -626,8 +716,36 @@ defineExpose({
         </button>
       </div>
 
+      <!-- Loading State -->
+      <div
+        v-if="isLoading"
+        class="flex flex-col items-center justify-center py-12 text-center"
+      >
+        <i class="i-lucide-loader-2 w-8 h-8 mb-3 text-n-blue-8 animate-spin" />
+        <p class="text-sm text-n-slate-11">
+          {{ t('AGENT_BOTS.TEMPLATES.LOADING') }}
+        </p>
+      </div>
+
+      <!-- Error State -->
+      <div
+        v-else-if="loadError"
+        class="flex flex-col items-center justify-center py-12 text-center"
+      >
+        <i class="i-lucide-alert-circle w-8 h-8 mb-3 text-n-red-8" />
+        <p class="text-sm text-n-red-11 mb-2">
+          {{ loadError }}
+        </p>
+        <Button
+          size="sm"
+          faded
+          :label="t('AGENT_BOTS.TEMPLATES.RETRY')"
+          @click="loadTemplates"
+        />
+      </div>
+
       <!-- Templates Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           v-for="template in filteredTemplates"
           :key="template.id"
