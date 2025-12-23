@@ -96,9 +96,9 @@ begin
       )
 
       if inbox_specific
-        puts "  ✅ Inbox-specific image exists (will be used first)"
+        puts '  ✅ Inbox-specific image exists (will be used first)'
       else
-        puts "  ✅ No inbox-specific image (will fallback to shared)"
+        puts '  ✅ No inbox-specific image (will fallback to shared)'
       end
       puts ''
 

@@ -759,3 +759,49 @@ end
 - [Handler Methods Reference](./HANDLER_METHODS_REFERENCE.md)
 - [Bot Service Interface](../../app/services/apple_messages_for_business/concerns/bot_service_interface.rb)
 - [Handler Methods Registry](../../app/services/apple_messages_for_business/handler_methods_registry.rb)
+
+
+Handler UI 
+
+ 1. "Handlers" Button in Toolbar ✨ NEW!
+
+  - Located in the top toolbar next to "Templates"
+  - Click to open the comprehensive Handler Methods Browser dialog
+  - Features:
+    - Search bar - Find handlers by name/description/tags
+    - Filters - Type (state/keyword/interactive/action), Category, Status
+    - Sort options - Alphabetical, by type, by status
+    - Preview panel - Hover to see full metadata (triggers, dependencies, examples)
+    - Grouped display - Handlers organized by category
+
+  2. In Node Editors (Autocomplete)
+
+  When you double-click a node to edit it:
+  - State nodes - Handler selector with type filter state
+  - Intent nodes - Handler selector with type filter keyword
+  - Action nodes - Handler selector with type filter action
+
+  The selector provides:
+  - Type-ahead search with fuzzy matching
+  - Handler type badges (color-coded)
+  - Status badges (stable/experimental/deprecated)
+  - Match reason display
+  - Auto-validation with visual feedback (✓ green when valid)
+  - Auto-fill label from handler metadata
+
+  3. Visual Display on Canvas
+
+  Handlers appear directly on nodes:
+  - Gray badge with </> code icon
+  - Monospace font for method name
+  - Visible at a glance without editing
+
+  How It Works
+
+  The system is now fully independent from hard-coded references:
+  - ✅ Dynamically discovers handlers from AcousticHouseBotService
+  - ✅ No hard-coded KEYWORD_HANDLERS or INTERACTIVE_HANDLERS needed
+  - ✅ Extensible - works with any service implementing BotServiceInterface
+  - ✅ Rich metadata: description, triggers, dependencies, examples, tags
+  - ✅ Real-time validation
+
