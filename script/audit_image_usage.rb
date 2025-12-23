@@ -44,7 +44,7 @@ end
 def format_bytes(bytes)
   return '0 B' if bytes.zero?
 
-  units = ['B', 'KB', 'MB', 'GB']
+  units = %w[B KB MB GB]
   exponent = (Math.log(bytes) / Math.log(1024)).floor
   value = bytes / (1024.0**exponent)
 
@@ -58,7 +58,7 @@ begin
   total_accounts = AppleListPickerImage.distinct.count(:account_id)
   total_inboxes = AppleListPickerImage.distinct.count(:inbox_id)
 
-  puts "Overview:"
+  puts 'Overview:'
   puts "  Total AppleListPickerImage records: #{total_images}"
   puts "  Total SharedAppleImage records: #{shared_images}"
   puts "  Total accounts with images: #{total_accounts}"
@@ -211,14 +211,12 @@ begin
 
   # Images without attachments
   images_without_attachments = AppleListPickerImage.left_joins(:image_attachment)
-                                                    .where(active_storage_attachments: { id: nil })
-                                                    .count
+                                                   .where(active_storage_attachments: { id: nil })
+                                                   .count
 
   puts "  Images without attachments: #{images_without_attachments}"
 
-  if images_without_attachments.positive?
-    puts '  ⚠️  These records should be cleaned up.'
-  end
+  puts '  ⚠️  These records should be cleaned up.' if images_without_attachments.positive?
   puts ''
 
   # Migration Recommendations

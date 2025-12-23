@@ -68,18 +68,18 @@ if !options[:dry_run] && !options[:account_id] && !options[:all_accounts]
 end
 
 # Determine which accounts to process
-if options[:account_id]
-  account_ids = [options[:account_id]]
-elsif options[:all_accounts]
-  account_ids = Account.pluck(:id)
-else
-  # Dry run: show all accounts with Apple Messages inboxes
-  account_ids = Account
-                .joins(inboxes: :channel)
-                .where(inboxes: { channel_type: 'Channel::AppleMessagesForBusiness' })
-                .distinct
-                .pluck(:id)
-end
+account_ids = if options[:account_id]
+                [options[:account_id]]
+              elsif options[:all_accounts]
+                Account.pluck(:id)
+              else
+                # Dry run: show all accounts with Apple Messages inboxes
+                Account
+                  .joins(inboxes: :channel)
+                  .where(inboxes: { channel_type: 'Channel::AppleMessagesForBusiness' })
+                  .distinct
+                  .pluck(:id)
+              end
 
 # Header
 puts '=' * 80
@@ -92,7 +92,7 @@ puts "Branding images to migrate: #{BRANDING_IMAGES.keys.join(', ')}"
 puts ''
 
 # Confirmation for execute mode
-if !options[:dry_run]
+unless options[:dry_run]
   puts '⚠️  WARNING: This will create SharedAppleImage records for branding images.'
   puts '   Original AppleListPickerImage records will be kept.'
   puts ''
@@ -151,7 +151,7 @@ account_ids.each do |account_id|
     )
 
     if existing_shared&.image&.attached?
-      puts "    ✅ Already exists in SharedAppleImage - skipping"
+      puts '    ✅ Already exists in SharedAppleImage - skipping'
       stats[:skipped] += 1
       next
     end
@@ -166,7 +166,7 @@ account_ids.each do |account_id|
                    .find { |img| img.image.attached? }
 
     unless source_image
-      puts "    ⏭️  Not found in any inbox - skipping"
+      puts '    ⏭️  Not found in any inbox - skipping'
       stats[:not_found] += 1
       next
     end
@@ -180,7 +180,7 @@ account_ids.each do |account_id|
       puts '    🔍 [DRY RUN] Would create SharedAppleImage with:'
       puts "       - account_id: #{account_id}"
       puts "       - identifier: #{identifier}"
-      puts "       - image_type: branding"
+      puts '       - image_type: branding'
       puts "       - description: #{config[:description]}"
       puts "       - original_name: #{source_image.original_name}"
       stats[:migrated] += 1
