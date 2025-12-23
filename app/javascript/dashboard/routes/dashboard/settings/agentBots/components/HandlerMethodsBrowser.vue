@@ -1,3 +1,4 @@
+<!-- eslint-disable @intlify/vue-i18n/no-dynamic-keys -->
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -195,7 +196,11 @@ const filteredHandlers = computed(() => {
 const groupedHandlers = computed(() => {
   const groups = {};
 
-  filteredHandlers.value.forEach(handler => {
+  // Limit total handlers to prevent rendering issues
+  const maxHandlers = 50;
+  const limitedHandlers = filteredHandlers.value.slice(0, maxHandlers);
+
+  limitedHandlers.forEach(handler => {
     const category = handler.category || 'uncategorized';
     if (!groups[category]) {
       groups[category] = [];
@@ -206,7 +211,11 @@ const groupedHandlers = computed(() => {
   return Object.entries(groups).map(([category, items]) => ({
     category,
     label:
-      t(`AGENT_BOTS.HANDLER_CATEGORIES.${category.toUpperCase()}`) || category,
+      t(
+        `AGENT_BOTS.HANDLER_CATEGORIES.${(category || 'UNCATEGORIZED').toUpperCase()}`
+      ) ||
+      category ||
+      'Uncategorized',
     items,
   }));
 });
@@ -271,24 +280,55 @@ function selectHandler(handler) {
   selectedHandler.value = handler;
 }
 
-/**
- * Preview handler (load full details)
- */
-async function previewHandlerDetails(handler) {
+// Debounced preview to prevent flickering
+const debouncedPreviewHandler = useDebounceFn(async handler => {
   try {
-    const details = await fetchHandlerDetails(handler.method_name);
-    previewHandler.value = details;
+    // eslint-disable-next-line no-console
+    console.log('[HandlerBrowser] Fetching details for:', handler.method_name);
+
+    const response = await fetchHandlerDetails(handler.method_name);
+
+    // eslint-disable-next-line no-console
+    console.log('[HandlerBrowser] Details received:', response);
+
+    // API returns {handler_method: {...}}, unwrap it
+    previewHandler.value = response.handler_method || response;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[HandlerBrowser] Preview error:', err);
+
+    // Fallback: Show basic handler info from list if detailed fetch fails
+    previewHandler.value = {
+      method_name: handler.method_name,
+      display_name: handler.display_name,
+      description: handler.description,
+      handler_type: handler.handler_type,
+      category: handler.category,
+      status: handler.status,
+      // Add empty structures for optional fields
+      triggers: handler.triggers || {},
+      dependencies: handler.dependencies || {},
+      tags: handler.tags || [],
+    };
   }
+}, 150); // 150ms delay to prevent rapid flickering
+
+/**
+ * Preview handler (wrapper for debounced version)
+ */
+function previewHandlerDetails(handler) {
+  debouncedPreviewHandler(handler);
 }
 
 /**
- * Clear preview
+ * Clear preview (also debounced to prevent flicker)
  */
-function clearPreview() {
+const debouncedClearPreview = useDebounceFn(() => {
   previewHandler.value = null;
+}, 200);
+
+function clearPreview() {
+  debouncedClearPreview();
 }
 
 /**
@@ -372,7 +412,7 @@ defineExpose({
     :title="t('AGENT_BOTS.HANDLER_METHODS.BROWSER.TITLE')"
     :show-cancel-button="false"
     :show-confirm-button="false"
-    width="3xl"
+    width="7xl"
     overflow-y-auto
     @close="close"
   >
@@ -384,6 +424,9 @@ defineExpose({
 
       <!-- Search Bar -->
       <div class="relative">
+        <i
+          class="i-lucide-search absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-n-slate-11 pointer-events-none"
+        />
         <input
           v-model="searchQuery"
           type="text"
@@ -391,9 +434,6 @@ defineExpose({
             t('AGENT_BOTS.HANDLER_METHODS.BROWSER.SEARCH_PLACEHOLDER')
           "
           class="w-full px-4 py-2 pl-10 border border-n-weak rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-8 focus:border-transparent"
-        />
-        <i
-          class="i-lucide-search absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-n-slate-11"
         />
         <button
           v-if="searchQuery"
@@ -720,6 +760,65 @@ defineExpose({
                 <p class="text-sm text-n-slate-12 font-mono mt-1">
                   {{ previewHandler.method_name }}
                 </p>
+              </div>
+
+              <!-- Description -->
+              <div v-if="previewHandler.description">
+                <label
+                  class="text-xs text-n-slate-11 uppercase tracking-wide"
+                  >{{
+                    t('AGENT_BOTS.HANDLER_METHODS.DETAILS.DESCRIPTION')
+                  }}</label
+                >
+                <p class="text-sm text-n-slate-12 mt-1">
+                  {{ previewHandler.description }}
+                </p>
+              </div>
+
+              <!-- Handler Type -->
+              <div v-if="previewHandler.handler_type">
+                <label
+                  class="text-xs text-n-slate-11 uppercase tracking-wide"
+                  >{{
+                    t('AGENT_BOTS.HANDLER_METHODS.DETAILS.HANDLER_TYPE')
+                  }}</label
+                >
+                <p class="text-sm text-n-slate-12 mt-1">
+                  {{
+                    t(
+                      `AGENT_BOTS.HANDLER_TYPES.${previewHandler.handler_type.toUpperCase()}`
+                    )
+                  }}
+                </p>
+              </div>
+
+              <!-- Category -->
+              <div v-if="previewHandler.category">
+                <label
+                  class="text-xs text-n-slate-11 uppercase tracking-wide"
+                  >{{ t('AGENT_BOTS.HANDLER_METHODS.DETAILS.CATEGORY') }}</label
+                >
+                <p class="text-sm text-n-slate-12 mt-1">
+                  {{
+                    t(
+                      `AGENT_BOTS.HANDLER_CATEGORIES.${previewHandler.category.toUpperCase()}`
+                    )
+                  }}
+                </p>
+              </div>
+
+              <!-- Status -->
+              <div v-if="previewHandler.status">
+                <label
+                  class="text-xs text-n-slate-11 uppercase tracking-wide"
+                  >{{ t('AGENT_BOTS.HANDLER_METHODS.DETAILS.STATUS') }}</label
+                >
+                <span
+                  class="inline-block px-2 py-0.5 mt-1 text-xs font-medium rounded-full"
+                  :class="getStatusColor(previewHandler.status)"
+                >
+                  {{ previewHandler.status }}
+                </span>
               </div>
 
               <!-- Triggers -->

@@ -11,6 +11,7 @@ import BotStudioCanvas from './components/BotStudioCanvas.vue';
 import ValidationPanel from './components/ValidationPanel.vue';
 import ImportFlowDialog from './components/ImportFlowDialog.vue';
 import TemplateBrowserDialog from './components/TemplateBrowserDialog.vue';
+import HandlerMethodsBrowser from './components/HandlerMethodsBrowser.vue';
 import BotTestConsole from './components/BotTestConsole.vue';
 
 // Node Editors
@@ -32,7 +33,6 @@ const selectedNode = ref(null);
 const isCompiling = ref(false);
 const isSaving = ref(false);
 const isImporting = ref(false);
-const isUpdatingNode = ref(false);
 const isValidating = ref(false);
 
 // Canvas controls ref
@@ -43,6 +43,9 @@ const importFlowDialogRef = ref(null);
 
 // Template browser dialog ref
 const templateBrowserRef = ref(null);
+
+// Handler browser dialog ref
+const handlerBrowserRef = ref(null);
 
 // File input ref for JSON import
 const fileInputRef = ref(null);
@@ -117,16 +120,24 @@ const loadOrCreateFlow = async () => {
       }
     }
 
+    // Use imported flow if found, otherwise use first available flow
     if (importedFlow) {
       flowId.value = importedFlow.id;
       // eslint-disable-next-line no-console
       console.log('Set flowId to:', flowId.value);
+    } else if (flows?.flows && flows.flows.length > 0) {
+      // Use the first flow if no imported flow exists
+      flowId.value = flows.flows[0].id;
+      // eslint-disable-next-line no-console
+      console.log(
+        'Using first available flow:',
+        flows.flows[0].name,
+        'ID:',
+        flowId.value
+      );
     } else {
       // eslint-disable-next-line no-console
-      console.warn(
-        'No imported flow found. Available flows:',
-        flows?.flows?.map(f => f.name)
-      );
+      console.warn('No flows available for this bot');
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -160,7 +171,11 @@ const handleSaveNode = async nodeData => {
   }
 
   // eslint-disable-next-line no-console
-  console.log('[BotStudio] Node updated locally:', selectedNode.value.id, nodeData);
+  console.log(
+    '[BotStudio] Node updated locally:',
+    selectedNode.value.id,
+    nodeData
+  );
 };
 
 // Handle cancel edit
@@ -180,7 +195,10 @@ const handleSaveFlow = async () => {
 
   // Debug: Log all state nodes to help find duplicates
   const stateNodes = flowData.nodes.filter(n => n.type === 'state');
-  const stateIds = stateNodes.map(n => ({ id: n.id, state_id: n.data?.state_id }));
+  const stateIds = stateNodes.map(n => ({
+    id: n.id,
+    state_id: n.data?.state_id,
+  }));
   // eslint-disable-next-line no-console
   console.log('[BotStudio] All state nodes:', stateIds);
 
@@ -265,6 +283,11 @@ const handleImportFromFlow = () => {
 // Handle browse templates
 const handleBrowseTemplates = () => {
   templateBrowserRef.value?.open();
+};
+
+// Handle browse handlers
+const handleBrowseHandlers = () => {
+  handlerBrowserRef.value?.open();
 };
 
 // Handle insert template
@@ -438,7 +461,10 @@ const validateFlow = async () => {
     }
     if (result?.warnings && result.warnings.length > 0) {
       // eslint-disable-next-line no-console
-      console.log('[BotStudio] ⚠️  Validation warnings (count):', result.warnings.length);
+      console.log(
+        '[BotStudio] ⚠️  Validation warnings (count):',
+        result.warnings.length
+      );
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -464,13 +490,18 @@ const handleValidationIssueClick = issue => {
     if (matchingNode) {
       nodeId = matchingNode.id;
       // eslint-disable-next-line no-console
-      console.log(`[BotStudio] Found node for state_id '${issue.state_id}': ${nodeId}`);
+      console.log(
+        `[BotStudio] Found node for state_id '${issue.state_id}': ${nodeId}`
+      );
     }
   }
 
   if (!nodeId) {
     // eslint-disable-next-line no-console
-    console.warn('[BotStudio] Could not find node for validation issue:', issue);
+    console.warn(
+      '[BotStudio] Could not find node for validation issue:',
+      issue
+    );
     return;
   }
 
@@ -555,6 +586,13 @@ onMounted(async () => {
             slate
             faded
             @click="handleBrowseTemplates"
+          />
+          <Button
+            icon="i-lucide-code-2"
+            :label="t('AGENT_BOTS.STUDIO.BROWSE_HANDLERS')"
+            slate
+            faded
+            @click="handleBrowseHandlers"
           />
           <Button
             icon="i-lucide-folder-open"
@@ -652,16 +690,31 @@ onMounted(async () => {
           >
             <i class="i-lucide-search w-4 h-4 text-n-slate-11" />
           </button>
-          <span
+          <div
             v-if="canvasRef?.highlightedNodeIds?.length > 0"
-            class="text-xs text-n-slate-11 ml-1"
+            class="flex items-center gap-2 ml-2"
           >
-            {{
-              t('AGENT_BOTS.STUDIO.NODES_FOUND', {
-                count: canvasRef.highlightedNodeIds.length,
-              })
-            }}
-          </span>
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ canvasRef.currentSearchIndex + 1 }} /
+              {{ canvasRef.highlightedNodeIds.length }}
+            </span>
+            <button
+              class="p-1.5 hover:bg-n-slate-3 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="canvasRef.highlightedNodeIds.length <= 1"
+              :title="$t('AGENT_BOTS.BOT_STUDIO.SEARCH.PREVIOUS_RESULT')"
+              @click="canvasRef.prevSearchResult"
+            >
+              <i class="i-lucide-chevron-up w-4 h-4 text-n-slate-11" />
+            </button>
+            <button
+              class="p-1.5 hover:bg-n-slate-3 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="canvasRef.highlightedNodeIds.length <= 1"
+              :title="$t('AGENT_BOTS.BOT_STUDIO.SEARCH.NEXT_RESULT')"
+              @click="canvasRef.nextSearchResult"
+            >
+              <i class="i-lucide-chevron-down w-4 h-4 text-n-slate-11" />
+            </button>
+          </div>
         </div>
 
         <div class="h-5 w-px bg-n-soft" />
@@ -855,6 +908,13 @@ onMounted(async () => {
     <TemplateBrowserDialog
       ref="templateBrowserRef"
       @insert-template="handleInsertTemplate"
+    />
+
+    <!-- Handler Methods Browser -->
+    <HandlerMethodsBrowser
+      ref="handlerBrowserRef"
+      :bot-id="botId"
+      service-name="AcousticHouseBotService"
     />
   </div>
 </template>

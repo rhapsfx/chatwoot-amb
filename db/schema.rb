@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_12_11_134204) do
+ActiveRecord::Schema[7.1].define(version: 2025_12_20_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -317,6 +317,20 @@ ActiveRecord::Schema[7.1].define(version: 2025_12_11_134204) do
     t.datetime "updated_at", precision: nil, null: false
     t.boolean "active", default: true, null: false
     t.index ["account_id"], name: "index_automation_rules_on_account_id"
+  end
+
+  create_table "bot_action_templates", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "template_type", null: false
+    t.jsonb "parameters", default: {}, null: false
+    t.jsonb "metadata", default: {}
+    t.integer "execution_order", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "name"], name: "index_bot_action_templates_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_bot_action_templates_on_account_id"
+    t.index ["template_type"], name: "index_bot_action_templates_on_template_type"
   end
 
   create_table "bot_flows", force: :cascade do |t|
@@ -1448,6 +1462,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_12_11_134204) do
   add_foreign_key "agent_bot_versions", "agent_bots"
   add_foreign_key "apple_list_picker_images", "accounts"
   add_foreign_key "apple_list_picker_images", "inboxes"
+  add_foreign_key "bot_action_templates", "accounts"
   add_foreign_key "bot_flows", "agent_bots"
   add_foreign_key "bot_flows", "bot_flows", column: "parent_flow_id"
   add_foreign_key "inboxes", "portals"

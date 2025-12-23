@@ -18,12 +18,20 @@ const keywordPreview = computed(() => {
   return `${keywords.value[0]} +${keywords.value.length - 1} more`;
 });
 
+const handler = computed(() => props.data.handler || null);
+const label = computed(() => props.data.label || null);
+
 // Get scope (default to 'global' for backward compatibility)
 const scope = computed(() => props.data.scope || 'global');
-const scopeLabel = computed(() => scope.value === 'global' ? 'Global' : 'Contextual');
-const scopeIcon = computed(() => scope.value === 'global' ? 'i-lucide-globe' : 'i-lucide-git-branch');
+const scopeLabel = computed(() =>
+  scope.value === 'global' ? 'Global' : 'Contextual'
+);
+const scopeIcon = computed(() =>
+  scope.value === 'global' ? 'i-lucide-globe' : 'i-lucide-git-branch'
+);
 
 // Get validation status
+// eslint-disable-next-line no-underscore-dangle
 const validation = computed(() => props.data._validation);
 const hasWarning = computed(() => validation.value?.level === 'warning');
 const hasError = computed(() => validation.value?.level === 'error');
@@ -48,13 +56,22 @@ const validationMessages = computed(
       <span class="node-type">Intent</span>
       <!-- Validation indicator -->
       <span v-if="hasError" class="validation-badge error-badge">!</span>
-      <span v-if="hasWarning && !hasError" class="validation-badge warning-badge">⚠</span>
+      <span
+        v-if="hasWarning && !hasError"
+        class="validation-badge warning-badge"
+        >⚠</span
+      >
     </div>
 
     <div class="node-content">
+      <div v-if="label" class="intent-label">{{ label }}</div>
       <div class="keyword-preview">{{ keywordPreview }}</div>
       <div class="match-type">
         {{ data.exact_match ? 'Exact match' : 'Contains' }}
+      </div>
+      <div v-if="handler" class="handler-method">
+        <i class="i-lucide-code" />
+        <span>{{ handler }}</span>
       </div>
       <div class="scope-badge" :class="`scope-${scope}`">
         <i :class="scopeIcon" />
@@ -182,6 +199,15 @@ const validationMessages = computed(
   @apply p-3;
 }
 
+.intent-label {
+  @apply text-sm font-semibold mb-2;
+  color: rgb(var(--slate-12));
+}
+
+.dark .intent-label {
+  @apply text-slate-100;
+}
+
 .keyword-preview {
   @apply text-sm font-medium mb-1;
   color: rgb(var(--slate-12));
@@ -198,6 +224,22 @@ const validationMessages = computed(
 
 .dark .match-type {
   @apply text-slate-400;
+}
+
+.handler-method {
+  @apply flex items-center gap-1 text-xs mt-2 px-2 py-1 rounded-md font-mono;
+  background: rgb(var(--slate-100));
+  color: rgb(var(--slate-700));
+  width: fit-content;
+}
+
+.dark .handler-method {
+  background: rgb(var(--slate-800));
+  color: rgb(var(--slate-300));
+}
+
+.handler-method i {
+  @apply text-xs;
 }
 
 .scope-badge {

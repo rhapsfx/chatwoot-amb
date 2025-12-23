@@ -3,13 +3,13 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import HandlerMethodSelector from '../HandlerMethodSelector.vue';
 
 const props = defineProps({
   node: {
     type: Object,
     required: true,
   },
-  // eslint-disable-next-line vue/no-unused-properties
   botId: {
     type: Number,
     required: false,
@@ -27,6 +27,8 @@ const editedData = ref({
   exact_match: false,
   case_sensitive: false,
   scope: 'global', // global or contextual
+  handler: '', // Handler method to call when intent matches
+  label: '', // Display label for the intent
 });
 
 const newKeyword = ref('');
@@ -41,6 +43,8 @@ watch(
         exact_match: newNode.data.exact_match || false,
         case_sensitive: newNode.data.case_sensitive || false,
         scope: newNode.data.scope || 'global', // default to global for backward compatibility
+        handler: newNode.data.handler || '',
+        label: newNode.data.label || '',
       };
     }
   },
@@ -56,6 +60,13 @@ const addKeyword = () => {
 
 const removeKeyword = index => {
   editedData.value.keywords.splice(index, 1);
+};
+
+const handleHandlerSelected = handler => {
+  // Auto-fill label from handler metadata if not already set
+  if (!editedData.value.label && handler.display_name) {
+    editedData.value.label = handler.display_name;
+  }
 };
 
 const handleSave = () => {
@@ -74,6 +85,21 @@ const handleCancel = () => {
     </h3>
 
     <div class="space-y-4">
+      <!-- Label -->
+      <div>
+        <label class="block text-sm font-medium text-n-slate-11 mb-1">
+          {{ t('AGENT_BOTS.EDITORS.LABEL') }}
+        </label>
+        <Input
+          v-model="editedData.label"
+          placeholder="e.g., Menu Request"
+          class="w-full"
+        />
+        <p class="text-xs text-n-slate-10 mt-1">
+          {{ t('AGENT_BOTS.EDITORS.LABEL_DESCRIPTION') }}
+        </p>
+      </div>
+
       <!-- Keywords -->
       <div>
         <label class="block text-sm font-medium text-n-slate-11 mb-1">
@@ -104,6 +130,24 @@ const handleCancel = () => {
         </div>
         <p class="text-xs text-n-slate-10 mt-1">
           {{ t('AGENT_BOTS.EDITORS.KEYWORDS_TRIGGER_HELP') }}
+        </p>
+      </div>
+
+      <!-- Handler Method -->
+      <div>
+        <label class="block text-sm font-medium text-n-slate-11 mb-1">
+          {{ t('AGENT_BOTS.EDITORS.HANDLER_METHOD') }}
+        </label>
+        <HandlerMethodSelector
+          v-model="editedData.handler"
+          :bot-id="botId"
+          service-name="AcousticHouseBotService"
+          handler-type="keyword"
+          :required="false"
+          @handler-selected="handleHandlerSelected"
+        />
+        <p class="text-xs text-n-slate-10 mt-1">
+          {{ t('AGENT_BOTS.EDITORS.HANDLER_METHOD_INTENT_HELP') }}
         </p>
       </div>
 
@@ -155,7 +199,8 @@ const handleCancel = () => {
                 <span class="text-sm font-medium text-n-slate-12">Global</span>
               </div>
               <p class="text-xs text-n-slate-10 mt-0.5">
-                Always checked on every message (for startover, stop, menu, help, reset)
+                Always checked on every message (for startover, stop, menu,
+                help, reset)
               </p>
             </div>
           </label>
@@ -172,7 +217,8 @@ const handleCancel = () => {
                 <span class="text-sm font-medium text-n-slate-12">Contextual</span>
               </div>
               <p class="text-xs text-n-slate-10 mt-0.5">
-                Only checked when connected to current state (for feature-specific intents)
+                Only checked when connected to current state (for
+                feature-specific intents)
               </p>
             </div>
           </label>

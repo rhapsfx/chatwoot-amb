@@ -96,6 +96,11 @@ class AgentBotPolicy < ApplicationPolicy
     @account_user.administrator? || @account_user.agent?
   end
 
+  # Flow templates permissions
+  def templates?
+    @account_user.administrator? || @account_user.agent?
+  end
+
   # Handler methods permissions
   def handler_methods?
     @account_user.administrator? || @account_user.agent?

@@ -19,6 +19,7 @@ const emit = defineEmits(['configure']);
 
 const actionType = computed(() => props.data.action_type || 'Action');
 const actionLabel = computed(() => props.data.label || 'New Action');
+const handler = computed(() => props.data.handler || null);
 </script>
 
 <template>
@@ -33,6 +34,10 @@ const actionLabel = computed(() => props.data.label || 'New Action');
     <div class="node-content">
       <div class="action-type">{{ actionType }}</div>
       <div class="action-label">{{ actionLabel }}</div>
+      <div v-if="handler" class="handler-method">
+        <i class="i-lucide-code" />
+        <span>{{ handler }}</span>
+      </div>
     </div>
 
     <Handle type="source" :position="Position.Right" />
@@ -102,5 +107,21 @@ const actionLabel = computed(() => props.data.label || 'New Action');
 
 .dark .action-label {
   @apply text-slate-200;
+}
+
+.handler-method {
+  @apply flex items-center gap-1 text-xs mt-2 px-2 py-1 rounded-md font-mono;
+  background: rgb(var(--slate-100));
+  color: rgb(var(--slate-700));
+  width: fit-content;
+}
+
+.dark .handler-method {
+  background: rgb(var(--slate-800));
+  color: rgb(var(--slate-300));
+}
+
+.handler-method i {
+  @apply text-xs;
 }
 </style>
