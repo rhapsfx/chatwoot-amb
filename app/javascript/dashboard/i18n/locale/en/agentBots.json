@@ -13,13 +13,15 @@
     "BOT_CONFIGURATION": {
       "TITLE": "Select an agent bot",
       "DESC": "Assign an Agent Bot to your inbox. They can handle initial conversations and transfer them to a live agent when necessary.",
+      "SELECT_LABEL": "Select a bot to assign",
       "SUBMIT": "Update",
       "DISCONNECT": "Disconnect bot",
       "SUCCESS_MESSAGE": "Successfully updated the agent bot.",
       "DISCONNECTED_SUCCESS_MESSAGE": "Successfully disconnected the agent bot.",
       "ERROR_MESSAGE": "Could not update the agent bot. Please try again.",
       "DISCONNECTED_ERROR_MESSAGE": "Could not disconnect the agent bot. Please try again.",
-      "SELECT_PLACEHOLDER": "Select bot"
+      "SELECT_PLACEHOLDER": "Select bot",
+      "SELECT_ERROR": "Please select a bot to assign"
     },
     "ADD": {
       "TITLE": "Add Bot",
@@ -180,6 +182,7 @@
       "CURRENT": "Current",
       "PRIORITY": "Priority",
       "INBOX": "Inbox",
+      "BOT_NAME": "Bot",
       "STATUS": "Status",
       "ACTIVE": "Active",
       "INACTIVE": "Inactive",

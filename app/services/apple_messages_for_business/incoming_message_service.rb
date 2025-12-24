@@ -183,7 +183,12 @@ class AppleMessagesForBusiness::IncomingMessageService
     Rails.logger.info "[AMB IncomingMessage] Message created successfully - ID: #{@message.id}, content_type: #{@message.content_type}"
 
     # Trigger bot if enabled for this conversation
-    trigger_bot_if_enabled
+    # IMPORTANT: Skip bot triggering for IDR placeholder messages - bot will be triggered after IDR is processed
+    if @message.content == 'Processing Interactive Data Reference...'
+      Rails.logger.info '[Bot] ⏸️  Skipping bot trigger for IDR placeholder - will trigger after processing'
+    else
+      trigger_bot_if_enabled
+    end
   end
 
   def source_id
@@ -788,6 +793,12 @@ class AppleMessagesForBusiness::IncomingMessageService
       @message.reload
       Rails.logger.info '[AMB IncomingMessage] IDR processing completed successfully - content_type unchanged'
       Rails.logger.info "[AMB IncomingMessage] Final message content: '#{@message.content}'"
+
+      # CRITICAL: Trigger bot NOW that we have the real extracted content
+      # We skipped the trigger during message creation (line 187) for the placeholder
+      # Now we have the actual user selection, so trigger the bot to process it
+      Rails.logger.info '[Bot] 🎯 Triggering bot after IDR processing with real content'
+      trigger_bot_if_enabled
     rescue StandardError => e
       Rails.logger.error "[AMB IncomingMessage] IDR processing failed: #{e.message}"
 
@@ -1282,16 +1293,22 @@ class AppleMessagesForBusiness::IncomingMessageService
       return
     end
 
-    # Check for configured AMB bot via AgentBotInbox
-    bot_inbox = @inbox.agent_bot_inbox
-    unless bot_inbox&.active? && bot_inbox.agent_bot&.apple_messages_for_business?
+    # Check for configured AMB bot via AgentBotInbox (highest priority active AMB bot)
+    bot_inbox = @inbox.agent_bot_inboxes
+                      .active
+                      .joins(:agent_bot)
+                      .where(agent_bots: { bot_type: 'apple_messages_for_business' })
+                      .order(priority: :asc)
+                      .first
+
+    unless bot_inbox&.agent_bot.present?
       Rails.logger.info '[Bot] ⚠️  No active configured AMB bot found - skipping bot processing'
-      Rails.logger.info "[Bot] 📋 Inbox ID: #{@inbox.id}, Agent Bot Inbox: #{bot_inbox.present? ? 'present' : 'nil'}, Active: #{bot_inbox&.active?}, Bot Type: #{bot_inbox&.agent_bot&.bot_type}"
+      Rails.logger.info "[Bot] 📋 Inbox ID: #{@inbox.id}, Active AMB Bot Assignments: #{@inbox.agent_bot_inboxes.active.count}"
       return
     end
 
     configured_bot = bot_inbox.agent_bot
-    Rails.logger.info "[Bot] 🤖 Using configured AMB bot: #{configured_bot.name} (ID: #{configured_bot.id})"
+    Rails.logger.info "[Bot] 🤖 Using configured AMB bot: #{configured_bot.name} (ID: #{configured_bot.id}, Priority: #{bot_inbox.priority})"
 
     # Check if bot has an active published flow (Bot Studio)
     active_flow = configured_bot.bot_flows.active.published.first

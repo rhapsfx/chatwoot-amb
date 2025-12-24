@@ -320,6 +320,10 @@ class AppleMessagesForBusiness::SendMessageService
       base_data[:data][:event] = build_time_picker_data
       base_data[:receivedMessage] = build_received_message
       base_data[:replyMessage] = build_reply_message
+
+      # Load images for time picker (from receivedMessage and replyMessage imageIdentifiers)
+      time_picker_images = load_time_picker_images
+      base_data[:data][:images] = time_picker_images if time_picker_images.present?
     when 'apple_form'
       # Apple MSP Form requires dynamic structure with messageForms template
       base_data[:data][:dynamic] = build_form_dynamic_data
@@ -690,6 +694,45 @@ class AppleMessagesForBusiness::SendMessageService
     missing.each do |identifier|
       Rails.logger.warn "[AMB Send] Form image #{identifier} not found in any tier"
     end
+  end
+
+  # Load time picker images from receivedMessage and replyMessage imageIdentifiers
+  def load_time_picker_images
+    identifiers = []
+
+    # Collect from received_message and reply_message
+    received_msg = content_attributes['received_message'] || {}
+    reply_msg = content_attributes['reply_message'] || {}
+
+    # Check both snake_case and camelCase variants
+    identifiers << received_msg['image_identifier'] if received_msg['image_identifier'].present?
+    identifiers << received_msg['imageIdentifier'] if received_msg['imageIdentifier'].present?
+    identifiers << reply_msg['image_identifier'] if reply_msg['image_identifier'].present?
+    identifiers << reply_msg['imageIdentifier'] if reply_msg['imageIdentifier'].present?
+
+    # Also check top-level flat keys
+    identifiers << content_attributes['received_image_identifier'] if content_attributes['received_image_identifier'].present?
+    identifiers << content_attributes['reply_image_identifier'] if content_attributes['reply_image_identifier'].present?
+
+    identifiers = identifiers.compact.uniq
+    return [] if identifiers.empty?
+
+    Rails.logger.info "[AMB Send] Loading #{identifiers.length} time picker images: #{identifiers.inspect}"
+
+    # Use ImageFetchService for three-tier fallback (inbox → shared → embedded)
+    images_array = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @channel.account_id,
+      inbox_id: @channel.inbox.id,
+      embedded_images: content_attributes['images'] || [] # Pass embedded images if any
+    ).fetch_and_encode(identifiers)
+
+    # Log warnings for missing images
+    missing = identifiers - images_array.map { |img| img[:identifier] }
+    missing.each do |identifier|
+      Rails.logger.warn "[AMB Send] Time picker image #{identifier} not found in any tier"
+    end
+
+    images_array
   end
 
   def convert_form_builder_pages_to_msp(builder_pages)

@@ -3190,8 +3190,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def bot_user
-    # Return the AgentBot associated with this inbox, or nil
-    @conversation.inbox.agent_bot
+    # Return the AgentBot that was provided to the constructor
+    # The bot is passed from FlowExecutorService or IncomingMessageService
+    @bot
   end
 
   # Typing indicator methods

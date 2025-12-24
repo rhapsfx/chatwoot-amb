@@ -396,6 +396,17 @@ export const actions = {
     }
   },
 
+  // Get all bot assignments for an inbox
+  getInboxBots: async (_, inboxId) => {
+    try {
+      const response = await InboxesAPI.getAgentBots(inboxId);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
+  },
+
   // Flow Management Actions
   getFlows: async ({ commit }, botId) => {
     commit(types.SET_AGENT_BOT_UI_FLAG, { isFetchingFlows: true });

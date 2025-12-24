@@ -51,18 +51,52 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController
   end
 
   def agent_bot
-    @agent_bot = @inbox.agent_bot
+    # Return all agent bot inboxes with their bots (including inactive)
+    @agent_bot_inboxes = @inbox.agent_bot_inboxes.includes(:agent_bot, :version).order(priority: :asc)
+
+    # Format response with 'active' field for frontend compatibility
+    bot_inboxes_json = @agent_bot_inboxes.as_json(
+      include: {
+        agent_bot: { only: [:id, :name, :bot_type] },
+        version: { only: [:id, :version_tag] }
+      }
+    )
+
+    bot_inboxes_json.each do |bi|
+      bot_inbox = @agent_bot_inboxes.find { |b| b.id == bi['id'] }
+      bi['active'] = bot_inbox.active?
+    end
+
+    render json: { agent_bot_inboxes: bot_inboxes_json }
   end
 
   def set_agent_bot
     if @agent_bot
-      agent_bot_inbox = @inbox.agent_bot_inbox || AgentBotInbox.new(inbox: @inbox)
-      agent_bot_inbox.agent_bot = @agent_bot
+      # Find or create bot assignment
+      agent_bot_inbox = @inbox.agent_bot_inboxes.find_or_initialize_by(agent_bot: @agent_bot)
+
+      # Set default priority if new
+      agent_bot_inbox.priority ||= (@inbox.agent_bot_inboxes.maximum(:priority) || 0) + 1
+      agent_bot_inbox.status = :active
       agent_bot_inbox.save!
-    elsif @inbox.agent_bot_inbox.present?
-      @inbox.agent_bot_inbox.destroy!
+
+      # Format response with 'active' field for frontend compatibility
+      response_data = agent_bot_inbox.as_json(
+        include: {
+          agent_bot: { only: [:id, :name, :bot_type] },
+          version: { only: [:id, :version_tag] }
+        }
+      )
+      response_data['active'] = agent_bot_inbox.active?
+
+      render json: { agent_bot_inbox: response_data }
+    elsif params[:agent_bot].nil?
+      # Remove all bot assignments
+      @inbox.agent_bot_inboxes.destroy_all
+      head :ok
+    else
+      head :ok
     end
-    head :ok
   end
 
   def destroy

@@ -135,9 +135,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent' and set sent_at timestamp
+      outgoing_message.update!(status: :sent, sent_at: Time.current)
       log_info "[TemplateExecutor] send_text_message: Successfully sent - #{content[0..50]}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_text_message: Failed - #{result[:error]}"
       0
     end
@@ -204,18 +208,20 @@ class AppleMessagesForBusiness::TemplateExecutorService
       return 0
     end
 
-    # Load template data with images using TemplateFacade
+    # Load template data using TemplateFacade
+    # Note: Time picker uses individual image identifier fields (received_image_identifier, reply_image_identifier)
+    # NOT an images array like list_picker/form, so we use load_data instead of load_data_with_images
     facade = AppleMessagesForBusiness::TemplateFacade.new(message_template)
-    time_picker_data = facade.load_data_with_images('time_picker')
+    time_picker_data = facade.load_data('time_picker')
 
     if time_picker_data.blank?
       log_error "[TemplateExecutor] send_time_picker: No time picker data in template #{template_id}"
       return 0
     end
 
-    # Merge in optional parameters (timezone, location)
+    # Merge in optional parameters
+    # Note: Only timezone_offset is allowed; location_data is NOT in ALLOWED_APPLE_TIME_PICKER_KEYS
     time_picker_data['timezone_offset'] = params['timezone_offset'] if params['timezone_offset']
-    time_picker_data['location_data'] = params['location_data'] if params['location_data']
 
     # Create outgoing message
     outgoing_message = @conversation.messages.create!(
