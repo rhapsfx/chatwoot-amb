@@ -256,13 +256,19 @@ class AppleMessagesForBusiness::FlowExecutorService
       end
     end
 
-    # Handle transitions
+    # Handle transitions - automatically follow edges to next state
     outgoing_edge = @edges.find { |e| e['source'] == node['id'] }
     if outgoing_edge
       target_node = find_node_by_id(outgoing_edge['target'])
       if target_node && target_node['type'] == 'state'
         @current_state = target_node.dig('data', 'state_id') || target_node['id']
-        log_info "[FlowExecutor] ➡️ Transitioned to state: #{@current_state}"
+        log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
+
+        # CRITICAL: Actually execute the target node to continue the flow
+        # This enables automatic handler chaining via visual edges
+        log_info '[FlowExecutor] 🎬 Executing target state node after transition'
+        @executed_nodes << target_node['id']
+        messages_sent += execute_state_node(target_node)
       end
     end
 
@@ -272,8 +278,8 @@ class AppleMessagesForBusiness::FlowExecutorService
   # Execute handler method with 4-tier fallback system
   # Priority 1: Template reference (format: "template:123")
   # Priority 2: Template by name
-  # Priority 3: Handler metadata (existing system)
-  # Priority 4: Direct service call (deprecated)
+  # Priority 3: Handler metadata (existing system) - SKIPPED for handlers with chaining
+  # Priority 4: Direct service call (for complex handlers with chaining logic)
   def execute_handler_method(handler_name)
     log_info "[FlowExecutor] 🔍 Looking for handler: #{handler_name}"
 
@@ -297,15 +303,34 @@ class AppleMessagesForBusiness::FlowExecutorService
       return execute_template(template)
     end
 
-    # PRIORITY 3: Check for handler metadata (existing system)
+    # PRIORITY 3: SKIP metadata for handlers with known chaining logic
+    # These handlers call other handlers and must execute their actual code
+    # Using metadata would break the chaining behavior
+    handlers_with_chaining = [
+      :handle_welcome,  # calls handle_region_prompt
+      :handle_region_selection,  # calls handle_form_or_name_prompt
+      :handle_form_response,  # calls handle_name_preference_prompt
+      :handle_guitar_selection,  # calls handle_ar_introduction
+      :handle_ar_introduction,  # calls handle_ar_first_question
+      :handle_apple_pay_response,  # calls handle_lesson_introduction
+      :handle_lesson_introduction,  # calls handle_location_request
+      :handle_time_picker_response,  # calls handle_continue_prompt
+      :handle_summary,  # calls handle_final_message
+      :handle_start_over,  # calls handle_welcome
+      :handle_menu_selection  # calls multiple handlers based on selection
+    ]
+
+    # Check for handler metadata BUT skip if handler has chaining logic
     handler_metadata = AppleMessagesForBusiness::AcousticHouseBotService.handler_methods_metadata[handler_name.to_sym]
-    if handler_metadata
-      log_info '[FlowExecutor] 📋 Handler metadata found (legacy)'
+    if handler_metadata && !handlers_with_chaining.include?(handler_name.to_sym)
+      log_info '[FlowExecutor] 📋 Handler metadata found (using templates)'
       return execute_handler_via_metadata(handler_name, handler_metadata)
+    elsif handler_metadata && handlers_with_chaining.include?(handler_name.to_sym)
+      log_info "[FlowExecutor] ⚠️  Handler #{handler_name} has chaining logic - skipping metadata, using direct call"
     end
 
-    # PRIORITY 4: Fallback to direct service call (deprecated)
-    log_warn "[FlowExecutor] ⚠️  Using deprecated handler method: #{handler_name}"
+    # PRIORITY 4: Direct service call (for complex handlers)
+    log_info "[FlowExecutor] 🎯 Using direct service call for handler: #{handler_name}"
     execute_handler_via_service(handler_name)
   end
 

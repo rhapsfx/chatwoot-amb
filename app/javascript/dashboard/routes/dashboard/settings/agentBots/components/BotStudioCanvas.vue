@@ -1106,7 +1106,7 @@ defineExpose({
       :elements-selectable="isInteractive"
       :zoom-on-scroll="isInteractive"
       :pan-on-scroll="isInteractive"
-      :snap-to-grid="true"
+      snap-to-grid
       :snap-grid="[20, 20]"
       fit-view-on-init
       class="vue-flow-container"

@@ -55,7 +55,7 @@ class BotActionTemplate < ApplicationRecord
     },
     'send_time_picker' => {
       required: %w[template_id],
-      optional: %w[timezone_offset location_data]
+      optional: %w[timezone_offset]
     },
     'send_form' => {
       required: %w[template_id],

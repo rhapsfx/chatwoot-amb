@@ -53,9 +53,11 @@ class AgentBotListener < BaseListener
   end
 
   def active_inbox_agent_bot(inbox)
-    return unless inbox.agent_bot_inbox&.active?
+    # Get the highest priority active bot for this inbox
+    active_bot_inbox = inbox.agent_bot_inboxes.active.order(priority: :asc).first
+    return unless active_bot_inbox
 
-    inbox.agent_bot
+    active_bot_inbox.agent_bot
   end
 
   def process_message_event(method_name, agent_bot, message, _event)
