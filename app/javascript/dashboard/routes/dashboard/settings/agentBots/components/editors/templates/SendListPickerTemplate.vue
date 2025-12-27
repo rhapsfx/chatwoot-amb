@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
+import templatesAPI from 'dashboard/api/templates';
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
+  // eslint-disable-next-line vue/no-unused-properties
   accountId: { type: Number, required: true },
 });
 
@@ -17,37 +18,36 @@ const loading = ref(false);
 const errorMessage = ref('');
 
 // Load list picker templates
-onMounted(async () => {
-  await loadTemplates();
-});
-
 const loadTemplates = async () => {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    const response = await axios.get(
-      `/api/v1/accounts/${props.accountId}/templates`,
-      {
-        params: {
-          category: 'general',
-          status: 'active',
-          per_page: 100,
-        },
-      }
-    );
+    const response = await templatesAPI.get({
+      status: 'active',
+      per_page: 100,
+    });
 
     // Filter templates by checking for list_picker content
     listPickerTemplates.value = (response.data.templates || []).filter(
       template => {
+        // Check template_type if available
+        if (template.template_type === 'list_picker') return true;
+
         // Check if template has list_picker content structure
         const content = template.content || {};
         const attrs =
           content.contentAttributes || content.content_attributes || {};
-        return (
-          attrs.sections !== undefined ||
-          template.supportedChannels?.includes('apple_messages_for_business')
-        );
+
+        // List pickers have sections array (be lenient)
+        const hasSections = attrs.sections !== undefined;
+
+        // Also check if it's tagged as list_picker
+        const isListPickerTemplate =
+          template.tags?.includes('list_picker') ||
+          template.tags?.includes('list');
+
+        return hasSections || isListPickerTemplate;
       }
     );
 
@@ -57,6 +57,7 @@ const loadTemplates = async () => {
       );
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to load list picker templates:', error);
     errorMessage.value = t(
       'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.SEND_LIST_PICKER.ERROR_LOADING'
@@ -65,6 +66,10 @@ const loadTemplates = async () => {
     loading.value = false;
   }
 };
+
+onMounted(async () => {
+  await loadTemplates();
+});
 
 // Two-way binding for template_id
 const templateId = computed({
@@ -88,7 +93,9 @@ const waitForResponse = computed({
 // Find selected template details
 const selectedTemplate = computed(() => {
   if (!templateId.value) return null;
-  return listPickerTemplates.value.find(t => t.id === templateId.value);
+  return listPickerTemplates.value.find(
+    template => template.id === templateId.value
+  );
 });
 </script>
 

@@ -171,6 +171,18 @@ class AgentBotsAPI extends ApiClient {
       ...params,
     });
   }
+
+  // Bot Action Templates
+  getBotActionTemplates(accountId, botId) {
+    return axios.get(`${this.url}/${botId}/bot_action_templates`);
+  }
+
+  updateBotActionTemplate(botId, templateId, templateData) {
+    return axios.patch(
+      `${this.url}/${botId}/bot_action_templates/${templateId}`,
+      { template: templateData }
+    );
+  }
 }
 
 export default new AgentBotsAPI();

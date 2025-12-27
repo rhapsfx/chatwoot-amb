@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
+import templatesAPI from 'dashboard/api/templates';
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
+  // eslint-disable-next-line vue/no-unused-properties
   accountId: { type: Number, required: true },
 });
 
@@ -17,36 +18,37 @@ const loading = ref(false);
 const errorMessage = ref('');
 
 // Load time picker templates
-onMounted(async () => {
-  await loadTemplates();
-});
-
 const loadTemplates = async () => {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    const response = await axios.get(
-      `/api/v1/accounts/${props.accountId}/templates`,
-      {
-        params: {
-          category: 'scheduling',
-          status: 'active',
-          per_page: 100,
-        },
-      }
-    );
+    const response = await templatesAPI.get({
+      status: 'active',
+      per_page: 100,
+    });
 
     // Filter templates by checking for time_picker content
     timePickerTemplates.value = (response.data.templates || []).filter(
       template => {
+        // Check template_type if available
+        if (template.template_type === 'time_picker') return true;
+
         const content = template.content || {};
         const attrs =
           content.contentAttributes || content.content_attributes || {};
-        return (
-          (attrs.event !== undefined && attrs.event?.timeslots !== undefined) ||
-          template.supportedChannels?.includes('apple_messages_for_business')
-        );
+
+        // Time pickers have event with timeslots (be more lenient with structure check)
+        const hasEventWithTimeslots =
+          attrs.event !== undefined && attrs.event?.timeslots !== undefined;
+
+        // Also check if it's tagged as scheduling/time picker
+        const isSchedulingTemplate =
+          template.category === 'scheduling' ||
+          template.tags?.includes('time_picker') ||
+          template.tags?.includes('scheduling');
+
+        return hasEventWithTimeslots || isSchedulingTemplate;
       }
     );
 
@@ -56,6 +58,7 @@ const loadTemplates = async () => {
       );
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to load time picker templates:', error);
     errorMessage.value = t(
       'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.SEND_TIME_PICKER.ERROR_LOADING'
@@ -131,7 +134,9 @@ const locationLongitude = computed({
 
 const selectedTemplate = computed(() => {
   if (!templateId.value) return null;
-  return timePickerTemplates.value.find(t => t.id === templateId.value);
+  return timePickerTemplates.value.find(
+    template => template.id === templateId.value
+  );
 });
 </script>
 

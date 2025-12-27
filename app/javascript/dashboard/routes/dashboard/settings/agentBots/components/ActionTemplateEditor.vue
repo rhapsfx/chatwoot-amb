@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, defineAsyncComponent } from 'vue';
+import { ref, computed, watch, defineAsyncComponent, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -25,6 +25,7 @@ const templateName = ref('');
 const templateType = ref('');
 const templateParameters = ref({});
 const isLoading = ref(false);
+const isLoadingTemplateData = ref(false);
 
 // Template type definitions with metadata
 const templateTypes = computed(() => [
@@ -195,36 +196,17 @@ const isFormValid = computed(() => {
   return Boolean(templateName.value && templateType.value);
 });
 
-// Watch template prop for editing mode
-watch(
-  () => props.template,
-  newTemplate => {
-    if (newTemplate) {
-      templateName.value = newTemplate.name || '';
-      templateType.value = newTemplate.template_type || '';
-      templateParameters.value = newTemplate.parameters || {};
-    }
-  },
-  { immediate: true }
-);
-
-// Reset parameters when template type changes
-watch(templateType, (newType, oldType) => {
-  if (newType !== oldType) {
-    templateParameters.value = {};
-  }
-});
-
 // Methods
-const open = () => {
-  dialogRef.value?.open();
-};
-
 const resetForm = () => {
   templateName.value = '';
   templateType.value = '';
   templateParameters.value = {};
   isLoading.value = false;
+  isLoadingTemplateData.value = false;
+};
+
+const open = () => {
+  dialogRef.value?.open();
 };
 
 const close = () => {
@@ -246,6 +228,43 @@ const save = () => {
 
   emit('save', templateData);
 };
+
+// Watch template prop for editing mode
+watch(
+  () => props.template,
+  newTemplate => {
+    if (newTemplate) {
+      isLoadingTemplateData.value = true;
+      templateName.value = newTemplate.name || '';
+      templateType.value = newTemplate.template_type || '';
+      templateParameters.value = newTemplate.parameters || {};
+      // Allow one tick for templateType watch to see the loading flag
+      nextTick(() => {
+        isLoadingTemplateData.value = false;
+      });
+    } else {
+      // Reset form when template is cleared
+      resetForm();
+    }
+  },
+  { immediate: true }
+);
+
+// Reset parameters when template type changes (but not when loading template data)
+watch(templateType, (newType, oldType) => {
+  // Only reset if:
+  // 1. The type actually changed
+  // 2. There was a previous value (not initial assignment)
+  // 3. We're not currently loading template data from props
+  if (
+    newType !== oldType &&
+    oldType !== '' &&
+    oldType !== undefined &&
+    !isLoadingTemplateData.value
+  ) {
+    templateParameters.value = {};
+  }
+});
 
 defineExpose({ open, close });
 </script>

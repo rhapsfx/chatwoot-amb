@@ -14,6 +14,7 @@
 #   result = executor.execute
 #
 class AppleMessagesForBusiness::FlowExecutorService
+  include AppleMessagesForBusiness::Concerns::Utf8Logging
   attr_reader :flow, :conversation, :message, :executed_nodes
 
   def initialize(flow, conversation, message)
@@ -37,8 +38,38 @@ class AppleMessagesForBusiness::FlowExecutorService
     log_info "[FlowExecutor] 🚀 Executing flow '#{@flow.name}' for message: #{@message.content}"
     log_info "[FlowExecutor] 📍 Current state: #{@current_state}"
 
-    # Normalize message
-    normalized_message = @message.content.to_s.strip.downcase
+    # Check timeout FIRST before any processing
+    if conversation_timed_out?
+      log_info '[FlowExecutor] 🕐 Conversation timed out, resetting to welcome'
+      reset_conversation_to_welcome
+      return execute_welcome_state
+    end
+
+    # Check for attachments SECOND (after timeout check, before keyword/state processing)
+    if @message.attachments.present?
+      log_info "[FlowExecutor] 📎 Attachment detected (#{@message.attachments.count})"
+      result = handle_attachment
+      return result if result
+    end
+
+    # Check if this is an interactive message response (quick reply, list picker, etc.)
+    interactive_value = extract_interactive_response_value
+
+    # Normalize message - use interactive value if present, otherwise use content
+    normalized_message = (interactive_value || @message.content).to_s.strip.downcase
+
+    if interactive_value
+      log_info "[FlowExecutor] 📱 Interactive response detected: #{interactive_value}"
+
+      # Idempotency guard: Check if we've already processed this interaction
+      if interaction_already_processed?(interactive_value)
+        log_info '[FlowExecutor] 🔒 Interaction already processed, skipping'
+        return { success: true, skipped: true, nodes_executed: [], current_state: @current_state, messages_sent: 0 }
+      end
+
+      # Mark interaction as processed
+      mark_interaction_processed(interactive_value)
+    end
 
     # Track execution
     @executed_nodes = []
@@ -50,6 +81,15 @@ class AppleMessagesForBusiness::FlowExecutorService
       log_info "[FlowExecutor] 🔑 Intent matched: #{handler_node.dig('data', 'label')} (Node ID: #{handler_node['id']})"
       log_info "[FlowExecutor] 🔍 Intent node data: #{handler_node['data'].inspect}"
       messages_sent = execute_intent_node(handler_node)
+    elsif interactive_value && (waiting_intent = find_waiting_intent_for_interactive_response)
+      # If no keyword match but this is an interactive response, check for a waiting intent node
+      @executed_nodes << waiting_intent['id']
+      log_info "[FlowExecutor] 📱 Matched waiting intent for interactive response: #{waiting_intent.dig('data', 'label')}"
+      # Store the interactive value in conversation attributes for the next state to use
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes['last_interactive_value'] = interactive_value
+      @conversation.save!
+      messages_sent = execute_intent_node(waiting_intent)
     else
       # Process current state
       state_node = find_state_node(@current_state)
@@ -60,7 +100,7 @@ class AppleMessagesForBusiness::FlowExecutorService
       else
         log_warn "[FlowExecutor] ⚠️ No matching state found for: #{@current_state}"
         # Send fallback message
-        send_text_message("I'm not sure how to respond to that.")
+        send_text_message(I18n.t('messages.activity.bot_flow.fallback_response'))
         messages_sent = 1
       end
     end
@@ -89,6 +129,81 @@ class AppleMessagesForBusiness::FlowExecutorService
   end
 
   private
+
+  # Extract value from interactive message responses (quick reply, list picker, etc.)
+  # @return [String, nil] The selected identifier/value, or nil if not an interactive response
+  def extract_interactive_response_value
+    return nil if @message.content_attributes.blank?
+
+    attrs = @message.content_attributes.with_indifferent_access
+
+    # Interactive data is stored under the 'interactive_data' key by IncomingMessageService
+    interactive_data = attrs['interactive_data']
+    return nil unless interactive_data && interactive_data['data']
+
+    data = interactive_data['data']
+
+    # Check for different interactive response types
+    # Quick Reply: data['quick-reply'] with items and selectedIndex
+    if data['quick-reply'].present?
+      quick_reply = data['quick-reply']
+      if quick_reply['items'].present? && quick_reply['selectedIndex'].present?
+        selected_index = quick_reply['selectedIndex']
+        selected_item = quick_reply['items'][selected_index]
+        return selected_item['identifier'] || selected_item['value'] if selected_item
+      end
+    end
+
+    # List Picker: data['listPicker'] with sections
+    if data['listPicker'].present?
+      list_picker = data['listPicker']
+      if list_picker['sections'].is_a?(Array)
+        list_picker['sections'].each do |section|
+          next unless section['items'].is_a?(Array)
+
+          selected_item = section['items'].find { |item| item['selected'] == true }
+          return selected_item['identifier'] || selected_item['value'] if selected_item
+        end
+      end
+    end
+
+    # Time Picker: data['timePicker'] or data['event'] with timeslots
+    if data['timePicker'].present? || data['event'].present?
+      time_picker = data['timePicker'] || data['event']
+      if time_picker['timeslots'].is_a?(Array)
+        selected_slot = time_picker['timeslots'].find { |slot| slot['selected'] == true }
+        return selected_slot['identifier'] || selected_slot['duration'] if selected_slot
+      end
+    end
+
+    # Form: data['dynamic'] with selections (would need more complex handling)
+
+    nil
+  end
+
+  # Find an intent node that's waiting for an interactive response
+  # This is used when there's no keyword match but we have an interactive response
+  # @return [Hash, nil] The waiting intent node, or nil if none found
+  def find_waiting_intent_for_interactive_response
+    return nil unless @current_state
+
+    current_state_node = @nodes.find do |n|
+      n['type'] == 'state' && (n.dig('data', 'state_id') == @current_state || n['id'] == @current_state)
+    end
+
+    return nil unless current_state_node
+
+    # Find the first intent node connected FROM current state
+    # These are contextual intents waiting for user input
+    waiting_intent_id = @edges
+                        .select { |e| e['source'] == current_state_node['id'] }
+                        .find { |e| @nodes.any? { |n| n['id'] == e['target'] && n['type'] == 'intent' } }
+                        &.dig('target')
+
+    return nil unless waiting_intent_id
+
+    @nodes.find { |n| n['id'] == waiting_intent_id }
+  end
 
   # Find initial state from flow
   def find_initial_state
@@ -136,7 +251,7 @@ class AppleMessagesForBusiness::FlowExecutorService
         # Find all intent nodes connected FROM current state
         contextual_intent_ids = @edges
                                 .select { |e| e['source'] == current_state_node['id'] }
-                                .map { |e| e['target'] }
+                                .pluck('target')
 
         contextual_intents = @nodes.select do |n|
           n['type'] == 'intent' &&
@@ -322,7 +437,7 @@ class AppleMessagesForBusiness::FlowExecutorService
 
     # Check for handler metadata BUT skip if handler has chaining logic
     handler_metadata = AppleMessagesForBusiness::AcousticHouseBotService.handler_methods_metadata[handler_name.to_sym]
-    if handler_metadata && !handlers_with_chaining.include?(handler_name.to_sym)
+    if handler_metadata && handlers_with_chaining.exclude?(handler_name.to_sym)
       log_info '[FlowExecutor] 📋 Handler metadata found (using templates)'
       return execute_handler_via_metadata(handler_name, handler_metadata)
     elsif handler_metadata && handlers_with_chaining.include?(handler_name.to_sym)
@@ -462,6 +577,9 @@ class AppleMessagesForBusiness::FlowExecutorService
       # Legacy handler execution
       handler_name = action['handler_name']
       execute_handler_method(handler_name)
+    when 'execute_custom_code'
+      # Execute custom code handler from AcousticHouseBotService
+      execute_custom_code_action(action)
     when 'send_template'
       template_name = action['template_name']
       template = find_template(template_name)
@@ -478,6 +596,9 @@ class AppleMessagesForBusiness::FlowExecutorService
       send_text_message(action['text'])
       # No delay for simple text messages
       1
+    when 'send_oauth', 'execute_oauth'
+      # OAuth authentication action
+      execute_oauth_action(action)
     else
       log_warn "[FlowExecutor] ⚠️ Unknown action type: #{action_type}"
       0
@@ -638,17 +759,25 @@ class AppleMessagesForBusiness::FlowExecutorService
     {
       current_state: bot_session['current_state'],
       message_count: bot_session['message_count'] || 0,
-      last_update: bot_session['last_update']
+      retry_count: bot_session['retry_count'] || 0,
+      last_update: bot_session['last_update'] || bot_session['last_updated_at']
     }.symbolize_keys
   end
 
   # Save session state to conversation
   def save_session_state
     attrs = @conversation.additional_attributes || {}
+    attrs['bot_session'] ||= {}
+
+    # Preserve retry_count if it exists
+    retry_count = attrs.dig('bot_session', 'retry_count') || @session[:retry_count] || 0
+
     attrs['bot_session'] = {
       'current_state' => @current_state,
       'message_count' => (@session[:message_count] || 0) + 1,
       'last_update' => Time.current.iso8601,
+      'last_updated_at' => Time.current.iso8601,
+      'retry_count' => retry_count,
       'flow_id' => @flow.id,
       'flow_name' => @flow.name
     }
@@ -656,16 +785,469 @@ class AppleMessagesForBusiness::FlowExecutorService
     @conversation.update!(additional_attributes: attrs)
   end
 
-  # Logging helpers
-  def log_info(message)
-    Rails.logger.info message
+  # ============================================================================
+  # RETRY COUNTER MANAGEMENT (Section 6.1)
+  # ============================================================================
+
+  # Increment retry count for current state
+  # @return [Integer] The new retry count
+  def increment_retry_count
+    session = load_session_state
+    session[:retry_count] ||= 0
+    session[:retry_count] += 1
+    save_session_state_with_retry(session)
+    session[:retry_count]
   end
 
-  def log_warn(message)
-    Rails.logger.warn message
+  # Get current retry count
+  # @return [Integer] The current retry count
+  def retry_count
+    session = load_session_state
+    session[:retry_count] || 0
   end
 
-  def log_error(message)
-    Rails.logger.error message
+  # Reset retry count to zero
+  def reset_retry_count
+    session = load_session_state
+    session[:retry_count] = 0
+    save_session_state_with_retry(session)
   end
+
+  # Save session state with retry count
+  def save_session_state_with_retry(session)
+    attrs = @conversation.additional_attributes || {}
+    attrs['bot_session'] ||= {}
+    attrs['bot_session']['retry_count'] = session[:retry_count]
+    attrs['bot_session']['last_updated_at'] = Time.current.iso8601
+    @conversation.update!(additional_attributes: attrs)
+  end
+
+  # ============================================================================
+  # TIMEOUT DETECTION & AUTO-RESET (Section 6.1)
+  # ============================================================================
+
+  # Check if conversation has timed out (30 minutes of inactivity)
+  # @return [Boolean] true if conversation has timed out
+  def conversation_timed_out?
+    session = load_session_state
+    last_updated = session[:last_update]
+    return false unless last_updated
+
+    timeout = 30.minutes
+    Time.zone.parse(last_updated) < timeout.ago
+  rescue ArgumentError
+    log_warn "[FlowExecutor] ⚠️ Invalid timestamp in session: #{last_updated}"
+    false
+  end
+
+  # Reset conversation to welcome state and clear all attributes
+  def reset_conversation_to_welcome
+    log_info '[FlowExecutor] 🔄 Resetting conversation to welcome state'
+
+    # Clear all conversation attributes
+    @conversation.custom_attributes = {}
+    @conversation.save!
+
+    # Reset session state
+    attrs = @conversation.additional_attributes || {}
+    attrs['bot_session'] = {
+      'current_state' => find_initial_state,
+      'message_count' => 0,
+      'retry_count' => 0,
+      'last_updated_at' => Time.current.iso8601
+    }
+    @conversation.update!(additional_attributes: attrs)
+
+    # Update local state
+    @current_state = find_initial_state
+    @session = load_session_state
+  end
+
+  # Execute welcome state after timeout reset
+  def execute_welcome_state
+    log_info '[FlowExecutor] 👋 Executing welcome state after timeout'
+
+    # Find welcome/initial state node
+    welcome_node = find_state_node(@current_state)
+    return { success: false, error: 'Welcome state not found' } unless welcome_node
+
+    @executed_nodes << welcome_node['id']
+    messages_sent = execute_state_node(welcome_node)
+
+    save_session_state
+
+    {
+      success: true,
+      nodes_executed: @executed_nodes,
+      current_state: @current_state,
+      messages_sent: messages_sent,
+      timeout_reset: true
+    }
+  end
+
+  # ============================================================================
+  # IDEMPOTENCY GUARDS (Section 6.1)
+  # ============================================================================
+
+  # Check if an interaction has already been processed
+  # @param [String] interactive_value The interaction identifier
+  # @return [Boolean] true if already processed
+  def interaction_already_processed?(interactive_value)
+    cache_key = generate_interaction_cache_key(interactive_value)
+    Rails.cache.read(cache_key).present?
+  end
+
+  # Mark an interaction as processed
+  # @param [String] interactive_value The interaction identifier
+  def mark_interaction_processed(interactive_value)
+    cache_key = generate_interaction_cache_key(interactive_value)
+    # Store for 2 minutes to prevent duplicate processing
+    Rails.cache.write(cache_key, '1', expires_in: 2.minutes)
+    log_info "[FlowExecutor] 🔐 Marked interaction as processed: #{cache_key}"
+  end
+
+  # Generate cache key for interaction idempotency
+  # @param [String] interactive_value The interaction identifier
+  # @return [String] The cache key
+  def generate_interaction_cache_key(interactive_value)
+    # Create hash of conversation ID and interaction data
+    interaction_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{interactive_value}")
+    "flow_executor:#{@flow.id}:interaction:#{interaction_hash}"
+  end
+
+  # ============================================================================
+  # CUSTOM CODE EXECUTION (Section 6.2)
+  # ============================================================================
+
+  # Execute custom code handler from AcousticHouseBotService
+  # This allows Bot Studio state nodes to execute Ruby code from the legacy service
+  # Enables complex logic like form parsing, geocoding, retry logic, etc.
+  # @param [Hash] action The action configuration with handler name
+  # @return [Integer] Number of messages sent (approximate)
+  def execute_custom_code_action(action)
+    handler_name = action['handler']
+
+    if handler_name.blank?
+      log_error '[FlowExecutor] ❌ execute_custom_code action missing handler name'
+      return 0
+    end
+
+    # Create AcousticHouseBotService instance
+    service = AppleMessagesForBusiness::AcousticHouseBotService.new(
+      @conversation,
+      @message,
+      @flow.agent_bot,
+      @flow.agent_bot.bot_config
+    )
+
+    # Check if handler exists
+    unless service.respond_to?(handler_name.to_sym, true)
+      log_error "[FlowExecutor] ❌ Custom handler '#{handler_name}' not found in AcousticHouseBotService"
+      return 0
+    end
+
+    # Invoke handler using send
+    log_info "[FlowExecutor] 🔧 Executing custom handler: #{handler_name}"
+
+    begin
+      service.send(handler_name.to_sym)
+      log_info "[FlowExecutor] ✅ Custom handler executed successfully: #{handler_name}"
+      1 # Return 1 to indicate handler was called (actual message count may vary)
+    rescue StandardError => e
+      log_error "[FlowExecutor] ❌ Error executing custom handler #{handler_name}: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      0
+    end
+  end
+
+  # ============================================================================
+  # OAUTH AUTHENTICATION INTEGRATION (Section 6.7)
+  # ============================================================================
+
+  # Execute OAuth authentication action
+  # Sends OAuth authentication request to Apple Business Chat
+  # @param [Hash] action Action configuration with provider
+  # @return [Integer] Number of messages sent (1 if successful, 0 if failed)
+  def execute_oauth_action(action)
+    provider = action['provider']
+
+    log_info "[FlowExecutor] 🔐 Executing OAuth authentication for provider: #{provider}"
+
+    # Check if provider is enabled
+    unless @conversation.inbox.channel.oauth2_provider_enabled?(provider)
+      log_warn "[FlowExecutor] ⚠️ OAuth provider '#{provider}' is not enabled for this inbox"
+      send_text_message(I18n.t('messages.activity.bot_flow.oauth.provider_not_enabled', provider: provider.capitalize))
+      return 1
+    end
+
+    # Build authentication data
+    authentication_data = { 'provider' => provider }
+    message_content = I18n.t('messages.activity.bot_flow.oauth.sign_in_prompt', provider: provider.capitalize)
+
+    log_info '[FlowExecutor] 📤 Sending OAuth authentication request to Apple MSP'
+
+    # Use SendAuthenticationService to send OAuth request
+    service = AppleMessagesForBusiness::SendAuthenticationService.new(
+      channel: @conversation.inbox.channel,
+      destination_id: @conversation.contact_inbox.source_id,
+      authentication_data: authentication_data,
+      message_content: message_content
+    )
+
+    result = service.perform
+
+    if result[:success]
+      log_info '[FlowExecutor] ✅ OAuth authentication sent successfully'
+      1
+    else
+      log_error "[FlowExecutor] ❌ OAuth authentication failed: #{result[:error]}"
+      send_text_message(I18n.t('messages.activity.bot_flow.oauth.unavailable'))
+      0
+    end
+  rescue StandardError => e
+    log_error "[FlowExecutor] ❌ Error executing OAuth action: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    send_text_message(I18n.t('messages.activity.bot_flow.oauth.unavailable'))
+    0
+  end
+
+  # ============================================================================
+  # ATTACHMENT HANDLING (Section 6.6)
+  # ============================================================================
+
+  # Handle incoming attachments (photos, files, etc.)
+  # @return [Hash, nil] Execution result if attachment was handled, nil otherwise
+  def handle_attachment
+    # Check if current state expects attachments
+    current_node = find_current_state_node
+    unless current_node
+      log_warn '[FlowExecutor] ⚠️ No current state node found for attachment handling'
+      return nil
+    end
+
+    attachment_handler = current_node.dig('data', 'attachment_handler')
+    unless attachment_handler
+      log_info '[FlowExecutor] 📎 Current state does not handle attachments, continuing normal flow'
+      return nil
+    end
+
+    log_info "[FlowExecutor] 📎 Current state has attachment handler: #{attachment_handler}"
+
+    # Check for image attachments
+    has_image = @message.attachments.any? do |attachment|
+      attachment.file&.content_type&.start_with?('image/')
+    end
+
+    if has_image && attachment_handler == 'handle_photo_upload'
+      log_info '[FlowExecutor] 📸 Photo upload detected, processing'
+      send_text_message(I18n.t('messages.activity.bot_flow.attachment.photo_received'))
+
+      # Find next state
+      next_state = current_node.dig('data', 'attachment_next_state')
+      if next_state
+        log_info "[FlowExecutor] ➡️ Transitioning to next state: #{next_state}"
+        transition_to_state(next_state)
+      else
+        log_warn '[FlowExecutor] ⚠️ No attachment_next_state configured'
+      end
+
+      # Save session state
+      save_session_state
+
+      {
+        success: true,
+        attachment_handled: true,
+        nodes_executed: [current_node['id']],
+        current_state: @current_state,
+        messages_sent: 1
+      }
+    else
+      log_info "[FlowExecutor] 📎 Attachment type or handler mismatch (has_image: #{has_image}, handler: #{attachment_handler})"
+      nil
+    end
+  end
+
+  # Find the current state node
+  # @return [Hash, nil] The current state node, or nil if not found
+  def find_current_state_node
+    return nil unless @current_state
+
+    @nodes.find do |n|
+      n['type'] == 'state' && (n.dig('data', 'state_id') == @current_state || n['id'] == @current_state)
+    end
+  end
+
+  # Transition to a new state
+  # @param [String] state_id The target state ID
+  def transition_to_state(state_id)
+    @current_state = state_id
+    log_info "[FlowExecutor] 🔄 State transitioned to: #{state_id}"
+  end
+
+  # ============================================================================
+  # ADVANCED CONDITION TYPES (Section 6.3)
+  # ============================================================================
+
+  # Evaluate condition node and return result
+  # @param [Hash] condition_node The condition node to evaluate
+  # @return [Boolean, String, nil] Condition result (boolean, target node ID, or nil)
+  def evaluate_condition(condition_node)
+    condition_type = condition_node.dig('data', 'condition_type')
+
+    case condition_type
+    when 'capability_check'
+      evaluate_capability_condition(condition_node)
+    when 'count_check'
+      evaluate_count_condition(condition_node)
+    when 'comparison'
+      evaluate_comparison_condition(condition_node)
+    when 'time_check'
+      evaluate_time_condition(condition_node)
+    else
+      log_warn "[FlowExecutor] ⚠️ Unknown condition type: #{condition_type}"
+      false
+    end
+  end
+
+  # Evaluate capability check condition
+  # Checks if contact has specific Apple Messages capability (FORM, AR, etc.)
+  # @param [Hash] condition_node The condition node
+  # @return [Boolean] true if contact has the capability
+  def evaluate_capability_condition(condition_node)
+    capability = condition_node.dig('data', 'capability')
+    contact = @conversation.contact
+    capabilities = contact.additional_attributes&.dig('apple_messages_capabilities') || ''
+
+    has_capability = capabilities.include?(capability)
+    log_info "[FlowExecutor] 🔍 Capability check: #{capability} = #{has_capability}"
+
+    has_capability
+  end
+
+  # Evaluate count check condition
+  # Evaluates count of items in conversation attribute and routes to different targets
+  # Supports ranges (2..5), exact values (1), and thresholds (6+)
+  # @param [Hash] condition_node The condition node
+  # @return [String, nil] Target node ID based on count
+  def evaluate_count_condition(condition_node)
+    variable = condition_node.dig('data', 'variable')
+    value = get_conversation_attribute(variable)
+
+    # Parse value to get count
+    count = if value.is_a?(String) && value.start_with?('[')
+              begin
+                JSON.parse(value).length
+              rescue JSON::ParserError
+                log_warn "[FlowExecutor] ⚠️ Failed to parse JSON array: #{value}"
+                0
+              end
+            elsif value.is_a?(Array)
+              value.length
+            else
+              value.to_i
+            end
+
+    log_info "[FlowExecutor] 🔢 Count check: #{variable} = #{count}"
+
+    # Find matching route
+    routes = condition_node.dig('data', 'routes') || {}
+
+    routes.each do |range_str, target|
+      matched = if range_str.include?('..')
+                  # Range: "2..5"
+                  range = eval(range_str) # rubocop:disable Security/Eval
+                  range.include?(count)
+                elsif range_str.include?('+')
+                  # "6+" means >= 6
+                  threshold = range_str.to_i
+                  count >= threshold
+                else
+                  # Exact: "1"
+                  count == range_str.to_i
+                end
+
+      if matched
+        log_info "[FlowExecutor] ✅ Count matched route: #{range_str} → #{target}"
+        return target
+      end
+    end
+
+    log_warn "[FlowExecutor] ⚠️ No route matched for count: #{count}"
+    nil
+  end
+
+  # Evaluate comparison condition
+  # Compares conversation attribute value with threshold
+  # Supports operators: >=, >, <=, <, ==
+  # @param [Hash] condition_node The condition node
+  # @return [Boolean] Comparison result
+  def evaluate_comparison_condition(condition_node)
+    variable = condition_node.dig('data', 'variable')
+    operator = condition_node.dig('data', 'operator')
+    threshold = condition_node.dig('data', 'value')
+
+    value = get_conversation_attribute(variable)
+
+    result = case operator
+             when '>=' then value.to_i >= threshold.to_i
+             when '>' then value.to_i > threshold.to_i
+             when '<=' then value.to_i <= threshold.to_i
+             when '<' then value.to_i < threshold.to_i
+             when '==' then value.to_s == threshold.to_s
+             else
+               log_warn "[FlowExecutor] ⚠️ Unknown operator: #{operator}"
+               false
+             end
+
+    log_info "[FlowExecutor] 🔍 Comparison: #{variable} (#{value}) #{operator} #{threshold} = #{result}"
+
+    result
+  end
+
+  # Evaluate time check condition
+  # Checks if timestamp is older than threshold
+  # @param [Hash] condition_node The condition node
+  # @return [Boolean] true if timestamp is older than threshold
+  def evaluate_time_condition(condition_node)
+    variable = condition_node.dig('data', 'variable')
+    threshold_str = condition_node.dig('data', 'threshold') # "30_minutes"
+
+    timestamp = get_conversation_attribute(variable)
+    unless timestamp
+      log_warn "[FlowExecutor] ⚠️ No timestamp found for variable: #{variable}"
+      return false
+    end
+
+    # Parse threshold (e.g., "30_minutes" → 30.minutes)
+    threshold = begin
+      eval(threshold_str) # rubocop:disable Security/Eval
+    rescue StandardError => e
+      log_error "[FlowExecutor] ❌ Failed to parse threshold: #{threshold_str} (#{e.message})"
+      return false
+    end
+
+    # Check if timestamp is older than threshold
+    is_older = Time.zone.parse(timestamp) < threshold.ago
+    log_info "[FlowExecutor] ⏰ Time check: #{variable} (#{timestamp}) older than #{threshold_str}? #{is_older}"
+
+    is_older
+  rescue ArgumentError => e
+    log_error "[FlowExecutor] ❌ Invalid timestamp format: #{timestamp} (#{e.message})"
+    false
+  end
+
+  # Get conversation attribute value
+  # @param [String] attribute_name The attribute name
+  # @return [String, nil] The attribute value
+  def get_conversation_attribute(attribute_name)
+    # Check both custom_attributes and additional_attributes
+    value = @conversation.custom_attributes&.dig(attribute_name)
+    value ||= @conversation.additional_attributes&.dig(attribute_name)
+    value ||= @conversation.additional_attributes&.dig('bot_session', attribute_name)
+
+    value
+  end
+
+  # Logging helpers provided by Utf8Logging concern
+  # - log_info, log_warn, log_error, log_debug are now UTF-8 safe
 end

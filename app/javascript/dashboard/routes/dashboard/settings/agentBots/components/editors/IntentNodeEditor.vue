@@ -196,8 +196,10 @@ const handleCancel = () => {
             <div class="flex-1">
               <div class="flex items-center gap-1">
                 <i class="i-lucide-globe text-n-blue-11 w-4 h-4" />
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
                 <span class="text-sm font-medium text-n-slate-12">Global</span>
               </div>
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
               <p class="text-xs text-n-slate-10 mt-0.5">
                 Always checked on every message (for startover, stop, menu,
                 help, reset)
@@ -214,8 +216,12 @@ const handleCancel = () => {
             <div class="flex-1">
               <div class="flex items-center gap-1">
                 <i class="i-lucide-git-branch text-n-purple-11 w-4 h-4" />
-                <span class="text-sm font-medium text-n-slate-12">Contextual</span>
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+                <span class="text-sm font-medium text-n-slate-12">
+                  Contextual
+                </span>
               </div>
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
               <p class="text-xs text-n-slate-10 mt-0.5">
                 Only checked when connected to current state (for
                 feature-specific intents)

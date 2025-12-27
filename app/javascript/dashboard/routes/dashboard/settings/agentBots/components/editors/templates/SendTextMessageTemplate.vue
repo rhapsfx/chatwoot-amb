@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
+  // eslint-disable-next-line vue/no-unused-properties
   accountId: { type: Number, required: true },
 });
 

@@ -29,6 +29,10 @@
 #   - send_imessage_app: Custom iMessage app invocation
 #   - send_app_clip: App Clip invocation
 #
+# Dynamic Content Generation Methods (for Bot Studio flows):
+#   - build_store_list_picker: Generate list picker from available_stores conversation attribute
+#   - build_time_picker: Generate time picker with location data from conversation attributes
+#
 class AppleMessagesForBusiness::TemplateExecutorService
   def initialize(template:, conversation:, message:)
     @template = template
@@ -91,6 +95,23 @@ class AppleMessagesForBusiness::TemplateExecutorService
   end
   # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
+  # Execute dynamic template (for Bot Studio flow actions)
+  # This method is called by FlowExecutorService when executing dynamic actions
+  # Example: execute_dynamic_template('build_store_list_picker')
+  def execute_dynamic_template(handler_name)
+    log_info "[TemplateExecutor] Executing dynamic template: #{handler_name}"
+
+    case handler_name
+    when 'build_store_list_picker'
+      build_store_list_picker
+    when 'build_time_picker'
+      build_time_picker
+    else
+      log_error "[TemplateExecutor] Unknown dynamic template handler: #{handler_name}"
+      0
+    end
+  end
+
   private
 
   # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -135,8 +156,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
-      # Update message status to 'sent' and set sent_at timestamp
-      outgoing_message.update!(status: :sent, sent_at: Time.current)
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_text_message: Successfully sent - #{content[0..50]}"
       1
     else
@@ -189,9 +210,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_list_picker: Successfully sent - Template: #{message_template.name}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_list_picker: Failed - #{result[:error]}"
       0
     end
@@ -245,9 +270,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_time_picker: Successfully sent - Template: #{message_template.name}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_time_picker: Failed - #{result[:error]}"
       0
     end
@@ -298,9 +327,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_form: Successfully sent - Template: #{message_template.name}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_form: Failed - #{result[:error]}"
       0
     end
@@ -345,9 +378,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_rich_link: Successfully sent - #{params['url']}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_rich_link: Failed - #{result[:error]}"
       0
     end
@@ -362,10 +399,19 @@ class AppleMessagesForBusiness::TemplateExecutorService
       return 0
     end
 
-    # Build quick reply content attributes using CaseTransformer
+    # Build quick reply content attributes for Apple Messages
+    # Convert BotActionTemplate format to Message format
+    items = params['items'].map do |item|
+      {
+        'identifier' => item['value'],  # Convert 'value' to 'identifier'
+        'title' => item['title']
+      }
+    end
+
     quick_reply_data = {
-      'source_id' => params['request_id'] || SecureRandom.uuid,
-      'items' => params['items']
+      'request_identifier' => params['request_id'] || SecureRandom.uuid,  # Correct field name
+      'summary_text' => params['message'],  # Required field
+      'items' => items
     }
 
     # Create outgoing message
@@ -390,9 +436,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_quick_reply: Successfully sent - #{params['items'].length} options"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_quick_reply: Failed - #{result[:error]}"
       0
     end
@@ -578,9 +628,13 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_imessage_app: Successfully sent - #{params['app_name']}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_imessage_app: Failed - #{result[:error]}"
       0
     end
@@ -626,11 +680,207 @@ class AppleMessagesForBusiness::TemplateExecutorService
     ).perform
 
     if result[:success]
+      # Update message status to 'sent'
+      outgoing_message.update!(status: :sent)
       log_info "[TemplateExecutor] send_app_clip: Successfully sent - #{params['title']}"
       1
     else
+      # Update message status to 'failed'
+      outgoing_message.update!(status: :failed)
       log_error "[TemplateExecutor] send_app_clip: Failed - #{result[:error]}"
       0
+    end
+  end
+
+  # M. Dynamic Store List Picker (for Bot Studio flows)
+  # Generates list picker from conversation attributes (available_stores)
+  def build_store_list_picker
+    # Get stores from conversation attributes
+    stores_json = @conversation.custom_attributes['available_stores']
+    unless stores_json
+      log_error '[TemplateExecutor] build_store_list_picker: No available_stores in conversation attributes'
+      return 0
+    end
+
+    stores = JSON.parse(stores_json)
+
+    # Build list picker sections
+    items = stores.map.with_index do |store, index|
+      {
+        'identifier' => index.to_s,
+        'title' => store['name'],
+        'subtitle' => "#{store['distance_km']} km away",
+        'style' => 'large',
+        'image_identifier' => 'apple_store_logo'
+      }
+    end
+
+    sections = [{
+      'title' => 'Nearby Apple Stores',
+      'multiple_selection' => false,
+      'items' => items
+    }]
+
+    # Fetch images using ImageFetchService (three-tier fallback)
+    images = AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @account.id,
+      inbox_id: @inbox.id,
+      embedded_images: []
+    ).fetch_and_encode(['apple_store_logo'])
+
+    # Build content attributes
+    content_attrs = {
+      'sections' => sections,
+      'request_identifier' => 'lp_store_selection',
+      'images' => images
+    }
+
+    # Create outgoing message
+    outgoing_message = @conversation.messages.create!(
+      account_id: @account.id,
+      inbox_id: @inbox.id,
+      message_type: :outgoing,
+      content: I18n.t('messages.activity.bot_flow.template.select_store'),
+      content_type: 'apple_list_picker',
+      content_attributes: content_attrs,
+      sender: @account.administrators.first
+    )
+
+    # Send via Apple Messages
+    dest_id = destination_id
+    return 0 unless dest_id
+
+    result = AppleMessagesForBusiness::SendListPickerService.new(
+      channel: @channel,
+      destination_id: dest_id,
+      message: outgoing_message
+    ).perform
+
+    if result[:success]
+      outgoing_message.update!(status: :sent)
+      log_info "[TemplateExecutor] build_store_list_picker: Successfully sent - #{stores.length} stores"
+      1
+    else
+      outgoing_message.update!(status: :failed)
+      log_error "[TemplateExecutor] build_store_list_picker: Failed - #{result[:error]}"
+      0
+    end
+  rescue StandardError => e
+    log_error "[TemplateExecutor] build_store_list_picker: Failed - #{e.message}"
+    0
+  end
+
+  # N. Dynamic Time Picker (for Bot Studio flows)
+  # Generates time picker with location data from conversation attributes
+  def build_time_picker
+    # Get location from conversation attributes
+    location_name = @conversation.custom_attributes['selected_store_name']
+    lat = @conversation.custom_attributes['store_search_lat']&.to_f
+    lon = @conversation.custom_attributes['store_search_lon']&.to_f
+
+    unless location_name && lat && lon
+      log_error '[TemplateExecutor] build_time_picker: Missing location data in conversation attributes'
+      return 0
+    end
+
+    # Calculate timezone
+    timezone_offset = calculate_timezone_offset(lon)
+
+    # Generate timeslots (7-8 days from now)
+    day1 = 7.days.from_now.to_date
+    day2 = 8.days.from_now.to_date
+
+    timeslots = [
+      { 'identifier' => '0', 'start_time' => "#{day1}T15:30#{timezone_offset}", 'duration' => 3600 },
+      { 'identifier' => '1', 'start_time' => "#{day1}T17:00#{timezone_offset}", 'duration' => 3600 },
+      { 'identifier' => '2', 'start_time' => "#{day1}T19:30#{timezone_offset}", 'duration' => 3600 },
+      { 'identifier' => '3', 'start_time' => "#{day2}T15:00#{timezone_offset}", 'duration' => 3600 },
+      { 'identifier' => '4', 'start_time' => "#{day2}T17:30#{timezone_offset}", 'duration' => 3600 },
+      { 'identifier' => '5', 'start_time' => "#{day2}T19:00#{timezone_offset}", 'duration' => 3600 }
+    ]
+
+    # Build content attributes
+    content_attrs = {
+      'request_identifier' => 'time_0319',
+      'received_title' => I18n.t('messages.activity.bot_flow.template.schedule_lesson'),
+      'received_subtitle' => location_name,
+      'event' => {
+        'identifier' => SecureRandom.uuid,
+        'title' => 'Guitar Lesson',
+        'location' => {
+          'latitude' => lat,
+          'longitude' => lon,
+          'title' => location_name
+        },
+        'timeslots' => timeslots
+      }
+    }
+
+    # Create outgoing message
+    outgoing_message = @conversation.messages.create!(
+      account_id: @account.id,
+      inbox_id: @inbox.id,
+      message_type: :outgoing,
+      content: I18n.t('messages.activity.bot_flow.template.schedule_lesson'),
+      content_type: 'apple_time_picker',
+      content_attributes: content_attrs,
+      sender: @account.administrators.first
+    )
+
+    # Send via Apple Messages
+    dest_id = destination_id
+    return 0 unless dest_id
+
+    result = AppleMessagesForBusiness::SendMessageService.new(
+      channel: @channel,
+      destination_id: dest_id,
+      message: outgoing_message
+    ).perform
+
+    if result[:success]
+      outgoing_message.update!(status: :sent)
+      log_info "[TemplateExecutor] build_time_picker: Successfully sent - #{timeslots.length} timeslots at #{location_name}"
+      1
+    else
+      outgoing_message.update!(status: :failed)
+      log_error "[TemplateExecutor] build_time_picker: Failed - #{result[:error]}"
+      0
+    end
+  rescue StandardError => e
+    log_error "[TemplateExecutor] build_time_picker: Failed - #{e.message}"
+    0
+  end
+
+  # Calculate timezone offset from longitude for time picker
+  def calculate_timezone_offset(longitude)
+    # Global timezone approximation based on longitude
+    # Returns ISO 8601 timezone offset format
+    if longitude < -120
+      '-0800' # Pacific (US West Coast, parts of Canada/Mexico)
+    elsif longitude < -105
+      '-0700' # Mountain (US Mountain, parts of Mexico)
+    elsif longitude < -90
+      '-0600' # Central (US Central, parts of Mexico)
+    elsif longitude < -60
+      '-0500' # Eastern (US East Coast, parts of Canada/South America)
+    elsif longitude < -30
+      '-0300' # South America (Brazil, Argentina)
+    elsif longitude < 15
+      '+0000' # UK, Western Europe, West Africa
+    elsif longitude < 30
+      '+0100' # Central Europe (France, Germany, Italy)
+    elsif longitude < 45
+      '+0200' # Eastern Europe (Finland, Greece, South Africa)
+    elsif longitude < 75
+      '+0300' # Middle East (Turkey, Israel, UAE)
+    elsif longitude < 105
+      '+0530' # India
+    elsif longitude < 120
+      '+0800' # China, Singapore
+    elsif longitude < 150
+      '+0900' # Japan, Korea
+    else
+      '+1000' # Australia (East)
     end
   end
 

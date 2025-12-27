@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
+  // eslint-disable-next-line vue/no-unused-properties
   accountId: { type: Number, required: true },
 });
 
@@ -43,7 +44,7 @@ const headersJson = computed({
       emit('update:modelValue', { ...props.modelValue, headers: parsed });
     } catch (e) {
       headersError.value = t(
-        'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
+        'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
       );
     }
   },
@@ -66,7 +67,7 @@ const bodyJson = computed({
       emit('update:modelValue', { ...props.modelValue, body: parsed });
     } catch (e) {
       bodyError.value = t(
-        'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
+        'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
       );
     }
   },
@@ -90,7 +91,7 @@ const formatHeaders = () => {
     headersError.value = '';
   } catch (e) {
     headersError.value = t(
-      'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
+      'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
     );
   }
 };
@@ -103,7 +104,7 @@ const formatBody = () => {
     bodyError.value = '';
   } catch (e) {
     bodyError.value = t(
-      'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
+      'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.JSON_ERROR'
     );
   }
 };
@@ -114,7 +115,11 @@ const formatBody = () => {
     <!-- URL -->
     <div>
       <label class="block text-sm font-medium text-n-slate-12 mb-2">
-        {{ t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.URL') }}
+        {{
+          t(
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.URL'
+          )
+        }}
         *
       </label>
       <input
@@ -123,7 +128,7 @@ const formatBody = () => {
         class="w-full px-4 py-2 border border-n-weak rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-8"
         :placeholder="
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.URL_PLACEHOLDER'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.URL_PLACEHOLDER'
           )
         "
       />
@@ -132,7 +137,11 @@ const formatBody = () => {
     <!-- HTTP Method -->
     <div>
       <label class="block text-sm font-medium text-n-slate-12 mb-2">
-        {{ t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.METHOD') }}
+        {{
+          t(
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.METHOD'
+          )
+        }}
         *
       </label>
       <select
@@ -142,7 +151,7 @@ const formatBody = () => {
         <option value="">
           {{
             t(
-              'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.SELECT_METHOD'
+              'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.SELECT_METHOD'
             )
           }}
         </option>
@@ -159,7 +168,9 @@ const formatBody = () => {
       <div class="flex items-center justify-between mb-2">
         <label class="block text-sm font-medium text-n-slate-12">
           {{
-            t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS')
+            t(
+              'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS'
+            )
           }}
         </label>
         <button
@@ -168,7 +179,7 @@ const formatBody = () => {
         >
           {{
             t(
-              'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.FORMAT_JSON'
+              'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.FORMAT_JSON'
             )
           }}
         </button>
@@ -185,7 +196,7 @@ const formatBody = () => {
         "
         :placeholder="
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS_PLACEHOLDER'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS_PLACEHOLDER'
           )
         "
       />
@@ -196,7 +207,7 @@ const formatBody = () => {
       <p v-else class="mt-1 text-xs text-n-slate-11">
         {{
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS_HELP'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.HEADERS_HELP'
           )
         }}
       </p>
@@ -206,7 +217,11 @@ const formatBody = () => {
     <div v-if="['POST', 'PUT', 'PATCH'].includes(method)">
       <div class="flex items-center justify-between mb-2">
         <label class="block text-sm font-medium text-n-slate-12">
-          {{ t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY') }}
+          {{
+            t(
+              'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY'
+            )
+          }}
         </label>
         <button
           class="px-3 py-1 text-xs text-n-blue-8 hover:bg-n-blue-2 rounded transition-colors"
@@ -214,7 +229,7 @@ const formatBody = () => {
         >
           {{
             t(
-              'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.FORMAT_JSON'
+              'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.FORMAT_JSON'
             )
           }}
         </button>
@@ -231,7 +246,7 @@ const formatBody = () => {
         "
         :placeholder="
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY_PLACEHOLDER'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY_PLACEHOLDER'
           )
         "
       />
@@ -241,7 +256,9 @@ const formatBody = () => {
       </p>
       <p v-else class="mt-1 text-xs text-n-slate-11">
         {{
-          t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY_HELP')
+          t(
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.BODY_HELP'
+          )
         }}
       </p>
     </div>
@@ -251,7 +268,7 @@ const formatBody = () => {
       <label class="block text-sm font-medium text-n-slate-12 mb-2">
         {{
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN'
           )
         }}
       </label>
@@ -260,14 +277,14 @@ const formatBody = () => {
         class="w-full px-4 py-2 border border-n-weak rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-8"
         :placeholder="
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN_PLACEHOLDER'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN_PLACEHOLDER'
           )
         "
       />
       <p class="mt-1 text-xs text-n-slate-11">
         {{
           t(
-            'AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN_HELP'
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.STORE_RESPONSE_IN_HELP'
           )
         }}
       </p>
@@ -276,7 +293,11 @@ const formatBody = () => {
     <!-- Example Section -->
     <div class="p-4 bg-n-slate-2 border border-n-weak rounded-lg">
       <p class="text-xs font-medium text-n-slate-12 mb-2">
-        {{ t('AGENT_BOTS.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.EXAMPLE') }}
+        {{
+          t(
+            'AGENT_BOTS.TEMPLATES.ACTION_TEMPLATES.TYPES.API_CALL.PARAMETERS.EXAMPLE'
+          )
+        }}
       </p>
       <pre class="text-xs text-n-slate-11 font-mono overflow-x-auto">
 {

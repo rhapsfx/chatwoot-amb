@@ -20,14 +20,14 @@ class AppleMessagesForBusiness::SendMessageService
     lock_acquired = Redis::Alfred.set(lock_key, '1', ex: 30, nx: true)
 
     unless lock_acquired
-      Rails.logger.warn "[AMB Send] Message #{@message.id} is already being sent (lock exists)"
+      log_warn "[AMB Send] Message #{@message.id} is already being sent (lock exists)"
       return { success: false, error: 'Message send already in progress', error_code: 'SEND_IN_PROGRESS' }
     end
 
     begin
       # CRITICAL: Check if user has opted out (Apple MSP requirement)
       if user_opted_out?
-        Rails.logger.warn "[AMB Send] Cannot send message - user #{@destination_id} has opted out"
+        log_warn "[AMB Send] Cannot send message - user #{@destination_id} has opted out"
         return { success: false, error: 'User has opted out of receiving messages', error_code: 'USER_OPTED_OUT' }
       end
 
@@ -42,7 +42,7 @@ class AppleMessagesForBusiness::SendMessageService
       Redis::Alfred.delete(lock_key)
     end
   rescue StandardError => e
-    Rails.logger.error "Apple Messages send failed: #{e.message}"
+    log_error "Apple Messages send failed: #{e.message}"
     { success: false, error: e.message }
   end
 
@@ -89,7 +89,7 @@ class AppleMessagesForBusiness::SendMessageService
   end
 
   def idempotency_response
-    Rails.logger.info "[AMB Send] Message #{@message.id} already sent (external_source_id: #{@message.external_source_id_apple_messages}), skipping"
+    log_info "[AMB Send] Message #{@message.id} already sent (external_source_id: #{@message.external_source_id_apple_messages}), skipping"
     { success: true, message_id: @message.external_source_id_apple_messages, skipped: true }
   end
 
@@ -112,7 +112,7 @@ class AppleMessagesForBusiness::SendMessageService
     # Store in database
     @message.update_column(:apple_msp_payload, apple_msp_payload)
 
-    Rails.logger.info "✅ Apple MSP - Stored payload (status: #{status}, type: #{@message.content_type})"
+    log_info "✅ Apple MSP - Stored payload (status: #{status}, type: #{@message.content_type})"
   end
 
   def sanitize_payload_for_storage(payload)
@@ -220,10 +220,10 @@ class AppleMessagesForBusiness::SendMessageService
 
     response = send_to_apple_gateway(payload, message_id, request_idr: request_idr)
 
-    Rails.logger.info "[AMB Send] Apple MSP Response - Code: #{response.code}, Success: #{response.success?}"
+    log_info "[AMB Send] Apple MSP Response - Code: #{response.code}, Success: #{response.success?}"
 
     if response.success?
-      Rails.logger.info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
+      log_info "[AMB Send] ✅ Successfully sent to Apple MSP - Message ID: #{@message.id}"
       # Store the payload that was sent to Apple MSP for debugging
       store_apple_msp_payload(payload, 'sent', message_id)
 
@@ -234,11 +234,11 @@ class AppleMessagesForBusiness::SendMessageService
         begin
           response_data = JSON.parse(response.body)
           if response_data['dataRef'].present?
-            Rails.logger.info "[AMB Send] Received dataRef for message #{message_id}"
+            log_info "[AMB Send] Received dataRef for message #{message_id}"
             result[:data_ref] = response_data['dataRef']
           end
         rescue JSON::ParserError => e
-          Rails.logger.warn "[AMB Send] Failed to parse response body for dataRef: #{e.message}"
+          log_warn "[AMB Send] Failed to parse response body for dataRef: #{e.message}"
         end
       end
 
@@ -1244,10 +1244,10 @@ class AppleMessagesForBusiness::SendMessageService
         validator.validate!
       end
     rescue AppleMessagesForBusiness::PayloadValidatorService::ValidationError => e
-      Rails.logger.error "[AMB Send] Payload validation failed: #{e.message}"
+      log_error "[AMB Send] Payload validation failed: #{e.message}"
       # Log the invalid payload for debugging (sanitized to avoid base64 spam)
       sanitized_payload = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(payload)
-      Rails.logger.error "[AMB Send] Invalid payload: #{sanitized_payload.to_json}"
+      log_error "[AMB Send] Invalid payload: #{sanitized_payload.to_json}"
       # Return error response instead of sending to Apple
       return OpenStruct.new(
         success?: false,
