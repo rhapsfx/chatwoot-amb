@@ -30,14 +30,12 @@ const scopeIcon = computed(() =>
   scope.value === 'global' ? 'i-lucide-globe' : 'i-lucide-git-branch'
 );
 
-// Get validation status
-// eslint-disable-next-line no-underscore-dangle
-const validation = computed(() => props.data._validation);
-const hasWarning = computed(() => validation.value?.level === 'warning');
-const hasError = computed(() => validation.value?.level === 'error');
-const validationMessages = computed(
-  () => validation.value?.messages?.join(', ') || ''
-);
+// Get validation status - DISABLED to prevent infinite reactivity loops
+// TODO: Re-implement validation without circular dependencies
+// const validation = computed(() => props.data._validation);
+const hasWarning = computed(() => false);
+const hasError = computed(() => false);
+const validationMessages = computed(() => '');
 </script>
 
 <template>

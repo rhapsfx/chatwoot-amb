@@ -147,6 +147,9 @@ Rails.application.routes.draw do
                 get :search
               end
             end
+
+            # Bot Action Templates for state node actions
+            resources :bot_action_templates, controller: 'agent_bots/bot_action_templates', only: [:index, :show, :update]
           end
           # Template endpoints for CRUD operations
           resources :templates, only: [:index, :show, :create, :update, :destroy] do

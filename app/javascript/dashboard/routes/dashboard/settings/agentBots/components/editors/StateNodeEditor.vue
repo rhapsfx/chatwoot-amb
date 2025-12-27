@@ -1,10 +1,12 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStoreGetters } from 'dashboard/composables/store';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Textarea from 'dashboard/components-next/textarea/Textarea.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import HandlerMethodSelector from '../HandlerMethodSelector.vue';
+import StateActionsEditor from '../StateActionsEditor.vue';
 
 const props = defineProps({
   node: {
@@ -20,6 +22,8 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel']);
 
 const { t } = useI18n();
+const { getCurrentAccountId } = useStoreGetters();
+const accountId = getCurrentAccountId.value;
 
 // Local editable state
 const editedData = ref({
@@ -138,12 +142,11 @@ const handleHandlerSelected = handler => {
 
       <!-- Actions (placeholder for now) -->
       <div>
-        <label class="block text-sm font-medium text-n-slate-11 mb-1">
-          {{ t('AGENT_BOTS.NODE_CONFIG.ACTIONS') }}
-        </label>
-        <div class="text-xs text-n-slate-10 p-3 bg-n-slate-2 rounded">
-          {{ t('AGENT_BOTS.EDITORS.ACTIONS_FUTURE_PHASE') }}
-        </div>
+        <StateActionsEditor
+          v-model="editedData.actions"
+          :bot-id="botId"
+          :account-id="accountId"
+        />
       </div>
 
       <!-- Save/Cancel Buttons -->

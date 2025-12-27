@@ -75,7 +75,7 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-4">
     <div v-if="loading" class="flex items-center justify-center py-8">
-      <Spinner size="md" />
+      <Spinner :size="32" />
       <span class="ml-2 text-sm text-n-slate-10">{{
         t('AGENT_BOTS.NODE_CONFIG.LOADING_TEMPLATES')
       }}</span>

@@ -124,7 +124,8 @@
       },
       "CANCEL": "Cancel",
       "CREATE": "Create Bot",
-      "UPDATE": "Update Bot"
+      "UPDATE": "Update Bot",
+      "SAVE": "Save"
     },
     "WEBHOOK": {
       "DESCRIPTION": "Configure a webhook bot to integrate with your custom services. The bot will receive and process events from conversations and can respond to them."
@@ -209,7 +210,7 @@
       "IMPORT_FROM_FLOW": "Import Flow",
       "IMPORT_FROM_JSON": "Import JSON",
       "EXPORT_TO_JSON": "Export JSON",
-      "BROWSE_TEMPLATES": "Templates",
+      "BROWSE_TEMPLATES": "Flow Templates",
       "BROWSE_HANDLERS": "Handlers",
       "VALIDATE": "Validate",
       "TEST": "Test",
@@ -431,7 +432,242 @@
       "FOOTER_TIP": "Templates can be edited after insertion",
       "INSERT": "Insert Template",
       "INSERT_SUCCESS": "Template inserted successfully",
-      "BROWSE_TEMPLATES": "Browse Templates"
+      "BROWSE_TEMPLATES": "Browse Templates",
+      "ACTION_TEMPLATES": {
+        "EDIT_TITLE": "Edit Action Template",
+        "CREATE_TITLE": "Create Action Template",
+        "NAME": "Template Name",
+        "NAME_PLACEHOLDER": "Enter template name (e.g., welcome_message, send_menu)",
+        "SELECT_TYPE": "Select Template Type",
+        "PARAMETERS": "Parameters",
+        "TYPE": "Type",
+        "ACTION": "Action",
+        "PREVIEW": "Preview",
+        "CREATE": "Create Template",
+        "EDITOR_COMING_SOON": "Editor for this template type coming soon",
+        "TYPES": {
+          "SEND_TEXT_MESSAGE": {
+            "NAME": "Send Text Message",
+            "DESCRIPTION": "Send a simple text message to the user",
+            "PARAMETERS": {
+              "MESSAGE": "Message",
+              "MESSAGE_PLACEHOLDER": "Enter the message text to send to the user",
+              "DELAY_SECONDS": "Delay (seconds)",
+              "DELAY_PLACEHOLDER": "Optional delay before sending (e.g., 0.5, 1, 2)",
+              "DELAY_HELP": "Add a typing indicator delay before sending this message (default: 0)"
+            }
+          },
+          "SEND_LIST_PICKER": {
+            "NAME": "Send List Picker",
+            "DESCRIPTION": "Send an interactive list picker for user selection",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "List Picker Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved list picker template to send to the user",
+              "TEMPLATE": "List Picker Template",
+              "WAIT_FOR_RESPONSE": "Wait for user response before continuing",
+              "WAIT_FOR_RESPONSE_HELP": "If enabled, the bot will pause and wait for the user to select an option before proceeding to the next step"
+            },
+            "NO_TEMPLATES": "No list picker templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load list picker templates. Please try again.",
+            "LOADING": "Loading list picker templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_TIME_PICKER": {
+            "NAME": "Send Time Picker",
+            "DESCRIPTION": "Send a time picker for scheduling appointments",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "Time Picker Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved time picker template to send to the user",
+              "TEMPLATE": "Time Picker Template",
+              "TIMEZONE_OFFSET": "Timezone Offset",
+              "TIMEZONE_PLACEHOLDER": "Hours from UTC",
+              "TIMEZONE_HELP": "Example: -8 for PST (UTC-8), +1 for CET (UTC+1)",
+              "LOCATION": "Location (Optional)",
+              "LOCATION_NAME_PLACEHOLDER": "Location name",
+              "LATITUDE_PLACEHOLDER": "Latitude",
+              "LONGITUDE_PLACEHOLDER": "Longitude",
+              "LOCATION_HELP": "Add location context for the time picker (e.g., 'Apple Park, 37.334606, -122.009102')"
+            },
+            "NO_TEMPLATES": "No time picker templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load time picker templates. Please try again.",
+            "LOADING": "Loading time picker templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_FORM": {
+            "NAME": "Send Form",
+            "DESCRIPTION": "Send a form for collecting user information",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "Form Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved form template to send to the user",
+              "TEMPLATE": "Form Template",
+              "PRE_FILL_DATA": "Pre-fill Data (Optional)",
+              "PRE_FILL_PLACEHOLDER": "{\n  \"fieldName\": \"defaultValue\"\n}",
+              "PRE_FILL_HELP": "JSON object containing default values to pre-fill form fields",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            },
+            "NO_TEMPLATES": "No form templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load form templates. Please try again.",
+            "LOADING": "Loading form templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_RICH_LINK": {
+            "NAME": "Send Rich Link",
+            "DESCRIPTION": "Send a rich link with image and metadata",
+            "PARAMETERS": {
+              "URL": "URL",
+              "URL_PLACEHOLDER": "https://example.com/product",
+              "URL_HELP": "The web URL to link to (must start with https://)",
+              "TITLE": "Title",
+              "TITLE_PLACEHOLDER": "Link title (e.g., Check out our store)",
+              "SUBTITLE": "Subtitle (Optional)",
+              "SUBTITLE_PLACEHOLDER": "Additional description text",
+              "IMAGE_URL": "Image URL (Optional)",
+              "IMAGE_URL_PLACEHOLDER": "https://example.com/image.jpg",
+              "IMAGE_URL_HELP": "URL to an image to display with the link"
+            }
+          },
+          "SEND_QUICK_REPLY": {
+            "NAME": "Send Quick Reply",
+            "DESCRIPTION": "Send quick reply buttons for fast responses",
+            "PARAMETERS": {
+              "TEMPLATE": "Quick Reply Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved quick reply template to send to the user",
+              "MESSAGE": "Message",
+              "MESSAGE_PLACEHOLDER": "Enter message text",
+              "REQUEST_ID": "Request ID",
+              "REQUEST_ID_PLACEHOLDER": "Enter request identifier",
+              "REQUEST_ID_HELP": "Unique identifier for tracking this quick reply request",
+              "ITEMS": "Quick Reply Items",
+              "NO_ITEMS": "No items added yet. Click 'Add Item' to create quick reply options.",
+              "ADD_ITEM": "Add Item",
+              "REMOVE_ITEM": "Remove",
+              "ITEM_TITLE": "Button Text",
+              "ITEM_TITLE_PLACEHOLDER": "Display text",
+              "ITEM_VALUE": "Value",
+              "ITEM_VALUE_PLACEHOLDER": "Internal value"
+            },
+            "NO_TEMPLATES": "No quick reply templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load quick reply templates. Please try again.",
+            "LOADING": "Loading quick reply templates...",
+            "RETRY": "Retry"
+          },
+          "UPDATE_ATTRIBUTES": {
+            "NAME": "Update Attributes",
+            "DESCRIPTION": "Update conversation custom attributes",
+            "PARAMETERS": {
+              "ATTRIBUTES": "Attributes (JSON)",
+              "ATTRIBUTES_PLACEHOLDER": "{\n  \"key\": \"value\"\n}",
+              "ATTRIBUTES_HELP": "JSON object containing attributes to update",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            }
+          },
+          "CONDITIONAL_BRANCH": {
+            "NAME": "Conditional Branch",
+            "DESCRIPTION": "Branch conversation flow based on conditions",
+            "PARAMETERS": {
+              "CONDITION_TYPE": "Condition Type",
+              "EXPRESSION": "Expression",
+              "EXPRESSION_PLACEHOLDER": "Enter conditional expression"
+            }
+          },
+          "SEND_APPLE_PAY": {
+            "NAME": "Send Apple Pay",
+            "DESCRIPTION": "Request payment via Apple Pay",
+            "PARAMETERS": {
+              "MERCHANT_ID": "Merchant ID",
+              "MERCHANT_ID_PLACEHOLDER": "merchant.com.example.store",
+              "MERCHANT_ID_HELP": "Your Apple Pay merchant identifier (register at developer.apple.com)",
+              "ITEM_NAME": "Item Name",
+              "ITEM_NAME_PLACEHOLDER": "Premium Subscription",
+              "AMOUNT": "Amount",
+              "AMOUNT_PLACEHOLDER": "0.00",
+              "AMOUNT_HELP": "Payment amount (e.g., 19.99, 100.00)",
+              "CURRENCY": "Currency",
+              "CURRENCY_PLACEHOLDER": "USD",
+              "CURRENCY_HELP": "ISO 4217 currency code (USD, EUR, GBP, etc.)",
+              "DESCRIPTION": "Description",
+              "DESCRIPTION_PLACEHOLDER": "Payment description"
+            }
+          },
+          "API_CALL": {
+            "NAME": "API Call",
+            "DESCRIPTION": "Make an HTTP API call to external service",
+            "PARAMETERS": {
+              "URL": "API URL",
+              "URL_PLACEHOLDER": "https://api.example.com/endpoint",
+              "METHOD": "HTTP Method",
+              "SELECT_METHOD": "Select method...",
+              "HEADERS": "Headers (Optional)",
+              "HEADERS_PLACEHOLDER": "{ \"Authorization\": \"Bearer token\" }",
+              "HEADERS_HELP": "JSON object containing HTTP headers",
+              "BODY": "Request Body (Optional)",
+              "BODY_PLACEHOLDER": "{ \"key\": \"value\" }",
+              "BODY_HELP": "JSON object containing request body",
+              "STORE_RESPONSE_IN": "Store Response In (Optional)",
+              "STORE_RESPONSE_IN_PLACEHOLDER": "api_response",
+              "STORE_RESPONSE_IN_HELP": "Conversation attribute name to store the API response",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            }
+          },
+          "SEND_IMESSAGE_APP": {
+            "NAME": "Send iMessage App",
+            "DESCRIPTION": "Launch an iMessage app extension",
+            "PARAMETERS": {
+              "APP_ID": "App Bundle ID",
+              "APP_ID_PLACEHOLDER": "com.example.app.MessagesExtension",
+              "APP_ID_HELP": "iMessage app bundle identifier (e.g., com.shazam.Shazam.MessagesExtension)",
+              "APP_NAME": "App Name",
+              "APP_NAME_PLACEHOLDER": "Guitar Tuner",
+              "APP_ICON_URL": "App Icon URL (Optional)",
+              "APP_ICON_URL_PLACEHOLDER": "https://example.com/icon.png",
+              "LAUNCH_URL": "Launch URL (Optional)",
+              "LAUNCH_URL_PLACEHOLDER": "imessage-app://open?feature=tuner",
+              "LAUNCH_URL_HELP": "Deep link URL to launch specific app feature",
+              "DATA": "App Data (Optional)",
+              "DATA_PLACEHOLDER": "{ \"key\": \"value\" }",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "KNOWN_APPS_TITLE": "Common iMessage Apps:",
+              "KNOWN_APPS": {
+                "SHAZAM": "• Shazam: com.shazam.Shazam.MessagesExtension",
+                "APPLE_MUSIC": "• Apple Music: com.apple.Music.MessagesExtension",
+                "PHOTOS": "• Photos: com.apple.mobileslideshow.PhotosMessagesApp"
+              }
+            }
+          },
+          "SEND_APP_CLIP": {
+            "NAME": "Send App Clip",
+            "DESCRIPTION": "Share an App Clip experience",
+            "PARAMETERS": {
+              "APP_CLIP_URL": "App Clip URL",
+              "APP_CLIP_URL_PLACEHOLDER": "https://example.com/clips/guitar-tuner",
+              "APP_CLIP_URL_HELP": "URL to invoke App Clip (must be registered in App Store Connect)",
+              "TITLE": "Title",
+              "TITLE_PLACEHOLDER": "Try our Guitar Tuner",
+              "SUBTITLE": "Subtitle (Optional)",
+              "SUBTITLE_PLACEHOLDER": "Tune your guitar without installing an app",
+              "IMAGE_URL": "Hero Image URL (Optional)",
+              "IMAGE_URL_PLACEHOLDER": "https://example.com/hero.png",
+              "IMAGE_URL_HELP": "Hero image displayed in App Clip card",
+              "ACTION_TITLE": "Button Text (Optional)",
+              "ACTION_TITLE_PLACEHOLDER": "Open",
+              "ACTION_TITLE_HELP": "Text shown on action button (default: \"Open\")",
+              "INFO_TITLE": "About App Clips:",
+              "INFO_TEXT": "App Clips are lightweight experiences (max 10MB) that let users access your app's functionality without installation. They're perfect for quick interactions like tuning a guitar, making a reservation, or viewing product details."
+            }
+          }
+        }
+      }
     },
     "EDITORS": {
       "EDIT_STATE_NODE": "Edit State Node",
@@ -481,6 +717,26 @@
     },
     "NODE_CONFIG": {
       "ACTIONS": "Actions",
+      "ACTIONS_HELP": "Configure the actions to execute when this state node is reached",
+      "ADD_ACTION": "Add Action",
+      "ADD_FIRST_ACTION": "Add First Action",
+      "NO_ACTIONS": "No actions configured",
+      "ACTION_NUMBER": "Action {number}",
+      "ACTION_TYPE": "Action Type",
+      "SELECT_ACTION_TYPE": "Select action type...",
+      "SELECT_TEMPLATE": "Select Template",
+      "CHOOSE_TEMPLATE": "Choose a template...",
+      "TEMPLATE_NUMBER": "Template {number}",
+      "TEMPLATES_SEQUENCE": "Templates Sequence",
+      "ADD_TEMPLATE": "Add Template",
+      "NO_TEMPLATES_ADDED": "No templates added yet",
+      "TEMPLATE_TYPE": "Type",
+      "TEMPLATE_PARAMETERS": "Template Parameters",
+      "PARAMETER_NAME": "{name}:",
+      "EDIT_TEMPLATE": "Edit template configuration",
+      "SHOW_DETAILS": "Show template details",
+      "HIDE_DETAILS": "Hide template details",
+      "RETRY": "Retry",
       "ADD": "Add",
       "EXACT_MATCH": "Exact Match",
       "CASE_SENSITIVE": "Case Sensitive",
@@ -834,7 +1090,7 @@
             "LAUNCH_URL_PLACEHOLDER": "imessage-app://open?feature=tuner",
             "LAUNCH_URL_HELP": "Deep link URL to launch specific app feature",
             "DATA": "App Data (Optional)",
-            "DATA_PLACEHOLDER": "{ \"mode\": \"tune\", \"instrument\": \"guitar\" }",
+            "DATA_PLACEHOLDER": "{ \"key\": \"value\" }",
             "FORMAT_JSON": "Format JSON",
             "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
             "KNOWN_APPS_TITLE": "Common iMessage Apps:",

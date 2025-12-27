@@ -117,6 +117,19 @@ class AgentBotPolicy < ApplicationPolicy
   def validate_handler_method?
     @account_user.administrator? || @account_user.agent?
   end
+
+  # Inbox version assignment permissions
+  def assign_version?
+    @account_user.administrator?
+  end
+
+  def clear_version?
+    @account_user.administrator?
+  end
+
+  def update_config_override?
+    @account_user.administrator?
+  end
 end
 
 AgentBotPolicy.prepend_mod_with('AgentBotPolicy')

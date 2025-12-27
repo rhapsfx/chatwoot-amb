@@ -61,12 +61,17 @@ const currentSearchIndex = ref(0); // Track which search result we're viewing
 // Node Validation (Warnings & Errors)
 // ========================================
 
+// Store validation state separately to avoid infinite reactivity loops with VueFlow
+// DO NOT store validation in nodes.value - it causes VueFlow to trigger re-renders
+// eslint-disable-next-line no-unused-vars
+const nodeValidationMap = ref(new Map());
+
 // Detect nodes with warnings (orange) or errors (red)
-const getNodeValidationStatus = nodeId => {
-  const node = nodes.value.find(n => n.id === nodeId);
+// eslint-disable-next-line no-unused-vars
+const getNodeValidationStatus = (node, allEdges) => {
   if (!node) return null;
 
-  const outgoingEdges = edges.value.filter(e => e.source === nodeId);
+  const outgoingEdges = allEdges.filter(e => e.source === node.id);
   const hasOutgoingEdge = outgoingEdges.length > 0;
 
   // Check for warnings (orange)
@@ -118,24 +123,35 @@ const getNodeValidationStatus = nodeId => {
   return null;
 };
 
-// Apply validation status to nodes directly
+// Update validation map without touching nodes array
+// TEMPORARILY DISABLED to prevent infinite reactivity loops
+// TODO: Re-implement validation without causing VueFlow reactivity issues
 const updateNodeValidation = () => {
+  // Validation system temporarily disabled to prevent stack overflow
+  // The infinite loop was caused by reactive dependencies in VueFlow's v-model
+  /* DISABLED CODE:
+  const newValidationMap = new Map();
+  const currentEdges = edges.value;
+  
   nodes.value.forEach(node => {
-    const validation = getNodeValidationStatus(node.id);
-
-    // Update node class for styling
-    if (validation?.level === 'error') {
-      node.class = 'node-error';
-    } else if (validation?.level === 'warning') {
-      node.class = 'node-warning';
-    } else {
-      node.class = '';
+    const validation = getNodeValidationStatus(node, currentEdges);
+    if (validation) {
+      newValidationMap.set(node.id, validation);
     }
-
-    // Pass validation to node component
-    if (!node.data) node.data = {};
-    node.data._validation = validation;
   });
+
+  nodeValidationMap.value = newValidationMap;
+  */
+};
+
+// Helper to get validation classes for a node
+const getNodeClasses = (nodeId, isHighlighted) => {
+  return {
+    'highlighted-node': isHighlighted,
+    // Validation classes disabled to prevent infinite loop
+    // 'node-error': nodeValidationMap.value.get(nodeId)?.level === 'error',
+    // 'node-warning': nodeValidationMap.value.get(nodeId)?.level === 'warning',
+  };
 };
 
 // Platform detection for keyboard shortcuts display
@@ -1014,11 +1030,20 @@ const onNodesChange = changes => {
 
 // Handle node selection
 const onNodeClick = event => {
+  // Update highlight to show the clicked node
+  highlightedNodeIds.value = [event.node.id];
+  // Clear search if active
+  if (searchQuery.value) {
+    searchQuery.value = '';
+    currentSearchIndex.value = 0;
+  }
   emit('nodeSelected', event.node);
 };
 
 // Handle node double-click (for editing)
 const onNodeDoubleClick = event => {
+  // Update highlight to show the clicked node
+  highlightedNodeIds.value = [event.node.id];
   emit('nodeSelected', event.node);
 };
 
@@ -1061,6 +1086,29 @@ watch(
 );
 
 // Expose methods and state for parent component
+// Update a specific node's data
+const updateNode = (nodeId, nodeData) => {
+  const nodeIndex = nodes.value.findIndex(n => n.id === nodeId);
+  if (nodeIndex !== -1) {
+    // Create new array to trigger Vue reactivity
+    nodes.value = nodes.value.map((node, idx) => {
+      if (idx === nodeIndex) {
+        return {
+          ...node,
+          data: { ...node.data, ...nodeData },
+        };
+      }
+      return node;
+    });
+    // eslint-disable-next-line no-console
+    console.log(
+      '[BotStudioCanvas] Node updated in canvas (reactivity triggered):',
+      nodeId,
+      nodeData
+    );
+  }
+};
+
 defineExpose({
   // State
   searchQuery,
@@ -1086,6 +1134,7 @@ defineExpose({
   autoLayout,
   loadFlowData,
   focusNode,
+  updateNode,
 
   // Data access
   getFlowData: () => ({
@@ -1129,41 +1178,56 @@ defineExpose({
       <template #node-state="nodeProps">
         <StateNode
           v-bind="nodeProps"
-          :class="{
-            'highlighted-node': highlightedNodeIds.includes(nodeProps.id),
-          }"
+          :class="
+            getNodeClasses(
+              nodeProps.id,
+              highlightedNodeIds.includes(nodeProps.id)
+            )
+          "
         />
       </template>
       <template #node-intent="nodeProps">
         <IntentNode
           v-bind="nodeProps"
-          :class="{
-            'highlighted-node': highlightedNodeIds.includes(nodeProps.id),
-          }"
+          :class="
+            getNodeClasses(
+              nodeProps.id,
+              highlightedNodeIds.includes(nodeProps.id)
+            )
+          "
         />
       </template>
       <template #node-template="nodeProps">
         <TemplateNode
           v-bind="nodeProps"
-          :class="{
-            'highlighted-node': highlightedNodeIds.includes(nodeProps.id),
-          }"
+          :class="
+            getNodeClasses(
+              nodeProps.id,
+              highlightedNodeIds.includes(nodeProps.id)
+            )
+          "
         />
       </template>
       <template #node-action="nodeProps">
         <ActionNode
           v-bind="nodeProps"
-          :class="{
-            'highlighted-node': highlightedNodeIds.includes(nodeProps.id),
-          }"
+          :class="
+            getNodeClasses(
+              nodeProps.id,
+              highlightedNodeIds.includes(nodeProps.id)
+            )
+          "
         />
       </template>
       <template #node-condition="nodeProps">
         <ConditionNode
           v-bind="nodeProps"
-          :class="{
-            'highlighted-node': highlightedNodeIds.includes(nodeProps.id),
-          }"
+          :class="
+            getNodeClasses(
+              nodeProps.id,
+              highlightedNodeIds.includes(nodeProps.id)
+            )
+          "
         />
       </template>
     </VueFlow>
@@ -1188,6 +1252,18 @@ defineExpose({
   animation: highlight-pulse 1s ease-in-out infinite;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
   border-color: var(--n-blue-8) !important;
+}
+
+/* Validation Error Node */
+:deep(.node-error) {
+  border-color: var(--n-red-8) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Validation Warning Node */
+:deep(.node-warning) {
+  border-color: var(--n-yellow-8) !important;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.3) !important;
 }
 
 @keyframes highlight-pulse {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStoreGetters } from 'dashboard/composables/store';
 import agentBotsAPI from 'dashboard/api/agentBots';
@@ -32,6 +32,28 @@ const categoryIcons = {
   sales: 'i-lucide-trending-up',
 };
 
+// Fallback to hardcoded templates if API fails
+const loadFallbackTemplates = () => {
+  templates.value = [
+    {
+      id: 'customer-support',
+      name: 'Customer Support Flow',
+      description:
+        'Handle common support inquiries with intent detection and routing',
+      category: 'support',
+      icon: 'i-lucide-headphones',
+      preview: {
+        nodes: 5,
+        connections: 6,
+      },
+      flowData: {
+        nodes: [],
+        edges: [],
+      },
+    },
+  ];
+};
+
 // Load templates from API
 const loadTemplates = async () => {
   if (!currentAccountId.value) return;
@@ -62,6 +84,7 @@ const loadTemplates = async () => {
       flowData: apiTemplate.flow_data || { nodes: [], edges: [] },
     }));
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to load flow templates:', error);
     loadError.value = error.message || 'Failed to load templates';
     // Keep hardcoded fallback templates for backward compatibility
@@ -71,586 +94,21 @@ const loadTemplates = async () => {
   }
 };
 
-// Fallback to hardcoded templates if API fails
-const loadFallbackTemplates = () => {
-  templates.value = [
-    {
-      id: 'customer-support',
-      name: 'Customer Support Flow',
-      description:
-        'Handle common support inquiries with intent detection and routing',
-      category: 'support',
-      icon: 'i-lucide-headphones',
-      preview: {
-        nodes: 5,
-        connections: 6,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'Welcome',
-              stateId: 'welcome',
-              description: 'Initial greeting',
-            },
-          },
-          {
-            id: 'intent-1',
-            type: 'intent',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Detect Intent',
-              keywords: ['help', 'support', 'issue', 'problem'],
-            },
-          },
-          {
-            id: 'condition-1',
-            type: 'condition',
-            position: { x: 500, y: 100 },
-            data: {
-              label: 'Route by Priority',
-              expression: 'intent.confidence > 0.8',
-            },
-          },
-          {
-            id: 'action-1',
-            type: 'action',
-            position: { x: 700, y: 50 },
-            data: {
-              label: 'High Priority',
-              actionType: 'assign_agent',
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 700, y: 150 },
-            data: {
-              label: 'Send FAQ',
-              templateName: 'faq_response',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'intent-1',
-            target: 'condition-1',
-            type: 'default',
-          },
-          {
-            id: 'e3',
-            source: 'condition-1',
-            target: 'action-1',
-            type: 'true',
-            label: 'High Priority',
-          },
-          {
-            id: 'e4',
-            source: 'condition-1',
-            target: 'template-1',
-            type: 'false',
-            label: 'Standard',
-          },
-        ],
-      },
-    },
-    {
-      id: 'order-status',
-      name: 'Order Status Inquiry',
-      description:
-        'Let customers check their order status with automated responses',
-      category: 'commerce',
-      icon: 'i-lucide-package',
-      preview: {
-        nodes: 4,
-        connections: 4,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'Order Inquiry',
-              stateId: 'order_start',
-              description: 'Customer asks about order',
-            },
-          },
-          {
-            id: 'action-1',
-            type: 'action',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Fetch Order',
-              actionType: 'api_call',
-            },
-          },
-          {
-            id: 'condition-1',
-            type: 'condition',
-            position: { x: 500, y: 100 },
-            data: {
-              label: 'Order Found?',
-              expression: 'order.exists',
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 700, y: 100 },
-            data: {
-              label: 'Order Status',
-              templateName: 'order_status',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'action-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'action-1',
-            target: 'condition-1',
-            type: 'default',
-          },
-          {
-            id: 'e3',
-            source: 'condition-1',
-            target: 'template-1',
-            type: 'true',
-            label: 'Found',
-          },
-        ],
-      },
-    },
-    {
-      id: 'faq-handler',
-      name: 'FAQ Handler',
-      description: 'Answer frequently asked questions automatically',
-      category: 'support',
-      icon: 'i-lucide-message-circle-question',
-      preview: {
-        nodes: 6,
-        connections: 7,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'FAQ Start',
-              stateId: 'faq_start',
-              description: 'User asks question',
-            },
-          },
-          {
-            id: 'intent-1',
-            type: 'intent',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Detect Question Type',
-              keywords: ['hours', 'location', 'pricing', 'shipping'],
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 500, y: 50 },
-            data: {
-              label: 'Hours Info',
-              templateName: 'business_hours',
-            },
-          },
-          {
-            id: 'template-2',
-            type: 'template',
-            position: { x: 500, y: 120 },
-            data: {
-              label: 'Location Info',
-              templateName: 'location_info',
-            },
-          },
-          {
-            id: 'template-3',
-            type: 'template',
-            position: { x: 500, y: 190 },
-            data: {
-              label: 'Pricing Info',
-              templateName: 'pricing_info',
-            },
-          },
-          {
-            id: 'action-1',
-            type: 'action',
-            position: { x: 700, y: 100 },
-            data: {
-              label: 'Escalate to Agent',
-              actionType: 'assign_agent',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'intent-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'intent-1',
-            target: 'template-1',
-            type: 'intent',
-            label: 'Hours',
-          },
-          {
-            id: 'e3',
-            source: 'intent-1',
-            target: 'template-2',
-            type: 'intent',
-            label: 'Location',
-          },
-          {
-            id: 'e4',
-            source: 'intent-1',
-            target: 'template-3',
-            type: 'intent',
-            label: 'Pricing',
-          },
-          {
-            id: 'e5',
-            source: 'template-1',
-            target: 'action-1',
-            type: 'default',
-          },
-          {
-            id: 'e6',
-            source: 'template-2',
-            target: 'action-1',
-            type: 'default',
-          },
-          {
-            id: 'e7',
-            source: 'template-3',
-            target: 'action-1',
-            type: 'default',
-          },
-        ],
-      },
-    },
-    {
-      id: 'appointment-booking',
-      name: 'Appointment Booking',
-      description: 'Guide customers through booking an appointment',
-      category: 'scheduling',
-      icon: 'i-lucide-calendar-check',
-      preview: {
-        nodes: 5,
-        connections: 5,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'Booking Start',
-              stateId: 'booking_start',
-              description: 'Customer wants to book',
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Show Time Picker',
-              templateName: 'time_picker',
-            },
-          },
-          {
-            id: 'condition-1',
-            type: 'condition',
-            position: { x: 500, y: 100 },
-            data: {
-              label: 'Time Available?',
-              expression: 'slot.available',
-            },
-          },
-          {
-            id: 'action-1',
-            type: 'action',
-            position: { x: 700, y: 50 },
-            data: {
-              label: 'Confirm Booking',
-              actionType: 'create_appointment',
-            },
-          },
-          {
-            id: 'template-2',
-            type: 'template',
-            position: { x: 700, y: 150 },
-            data: {
-              label: 'Suggest Alternative',
-              templateName: 'alternative_times',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'template-1',
-            target: 'condition-1',
-            type: 'default',
-          },
-          {
-            id: 'e3',
-            source: 'condition-1',
-            target: 'action-1',
-            type: 'true',
-            label: 'Available',
-          },
-          {
-            id: 'e4',
-            source: 'condition-1',
-            target: 'template-2',
-            type: 'false',
-            label: 'Unavailable',
-          },
-          {
-            id: 'e5',
-            source: 'template-2',
-            target: 'template-1',
-            type: 'default',
-          },
-        ],
-      },
-    },
-    {
-      id: 'feedback-collection',
-      name: 'Feedback Collection',
-      description: 'Collect customer feedback and ratings',
-      category: 'engagement',
-      icon: 'i-lucide-star',
-      preview: {
-        nodes: 4,
-        connections: 4,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'Feedback Start',
-              stateId: 'feedback_start',
-              description: 'Ask for feedback',
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Rating Picker',
-              templateName: 'rating_picker',
-            },
-          },
-          {
-            id: 'condition-1',
-            type: 'condition',
-            position: { x: 500, y: 100 },
-            data: {
-              label: 'Positive Rating?',
-              expression: 'rating >= 4',
-            },
-          },
-          {
-            id: 'template-2',
-            type: 'template',
-            position: { x: 700, y: 100 },
-            data: {
-              label: 'Thank You',
-              templateName: 'thank_you',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'template-1',
-            target: 'condition-1',
-            type: 'default',
-          },
-          {
-            id: 'e3',
-            source: 'condition-1',
-            target: 'template-2',
-            type: 'true',
-            label: 'Positive',
-          },
-          {
-            id: 'e4',
-            source: 'condition-1',
-            target: 'template-2',
-            type: 'false',
-            label: 'Negative',
-          },
-        ],
-      },
-    },
-    {
-      id: 'lead-qualification',
-      name: 'Lead Qualification',
-      description: 'Qualify leads and route to appropriate sales team',
-      category: 'sales',
-      icon: 'i-lucide-user-check',
-      preview: {
-        nodes: 6,
-        connections: 6,
-      },
-      flowData: {
-        nodes: [
-          {
-            id: 'start',
-            type: 'state',
-            position: { x: 100, y: 100 },
-            data: {
-              label: 'Lead Start',
-              stateId: 'lead_start',
-              description: 'New lead inquiry',
-            },
-          },
-          {
-            id: 'template-1',
-            type: 'template',
-            position: { x: 300, y: 100 },
-            data: {
-              label: 'Collect Info',
-              templateName: 'lead_form',
-            },
-          },
-          {
-            id: 'condition-1',
-            type: 'condition',
-            position: { x: 500, y: 100 },
-            data: {
-              label: 'Qualified Lead?',
-              expression: 'lead.score > 50',
-            },
-          },
-          {
-            id: 'action-1',
-            type: 'action',
-            position: { x: 700, y: 50 },
-            data: {
-              label: 'Route to Sales',
-              actionType: 'assign_to_sales',
-            },
-          },
-          {
-            id: 'action-2',
-            type: 'action',
-            position: { x: 700, y: 150 },
-            data: {
-              label: 'Add to Nurture',
-              actionType: 'add_to_campaign',
-            },
-          },
-          {
-            id: 'template-2',
-            type: 'template',
-            position: { x: 900, y: 100 },
-            data: {
-              label: 'Confirmation',
-              templateName: 'lead_confirmation',
-            },
-          },
-        ],
-        edges: [
-          { id: 'e1', source: 'start', target: 'template-1', type: 'default' },
-          {
-            id: 'e2',
-            source: 'template-1',
-            target: 'condition-1',
-            type: 'default',
-          },
-          {
-            id: 'e3',
-            source: 'condition-1',
-            target: 'action-1',
-            type: 'true',
-            label: 'High Score',
-          },
-          {
-            id: 'e4',
-            source: 'condition-1',
-            target: 'action-2',
-            type: 'false',
-            label: 'Low Score',
-          },
-          {
-            id: 'e5',
-            source: 'action-1',
-            target: 'template-2',
-            type: 'default',
-          },
-          {
-            id: 'e6',
-            source: 'action-2',
-            target: 'template-2',
-            type: 'default',
-          },
-        ],
-      },
-    },
-  ];
-};
+loadTemplates();
 
-// Load templates on component mount
-onMounted(() => {
-  loadTemplates();
+// Computed categories for filter
+const categories = computed(() => {
+  const cats = new Set(templates.value.map(template => template.category));
+  return [
+    { value: 'all', label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.ALL') },
+    ...Array.from(cats).map(cat => ({
+      value: cat,
+      label: t(`AGENT_BOTS.TEMPLATES.CATEGORIES.${cat.toUpperCase()}`),
+    })),
+  ];
 });
 
-const categories = computed(() => [
-  {
-    value: 'all',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.ALL'),
-    icon: 'i-lucide-layout-grid',
-  },
-  {
-    value: 'support',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.SUPPORT'),
-    icon: 'i-lucide-headphones',
-  },
-  {
-    value: 'commerce',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.COMMERCE'),
-    icon: 'i-lucide-shopping-cart',
-  },
-  {
-    value: 'scheduling',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.SCHEDULING'),
-    icon: 'i-lucide-calendar',
-  },
-  {
-    value: 'engagement',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.ENGAGEMENT'),
-    icon: 'i-lucide-users',
-  },
-  {
-    value: 'sales',
-    label: t('AGENT_BOTS.TEMPLATES.CATEGORIES.SALES'),
-    icon: 'i-lucide-trending-up',
-  },
-]);
-
+// Filter templates by category
 const filteredTemplates = computed(() => {
   if (selectedCategory.value === 'all') {
     return templates.value;
@@ -660,8 +118,9 @@ const filteredTemplates = computed(() => {
   );
 });
 
-const selectTemplate = template => {
-  selectedTemplate.value = template;
+// Dialog methods
+const open = () => {
+  dialogRef.value?.open();
 };
 
 const close = () => {
@@ -669,15 +128,19 @@ const close = () => {
   selectedTemplate.value = null;
 };
 
-const insertTemplate = () => {
-  if (!selectedTemplate.value) return;
+const selectTemplate = template => {
+  selectedTemplate.value = template;
+};
 
-  emit('insertTemplate', selectedTemplate.value.flowData);
-  close();
+const insertTemplate = () => {
+  if (selectedTemplate.value) {
+    emit('insertTemplate', selectedTemplate.value.flowData);
+    close();
+  }
 };
 
 defineExpose({
-  open: () => dialogRef.value?.open(),
+  open,
   close,
 });
 </script>
@@ -685,162 +148,122 @@ defineExpose({
 <template>
   <Dialog
     ref="dialogRef"
-    type="edit"
-    :title="t('AGENT_BOTS.TEMPLATES.TITLE')"
-    :show-cancel-button="false"
-    :show-confirm-button="false"
-    width="7xl"
-    overflow-y-auto
+    :title="t('AGENT_BOTS.TEMPLATES.BROWSER.TITLE')"
+    size="xl"
   >
-    <div class="flex flex-col gap-4">
-      <!-- Description -->
-      <p class="text-sm text-n-slate-11">
-        {{ t('AGENT_BOTS.TEMPLATES.DESCRIPTION') }}
-      </p>
-
+    <div class="flex flex-col gap-4 h-[600px]">
       <!-- Category Filter -->
-      <div class="flex gap-2 overflow-x-auto pb-2">
+      <div class="flex gap-2">
         <button
-          v-for="category in categories"
-          :key="category.value"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+          v-for="cat in categories"
+          :key="cat.value"
+          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           :class="[
-            selectedCategory === category.value
-              ? 'bg-n-blue-8 text-white'
-              : 'bg-n-slate-2 text-n-slate-11 hover:bg-n-slate-3',
+            selectedCategory === cat.value
+              ? 'bg-n-blue-9 text-white'
+              : 'bg-n-slate-3 text-n-slate-11 hover:bg-n-slate-4',
           ]"
-          @click="selectedCategory = category.value"
+          @click="selectedCategory = cat.value"
         >
-          <i class="w-4 h-4" :class="[category.icon]" />
-          <span>{{ category.label }}</span>
+          {{ cat.label }}
         </button>
       </div>
 
       <!-- Loading State -->
-      <div
-        v-if="isLoading"
-        class="flex flex-col items-center justify-center py-12 text-center"
-      >
-        <i class="i-lucide-loader-2 w-8 h-8 mb-3 text-n-blue-8 animate-spin" />
-        <p class="text-sm text-n-slate-11">
-          {{ t('AGENT_BOTS.TEMPLATES.LOADING') }}
-        </p>
+      <div v-if="isLoading" class="flex items-center justify-center py-12">
+        <div class="flex flex-col items-center gap-3">
+          <div
+            class="w-8 h-8 border-4 border-n-blue-9 border-t-transparent rounded-full animate-spin"
+          />
+          <p class="text-sm text-n-slate-11">
+            {{ t('AGENT_BOTS.TEMPLATES.BROWSER.LOADING') }}
+          </p>
+        </div>
       </div>
 
       <!-- Error State -->
-      <div
-        v-else-if="loadError"
-        class="flex flex-col items-center justify-center py-12 text-center"
-      >
-        <i class="i-lucide-alert-circle w-8 h-8 mb-3 text-n-red-8" />
-        <p class="text-sm text-n-red-11 mb-2">
-          {{ loadError }}
-        </p>
-        <Button
-          size="sm"
-          faded
-          :label="t('AGENT_BOTS.TEMPLATES.RETRY')"
-          @click="loadTemplates"
-        />
+      <div v-else-if="loadError" class="flex items-center justify-center py-12">
+        <div class="flex flex-col items-center gap-3 max-w-md text-center px-4">
+          <i class="i-lucide-alert-circle w-12 h-12 text-n-red-11" />
+          <p class="text-sm text-n-slate-12 font-medium">
+            {{ t('AGENT_BOTS.TEMPLATES.BROWSER.ERROR') }}
+          </p>
+          <p class="text-xs text-n-slate-11">
+            {{ loadError }}
+          </p>
+          <Button size="sm" @click="loadTemplates">
+            {{ t('AGENT_BOTS.TEMPLATES.BROWSER.RETRY') }}
+          </Button>
+        </div>
       </div>
 
       <!-- Templates Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          v-for="template in filteredTemplates"
-          :key="template.id"
-          class="flex flex-col gap-3 p-4 rounded-lg border-2 text-left transition-all group"
-          :class="[
-            selectedTemplate?.id === template.id
-              ? 'border-n-blue-8 bg-n-blue-1'
-              : 'border-n-weak hover:border-n-strong bg-n-white',
-          ]"
-          @click="selectTemplate(template)"
+      <div v-else class="flex-1 overflow-y-auto">
+        <div
+          v-if="filteredTemplates.length === 0"
+          class="flex items-center justify-center h-full"
         >
-          <!-- Header -->
-          <div class="flex items-start gap-3">
-            <div
-              class="flex items-center justify-center w-12 h-12 rounded-lg transition-colors"
-              :class="[
-                selectedTemplate?.id === template.id
-                  ? 'bg-n-blue-8 text-white'
-                  : 'bg-n-slate-2 text-n-slate-11 group-hover:bg-n-slate-3',
-              ]"
-            >
-              <i class="w-6 h-6" :class="[template.icon]" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-n-slate-12 mb-1">
-                {{ template.name }}
-              </h3>
-              <p class="text-sm text-n-slate-11">
-                {{ template.description }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Preview Stats -->
-          <div class="flex items-center gap-4 text-xs text-n-slate-11">
-            <div class="flex items-center gap-1">
-              <i class="i-lucide-circle-dot w-3 h-3" />
-              <span>
-                {{ template.preview.nodes }}
-                {{ t('AGENT_BOTS.TEMPLATES.NODES') }}
-              </span>
-            </div>
-            <div class="flex items-center gap-1">
-              <i class="i-lucide-git-branch w-3 h-3" />
-              <span>
-                {{ template.preview.connections }}
-                {{ t('AGENT_BOTS.TEMPLATES.CONNECTIONS') }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Selected Indicator -->
-          <div
-            v-if="selectedTemplate?.id === template.id"
-            class="flex items-center gap-2 text-sm text-n-blue-11 font-medium"
-          >
-            <i class="i-lucide-check-circle w-4 h-4" />
-            <span>{{ t('AGENT_BOTS.TEMPLATES.SELECTED') }}</span>
-          </div>
-        </button>
-      </div>
-
-      <!-- Empty State -->
-      <div
-        v-if="filteredTemplates.length === 0"
-        class="flex flex-col items-center justify-center py-8 text-center"
-      >
-        <i class="i-lucide-folder-open w-12 h-12 mb-3 text-n-slate-8" />
-        <p class="text-sm text-n-slate-11">
-          {{ t('AGENT_BOTS.TEMPLATES.NO_TEMPLATES') }}
-        </p>
-      </div>
-
-      <!-- Footer Actions -->
-      <div
-        class="flex justify-between items-center pt-4 border-t border-n-weak"
-      >
-        <div class="flex items-center gap-2 text-sm text-n-slate-11">
-          <i class="i-lucide-info w-4 h-4" />
-          <span>{{ t('AGENT_BOTS.TEMPLATES.FOOTER_TIP') }}</span>
+          <p class="text-sm text-n-slate-11">
+            {{ t('AGENT_BOTS.TEMPLATES.BROWSER.NO_TEMPLATES') }}
+          </p>
         </div>
-        <div class="flex gap-2">
-          <Button
-            faded
-            slate
-            :label="t('AGENT_BOTS.FORM.CANCEL')"
-            @click="close"
-          />
-          <Button
-            :label="t('AGENT_BOTS.TEMPLATES.INSERT')"
-            :disabled="!selectedTemplate"
-            @click="insertTemplate"
-          />
+        <div v-else class="grid grid-cols-2 gap-4">
+          <button
+            v-for="template in filteredTemplates"
+            :key="template.id"
+            class="flex flex-col gap-3 p-4 rounded-lg border-2 transition-all text-left"
+            :class="[
+              selectedTemplate?.id === template.id
+                ? 'border-n-blue-9 bg-n-blue-2'
+                : 'border-n-slate-6 hover:border-n-slate-8 bg-white',
+            ]"
+            @click="selectTemplate(template)"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="flex items-center justify-center w-10 h-10 rounded-lg bg-n-slate-3"
+              >
+                <i class="w-5 h-5 text-n-slate-11" :class="[template.icon]" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-medium text-n-slate-12 truncate">
+                  {{ template.name }}
+                </h4>
+                <p class="text-xs text-n-slate-11 line-clamp-2 mt-1">
+                  {{ template.description }}
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-4 text-xs text-n-slate-11">
+              <span class="flex items-center gap-1">
+                <i class="i-lucide-circle-dot w-3 h-3" />
+                {{ template.preview.nodes }}
+                {{ t('AGENT_BOTS.TEMPLATES.BROWSER.NODES') }}
+              </span>
+              <span class="flex items-center gap-1">
+                <i class="i-lucide-arrow-right w-3 h-3" />
+                {{ template.preview.connections }}
+                {{ t('AGENT_BOTS.TEMPLATES.BROWSER.CONNECTIONS') }}
+              </span>
+            </div>
+          </button>
         </div>
       </div>
     </div>
+
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <Button variant="tertiary" @click="close">
+          {{ t('CANCEL') }}
+        </Button>
+        <Button
+          :disabled="!selectedTemplate"
+          variant="primary"
+          @click="insertTemplate"
+        >
+          {{ t('AGENT_BOTS.TEMPLATES.BROWSER.INSERT') }}
+        </Button>
+      </div>
+    </template>
   </Dialog>
 </template>

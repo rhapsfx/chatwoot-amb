@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -57,6 +57,12 @@ const hasUnsavedChanges = ref(false);
 const validationResult = ref(null);
 const showValidationPanel = ref(true);
 const nodeValidationErrors = ref(new Map());
+
+// Panel resize state
+const leftPanelWidth = ref(192); // 48 * 4 = 192px
+const rightPanelWidth = ref(320); // 80 * 4 = 320px
+const isResizingLeft = ref(false);
+const isResizingRight = ref(false);
 
 // Test console state
 const showTestConsole = ref(false);
@@ -147,28 +153,43 @@ const loadOrCreateFlow = async () => {
 
 // Handle node selection from canvas
 const handleNodeSelected = node => {
-  selectedNode.value = node;
+  // CRITICAL: Deep clone with defensive checks for Chrome compatibility
+  // Chrome's stricter Proxy handling causes infinite loops with VueFlow's reactivity
+  // Safari is more forgiving, but we need to handle both
+  if (!node) {
+    selectedNode.value = null;
+    return;
+  }
+
+  try {
+    // Create a clean object without any Vue/VueFlow reactive wrapping
+    const cleanNode = {
+      id: node.id,
+      type: node.type,
+      position: node.position ? { ...node.position } : {},
+      data: node.data ? JSON.parse(JSON.stringify(node.data)) : {},
+      // Don't copy internal VueFlow properties that cause circular refs
+    };
+    selectedNode.value = cleanNode;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[BotStudio] Error cloning node:', error);
+    selectedNode.value = null;
+  }
 };
 
 // Handle node data save from editor
 const handleSaveNode = async nodeData => {
   if (!selectedNode.value || !flowId.value) return;
 
-  // Update local node data immediately (no API call)
-  // The entire flow will be saved when user clicks "Save" button
-  selectedNode.value.data = { ...selectedNode.value.data, ...nodeData };
-
   // Mark flow as having unsaved changes
   hasUnsavedChanges.value = true;
 
-  // Update the node in the canvas
-  if (canvasRef.value) {
-    const flowData = canvasRef.value.getFlowData();
-    const node = flowData.nodes.find(n => n.id === selectedNode.value.id);
-    if (node) {
-      node.data = { ...node.data, ...nodeData };
-    }
-  }
+  // Update the cloned selectedNode
+  selectedNode.value = {
+    ...selectedNode.value,
+    data: { ...selectedNode.value.data, ...nodeData },
+  };
 
   // eslint-disable-next-line no-console
   console.log(
@@ -176,6 +197,11 @@ const handleSaveNode = async nodeData => {
     selectedNode.value.id,
     nodeData
   );
+
+  // CRITICAL: Also update the canvas node so changes are visible
+  if (canvasRef.value && canvasRef.value.updateNode) {
+    canvasRef.value.updateNode(selectedNode.value.id, nodeData);
+  }
 };
 
 // Handle cancel edit
@@ -545,13 +571,48 @@ const goBack = () => {
   router.push({ name: 'agent_bots' });
 };
 
+// Panel resize functionality
+const startResizeLeft = () => {
+  isResizingLeft.value = true;
+  document.body.style.cursor = 'ew-resize';
+  document.body.style.userSelect = 'none';
+};
+
+const startResizeRight = () => {
+  isResizingRight.value = true;
+  document.body.style.cursor = 'ew-resize';
+  document.body.style.userSelect = 'none';
+};
+
+const handleResize = e => {
+  if (isResizingLeft.value) {
+    const newWidth = e.clientX;
+    // Min width 150px, max width 400px
+    leftPanelWidth.value = Math.min(Math.max(newWidth, 150), 400);
+  } else if (isResizingRight.value) {
+    const containerWidth = window.innerWidth;
+    const newWidth = containerWidth - e.clientX;
+    // Min width 300px, max width 800px
+    rightPanelWidth.value = Math.min(Math.max(newWidth, 300), 800);
+  }
+};
+
+const stopResize = () => {
+  isResizingLeft.value = false;
+  isResizingRight.value = false;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+};
+
 // Watch for flow changes and auto-validate
+// DISABLED: Auto-validation causes infinite reactivity loops
+// Users can manually validate using the "Validate" button
 watch(flowId, newFlowId => {
   if (newFlowId) {
-    // Validate after a short delay when flow is loaded
-    setTimeout(() => {
-      validateFlow();
-    }, 500);
+    // Auto-validation disabled to prevent stack overflow
+    // setTimeout(() => {
+    //   validateFlow();
+    // }, 500);
   }
 });
 
@@ -559,6 +620,16 @@ watch(flowId, newFlowId => {
 onMounted(async () => {
   await loadBot();
   await loadOrCreateFlow();
+
+  // Add resize event listeners
+  document.addEventListener('mousemove', handleResize);
+  document.addEventListener('mouseup', stopResize);
+});
+
+onUnmounted(() => {
+  // Clean up resize event listeners
+  document.removeEventListener('mousemove', handleResize);
+  document.removeEventListener('mouseup', stopResize);
 });
 </script>
 
@@ -804,9 +875,16 @@ onMounted(async () => {
     <div class="flex flex-1 overflow-hidden">
       <!-- Left: Node Palette -->
       <div
-        class="min-w-48 w-48 flex-shrink-0 bg-n-white border-r border-n-strong overflow-y-auto"
+        class="flex-shrink-0 bg-n-white border-r border-n-strong overflow-y-auto relative"
+        :style="{ width: `${leftPanelWidth}px` }"
       >
         <NodePalette />
+
+        <!-- Resize Handle -->
+        <div
+          class="absolute right-0 top-0 h-full w-1 cursor-ew-resize hover:bg-n-blue-8 transition-colors z-10"
+          @mousedown="startResizeLeft"
+        />
       </div>
 
       <!-- Center: Canvas -->
@@ -824,8 +902,14 @@ onMounted(async () => {
       <div class="flex">
         <!-- Config Panel -->
         <div
-          class="min-w-80 w-80 flex-shrink-0 bg-n-white border-l border-n-strong flex flex-col overflow-hidden"
+          class="flex-shrink-0 bg-n-white border-l border-n-strong flex flex-col overflow-hidden relative"
+          :style="{ width: `${rightPanelWidth}px` }"
         >
+          <!-- Resize Handle -->
+          <div
+            class="absolute left-0 top-0 h-full w-1 cursor-ew-resize hover:bg-n-blue-8 transition-colors z-10"
+            @mousedown="startResizeRight"
+          />
           <!-- Top: Node Editor (takes remaining space) -->
           <div class="flex-1 overflow-y-auto p-4">
             <!-- Dynamic Node Editor -->
