@@ -834,19 +834,42 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_form_or_name_prompt
-    # Check if device supports Apple Messages Forms
-    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-    supports_forms = capabilities.include?('FORM')
+    # Check if user has sent a response (incoming message with text content)
+    if @message.present? && @message.content.present? && @message.incoming?
+      # User has responded with text - capture the name
+      name = @message.content.strip
 
-    if supports_forms
-      log_info '[Bot] Device supports FORM - sending Apple Messages Form'
-      send_guitar_info_form
-      update_bot_state('AHB1') # Wait for form response
+      # Store in conversation attributes
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes['customer_name'] = name
+      @conversation.save!
+
+      log_info "[Bot] 📝 Captured customer name: #{name}"
+
+      # Transition to next state (name-preference)
+      @conversation.custom_attributes['current_state'] = 'state-name-preference'
+      @conversation.save!
+
+      # Return indicator that state should transition
+      { success: true, transition_to: 'state-name-preference' }
     else
-      log_info '[Bot] Device does not support FORM - asking for name via text'
-      send_text_message("What's your name?")
-      # Skip form and ask for text name input
-      update_bot_state('AHB1_2') # Wait for text name input
+      # First time in state - ask for name
+      # Check if device supports Apple Messages Forms
+      capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
+      supports_forms = capabilities.include?('FORM')
+
+      if supports_forms
+        log_info '[Bot] Device supports FORM - sending Apple Messages Form'
+        send_guitar_info_form
+        update_bot_state('AHB1') # Wait for form response
+      else
+        log_info '[Bot] Device does not support FORM - asking for name via text'
+        send_text_message("What's your name?")
+        # Skip form and ask for text name input
+        update_bot_state('AHB1_2') # Wait for text name input
+      end
+
+      { success: true, waiting_for_input: true }
     end
   end
 

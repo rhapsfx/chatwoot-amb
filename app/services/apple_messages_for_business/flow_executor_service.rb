@@ -950,8 +950,30 @@ class AppleMessagesForBusiness::FlowExecutorService
     log_info "[FlowExecutor] 🔧 Executing custom handler: #{handler_name}"
 
     begin
-      service.send(handler_name.to_sym)
+      result = service.send(handler_name.to_sym)
       log_info "[FlowExecutor] ✅ Custom handler executed successfully: #{handler_name}"
+
+      # Check if handler requested a state transition
+      if result.is_a?(Hash) && result[:transition_to]
+        target_state = result[:transition_to]
+        log_info "[FlowExecutor] 🔀 Handler requested transition to: #{target_state}"
+
+        # Update current state
+        @conversation.custom_attributes ||= {}
+        @conversation.custom_attributes['current_state'] = target_state
+        @conversation.save!
+
+        # Find and execute the target state
+        target_node = @flow_data['nodes'].find { |n| n['id'] == target_state }
+        if target_node
+          log_info "[FlowExecutor] ➡️ Transitioning to state: #{target_state}"
+          return execute_state_node(target_node)
+        else
+          log_error "[FlowExecutor] ❌ Target state not found: #{target_state}"
+          return 0
+        end
+      end
+
       1 # Return 1 to indicate handler was called (actual message count may vary)
     rescue StandardError => e
       log_error "[FlowExecutor] ❌ Error executing custom handler #{handler_name}: #{e.message}"
