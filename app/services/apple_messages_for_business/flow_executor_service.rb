@@ -30,6 +30,7 @@ class AppleMessagesForBusiness::FlowExecutorService
     @session = load_session_state
     @current_state = @session[:current_state] || find_initial_state
     @executed_nodes = []
+    @processing_interactive_response = false
   end
 
   # Execute flow for incoming message
@@ -80,6 +81,8 @@ class AppleMessagesForBusiness::FlowExecutorService
       @executed_nodes << handler_node['id']
       log_info "[FlowExecutor] 🔑 Intent matched: #{handler_node.dig('data', 'label')} (Node ID: #{handler_node['id']})"
       log_info "[FlowExecutor] 🔍 Intent node data: #{handler_node['data'].inspect}"
+      # Mark that we're processing an interactive response if one was detected
+      @processing_interactive_response = true if interactive_value.present?
       messages_sent = execute_intent_node(handler_node)
     elsif interactive_value && (waiting_intent = find_waiting_intent_for_interactive_response)
       # If no keyword match but this is an interactive response, check for a waiting intent node
@@ -89,6 +92,8 @@ class AppleMessagesForBusiness::FlowExecutorService
       @conversation.custom_attributes ||= {}
       @conversation.custom_attributes['last_interactive_value'] = interactive_value
       @conversation.save!
+      # Mark that we're processing an interactive response
+      @processing_interactive_response = true
       messages_sent = execute_intent_node(waiting_intent)
     else
       # Process current state
@@ -361,14 +366,26 @@ class AppleMessagesForBusiness::FlowExecutorService
     end
 
     # Execute actions (can contain template references)
+    has_waiting_action = false
     actions.each_with_index do |action, index|
       messages_sent += execute_action(action)
+
+      # Track if this action requires waiting for user input
+      waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
+      has_waiting_action = true if waiting_action_types.include?(action['type'])
 
       # Add delay between actions (except after last action)
       if index < actions.length - 1
         log_info '[FlowExecutor] ⏱️  Waiting between actions (1.5s delay)'
         sleep 1.5
       end
+    end
+
+    # If state has waiting actions, stop here and wait for user input
+    # Don't auto-transition - the next user message will trigger flow continuation
+    if has_waiting_action
+      log_info '[FlowExecutor] ⏸️  State has waiting action - will not auto-transition (waiting for user input)'
+      return messages_sent
     end
 
     # Handle transitions - automatically follow edges to next state
@@ -378,6 +395,20 @@ class AppleMessagesForBusiness::FlowExecutorService
       if target_node && target_node['type'] == 'state'
         @current_state = target_node.dig('data', 'state_id') || target_node['id']
         log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
+
+        # CRITICAL FIX: If we're processing an interactive response and the target state has a handler,
+        # we should NOT execute the handler with the interactive response message.
+        # Instead, wait for the next user message to execute that state's handler.
+        # Check both direct handlers and execute_custom_code actions
+        target_has_handler = target_node.dig('data', 'handler').present? ||
+                             target_node.dig('data', 'actions')&.any? { |a| a['type'] == 'execute_custom_code' }
+
+        if @processing_interactive_response && target_has_handler
+          log_info '[FlowExecutor] 🛑 Stopping auto-transition chain - target state has handler that expects new user input'
+          log_info "[FlowExecutor] 📍 Current state set to: #{@current_state}, waiting for next user message"
+          @executed_nodes << target_node['id']
+          return messages_sent
+        end
 
         # CRITICAL: Actually execute the target node to continue the flow
         # This enables automatic handler chaining via visual edges
@@ -595,6 +626,48 @@ class AppleMessagesForBusiness::FlowExecutorService
     when 'send_text'
       send_text_message(action['text'])
       # No delay for simple text messages
+      1
+    when 'send_text_message'
+      # Alias for send_text - Bot Studio uses this naming
+      send_text_message(action['text'] || action['message'])
+      1
+    when 'send_quick_reply'
+      # Send quick reply message - extract data from action
+      title = action['title']
+      request_id = action['request_id']
+      items = action['items'] || []
+      message = action['message']
+
+      if title.blank? || request_id.blank? || items.empty?
+        log_warn "[FlowExecutor] ⚠️ send_quick_reply action missing required fields (title: #{title.present?}, request_id: #{request_id.present?}, items: #{items.length})"
+        return 0
+      end
+
+      log_info "[FlowExecutor] 📤 Sending quick reply: #{title}"
+
+      # Build content_attributes for quick reply
+      # IMPORTANT: Use 'request_identifier' not 'request_id' (validation requirement)
+      content_attributes = {
+        'received_title' => title,
+        'request_identifier' => request_id,
+        'items' => items.map { |item| { 'title' => item['title'], 'identifier' => item['value'] } }
+      }
+      content_attributes['received_subtitle'] = message if message.present?
+
+      # Create outgoing message via MessageBuilder
+      Messages::MessageBuilder.new(
+        nil, # user (bot context, no specific user)
+        @conversation,
+        {
+          content: title,
+          message_type: :outgoing,
+          content_type: 'apple_quick_reply',
+          content_attributes: content_attributes,
+          sender: @flow.agent_bot
+        }
+      ).perform
+
+      log_info '[FlowExecutor] ✅ Quick reply message created and queued for sending'
       1
     when 'send_oauth', 'execute_oauth'
       # OAuth authentication action
