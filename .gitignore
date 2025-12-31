@@ -122,3 +122,4 @@ CLEANUP_LIST.md
 
 # Database backups with credentials (contain sensitive data)
 docs/backups/*.sql
+/.git-rewrite
