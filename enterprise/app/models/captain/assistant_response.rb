@@ -5,7 +5,7 @@
 #  id                :bigint           not null, primary key
 #  answer            :text             not null
 #  documentable_type :string
-#  embedding         :text
+#  embedding         :vector(1536)
 #  question          :string           not null
 #  status            :integer          default("approved"), not null
 #  created_at        :datetime         not null
@@ -20,6 +20,7 @@
 #  index_captain_assistant_responses_on_account_id    (account_id)
 #  index_captain_assistant_responses_on_assistant_id  (assistant_id)
 #  index_captain_assistant_responses_on_status        (status)
+#  vector_idx_knowledge_entries_embedding             (embedding) USING ivfflat
 #
 class Captain::AssistantResponse < ApplicationRecord
   self.table_name = 'captain_assistant_responses'
@@ -43,8 +44,8 @@ class Captain::AssistantResponse < ApplicationRecord
 
   enum status: { pending: 0, approved: 1 }
 
-  def self.search(query)
-    embedding = Captain::Llm::EmbeddingService.new.get_embedding(query)
+  def self.search(query, account_id: nil)
+    embedding = Captain::Llm::EmbeddingService.new(account_id: account_id).get_embedding(query)
     nearest_neighbors(:embedding, embedding, distance: 'cosine').limit(5)
   end
 

@@ -60,6 +60,9 @@ end
 json.reauthorization_required resource.channel.try(:reauthorization_required?) if resource.instagram?
 json.instagram_id resource.channel.try(:instagram_id) if resource.instagram?
 
+## Tiktok Attributes
+json.reauthorization_required resource.channel.try(:reauthorization_required?) if resource.tiktok?
+
 ## Twilio Attributes
 json.messaging_service_sid resource.channel.try(:messaging_service_sid)
 json.phone_number resource.channel.try(:phone_number)
@@ -131,26 +134,4 @@ end
 if resource.channel_type == 'Channel::Voice'
   json.voice_call_webhook_url resource.channel.try(:voice_call_webhook_url)
   json.voice_status_webhook_url resource.channel.try(:voice_status_webhook_url)
-end
-
-### Apple Messages for Business Channel
-if resource.apple_messages_for_business?
-  # Allow users with inbox_manage permission to see business_id for start conversation links
-  if Current.account_user&.administrator? || Current.account_user&.custom_role&.permissions&.include?('inbox_manage')
-    json.business_id resource.channel.try(:business_id)
-  end
-
-  # Other sensitive fields only for administrators
-  if Current.account_user&.administrator?
-    json.msp_id resource.channel.try(:msp_id)
-    json.secret resource.channel.try(:secret)
-    json.merchant_id resource.channel.try(:merchant_id)
-    json.apple_pay_merchant_cert resource.channel.try(:apple_pay_merchant_cert)
-    json.webhook_url resource.channel.try(:webhook_url)
-    json.imessage_extension_bid resource.channel.try(:imessage_extension_bid)
-    json.oauth2_providers resource.channel.try(:oauth2_providers)
-    json.payment_settings resource.channel.try(:payment_settings)
-    json.payment_processors resource.channel.try(:payment_processors)
-    json.imessage_apps resource.channel.try(:imessage_apps)
-  end
 end

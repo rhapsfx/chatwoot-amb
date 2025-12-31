@@ -14,15 +14,7 @@ defineProps({
     type: String,
     required: true,
   },
-  thumbnail: {
-    type: String,
-    default: '',
-  },
   isComingSoon: {
-    type: Boolean,
-    default: false,
-  },
-  disabled: {
     type: Boolean,
     default: false,
   },
@@ -37,18 +29,11 @@ defineProps({
         !isComingSoon,
       'cursor-not-allowed disabled:opacity-80': isComingSoon,
     }"
-    :disabled="disabled || isComingSoon"
   >
     <div
       class="flex size-10 items-center justify-center rounded-full bg-n-alpha-2"
     >
-      <img
-        v-if="thumbnail"
-        :src="thumbnail"
-        :alt="title"
-        class="size-6 object-contain"
-      />
-      <Icon v-else :icon="icon" class="text-n-slate-10 size-6" />
+      <Icon :icon="icon" class="text-n-slate-10 size-6" />
     </div>
 
     <div class="flex flex-col items-start gap-1.5">

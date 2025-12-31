@@ -4,16 +4,14 @@ import { ref, computed, defineEmits, onMounted } from 'vue';
 import { useEventListener } from '@vueuse/core';
 import Button from 'dashboard/components-next/button/Button.vue';
 
-const { modalType, closeOnBackdropClick, onClose, containerClass } =
-  defineProps({
-    closeOnBackdropClick: { type: Boolean, default: true },
-    showCloseButton: { type: Boolean, default: true },
-    onClose: { type: Function, required: true },
-    fullWidth: { type: Boolean, default: false },
-    modalType: { type: String, default: 'centered' },
-    size: { type: String, default: '' },
-    containerClass: { type: String, default: '' },
-  });
+const { modalType, closeOnBackdropClick, onClose } = defineProps({
+  closeOnBackdropClick: { type: Boolean, default: true },
+  showCloseButton: { type: Boolean, default: true },
+  onClose: { type: Function, required: true },
+  fullWidth: { type: Boolean, default: false },
+  modalType: { type: String, default: 'centered' },
+  size: { type: String, default: '' },
+});
 
 const emit = defineEmits(['close']);
 const show = defineModel('show', { type: Boolean, default: false });
@@ -79,15 +77,12 @@ onMounted(() => {
     >
       <div
         class="relative max-h-full overflow-auto bg-n-alpha-3 shadow-md modal-container rtl:text-right skip-context-menu"
-        :class="[
-          {
-            'rounded-xl w-[37.5rem]': !fullWidth,
-            'items-center rounded-none flex h-full justify-center w-full':
-              fullWidth,
-            [size]: true,
-          },
-          containerClass,
-        ]"
+        :class="{
+          'rounded-xl w-[37.5rem]': !fullWidth,
+          'items-center rounded-none flex h-full justify-center w-full':
+            fullWidth,
+          [size]: true,
+        }"
         @mouse.stop
         @mousedown="event => event.stopPropagation()"
       >
@@ -129,20 +124,7 @@ onMounted(() => {
         @apply p-4;
       }
     }
-
-    // AMB Modal Blue Border Styling - applied via containerClass prop
-    &.amb-modal-border {
-      background: transparent !important;
-      padding: 0 !important;
-      border: 4px solid #3b82f6 !important;
-      box-shadow: 0 0 0 4px rgba(191, 219, 254, 1) !important;
-    }
   }
-}
-
-.dark .modal-mask .modal-container.amb-modal-border {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 0 4px rgba(30, 64, 175, 1) !important;
 }
 
 .modal-big {

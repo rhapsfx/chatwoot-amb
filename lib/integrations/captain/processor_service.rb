@@ -61,7 +61,6 @@ class Integrations::Captain::ProcessorService < Integrations::BotProcessorServic
   end
 
   def determine_role(message)
-    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
-    message.message_type.to_s == 'incoming' ? 'User' : 'Bot'
+    message.message_type == 'incoming' ? 'User' : 'Bot'
   end
 end

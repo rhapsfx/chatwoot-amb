@@ -35,10 +35,7 @@
       "CONVERSATION_PARTICIPATING_MANAGE": "Manage participating conversations and those assigned to them",
       "CONTACT_MANAGE": "Manage contacts",
       "REPORT_MANAGE": "Manage reports",
-      "KNOWLEDGE_BASE_MANAGE": "Manage knowledge base",
-      "TEMPLATE_MANAGE": "Manage templates",
-      "INBOX_MANAGE": "Manage inboxes",
-      "AGENT_BOT_MANAGE": "Manage bots"
+      "KNOWLEDGE_BASE_MANAGE": "Manage knowledge base"
     },
     "FORM": {
       "NAME": {

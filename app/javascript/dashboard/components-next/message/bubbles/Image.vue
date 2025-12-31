@@ -20,12 +20,10 @@ const attachment = computed(() => {
   return attachments.value[0];
 });
 
-const { hasError, loadWithRetry } = useLoadWithRetry();
+const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry();
 
 const showGallery = ref(false);
 const isDownloading = ref(false);
-const imageDataUrl = ref(null);
-const isLoading = ref(true);
 
 onMounted(() => {
   if (attachment.value?.dataUrl) {
@@ -45,57 +43,6 @@ const downloadAttachment = async () => {
   }
 };
 
-// Check if URL is from ngrok (Apple Messages for Business)
-const isNgrokUrl = computed(() => {
-  return (
-    attachment.value?.dataUrl?.includes('.ngrok-free.app') ||
-    attachment.value?.dataUrl?.includes('.ngrok.io')
-  );
-});
-
-// Load image with proper headers to bypass ngrok browser warning
-const loadImageWithHeaders = async url => {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      'User-Agent': 'Chatwoot-Apple-Messages-For-Business',
-      Accept: 'image/*,*/*;q=0.8',
-    },
-    mode: 'cors',
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  const blob = await response.blob();
-  return URL.createObjectURL(blob);
-};
-
-// Load image on mount - use upstream's loadWithRetry for non-ngrok, custom logic for ngrok
-onMounted(async () => {
-  if (!attachment.value?.dataUrl) {
-    hasError.value = true;
-    return;
-  }
-
-  try {
-    if (isNgrokUrl.value) {
-      // For ngrok URLs, use fetch with proper headers
-      imageDataUrl.value = await loadImageWithHeaders(attachment.value.dataUrl);
-    } else {
-      // For regular URLs, use upstream's loadWithRetry
-      await loadWithRetry(attachment.value.dataUrl);
-      imageDataUrl.value = attachment.value.dataUrl;
-    }
-    isLoading.value = false;
-  } catch (error) {
-    hasError.value = true;
-    isLoading.value = false;
-  }
-});
-
 const handleImageError = () => {
   hasError.value = true;
 };
@@ -113,16 +60,10 @@ const handleImageError = () => {
         {{ $t('COMPONENTS.MEDIA.IMAGE_UNAVAILABLE') }}
       </p>
     </div>
-    <div
-      v-else-if="isLoading"
-      class="flex items-center justify-center p-8 rounded-lg"
-    >
-      <Icon icon="i-lucide-loader-2" class="animate-spin text-n-slate-11" />
-    </div>
-    <div v-else class="relative group rounded-lg overflow-hidden">
+    <div v-else-if="isLoaded" class="relative group rounded-lg overflow-hidden">
       <img
         class="skip-context-menu"
-        :src="imageDataUrl"
+        :src="attachment.dataUrl"
         :width="attachment.width"
         :height="attachment.height"
       />

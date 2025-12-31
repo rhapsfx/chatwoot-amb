@@ -10,11 +10,6 @@ import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
 import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
-import PriorityNone from 'dashboard/assets/images/dashboard/priority/none.svg';
-import PriorityUrgent from 'dashboard/assets/images/dashboard/priority/urgent.svg';
-import PriorityHigh from 'dashboard/assets/images/dashboard/priority/high.svg';
-import PriorityMedium from 'dashboard/assets/images/dashboard/priority/medium.svg';
-import PriorityLow from 'dashboard/assets/images/dashboard/priority/low.svg';
 
 export default {
   components: {
@@ -41,27 +36,27 @@ export default {
         {
           id: null,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.NONE'),
-          thumbnail: PriorityNone,
+          thumbnail: `/assets/images/dashboard/priority/none.svg`,
         },
         {
           id: CONVERSATION_PRIORITY.URGENT,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.URGENT'),
-          thumbnail: PriorityUrgent,
+          thumbnail: `/assets/images/dashboard/priority/${CONVERSATION_PRIORITY.URGENT}.svg`,
         },
         {
           id: CONVERSATION_PRIORITY.HIGH,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.HIGH'),
-          thumbnail: PriorityHigh,
+          thumbnail: `/assets/images/dashboard/priority/${CONVERSATION_PRIORITY.HIGH}.svg`,
         },
         {
           id: CONVERSATION_PRIORITY.MEDIUM,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.MEDIUM'),
-          thumbnail: PriorityMedium,
+          thumbnail: `/assets/images/dashboard/priority/${CONVERSATION_PRIORITY.MEDIUM}.svg`,
         },
         {
           id: CONVERSATION_PRIORITY.LOW,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.LOW'),
-          thumbnail: PriorityLow,
+          thumbnail: `/assets/images/dashboard/priority/${CONVERSATION_PRIORITY.LOW}.svg`,
         },
       ],
     };

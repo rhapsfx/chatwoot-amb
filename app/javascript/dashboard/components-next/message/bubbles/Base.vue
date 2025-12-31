@@ -1,58 +1,22 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import MessageMeta from '../MessageMeta.vue';
-import ApplePayloadModal from '../modals/ApplePayloadModal.vue';
 
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
-import { useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
 
 import { BUS_EVENTS } from 'shared/constants/busEvents';
-import { MESSAGE_VARIANTS, ORIENTATION, MESSAGE_TYPES } from '../constants';
+import { MESSAGE_VARIANTS, ORIENTATION } from '../constants';
 
 const props = defineProps({
   hideMeta: { type: Boolean, default: false },
 });
 
-const {
-  variant,
-  orientation,
-  inReplyTo,
-  shouldGroupWithNext,
-  messageType,
-  id, // eslint-disable-line no-unused-vars
-  inboxId,
-  appleMspPayload,
-  status,
-  contentAttributes,
-} = useMessageContext();
+const { variant, orientation, inReplyTo, shouldGroupWithNext } =
+  useMessageContext();
 const { t } = useI18n();
-
-const getInbox = useMapGetter('inboxes/getInbox');
-const inbox = computed(() => getInbox.value(inboxId.value));
-
-const showPayloadModal = ref(false);
-
-const isAppleMessagesChannel = computed(() => {
-  return inbox.value?.channel_type === 'Channel::AppleMessagesForBusiness';
-});
-
-const hasApplePayloadData = computed(() => {
-  return (
-    isAppleMessagesChannel.value &&
-    (appleMspPayload.value || contentAttributes.value)
-  );
-});
-
-const openPayloadModal = () => {
-  showPayloadModal.value = true;
-};
-
-const closePayloadModal = () => {
-  showPayloadModal.value = false;
-};
 
 const varaintBaseMap = {
   [MESSAGE_VARIANTS.AGENT]: 'bg-n-solid-blue text-n-slate-12',
@@ -130,7 +94,7 @@ const replyToPreview = computed(() => {
 
 <template>
   <div
-    class="text-sm relative"
+    class="text-sm"
     :class="[
       messageClass,
       {
@@ -138,14 +102,6 @@ const replyToPreview = computed(() => {
       },
     ]"
   >
-    <button
-      v-if="hasApplePayloadData"
-      v-tooltip.top-start="'View Apple Messages payload'"
-      class="absolute top-1 ltr:right-1 rtl:left-1 z-10 p-1 rounded-full bg-n-alpha-2 hover:bg-n-alpha-3 transition-colors"
-      @click.stop="openPayloadModal"
-    >
-      <fluent-icon icon="info" size="14" class="text-n-slate-11" />
-    </button>
     <div
       v-if="inReplyTo"
       class="p-2 -mx-1 mb-2 rounded-lg cursor-pointer bg-n-alpha-black1"
@@ -167,14 +123,5 @@ const replyToPreview = computed(() => {
       ]"
       class="mt-2"
     />
-    <Teleport to="body">
-      <ApplePayloadModal
-        v-model:show="showPayloadModal"
-        :payload="appleMspPayload"
-        :status="status"
-        :content-attributes="contentAttributes"
-        @close="closePayloadModal"
-      />
-    </Teleport>
   </div>
 </template>

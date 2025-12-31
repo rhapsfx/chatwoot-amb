@@ -1,8 +1,7 @@
 {
   "all": {
     "sourceCodeDir": "app/javascript",
-    "watchAdditionalPaths": [],
-    "skipCompatibilityCheck": true
+    "watchAdditionalPaths": []
   },
   "development": {
     "autoBuild": true,

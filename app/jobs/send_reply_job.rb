@@ -9,16 +9,14 @@ class SendReplyJob < ApplicationJob
     'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
     'Channel::Sms' => ::Sms::SendOnSmsService,
     'Channel::Instagram' => ::Instagram::SendOnInstagramService,
+    'Channel::Tiktok' => ::Tiktok::SendOnTiktokService,
     'Channel::Email' => ::Email::SendOnEmailService,
     'Channel::WebWidget' => ::Messages::SendEmailNotificationService,
-    'Channel::Api' => ::Messages::SendEmailNotificationService,
-    'Channel::AppleMessagesForBusiness' => ::AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService
+    'Channel::Api' => ::Messages::SendEmailNotificationService
   }.freeze
 
   def perform(message_id)
-    # Performance Optimization: Eager load attachments with ActiveStorage associations
-    # This prevents N+1 queries when processing attachments in SendMessageService
-    message = Message.includes(attachments: { file_attachment: :blob }).find(message_id)
+    message = Message.find(message_id)
     channel_name = message.conversation.inbox.channel.class.to_s
 
     return send_on_facebook_page(message) if channel_name == 'Channel::FacebookPage'

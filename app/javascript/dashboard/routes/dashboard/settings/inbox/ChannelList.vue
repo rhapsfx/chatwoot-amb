@@ -16,9 +16,13 @@ const globalConfig = useMapGetter('globalConfig/get');
 
 const enabledFeatures = ref({});
 
+const hasTiktokConfigured = computed(() => {
+  return window.chatwootConfig?.tiktokAppId;
+});
+
 const channelList = computed(() => {
   const { apiChannelName } = globalConfig.value;
-  return [
+  const channels = [
     {
       key: 'website',
       title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.WEBSITE.TITLE'),
@@ -73,21 +77,25 @@ const channelList = computed(() => {
       description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.INSTAGRAM.DESCRIPTION'),
       icon: 'i-woot-instagram',
     },
-    {
-      key: 'voice',
-      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.TITLE'),
-      description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.DESCRIPTION'),
-      icon: 'i-ri-phone-fill',
-    },
-    {
-      key: 'apple_messages_for_business',
-      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.TITLE'),
-      description: t(
-        'INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.DESCRIPTION'
-      ),
-      icon: 'i-woot-apple-messages',
-    },
   ];
+
+  if (hasTiktokConfigured.value) {
+    channels.push({
+      key: 'tiktok',
+      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.TIKTOK.TITLE'),
+      description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.TIKTOK.DESCRIPTION'),
+      icon: 'i-woot-tiktok',
+    });
+  }
+
+  channels.push({
+    key: 'voice',
+    title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.TITLE'),
+    description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.DESCRIPTION'),
+    icon: 'i-ri-phone-fill',
+  });
+
+  return channels;
 });
 
 const initializeEnabledFeatures = async () => {
@@ -108,15 +116,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-  >
-    <ChannelItem
-      v-for="channel in channelList"
-      :key="channel.key"
-      :channel="channel"
-      :enabled-features="enabledFeatures"
-      @channel-item-click="initChannelAuth"
-    />
+  <div class="w-full p-8 overflow-auto">
+    <div
+      class="grid max-w-3xl grid-cols-1 xs:grid-cols-2 mx-0 gap-6 sm:grid-cols-3"
+    >
+      <ChannelItem
+        v-for="channel in channelList"
+        :key="channel.key"
+        :channel="channel"
+        :enabled-features="enabledFeatures"
+        @channel-item-click="initChannelAuth"
+      />
+    </div>
   </div>
 </template>

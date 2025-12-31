@@ -80,7 +80,7 @@
         "PLACEHOLDER": "What does this bot do?"
       },
       "WEBHOOK_URL": {
-        "LABEL": "Webhook URL (optional)",
+        "LABEL": "Webhook URL",
         "PLACEHOLDER": "https://example.com/webhook",
         "REQUIRED": "Webhook URL is required"
       },

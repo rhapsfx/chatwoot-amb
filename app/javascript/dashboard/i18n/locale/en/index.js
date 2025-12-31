@@ -1,7 +1,6 @@
 import advancedFilters from './advancedFilters.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
-import appleMessages from './appleMessages.json';
 import attributesMgmt from './attributesMgmt.json';
 import auditLogs from './auditLogs.json';
 import automation from './automation.json';
@@ -38,14 +37,13 @@ import sla from './sla.json';
 import teamsSettings from './teamsSettings.json';
 import whatsappTemplates from './whatsappTemplates.json';
 import contentTemplates from './contentTemplates.json';
-import templates from './templates.json';
 import mfa from './mfa.json';
+import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
   ...agentBots,
   ...agentMgmt,
-  ...appleMessages,
   ...attributesMgmt,
   ...auditLogs,
   ...automation,
@@ -82,6 +80,6 @@ export default {
   ...teamsSettings,
   ...whatsappTemplates,
   ...contentTemplates,
-  ...templates,
   ...mfa,
+  ...yearInReview,
 };

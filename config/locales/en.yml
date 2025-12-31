@@ -62,6 +62,8 @@ en:
       failed: Signup failed
     assignment_policy:
       not_found: Assignment policy not found
+    attachments:
+      invalid: Invalid attachment
     saml:
       feature_not_enabled: SAML feature not enabled for this account
       sso_not_enabled: SAML SSO is not enabled for this installation
@@ -122,6 +124,13 @@ en:
       invalid_token: Invalid or expired MFA token
       invalid_credentials: Invalid credentials or verification code
       feature_unavailable: MFA feature is not available. Please configure encryption keys.
+    topup:
+      credits_required: Credits amount is required
+      invalid_credits: Invalid credits amount
+      invalid_option: Invalid topup option
+      plan_not_eligible: Top-ups are only available for paid plans. Please upgrade your plan first.
+      stripe_customer_not_configured: Stripe customer not configured
+      no_payment_method: No payment methods found. Please add a payment method before making a purchase.
   profile:
     mfa:
       enabled: MFA enabled successfully
@@ -197,6 +206,8 @@ en:
     messages:
       instagram_story_content: '%{story_sender} mentioned you in the story: '
       instagram_deleted_story_content: This story is no longer available.
+      instagram_shared_story_content: 'Shared story'
+      instagram_shared_post_content: 'Shared post'
       deleted: This message was deleted
       whatsapp:
         list_button_label: 'Choose an item'
@@ -300,10 +311,6 @@ en:
       name: 'OpenAI'
       short_description: 'AI-powered reply suggestions, summarization, and message enhancement.'
       description: 'Leverage the power of large language models from OpenAI with the features such as reply suggestions, summarization, message rephrasing, spell-checking, and label classification.'
-    perplexity:
-      name: 'Perplexity'
-      short_description: 'AI-powered reply suggestions, summarization, and message enhancement.'
-      description: 'Leverage the power of large language models from Perplexity with the features such as reply suggestions, summarization, message rephrasing, spell-checking, and label classification.'
     linear:
       name: 'Linear'
       short_description: 'Create and link Linear issues directly from conversations.'
@@ -442,21 +449,3 @@ en:
       subject: 'Finish setting up %{custom_domain}'
     ssl_status:
       custom_domain_not_configured: 'Custom domain is not configured'
-  apple_messages:
-    shared_images:
-      tabs:
-        system: 'System'
-        branding: 'Branding'
-        template: 'Template'
-      upload: 'Upload Image'
-      search_placeholder: 'Search by identifier or description...'
-      loading: 'Loading images...'
-      error: 'Failed to load images'
-      retry: 'Retry'
-      empty_state: 'No images available'
-      empty_state_hint: 'Upload images to get started'
-      delete: 'Delete'
-      confirm_delete: 'Are you sure you want to delete this image?'
-      image_count: '%{count} images'
-      errors:
-        file_too_large: 'Image file size must be less than 5MB'

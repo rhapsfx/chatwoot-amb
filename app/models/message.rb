@@ -4,7 +4,6 @@
 #
 #  id                        :integer          not null, primary key
 #  additional_attributes     :jsonb
-#  apple_msp_payload         :jsonb
 #  content                   :text
 #  content_attributes        :json
 #  content_type              :integer          default("text"), not null
@@ -97,17 +96,7 @@ class Message < ApplicationRecord
     input_csat: 9,
     integrations: 10,
     sticker: 11,
-    voice_call: 12,
-    apple_list_picker: 13,
-    apple_time_picker: 14,
-    apple_quick_reply: 15,
-    apple_pay: 16,
-    apple_rich_link: 17,
-    apple_authentication: 18,
-    apple_form: 19,
-    apple_custom_app: 20,
-    apple_form_response: 21,
-    apple_custom_payload: 22
+    voice_call: 12
   }
   enum status: { sent: 0, delivered: 1, read: 2, failed: 3 }
   # [:submitted_email, :items, :submitted_values] : Used for bot message types
@@ -119,14 +108,9 @@ class Message < ApplicationRecord
   # [:data] : Used for structured content types such as voice_call
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
-                                         :translations, :in_reply_to_external_id, :is_unsupported, :data, :sections, :event, :summary_text,
-                                         :images, :timezone_offset, :received_title, :received_subtitle, :received_style,
-                                         :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
-                                         :reply_secondary_subtitle, :reply_tertiary_subtitle,
-                                         :url, :title, :description, :rich_link_data_ref, :image_url, :image_data, :image_mime_type,
-                                         :site_name, :favicon_url], coder: JSON
+                                         :translations, :in_reply_to_external_id, :is_unsupported, :data], coder: JSON
 
-  store :external_source_ids, accessors: [:slack, :apple_messages], coder: JSON, prefix: :external_source_id
+  store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 
   scope :created_since, ->(datetime) { where('created_at > ?', datetime) }
   scope :chat, -> { where.not(message_type: :activity).where(private: false) }
@@ -166,8 +150,6 @@ class Message < ApplicationRecord
     )
     data[:echo_id] = echo_id if echo_id.present?
     data[:attachments] = attachments.map(&:push_event_data) if attachments.present?
-    # Normalize sender_type to match frontend expectations
-    data[:sender_type] = normalize_sender_type(data[:sender_type])
     merge_sender_attributes(data)
   end
 
@@ -272,24 +254,22 @@ class Message < ApplicationRecord
     Messages::SearchDataPresenter.new(self).search_data
   end
 
-  private
+  # Returns message content suitable for LLM consumption
+  # Falls back to audio transcription or attachment placeholder when content is nil
+  def content_for_llm
+    return content if content.present?
 
-  def normalize_sender_type(sender_type)
-    # Normalize sender_type from database class names to frontend-expected values
-    case sender_type
-    when 'AgentBot'
-      'agent_bot'
-    when 'User', 'AccountUser'
-      'User' # Both User and AccountUser represent agents, frontend expects 'User'
-    when 'Contact'
-      'Contact'
-    when 'Captain::Assistant'
-      'captain_assistant'
-    else
-      # For any other types, convert to snake_case
-      sender_type&.underscore
-    end
+    audio_transcription = attachments
+                          .where(file_type: :audio)
+                          .filter_map { |att| att.meta&.dig('transcribed_text') }
+                          .join(' ')
+                          .presence
+    return "[Voice Message] #{audio_transcription}" if audio_transcription.present?
+
+    '[Attachment]' if attachments.any?
   end
+
+  private
 
   def prevent_message_flooding
     # Added this to cover the validation specs in messages
@@ -324,24 +304,6 @@ class Message < ApplicationRecord
   end
 
   def ensure_content_type
-    # Don't override content_type if it's already set to an Apple Messages type
-    return if content_type.present? && content_type.start_with?('apple_')
-
-    # For Apple Messages, try to infer content_type from content_attributes
-    if content_type.blank? && content_attributes.present?
-      if content_attributes.key?('items') && content_attributes.key?('summary_text')
-        self.content_type = 'apple_quick_reply'
-        return
-      elsif content_attributes.key?('sections')
-        self.content_type = 'apple_list_picker'
-        return
-      elsif content_attributes.key?('event')
-        self.content_type = 'apple_time_picker'
-        return
-      end
-    end
-
-    # Default fallback
     self.content_type ||= Message.content_types[:text]
   end
 

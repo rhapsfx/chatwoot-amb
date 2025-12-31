@@ -42,28 +42,7 @@ const props = defineProps({
 const emit = defineEmits(['retry']);
 
 const allMessages = computed(() => {
-  // CRITICAL: Preserve appleMspPayload contents from camelization
-  // Apple MSP Gateway requires exact field names like 'quick-reply' (with hyphen)
-  // The camelcase-keys library doesn't have a way to exclude nested content,
-  // so we must manually preserve and restore appleMspPayload
-
-  const messages = props.messages.map(msg => {
-    // Store original appleMspPayload if it exists
-    const originalAppleMspPayload =
-      msg.appleMspPayload || msg.apple_msp_payload;
-
-    // Camelize the message
-    const camelized = useCamelCase(msg, { deep: true });
-
-    // Restore original appleMspPayload (not camelized)
-    if (originalAppleMspPayload) {
-      camelized.appleMspPayload = originalAppleMspPayload;
-    }
-
-    return camelized;
-  });
-
-  return messages;
+  return useCamelCase(props.messages, { deep: true });
 });
 
 const currentChat = useMapGetter('getSelectedChat');

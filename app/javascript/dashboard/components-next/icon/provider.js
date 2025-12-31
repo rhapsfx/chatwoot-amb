@@ -13,8 +13,8 @@ export function useChannelIcon(inbox) {
     'Channel::WebWidget': 'i-woot-website',
     'Channel::Whatsapp': 'i-woot-whatsapp',
     'Channel::Instagram': 'i-woot-instagram',
+    'Channel::Tiktok': 'i-woot-tiktok',
     'Channel::Voice': 'i-ri-phone-fill',
-    'Channel::AppleMessagesForBusiness': 'i-ri-apple-fill',
   };
 
   const providerIconMap = {

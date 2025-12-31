@@ -3,7 +3,7 @@ import { ref, computed, reactive, watch } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
-import { required, helpers } from '@vuelidate/validators';
+import { required, helpers, url } from '@vuelidate/validators';
 import { useVuelidate } from '@vuelidate/core';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import { useToggle } from '@vueuse/core';
@@ -48,16 +48,6 @@ const formState = reactive({
 const [showAccessToken, toggleAccessToken] = useToggle();
 const accessToken = ref('');
 
-// Custom URL validator that accepts localhost, IP addresses, and standard URLs
-const isValidWebhookUrl = value => {
-  if (!value) return true; // Optional field
-
-  // Allow localhost, IP addresses, and standard URLs
-  const urlPattern =
-    /^https?:\/\/(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w.-]+\.[\w.-]+)(:\d+)?(\/.*)?$/i;
-  return urlPattern.test(value);
-};
-
 const v$ = useVuelidate(
   {
     botName: {
@@ -67,10 +57,13 @@ const v$ = useVuelidate(
       ),
     },
     botUrl: {
-      // Webhook URL is optional, but if provided, it must be valid
-      isValidWebhookUrl: helpers.withMessage(
+      required: helpers.withMessage(
+        () => t('AGENT_BOTS.FORM.ERRORS.URL'),
+        required
+      ),
+      url: helpers.withMessage(
         () => t('AGENT_BOTS.FORM.ERRORS.VALID_URL'),
-        isValidWebhookUrl
+        url
       ),
     },
   },

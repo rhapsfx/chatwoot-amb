@@ -28,6 +28,7 @@ import ImageBubble from './bubbles/Image.vue';
 import FileBubble from './bubbles/File.vue';
 import AudioBubble from './bubbles/Audio.vue';
 import VideoBubble from './bubbles/Video.vue';
+import EmbedBubble from './bubbles/Embed.vue';
 import InstagramStoryBubble from './bubbles/InstagramStory.vue';
 import EmailBubble from './bubbles/Email/Index.vue';
 import UnsupportedBubble from './bubbles/Unsupported.vue';
@@ -37,14 +38,6 @@ import LocationBubble from './bubbles/Location.vue';
 import CSATBubble from './bubbles/CSAT.vue';
 import FormBubble from './bubbles/Form.vue';
 import VoiceCallBubble from './bubbles/VoiceCall.vue';
-import AppleListPickerBubble from './bubbles/AppleListPicker.vue';
-import AppleTimePickerBubble from './bubbles/AppleTimePicker.vue';
-import AppleQuickReplyBubble from './bubbles/AppleQuickReply.vue';
-import AppleFormBubble from './bubbles/AppleForm.vue';
-import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
-import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
-import AppleCustomAppBubble from './bubbles/AppleCustomApp.vue';
-import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
 
 import MessageError from './MessageError.vue';
 import ContextMenu from 'dashboard/modules/conversations/components/MessageContextMenu.vue';
@@ -119,7 +112,6 @@ const props = defineProps({
   attachments: { type: Array, default: () => [] },
   content: { type: String, default: null },
   contentAttributes: { type: Object, default: () => ({}) },
-  appleMspPayload: { type: Object, default: null }, // eslint-disable-line vue/no-unused-properties
   contentType: {
     type: String,
     default: 'text',
@@ -170,12 +162,7 @@ const variant = computed(() => {
   if (props.contentAttributes?.isUnsupported)
     return MESSAGE_VARIANTS.UNSUPPORTED;
 
-  // Check sender type with fallback to senderType prop
-  const senderType = props.sender?.type ?? props.senderType;
-  const isBot =
-    !props.sender ||
-    senderType === SENDER_TYPES.AGENT_BOT ||
-    senderType === SENDER_TYPES.CAPTAIN_ASSISTANT;
+  const isBot = !props.sender || props.sender.type === SENDER_TYPES.AGENT_BOT;
   if (isBot && props.messageType === MESSAGE_TYPES.OUTGOING) {
     return MESSAGE_VARIANTS.BOT;
   }
@@ -305,39 +292,6 @@ const componentToRender = computed(() => {
     return EmailBubble;
   }
 
-  // Apple Messages for Business content types
-  if (props.contentType === CONTENT_TYPES.APPLE_LIST_PICKER) {
-    return AppleListPickerBubble;
-  }
-
-  if (props.contentType === CONTENT_TYPES.APPLE_TIME_PICKER) {
-    return AppleTimePickerBubble;
-  }
-
-  if (props.contentType === CONTENT_TYPES.APPLE_QUICK_REPLY) {
-    return AppleQuickReplyBubble;
-  }
-
-  if (props.contentType === CONTENT_TYPES.APPLE_FORM) {
-    return AppleFormBubble;
-  }
-
-  if (props.contentType === CONTENT_TYPES.APPLE_RICH_LINK) {
-    return AppleRichLinkBubble;
-  }
-  if (props.contentType === CONTENT_TYPES.APPLE_FORM_RESPONSE) {
-    return AppleFormResponseBubble;
-  }
-
-  if (props.contentType === CONTENT_TYPES.APPLE_CUSTOM_APP) {
-    return AppleCustomAppBubble;
-  }
-
-  // Check for tapback reactions (Apple Messages)
-  if (props.contentAttributes?.is_tapback_reaction) {
-    return TapbackReactionBubble;
-  }
-
   if (props.contentAttributes?.isUnsupported) {
     return UnsupportedBubble;
   }
@@ -346,38 +300,31 @@ const componentToRender = computed(() => {
     return DyteBubble;
   }
 
-  if (props.contentAttributes.imageType === 'story_mention') {
+  const instagramSharedTypes = [
+    ATTACHMENT_TYPES.STORY_MENTION,
+    ATTACHMENT_TYPES.IG_STORY,
+    ATTACHMENT_TYPES.IG_POST,
+  ];
+  if (instagramSharedTypes.includes(props.contentAttributes.imageType)) {
     return InstagramStoryBubble;
   }
-
-  // Check if this is a template message with attachments
-  // Templates often have generic "Message" content, so we should show attachments directly
-  const isTemplateWithAttachments =
-    props.messageType === MESSAGE_TYPES.TEMPLATE &&
-    Array.isArray(props.attachments) &&
-    props.attachments.length > 0 &&
-    (!props.content || props.content === 'Message');
 
   if (Array.isArray(props.attachments) && props.attachments.length === 1) {
     const fileType = props.attachments[0].fileType;
 
-    // Show attachment bubble if:
-    // 1. No content at all, OR
-    // 2. This is a template with generic "Message" content
-    if (!props.content || isTemplateWithAttachments) {
+    if (!props.content) {
       if (fileType === ATTACHMENT_TYPES.IMAGE) return ImageBubble;
       if (fileType === ATTACHMENT_TYPES.FILE) return FileBubble;
       if (fileType === ATTACHMENT_TYPES.AUDIO) return AudioBubble;
       if (fileType === ATTACHMENT_TYPES.VIDEO) return VideoBubble;
       if (fileType === ATTACHMENT_TYPES.IG_REEL) return VideoBubble;
+      if (fileType === ATTACHMENT_TYPES.EMBED) return EmbedBubble;
       if (fileType === ATTACHMENT_TYPES.LOCATION) return LocationBubble;
     }
     // Attachment content is the name of the contact
     if (fileType === ATTACHMENT_TYPES.CONTACT) return ContactBubble;
   }
 
-  // If template has multiple attachments with generic content, show in TextBubble
-  // but the AttachmentChips component will display them properly
   return TextBubble;
 });
 
@@ -487,17 +434,10 @@ const avatarInfo = computed(() => {
   const { sender } = props;
   const { name, type, avatarUrl, thumbnail } = sender || {};
 
-  // Use sender type with fallback to senderType prop
-  const senderType = type ?? props.senderType;
-
   // If sender type is agent bot, use avatarUrl
-  if (
-    [SENDER_TYPES.AGENT_BOT, SENDER_TYPES.CAPTAIN_ASSISTANT].includes(
-      senderType
-    )
-  ) {
+  if ([SENDER_TYPES.AGENT_BOT, SENDER_TYPES.CAPTAIN_ASSISTANT].includes(type)) {
     return {
-      name: name ?? t('CONVERSATION.BOT'),
+      name: name ?? '',
       src: avatarUrl ?? '',
     };
   }
@@ -543,7 +483,7 @@ provideMessageContext({
   <div
     v-if="shouldRenderMessage"
     :id="`message${props.id}`"
-    class="flex w-full message-bubble-container mb-2"
+    class="flex mb-2 w-full message-bubble-container"
     :data-message-id="props.id"
     :class="[
       flexOrientationClass,

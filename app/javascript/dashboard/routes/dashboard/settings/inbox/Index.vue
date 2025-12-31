@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import Avatar from 'next/avatar/Avatar.vue';
 import { useAdmin } from 'dashboard/composables/useAdmin';
-import { usePolicy } from 'dashboard/composables/usePolicy';
 import SettingsLayout from '../SettingsLayout.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import {
@@ -20,17 +19,11 @@ const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
 const { isAdmin } = useAdmin();
-const { checkPermissions } = usePolicy();
 
 const showDeletePopup = ref(false);
 const selectedInbox = ref({});
 
 const inboxes = useMapGetter('inboxes/getInboxes');
-
-// Check if user has inbox_manage permission
-const canManageInboxes = computed(() => {
-  return isAdmin.value || checkPermissions(['inbox_manage']);
-});
 
 const inboxesList = computed(() => {
   return inboxes.value?.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -133,26 +126,6 @@ const openDelete = inbox => {
                     :channel-type="inbox.channel_type"
                     :medium="inbox.medium"
                   />
-                  <div
-                    v-if="
-                      inbox.channel_type === 'Channel::AppleMessagesForBusiness'
-                    "
-                    class="mt-1 text-xs text-n-slate-11"
-                  >
-                    <span>{{
-                      $t('INBOX_MGMT.APPLE_MESSAGES_STARTER_LINK')
-                    }}</span>
-                    <a
-                      :href="`https://bcrw.apple.com/sms:open?service=iMessage&recipient=urn:biz:${inbox.business_id}`"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="text-xs text-n-woot-9 hover:text-n-woot-10 hover:underline ml-1"
-                    >
-                      {{
-                        `https://bcrw.apple.com/sms:open?service=iMessage&recipient=urn:biz:${inbox.business_id}`
-                      }}
-                    </a>
-                  </div>
                 </div>
               </div>
             </td>
@@ -166,7 +139,7 @@ const openDelete = inbox => {
                   }"
                 >
                   <Button
-                    v-if="canManageInboxes"
+                    v-if="isAdmin"
                     v-tooltip.top="$t('INBOX_MGMT.SETTINGS')"
                     icon="i-lucide-settings"
                     slate

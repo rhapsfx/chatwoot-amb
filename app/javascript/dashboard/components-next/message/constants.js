@@ -49,6 +49,9 @@ export const ATTACHMENT_TYPES = {
   STORY_MENTION: 'story_mention',
   CONTACT: 'contact',
   IG_REEL: 'ig_reel',
+  EMBED: 'embed',
+  IG_POST: 'ig_post',
+  IG_STORY: 'ig_story',
 };
 
 export const CONTENT_TYPES = {
@@ -65,14 +68,6 @@ export const CONTENT_TYPES = {
   INTEGRATIONS: 'integrations',
   STICKER: 'sticker',
   VOICE_CALL: 'voice_call',
-  APPLE_LIST_PICKER: 'apple_list_picker',
-  APPLE_TIME_PICKER: 'apple_time_picker',
-  APPLE_QUICK_REPLY: 'apple_quick_reply',
-  APPLE_FORM: 'apple_form',
-  APPLE_PAY: 'apple_pay',
-  APPLE_RICH_LINK: 'apple_rich_link',
-  APPLE_FORM_RESPONSE: 'apple_form_response',
-  APPLE_CUSTOM_APP: 'apple_custom_app',
 };
 
 export const MEDIA_TYPES = [
@@ -81,3 +76,16 @@ export const MEDIA_TYPES = [
   ATTACHMENT_TYPES.AUDIO,
   ATTACHMENT_TYPES.IG_REEL,
 ];
+
+export const VOICE_CALL_STATUS = {
+  IN_PROGRESS: 'in-progress',
+  RINGING: 'ringing',
+  COMPLETED: 'completed',
+  NO_ANSWER: 'no-answer',
+  FAILED: 'failed',
+};
+
+export const VOICE_CALL_DIRECTION = {
+  INBOUND: 'inbound',
+  OUTBOUND: 'outbound',
+};

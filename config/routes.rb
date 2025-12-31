@@ -19,10 +19,13 @@ Rails.application.routes.draw do
     get '/app/accounts/:account_id/settings/inboxes/new/twitter', to: 'dashboard#index', as: 'app_new_twitter_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/microsoft', to: 'dashboard#index', as: 'app_new_microsoft_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/instagram', to: 'dashboard#index', as: 'app_new_instagram_inbox'
+    get '/app/accounts/:account_id/settings/inboxes/new/tiktok', to: 'dashboard#index', as: 'app_new_tiktok_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_twitter_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_email_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_instagram_inbox_agents'
+    get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_tiktok_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_instagram_inbox_settings'
+    get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_tiktok_inbox_settings'
     get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_email_inbox_settings'
 
     resource :widget, only: [:show]
@@ -31,25 +34,6 @@ Rails.application.routes.draw do
     end
     resource :slack_uploads, only: [:show]
   end
-
-  # Apple Pay domain verification (both with and without .txt extension)
-  get '/.well-known/apple-developer-merchantid-domain-association', to: proc { |_env|
-    file_path = Rails.public_path.join('.well-known/apple-developer-merchantid-domain-association')
-    if File.exist?(file_path)
-      [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
-    else
-      [404, { 'Content-Type' => 'text/plain' }, ['Not Found']]
-    end
-  }
-
-  get '/.well-known/apple-developer-merchantid-domain-association.txt', to: proc { |_env|
-    file_path = Rails.public_path.join('.well-known/apple-developer-merchantid-domain-association')
-    if File.exist?(file_path)
-      [200, { 'Content-Type' => 'text/plain' }, [File.read(file_path)]]
-    else
-      [404, { 'Content-Type' => 'text/plain' }, ['Not Found']]
-    end
-  }
 
   get '/api', to: 'api#index'
   namespace :api, defaults: { format: 'json' } do
@@ -94,39 +78,6 @@ Rails.application.routes.draw do
             delete :avatar, on: :member
             post :reset_access_token, on: :member
           end
-          # Template endpoints for CRUD operations
-          resources :templates, only: [:index, :show, :create, :update, :destroy] do
-            member do
-              post :render_template
-              post :attach_files
-              delete 'attachments/:attachment_id', action: :remove_attachment, as: :remove_attachment
-              put :reorder_attachments
-              get :validate_images
-            end
-            collection do
-              post :from_apple_message
-            end
-          end
-          # Bot-friendly template endpoints for search, render, and send
-          resources :bot_templates, only: [] do
-            collection do
-              get :search
-              post 'render', to: 'bot_templates#render_template'
-              post :send_message
-            end
-          end
-          # Shared Apple Messages for Business images (account-level)
-          resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do
-            member do
-              post :upload
-              delete :remove_image
-            end
-            collection do
-              get :system_images
-              get :branding_images
-              get :template_images
-            end
-          end
           resources :contact_inboxes, only: [] do
             collection do
               post :filter
@@ -162,23 +113,6 @@ Rails.application.routes.draw do
           namespace :channels do
             resource :twilio_channel, only: [:create]
           end
-          resources :apple_messages, only: [] do
-            collection do
-              post :parse_url
-              get :app_metadata
-            end
-          end
-          resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do
-            collection do
-              get :system_images
-              get :branding_images
-              get :template_images
-            end
-            member do
-              post :upload
-              delete :remove_image
-            end
-          end
           resources :conversations, only: [:index, :create, :show, :update, :destroy] do
             collection do
               get :meta
@@ -190,9 +124,6 @@ Rails.application.routes.draw do
                 member do
                   post :translate
                   post :retry
-                end
-                collection do
-                  post :send_apple_pay
                 end
               end
               resources :assignments, only: [:create]
@@ -217,7 +148,6 @@ Rails.application.routes.draw do
             end
           end
 
-          # Apple Pay payment gateway (outside of accounts scope)
           resources :search, only: [:index] do
             collection do
               get :conversations
@@ -250,6 +180,7 @@ Rails.application.routes.draw do
               resources :contact_inboxes, only: [:create]
               resources :labels, only: [:create, :index]
               resources :notes
+              post :call, on: :member, to: 'calls#create' if ChatwootApp.enterprise?
             end
           end
           resources :csat_survey_responses, only: [:index] do
@@ -274,24 +205,16 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
-            # OLD routes (kept for backward compatibility - Phase 1 of rename)
-            resources :apple_list_picker_images, only: [:index, :create, :destroy], module: :inboxes do
-              collection do
-                post :copy_from
-                post :bulk_upload
-              end
-            end
-            # NEW routes (Phase 1 - Non-Breaking rename to apple_amb_images)
-            resources :apple_amb_images, only: [:index, :create, :destroy], module: :inboxes do
-              collection do
-                post :copy_from
-                post :bulk_upload
-              end
-            end
-            # Apple Messages for Business construct_payload (App Clips)
-            resource :apple_construct_payload, only: [:create], module: :inboxes, controller: 'apple_construct_payload'
             get :health, on: :member
+            if ChatwootApp.enterprise?
+              resource :conference, only: %i[create destroy], controller: 'conference' do
+                get :token, on: :member
+              end
+            end
+
+            resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates'
           end
+
           resources :inbox_members, only: [:create, :show], param: :inbox_id do
             collection do
               delete :destroy
@@ -344,6 +267,10 @@ Rails.application.routes.draw do
           end
 
           namespace :instagram do
+            resource :authorization, only: [:create]
+          end
+
+          namespace :tiktok do
             resource :authorization, only: [:create]
           end
 
@@ -412,9 +339,6 @@ Rails.application.routes.draw do
               post :reorder, on: :collection
             end
           end
-
-          # Apple Pay payment gateway - specify absolute controller path
-          post 'apple_pay/payment_gateway', to: '/apple_messages_for_business/payment_gateway#process_payment'
 
           resources :upload, only: [:create]
         end
@@ -508,6 +432,7 @@ Rails.application.routes.draw do
               get :bot_metrics
             end
           end
+          resource :year_in_review, only: [:show]
           resources :live_reports, only: [] do
             collection do
               get :conversation_metrics
@@ -529,6 +454,7 @@ Rails.application.routes.draw do
               post :subscription
               get :limits
               post :toggle_deletion
+              post :topup_checkout
             end
           end
         end
@@ -620,40 +546,7 @@ Rails.application.routes.draw do
   post 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#process_payload'
   get 'webhooks/instagram', to: 'webhooks/instagram#verify'
   post 'webhooks/instagram', to: 'webhooks/instagram#events'
-  # Apple Messages for Business webhook - permanent URL without MSP ID
-  # The business_id is extracted from the destination-id header sent by Apple
-  # Apple appends /message to the base URL configured in Apple Business Register
-  post 'webhooks/apple_messages_for_business/message', to: 'webhooks/apple_messages_for_business#process_payload'
-  # Also support base URL without /message for flexibility
-  post 'webhooks/apple_messages_for_business', to: 'webhooks/apple_messages_for_business#process_payload'
-
-  # Apple Messages for Business routes
-  namespace :apple_messages_for_business do
-    resources :attachments, only: [:show] do
-      member do
-        get :download
-      end
-    end
-
-    # OAuth2 Authentication routes
-    get 'oauth/callback/:provider', to: 'oauth_callback#callback'
-    get 'landing/:session_id', to: 'landing_page#show'
-
-    # Apple Pay routes
-    scope ':msp_id' do
-      namespace :payment_gateway do
-        post 'process_payment', to: 'payment_gateway#process_payment'
-        post 'method_update', to: 'payment_gateway#payment_method_update'
-        post 'merchant_session', to: 'payment_gateway#create_merchant_session'
-        get 'validate_session/:session_id', to: 'payment_gateway#validate_merchant_session'
-        post 'webhook', to: 'payment_gateway#webhook'
-        get 'status/:transaction_id', to: 'payment_gateway#payment_status'
-      end
-    end
-
-    # Encrypted download routes
-    get 'encrypted_download/:token', to: 'encrypted_download#show'
-  end
+  post 'webhooks/tiktok', to: 'webhooks/tiktok#events'
 
   namespace :twitter do
     resource :callback, only: [:show]
@@ -672,18 +565,16 @@ Rails.application.routes.draw do
     resources :delivery_status, only: [:create]
 
     if ChatwootApp.enterprise?
-      resource :voice, only: [], controller: 'voice' do
-        collection do
-          post 'call/:phone', action: :call_twiml
-          post 'status/:phone', action: :status
-        end
-      end
+      post 'voice/call/:phone', to: 'voice#call_twiml', as: :voice_call
+      post 'voice/status/:phone', to: 'voice#status', as: :voice_status
+      post 'voice/conference_status/:phone', to: 'voice#conference_status', as: :voice_conference_status
     end
   end
 
   get 'microsoft/callback', to: 'microsoft/callbacks#show'
   get 'google/callback', to: 'google/callbacks#show'
   get 'instagram/callback', to: 'instagram/callbacks#show'
+  get 'tiktok/callback', to: 'tiktok/callbacks#show'
   get 'notion/callback', to: 'notion/callbacks#show'
   # ----------------------------------------------------------------------
   # Routes for external service verifications

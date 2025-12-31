@@ -8,7 +8,6 @@ import { useAlert, useTrack } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { OPEN_AI_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
 import OpenAPI from 'dashboard/api/integrations/openapi';
-import PerplexityAPI from 'dashboard/api/integrations/perplexity';
 
 /**
  * Cleans and normalizes a list of labels.
@@ -50,24 +49,9 @@ export function useAI() {
   const aiIntegration = computed(
     () =>
       appIntegrations.value.find(
-        integration =>
-          (integration.id === 'openai' || integration.id === 'perplexity') &&
-          !!integration.hooks.length
+        integration => integration.id === 'openai' && !!integration.hooks.length
       )?.hooks[0]
   );
-
-  /**
-   * Computed property for the AI integration type.
-   * @type {import('vue').ComputedRef<string|undefined>}
-   */
-  const aiIntegrationType = computed(() => {
-    const integration = appIntegrations.value.find(
-      integration =>
-        (integration.id === 'openai' || integration.id === 'perplexity') &&
-        !!integration.hooks.length
-    );
-    return integration?.id;
-  });
 
   /**
    * Computed property to check if AI integration is enabled.
@@ -148,14 +132,6 @@ export function useAI() {
   };
 
   /**
-   * Gets the appropriate API client based on the integration type.
-   * @returns {Object} The API client (OpenAPI or PerplexityAPI).
-   */
-  const getAPIClient = () => {
-    return aiIntegrationType.value === 'perplexity' ? PerplexityAPI : OpenAPI;
-  };
-
-  /**
    * Fetches label suggestions for the current conversation.
    * @returns {Promise<string[]>} An array of suggested labels.
    */
@@ -163,8 +139,7 @@ export function useAI() {
     if (!conversationId.value) return [];
 
     try {
-      const apiClient = getAPIClient();
-      const result = await apiClient.processEvent({
+      const result = await OpenAPI.processEvent({
         type: 'label_suggestion',
         hookId: hookId.value,
         conversationId: conversationId.value,
@@ -187,8 +162,7 @@ export function useAI() {
    */
   const processEvent = async (type = 'rephrase') => {
     try {
-      const apiClient = getAPIClient();
-      const result = await apiClient.processEvent({
+      const result = await OpenAPI.processEvent({
         hookId: hookId.value,
         type,
         content: draftMessage.value,
@@ -200,11 +174,9 @@ export function useAI() {
       return generatedMessage;
     } catch (error) {
       const errorData = error.response.data.error;
-      const integrationKey =
-        aiIntegrationType.value === 'perplexity' ? 'PERPLEXITY' : 'OPEN_AI';
       const errorMessage =
         errorData?.error?.message ||
-        t(`INTEGRATION_SETTINGS.${integrationKey}.GENERATE_ERROR`);
+        t('INTEGRATION_SETTINGS.OPEN_AI.GENERATE_ERROR');
       useAlert(errorMessage);
       return '';
     }
@@ -220,7 +192,6 @@ export function useAI() {
     appIntegrations,
     currentChat,
     replyMode,
-    aiIntegrationType,
     isAIIntegrationEnabled,
     isLabelSuggestionFeatureEnabled,
     isFetchingAppIntegrations,

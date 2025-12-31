@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require Rails.root.join('app/services/apple_messages_for_business/concerns/bot_service_interface')
+
 class AppleMessagesForBusiness::AcousticHouseBotService
+  include AppleMessagesForBusiness::Concerns::BotServiceInterface
+
   IDLE_TIMEOUT = 30.minutes
 
   # Template dependencies for deployment automation
@@ -16,7 +20,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   ].freeze
 
   # Returns array of required template names
-  def self.required_template_names
+  def self.required_template_namesd
     REQUIRED_TEMPLATES
   end
 
@@ -123,12 +127,177 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'qr_oauth_provider' => :handle_oauth_provider_selection
   }.freeze
 
-  def initialize(conversation, message)
+  # Handler methods metadata for Bot Studio integration
+  # Provides discovery, validation, and documentation of available handler methods
+  def self.handler_methods_metadata
+    {
+      handle_welcome: {
+        handler_type: :state,
+        display_name: 'Welcome Handler',
+        description: 'Sends initial welcome message and prompts for region selection',
+        category: 'onboarding',
+        status: :stable,
+        triggers: {
+          state_ids: %w[AHA1 AH-restart],
+          keywords: [],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_main_menu'],
+          attributes: []
+        },
+        tags: %w[welcome onboarding region]
+      },
+      handle_menu: {
+        handler_type: :keyword,
+        display_name: 'Main Menu',
+        description: 'Shows the main menu with available demo options',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['menu'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_main_menu'],
+          attributes: []
+        },
+        tags: %w[menu navigation]
+      },
+      handle_start_over: {
+        handler_type: :keyword,
+        display_name: 'Start Over',
+        description: 'Resets conversation and returns to welcome state',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['start', 'startover', 'start over', 'restart', 'begin', 'reset'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: [],
+          attributes: []
+        },
+        tags: %w[reset restart navigation]
+      },
+      handle_region_selection: {
+        handler_type: :interactive,
+        display_name: 'Region Selection',
+        description: 'Handles user region/travel selection from quick reply',
+        category: 'onboarding',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: [],
+          interactive_ids: ['qr_travel']
+        },
+        dependencies: {
+          templates: [],
+          attributes: ['customer_region']
+        },
+        tags: %w[region selection onboarding]
+      },
+      handle_guitar_selection: {
+        handler_type: :interactive,
+        display_name: 'Guitar Selection',
+        description: 'Handles guitar selection from list picker',
+        category: 'product',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: [],
+          interactive_ids: ['lp_guitar_0319']
+        },
+        dependencies: {
+          templates: %w[ah_guitar_list_picker ah_guitar_info_form],
+          attributes: ['selected_guitar']
+        },
+        tags: %w[guitar product list-picker]
+      },
+      handle_list_picker_demo: {
+        handler_type: :keyword,
+        display_name: 'List Picker Demo',
+        description: 'Shows standalone list picker demo with guitar selection',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['list picker', 'listpicker', 'guitar', 'guitars'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_guitar_list_picker'],
+          attributes: []
+        },
+        tags: %w[demo list-picker guitar]
+      },
+      handle_time_picker_demo: {
+        handler_type: :keyword,
+        display_name: 'Time Picker Demo',
+        description: 'Shows standalone time picker demo for scheduling',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['time picker', 'timepicker'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: [],
+          attributes: []
+        },
+        tags: %w[demo time-picker scheduling]
+      },
+      handle_form_demo: {
+        handler_type: :keyword,
+        display_name: 'Form Demo',
+        description: 'Shows standalone form demo for data collection',
+        category: 'demo',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['form', 'help me decide'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_guitar_info_form'],
+          attributes: []
+        },
+        tags: %w[demo form data-collection]
+      },
+      handle_summary: {
+        handler_type: :keyword,
+        display_name: 'Summary',
+        description: 'Shows conversation summary with selected options',
+        category: 'navigation',
+        status: :stable,
+        triggers: {
+          state_ids: [],
+          keywords: ['summary'],
+          interactive_ids: []
+        },
+        dependencies: {
+          templates: ['ah_summary'],
+          attributes: []
+        },
+        tags: %w[summary review]
+      }
+    }
+  end
+
+  def initialize(conversation, message, bot = nil, config = nil)
     @conversation = conversation
     @message = message
+    @bot = bot
+    @config = build_config(bot, config)
     @contact = conversation.contact
     @bot_state = get_bot_state
     @lang = detect_language
+
+    # Validate configuration if bot is provided
+    validate_config! if @bot.present?
   end
 
   def process_message
@@ -276,6 +445,100 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   private
+
+  # === Configuration Management ===
+
+  def build_config(bot, config)
+    if bot.present?
+      # Use provided config or bot's config
+      (config || bot.bot_config).with_indifferent_access
+    else
+      # Legacy mode: use default hardcoded configuration
+      Rails.logger.warn '[AcousticHouseBot] Running in legacy mode (hardcoded config)'
+      default_hardcoded_config
+    end
+  end
+
+  def validate_config!
+    required_keys = %w[conversation_flow keyword_mappings interactive_handlers required_templates]
+    missing_keys = required_keys - @config.keys
+
+    return unless missing_keys.any?
+
+    raise StandardError, "Missing required config keys: #{missing_keys.join(', ')}"
+  end
+
+  def validate_templates!
+    return unless @config.dig('required_templates', 'validation', 'enabled')
+
+    result = self.class.verify_templates_exist(@conversation.account_id)
+
+    if !result[:all_present] && @config.dig('required_templates', 'validation', 'fail_on_missing')
+      raise StandardError, "Missing required templates: #{result[:missing].join(', ')}"
+    end
+
+    return unless result[:missing].any?
+
+    Rails.logger.warn "[AcousticHouseBot] Missing templates: #{result[:missing].join(', ')}"
+  end
+
+  def default_hardcoded_config
+    {
+      'conversation_flow' => {
+        'initial_state' => 'AHA1',
+        'idle_timeout_minutes' => 30
+      },
+      'keyword_mappings' => {
+        'demo_keywords' => DEMO_KEYWORDS.stringify_keys,
+        'flow_control_keywords' => FLOW_CONTROL_KEYWORDS.stringify_keys
+      },
+      'interactive_handlers' => INTERACTIVE_HANDLERS.stringify_keys,
+      'required_templates' => {
+        'list' => REQUIRED_TEMPLATES,
+        'validation' => {
+          'enabled' => false
+        }
+      },
+      'typing_indicators' => {
+        'enabled' => TYPING_INDICATORS_ENABLED,
+        'delay_seconds' => TYPING_INDICATOR_DELAY
+      },
+      'idempotency' => {
+        'enabled' => true,
+        'ttl_minutes' => 2,
+        'redis_key_prefix' => 'amb_bot'
+      }
+    }.with_indifferent_access
+  end
+
+  # Config accessor methods (for gradual migration from hardcoded constants)
+  def idle_timeout
+    @config.dig('conversation_flow', 'idle_timeout_minutes')&.minutes || IDLE_TIMEOUT
+  end
+
+  def demo_keywords
+    @config.dig('keyword_mappings', 'demo_keywords') || DEMO_KEYWORDS
+  end
+
+  def flow_control_keywords
+    @config.dig('keyword_mappings', 'flow_control_keywords') || FLOW_CONTROL_KEYWORDS
+  end
+
+  def interactive_handlers
+    @config['interactive_handlers'] || INTERACTIVE_HANDLERS
+  end
+
+  def required_templates
+    @config.dig('required_templates', 'list') || REQUIRED_TEMPLATES
+  end
+
+  def typing_indicators_enabled?
+    @config.dig('typing_indicators', 'enabled') != false
+  end
+
+  def typing_indicator_delay
+    @config.dig('typing_indicators', 'delay_seconds') || TYPING_INDICATOR_DELAY
+  end
 
   # UTF-8 safe logging methods (inlined from Utf8Logging concern for deployment compatibility)
   def utf8_encode(obj)
@@ -571,19 +834,31 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_form_or_name_prompt
-    # Check if device supports Apple Messages Forms
-    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-    supports_forms = capabilities.include?('FORM')
+    # Check if user has sent a response (incoming message with text content)
+    if @message.present? && @message.content.present? && @message.incoming?
+      # User has responded with text - capture the name
+      name = @message.content.strip
 
-    if supports_forms
-      log_info '[Bot] Device supports FORM - sending Apple Messages Form'
-      send_guitar_info_form
-      update_bot_state('AHB1') # Wait for form response
+      # Store in conversation attributes
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes['customer_name'] = name
+      @conversation.save!
+
+      log_info "[Bot] 📝 Captured customer name: #{name}"
+
+      # Transition to condition node (let it route based on device capability)
+      @conversation.custom_attributes['current_state'] = 'condition-device-supports-forms'
+      @conversation.save!
+
+      # Return indicator that state should transition
+      { success: true, transition_to: 'condition-device-supports-forms' }
     else
-      log_info '[Bot] Device does not support FORM - asking for name via text'
+      # First time in state - ask for name
+      # Don't check device capability here - let the condition node handle routing
+      log_info '[Bot] Asking for customer name'
       send_text_message("What's your name?")
-      # Skip form and ask for text name input
-      update_bot_state('AHB1_2') # Wait for text name input
+
+      { success: true, waiting_for_input: true }
     end
   end
 
@@ -654,15 +929,29 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_text_name_input
-    # Handle plain text name input (for devices without form support)
-    customer_name = @message.content.strip
-    update_conversation_attribute('customer_name', customer_name)
+    # Handle plain text stage name input (for devices without form support)
+    # This is called AFTER customer_name has already been captured
+    # Now we need to collect the stage name
 
-    send_text_message("Thank you, #{customer_name}!")
+    if @message.present? && @message.content.present? && @message.incoming?
+      # User has responded with stage name
+      stage_name = @message.content.strip
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes['stage_name'] = stage_name
+      @conversation.save!
 
-    # Skip name preference (no stage name to choose from) - go directly to guitar list
-    update_bot_state('AHB3')
-    handle_guitar_list_prompt
+      log_info "[Bot] 📝 Captured stage name: #{stage_name}"
+
+      # Now we have both names - transition to name preference
+      { success: true, transition_to: 'state-name-preference' }
+    else
+      # First time - ask for stage name
+      customer_name = get_conversation_attribute('customer_name')
+      log_info "[Bot] Asking for stage name (customer_name: #{customer_name})"
+      send_text_message("Thanks! And what's your stage name or artist name?")
+
+      { success: true, waiting_for_input: true }
+    end
   end
 
   def handle_name_preference_prompt
@@ -877,10 +1166,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     update_bot_state('AHC3')
 
-    # NOTE: Removed blocking sleep(15.0) that was causing Rack timeouts
-    # AR question will be sent immediately - user may see question before AR file fully loads
-    # This is acceptable as the AR file will load in background
-    handle_ar_first_question
+    # IMPORTANT: Don't chain handle_ar_first_question here
+    # Let the visual flow handle the transition with proper timing
+    # The FlowExecutorService will follow the edge to the next state after a delay
+    log_info '[Bot] 🎸 AR file sent - waiting for flow transition'
+
+    # Return transition indicator for Bot Studio
+    { success: true, transition_to: 'state-ar-question-1' }
   end
 
   def handle_ar_first_question
@@ -2927,8 +3219,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def bot_user
-    # Return the AgentBot associated with this inbox, or nil
-    @conversation.inbox.agent_bot
+    # Return the AgentBot that was provided to the constructor
+    # The bot is passed from FlowExecutorService or IncomingMessageService
+    @bot
   end
 
   # Typing indicator methods

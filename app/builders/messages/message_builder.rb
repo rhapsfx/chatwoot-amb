@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 class Messages::MessageBuilder
   include ::FileTypeHelper
   include ::EmailHelper
@@ -24,13 +22,12 @@ class Messages::MessageBuilder
 
   def perform
     @message = @conversation.messages.build(message_params)
-
     process_attachments
     process_emails
-
+    # When the message has no quoted content, it will just be rendered as a regular message
+    # The frontend is equipped to handle this case
     process_email_content
     @message.save!
-
     @message
   end
 
@@ -44,17 +41,10 @@ class Messages::MessageBuilder
     params = convert_to_hash(@params)
     content_attributes = params.fetch(:content_attributes, {})
 
-    # Early return for String - use upstream's safe_parse_json
     return safe_parse_json(content_attributes) if content_attributes.is_a?(String)
+    return content_attributes if content_attributes.is_a?(Hash)
 
-    # Get content_attributes as hash
-    parsed_content_attributes = content_attributes.is_a?(Hash) ? content_attributes : {}
-
-    # Include images in content_attributes for Apple Messages
-    # Check both separate images parameter AND images nested in content_attributes
-    parsed_content_attributes[:images] = params[:images] if @params[:content_type]&.start_with?('apple_') && params.key?(:images)
-
-    parsed_content_attributes
+    {}
   end
 
   def process_attachments
@@ -114,8 +104,7 @@ class Messages::MessageBuilder
   end
 
   def sender
-    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
-    message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
+    message_type == 'outgoing' ? (message_sender || @user) : @conversation.contact
   end
 
   def external_created_at
@@ -148,8 +137,8 @@ class Messages::MessageBuilder
       content: @params[:content],
       private: @private,
       sender: sender,
-      content_type: @params[:content_type] || 'text',
-      content_attributes: content_attributes,
+      content_type: @params[:content_type],
+      content_attributes: content_attributes.presence,
       items: @items,
       in_reply_to: @in_reply_to,
       echo_id: @params[:echo_id],
@@ -234,3 +223,5 @@ class Messages::MessageBuilder
                                        })
   end
 end
+
+Messages::MessageBuilder.prepend_mod_with('Messages::MessageBuilder')

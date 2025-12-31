@@ -58,8 +58,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
   end
 
   def format_message_content
-    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
-    message.message_type.to_s == 'activity' ? "_#{message_text}_" : message_text
+    message.message_type == 'activity' ? "_#{message_text}_" : message_text
   end
 
   def message_text
@@ -122,8 +121,6 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
   end
 
   def upload_files
-    return unless message.attachments.any?
-
     files = build_files_array
     return if files.empty?
 
@@ -137,6 +134,8 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
       Rails.logger.info "slack_upload_result: #{result}"
     rescue Slack::Web::Api::Errors::SlackError => e
       Rails.logger.error "Failed to upload files: #{e.message}"
+    ensure
+      files.each { |file| file[:content]&.clear }
     end
   end
 
@@ -144,12 +143,29 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
     message.attachments.filter_map do |attachment|
       next unless attachment.with_attached_file?
 
-      {
-        filename: attachment.file.filename.to_s,
-        content: attachment.file.download,
-        title: attachment.file.filename.to_s
-      }
+      build_file_payload(attachment)
     end
+  end
+
+  def build_file_payload(attachment)
+    content = download_attachment_content(attachment)
+    return if content.blank?
+
+    {
+      filename: attachment.file.filename.to_s,
+      content: content,
+      title: attachment.file.filename.to_s
+    }
+  end
+
+  def download_attachment_content(attachment)
+    buffer = +''
+    attachment.file.blob.open do |file|
+      while (chunk = file.read(64.kilobytes))
+        buffer << chunk
+      end
+    end
+    buffer
   end
 
   def sender_name(sender)
@@ -161,8 +177,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
       'Contact'
     elsif sender.instance_of?(User)
       'Agent'
-    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
-    elsif message.message_type.to_s == 'activity' && sender.nil?
+    elsif message.message_type == 'activity' && sender.nil?
       'System'
     else
       'Bot'

@@ -5,9 +5,6 @@ export const AVAILABLE_CUSTOM_ROLE_PERMISSIONS = [
   'contact_manage',
   'report_manage',
   'knowledge_base_manage',
-  'template_manage',
-  'inbox_manage',
-  'agent_bot_manage',
 ];
 
 export const ROLES = ['agent', 'administrator'];
@@ -31,12 +28,6 @@ export const CONTACT_PERMISSIONS = 'contact_manage';
 export const REPORTS_PERMISSIONS = 'report_manage';
 
 export const PORTAL_PERMISSIONS = 'knowledge_base_manage';
-
-export const TEMPLATE_PERMISSIONS = 'template_manage';
-
-export const INBOX_PERMISSIONS = 'inbox_manage';
-
-export const AGENT_BOT_PERMISSIONS = 'agent_bot_manage';
 
 export const ASSIGNEE_TYPE_TAB_PERMISSIONS = {
   me: {

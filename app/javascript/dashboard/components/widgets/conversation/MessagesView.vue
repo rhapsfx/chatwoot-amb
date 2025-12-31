@@ -177,9 +177,6 @@ export default {
     },
 
     replyWindowBannerMessage() {
-      if (this.isAppleMessagesConversation) {
-        return this.$t('CONVERSATION.APPLE_MESSAGES_OPTED_OUT');
-      }
       if (this.isAWhatsAppChannel) {
         return this.$t('CONVERSATION.TWILIO_WHATSAPP_CAN_REPLY');
       }
@@ -202,14 +199,14 @@ export default {
       return this.$t('CONVERSATION.CANNOT_REPLY');
     },
     replyWindowLink() {
-      if (this.isAppleMessagesConversation) {
-        return ''; // No link for Apple Messages
-      }
       if (this.isAFacebookInbox || this.isAnInstagramChannel) {
         return REPLY_POLICY.FACEBOOK;
       }
       if (this.isAWhatsAppCloudChannel) {
         return REPLY_POLICY.WHATSAPP_CLOUD;
+      }
+      if (this.isATiktokChannel) {
+        return REPLY_POLICY.TIKTOK;
       }
       if (!this.isAPIInbox) {
         return REPLY_POLICY.TWILIO_WHATSAPP;
@@ -217,15 +214,15 @@ export default {
       return '';
     },
     replyWindowLinkText() {
-      if (this.isAppleMessagesConversation) {
-        return ''; // No link text for Apple Messages
-      }
       if (
         this.isAWhatsAppChannel ||
         this.isAFacebookInbox ||
         this.isAnInstagramChannel
       ) {
         return this.$t('CONVERSATION.24_HOURS_WINDOW');
+      }
+      if (this.isATiktokChannel) {
+        return this.$t('CONVERSATION.48_HOURS_WINDOW');
       }
       if (!this.isAPIInbox) {
         return this.$t('CONVERSATION.TWILIO_WHATSAPP_24_HOURS_WINDOW');
@@ -252,9 +249,6 @@ export default {
 
       return { incoming, outgoing };
     },
-    isAppleMessagesConversation() {
-      return this.inbox?.channel_type === 'Channel::AppleMessagesForBusiness';
-    },
   },
 
   watch: {
@@ -270,8 +264,6 @@ export default {
 
   created() {
     emitter.on(BUS_EVENTS.SCROLL_TO_MESSAGE, this.onScrollToMessage);
-    // when a new message comes in, we refetch the label suggestions
-    emitter.on(BUS_EVENTS.FETCH_LABEL_SUGGESTIONS, this.fetchSuggestions);
     // when a message is sent we set the flag to true this hides the label suggestions,
     // until the chat is changed and the flag is reset in the watch for currentChat
     emitter.on(BUS_EVENTS.MESSAGE_SENT, () => {
@@ -302,6 +294,10 @@ export default {
       if (!this.isEnterprise) {
         return;
       }
+
+      // Early exit if conversation already has labels - no need to suggest more
+      const existingLabels = this.currentChat?.labels || [];
+      if (existingLabels.length > 0) return;
 
       // method available in mixin, need to ensure that integrations are present
       await this.fetchIntegrationsIfRequired();
