@@ -846,28 +846,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
       log_info "[Bot] 📝 Captured customer name: #{name}"
 
-      # Transition to next state (name-preference)
-      @conversation.custom_attributes['current_state'] = 'state-name-preference'
+      # Transition to condition node (let it route based on device capability)
+      @conversation.custom_attributes['current_state'] = 'condition-device-supports-forms'
       @conversation.save!
 
       # Return indicator that state should transition
-      { success: true, transition_to: 'state-name-preference' }
+      { success: true, transition_to: 'condition-device-supports-forms' }
     else
       # First time in state - ask for name
-      # Check if device supports Apple Messages Forms
-      capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-      supports_forms = capabilities.include?('FORM')
-
-      if supports_forms
-        log_info '[Bot] Device supports FORM - sending Apple Messages Form'
-        send_guitar_info_form
-        update_bot_state('AHB1') # Wait for form response
-      else
-        log_info '[Bot] Device does not support FORM - asking for name via text'
-        send_text_message("What's your name?")
-        # Skip form and ask for text name input
-        update_bot_state('AHB1_2') # Wait for text name input
-      end
+      # Don't check device capability here - let the condition node handle routing
+      log_info '[Bot] Asking for customer name'
+      send_text_message("What's your name?")
 
       { success: true, waiting_for_input: true }
     end
@@ -940,15 +929,29 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_text_name_input
-    # Handle plain text name input (for devices without form support)
-    customer_name = @message.content.strip
-    update_conversation_attribute('customer_name', customer_name)
+    # Handle plain text stage name input (for devices without form support)
+    # This is called AFTER customer_name has already been captured
+    # Now we need to collect the stage name
 
-    send_text_message("Thank you, #{customer_name}!")
+    if @message.present? && @message.content.present? && @message.incoming?
+      # User has responded with stage name
+      stage_name = @message.content.strip
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes['stage_name'] = stage_name
+      @conversation.save!
 
-    # Skip name preference (no stage name to choose from) - go directly to guitar list
-    update_bot_state('AHB3')
-    handle_guitar_list_prompt
+      log_info "[Bot] 📝 Captured stage name: #{stage_name}"
+
+      # Now we have both names - transition to name preference
+      { success: true, transition_to: 'state-name-preference' }
+    else
+      # First time - ask for stage name
+      customer_name = get_conversation_attribute('customer_name')
+      log_info "[Bot] Asking for stage name (customer_name: #{customer_name})"
+      send_text_message("Thanks! And what's your stage name or artist name?")
+
+      { success: true, waiting_for_input: true }
+    end
   end
 
   def handle_name_preference_prompt
@@ -1163,10 +1166,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     update_bot_state('AHC3')
 
-    # NOTE: Removed blocking sleep(15.0) that was causing Rack timeouts
-    # AR question will be sent immediately - user may see question before AR file fully loads
-    # This is acceptable as the AR file will load in background
-    handle_ar_first_question
+    # IMPORTANT: Don't chain handle_ar_first_question here
+    # Let the visual flow handle the transition with proper timing
+    # The FlowExecutorService will follow the edge to the next state after a delay
+    log_info '[Bot] 🎸 AR file sent - waiting for flow transition'
+
+    # Return transition indicator for Bot Studio
+    { success: true, transition_to: 'state-ar-question-1' }
   end
 
   def handle_ar_first_question
