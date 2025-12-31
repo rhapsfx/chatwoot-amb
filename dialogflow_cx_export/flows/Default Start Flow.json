@@ -1,0 +1,7 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000",
+  "displayName": "Default Start Flow",
+  "nluSettings": {
+    "modelType": "MODEL_TYPE_STANDARD"
+  }
+}

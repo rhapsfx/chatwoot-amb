@@ -1,0 +1,39 @@
+{
+  "parameters": {
+    "method": "POST",
+    "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $(\"AHB1 - Parse Form Response\").item.json.accountId }}/conversations/{{ $(\"AHB1 - Parse Form Response\").item.json.conversationId }}/custom_attributes",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendBody": true,
+    "bodyParameters": {
+      "parameters": [
+        {
+          "name": "custom_attributes[user_name]",
+          "value": "={{ $(\"AHB1 - Parse Form Response\").item.json.userName || \"\" }}"
+        },
+        {
+          "name": "custom_attributes[stage_name]",
+          "value": "={{ $(\"AHB1 - Parse Form Response\").item.json.stageName || \"\" }}"
+        },
+        {
+          "name": "custom_attributes[selected_name]",
+          "value": "={{ $(\"AHB1 - Parse Form Response\").item.json.stageName || $(\"AHB1 - Parse Form Response\").item.json.userName || \"\" }}"
+        }
+      ]
+    }
+  },
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 4.3,
+  "position": [
+    3400,
+    -200
+  ],
+  "id": "d8d6fd5c-0a7b-4d22-a642-5272d116f464",
+  "name": "Update Name Attributes",
+  "credentials": {
+    "httpHeaderAuth": {
+      "id": "RQQuzy3scKeZsK8H",
+      "name": "n8n Local -Bot Chatwoot"
+    }
+  }
+}

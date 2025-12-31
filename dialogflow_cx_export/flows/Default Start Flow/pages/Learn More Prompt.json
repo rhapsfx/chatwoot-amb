@@ -1,0 +1,67 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Learn More Prompt",
+  "displayName": "Learn More Prompt",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "chips",
+                "options": [
+                  {
+                    "text": "Yes",
+                    "event": {
+                      "name": "learn_more_yes",
+                      "languageCode": "en"
+                    }
+                  },
+                  {
+                    "text": "No",
+                    "event": {
+                      "name": "learn_more_no",
+                      "languageCode": "en"
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Great! Our trade-in program is an awesome way to get credit for your old gear."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Final Message"
+    },
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "No problem. You can find more information on our website anytime."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Final Message"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Location Request",
+  "displayName": "Location Request",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "Please share your city or zip code so we can find the nearest store for you."
+          ]
+        }
+      }
+    ]
+  },
+  "form": {
+    "parameters": [
+      {
+        "displayName": "location",
+        "required": true,
+        "entityType": "@sys.location",
+        "fillBehavior": {
+          "initialPromptFulfillment": {
+            "messages": [
+              {
+                "text": {
+                  "text": [
+                    "I'm sorry, I didn't get that. What is your city or zip code?"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "$page.form.status = 'FINAL'",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Store Selection"
+    }
+  ]
+}

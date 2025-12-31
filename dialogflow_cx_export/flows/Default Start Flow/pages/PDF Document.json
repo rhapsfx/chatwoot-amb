@@ -1,0 +1,38 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/PDF Document",
+  "displayName": "PDF Document",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "info",
+                "title": "Guitar Warranty",
+                "subtitle": "View the warranty information for your new guitar.",
+                "action": {
+                  "link": "https://www.example.com/guitar_warranty.pdf"
+                }
+              },
+              {
+                "type": "info",
+                "title": "Quick Start Guide",
+                "subtitle": "Get started with your new guitar.",
+                "action": {
+                  "link": "https://www.example.com/quick_start_guide.pdf"
+                }
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Learn More Prompt"
+    }
+  ]
+}

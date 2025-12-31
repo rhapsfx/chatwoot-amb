@@ -1,0 +1,70 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Store Selection",
+  "displayName": "Store Selection",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "Great! Here are some stores we found near you:"
+          ]
+        }
+      },
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "list",
+                "title": "Select a Store",
+                "items": [
+                  {
+                    "type": "list_item",
+                    "title": "Guitar Center",
+                    "subtitle": "123 Main St, San Francisco, CA",
+                    "event": {
+                      "name": "store_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "store": "Guitar Center"
+                      }
+                    }
+                  },
+                  {
+                    "type": "list_item",
+                    "title": "Sam Ash",
+                    "subtitle": "456 Market St, San Francisco, CA",
+                    "event": {
+                      "name": "store_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "store": "Sam Ash"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "You selected $session.params.store. We'll schedule your lesson there."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Time Picker"
+    }
+  ]
+}

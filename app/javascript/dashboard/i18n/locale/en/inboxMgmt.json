@@ -1021,7 +1021,8 @@
       "API": "API Channel",
       "INSTAGRAM": "Instagram",
       "TIKTOK": "TikTok",
-      "VOICE": "Voice"
+      "VOICE": "Voice",
+      "APPLE_MESSAGES_FOR_BUSINESS": "Apple Messages for Business"
     }
   }
 }

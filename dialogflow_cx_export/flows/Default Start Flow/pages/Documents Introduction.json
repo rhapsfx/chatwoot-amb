@@ -1,0 +1,22 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Documents Introduction",
+  "displayName": "Documents Introduction",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "We also have some helpful documents for you.",
+            "You can view warranty information and a quick start guide."
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/PDF Document"
+    }
+  ]
+}

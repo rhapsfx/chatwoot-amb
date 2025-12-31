@@ -1,0 +1,81 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Form or Name Prompt",
+  "displayName": "Form or Name Prompt",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "info",
+                "title": "Guitar Info",
+                "subtitle": "Please fill out this form to help us find the perfect guitar for you.",
+                "action": {
+                  "link": "https://www.example.com/form"
+                }
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "form": {
+    "parameters": [
+      {
+        "displayName": "customer_name",
+        "required": true,
+        "entityType": "@sys.any",
+        "fillBehavior": {
+          "initialPromptFulfillment": {
+            "messages": [
+              {
+                "text": {
+                  "text": [
+                    "What's your name?"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "displayName": "stage_name",
+        "required": false,
+        "entityType": "@sys.any",
+        "fillBehavior": {
+          "initialPromptFulfillment": {
+            "messages": [
+              {
+                "text": {
+                  "text": [
+                    "What's your stage name? (optional)"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "$page.form.status = 'FINAL'",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Thanks, $session.params.customer_name!"
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Guitar List Prompt"
+    }
+  ]
+}

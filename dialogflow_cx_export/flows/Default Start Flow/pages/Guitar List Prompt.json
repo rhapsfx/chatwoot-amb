@@ -1,0 +1,75 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Guitar List Prompt",
+  "displayName": "Guitar List Prompt",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "list",
+                "title": "Choose your guitar",
+                "items": [
+                  {
+                    "type": "list_item",
+                    "title": "Acoustic Guitar",
+                    "subtitle": "A classic choice for any musician.",
+                    "event": {
+                      "name": "guitar_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "guitar": "Acoustic"
+                      }
+                    }
+                  },
+                  {
+                    "type": "list_item",
+                    "title": "Electric Guitar",
+                    "subtitle": "For those about to rock.",
+                    "event": {
+                      "name": "guitar_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "guitar": "Electric"
+                      }
+                    }
+                  },
+                  {
+                    "type": "list_item",
+                    "title": "Bass Guitar",
+                    "subtitle": "The foundation of the band.",
+                    "event": {
+                      "name": "guitar_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "guitar": "Bass"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "You picked the $session.params.guitar guitar. Excellent choice!"
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR Introduction"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR Introduction",
+  "displayName": "AR Introduction",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "Want to see how it looks in your space?",
+            "Our Augmented Reality feature lets you place a 3D model of the guitar right in your room."
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR First Question"
+    }
+  ]
+}

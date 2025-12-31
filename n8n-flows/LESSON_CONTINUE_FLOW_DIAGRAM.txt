@@ -1,0 +1,417 @@
+==============================================
+LESSON SCHEDULING & CONTINUE FLOW DIAGRAM
+==============================================
+
+Complete Visual Map of Tier 1.4 and 1.5
+Implementation Date: 2025-11-10
+Node Count: 14 new nodes
+
+==============================================
+TIER 1.4: LESSON SCHEDULING FLOW (AHF2, AHF3, AHG1)
+==============================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│                     APPLE PAY COMPLETE                          │
+│                 (Existing Flow - Tier 1.3)                      │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AMB Apple Pay Request                │
+         │   (Custom Node - Template 4)           │
+         │   • Line Items: Guitar, Tax, Shipping  │
+         │   • Merchant: Acoustic House           │
+         │   • Amount: $3,239.00                  │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHF2 - Schedule Lesson Intro         │  ← NEW
+         │   (HTTP Request)                       │
+         │   "However, let's schedule a lesson    │
+         │    with your guitar."                  │
+         │   Python Ref: Lines 1111-1118          │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHF3 - Request Location              │  ← NEW
+         │   (HTTP Request)                       │
+         │   "We can find the closest location    │
+         │    for you, just message us your       │
+         │    zipcode. Where are you?"            │
+         │   Python Ref: Lines 1119-1128          │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Set State: location_requested        │  ← NEW
+         │   (HTTP Request - Custom Attributes)   │
+         │   bot_state = 'location_requested'     │
+         └────────────────┬───────────────────────┘
+                          │
+                          │ [WAIT FOR USER TEXT INPUT]
+                          │
+┌─────────────────────────┴───────────────────────────┐
+│                                                     │
+│         USER SENDS TEXT MESSAGE                     │
+│         Example: "94102" or "San Francisco"         │
+│                                                     │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │      ROUTER WITH STATE                 │
+         │   (Code Node)                          │
+         │                                        │
+         │   Detects:                             │
+         │   • bot_state === 'location_requested' │
+         │   • content exists (text message)      │
+         │   • interactive_type is empty          │
+         │                                        │
+         │   Route: LOCATION_TEXT                 │
+         │   Flag: isLocationText = true          │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Is Location? (IF Node)               │
+         │   Condition: isLocationText === true   │
+         └────────────────┬───────────────────────┘
+                          │ TRUE
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHG1 - Parse Location                │  ← NEW
+         │   (Code Node)                          │
+         │   Input: text content                  │
+         │   Output:                              │
+         │   • location: string                   │
+         │   • isValid: boolean                   │
+         │   Python Ref: Lines 1130-1166          │
+         │   (Simplified - no geocoding yet)      │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHG1 - Time Picker Intro             │  ← NEW
+         │   (HTTP Request)                       │
+         │   "Here are the available times at     │
+         │    Apple Park."                        │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AMB Time Picker                      │
+         │   (Custom Node - Template 5)           │
+         │   • Start time options                 │
+         │   • Duration selection                 │
+         │   • Timezone aware                     │
+         └────────────────┬───────────────────────┘
+                          │
+                          │ [TIER 1.5 CONTINUES BELOW]
+                          │
+                          ▼
+
+==============================================
+TIER 1.5: CONTINUE FLOW (AHH2, AHI1)
+==============================================
+
+                          │ (From Time Picker above)
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Set State: time_confirmed            │  ← NEW
+         │   (HTTP Request - Custom Attributes)   │
+         │   bot_state = 'time_confirmed'         │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Confirm Appointment                  │
+         │   (HTTP Request)                       │
+         │   "✓ Your appointment is confirmed!    │
+         │    We'll send you a reminder..."       │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHH2 - Lesson Confirmation           │  ← NEW
+         │   (HTTP Request)                       │
+         │   "Thank you, you're all set to learn  │
+         │    to shread. 🤘"                      │
+         │   Python Ref: Lines 1191-1199          │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHH2 - Continue Question             │  ← NEW
+         │   (HTTP Request)                       │
+         │   "Shall we continue?"                 │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHH2 - Continue Quick Reply          │  ← NEW
+         │   (Custom AMB Quick Reply)             │
+         │   Template: 3                          │
+         │   Options:                             │
+         │   • continue_yes: "Yes, continue"      │
+         │   • continue_no: "No, skip"            │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Set State: continue_asked            │  ← NEW
+         │   (HTTP Request - Custom Attributes)   │
+         │   bot_state = 'continue_asked'         │
+         └────────────────┬───────────────────────┘
+                          │
+                          │ [WAIT FOR USER QUICK REPLY]
+                          │
+┌─────────────────────────┴───────────────────────────┐
+│                                                     │
+│    USER SELECTS QUICK REPLY OPTION                 │
+│    Option A: "Yes, continue"                        │
+│    Option B: "No, skip"                             │
+│                                                     │
+└─────────────────────────┬───────────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │      ROUTER WITH STATE                 │
+         │   (Code Node)                          │
+         │                                        │
+         │   Detects:                             │
+         │   • bot_state === 'continue_asked'     │
+         │   • interactive_type === 'quick_reply' │
+         │   • identifier: continue_yes/no        │
+         │                                        │
+         │   Route: CONTINUE_RESPONSE             │
+         │   Flag: isContinueResponse = true      │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   Is Continue Response? (IF Node)      │
+         │   Condition: isContinueResponse=true   │
+         └────────────────┬───────────────────────┘
+                          │ TRUE
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHI1 - Parse Continue Response       │  ← NEW
+         │   (Code Node)                          │
+         │   Input: quick reply identifier        │
+         │   Output:                              │
+         │   • shouldContinue: boolean            │
+         │   • continueIdentifier: string         │
+         │   Python Ref: Lines 1201-1217          │
+         └────────────────┬───────────────────────┘
+                          │
+                          ▼
+         ┌────────────────────────────────────────┐
+         │   AHI1 - Should Continue? (IF Node)    │  ← NEW
+         │   Condition: shouldContinue === true   │
+         └──────────┬─────────────────────┬───────┘
+                    │                     │
+            YES     │                     │ NO
+                    │                     │
+                    ▼                     ▼
+    ┌───────────────────────┐  ┌────────────────────────────┐
+    │  AHI1 - Rich Links    │  │  AHI1 - Learn More         │  ← NEW
+    │  Placeholder          │  │  Question                  │
+    │  (No-Op Node)         │  │  (HTTP Request)            │
+    │                       │  │  "Would you like to learn  │
+    │  📌 TIER 2:           │  │   more about Apple         │
+    │  Replace with AHI2    │  │   Messages for Business?"  │
+    │  Send Rich Link       │  └────────────┬───────────────┘
+    │  (Python L1218-1224)  │               │
+    └───────────────────────┘               ▼
+                                ┌────────────────────────────┐
+                                │  AHI1 - Learn More Quick   │  ← NEW
+                                │  Reply                     │
+                                │  (Custom AMB Quick Reply)  │
+                                │  Template: 3               │
+                                │  Options:                  │
+                                │  • learn_more_yes          │
+                                │  • learn_more_no           │
+                                │                            │
+                                │  📌 TIER 2:                │
+                                │  Route to AHK1 Summary     │
+                                │  (Python L1280-1302)       │
+                                └────────────────────────────┘
+
+==============================================
+STATE MACHINE SUMMARY
+==============================================
+
+State Transitions:
+
+  location_requested → location_parsed → time_confirmed → continue_asked → continue_response
+
+Bot States Set:
+  1. location_requested  ← Set by: Set State node after AHF3
+  2. time_confirmed      ← Set by: Set State node after Time Picker
+  3. continue_asked      ← Set by: Set State node after Continue QR
+
+Router Routes:
+  1. LOCATION_TEXT       ← Triggered by: bot_state='location_requested' + text input
+  2. CONTINUE_RESPONSE   ← Triggered by: bot_state='continue_asked' + quick reply
+
+==============================================
+INTEGRATION POINTS
+==============================================
+
+Upstream (Tier 1.3):
+  AR Flow → Apple Pay Transition → AMB Apple Pay Request
+  ↓
+  [Tier 1.4 Lesson Scheduling starts here]
+
+Downstream (Tier 2):
+  Continue Flow → Rich Links Placeholder → [AHI2 - Send Rich Link]
+                                           [AHI3 - Photo Transition]
+                                           [AHI4 - Ask for Photo]
+                                           [AHJ1-AHJ4 - Documents]
+                                           [AHK1-AHK3 - Summary]
+
+Lateral (Existing):
+  Is Time? (Router) → AMB Time Picker (direct access via keyword "time picker")
+  Is Location? (Router) → Location Request (direct access via keyword "location")
+
+==============================================
+NODE TYPES BREAKDOWN
+==============================================
+
+HTTP Request Nodes: 7
+  • AHF2 - Schedule Lesson Intro
+  • AHF3 - Request Location
+  • AHG1 - Time Picker Intro
+  • AHH2 - Lesson Confirmation
+  • AHH2 - Continue Question
+  • AHI1 - Learn More Question
+  • Set State: location_requested (custom attributes)
+  • Set State: time_confirmed (custom attributes)
+  • Set State: continue_asked (custom attributes)
+
+Code Nodes: 2
+  • AHG1 - Parse Location
+  • AHI1 - Parse Continue Response
+
+IF Nodes: 1
+  • AHI1 - Should Continue?
+
+Custom AMB Nodes: 2
+  • AHH2 - Continue Quick Reply (Quick Reply - Template 3)
+  • AHI1 - Learn More Quick Reply (Quick Reply - Template 3)
+
+No-Op Nodes: 1
+  • AHI1 - Rich Links Placeholder (Tier 2 connection point)
+
+Router Enhancements: 1
+  • Router with State (added 2 detection blocks, 2 boolean flags)
+
+Total New Nodes: 14
+
+==============================================
+TESTING PATHS
+==============================================
+
+Happy Path (Full Flow):
+  1. Complete Apple Pay
+  2. See "schedule a lesson" message
+  3. See "Where are you?" message
+  4. Send text: "94102"
+  5. See "available times at Apple Park" message
+  6. See Time Picker interactive
+  7. Select time slot
+  8. See "you're all set to shread 🤘" message
+  9. See "Shall we continue?" message
+  10. Select "Yes, continue"
+  11. [Reaches Rich Links Placeholder - Tier 2]
+
+Alternative Path (Skip Rich Links):
+  1-9. Same as above
+  10. Select "No, skip"
+  11. See "Would you like to learn more?" message
+  12. See Learn More Quick Reply (Yes/No)
+  13. [Routes to Summary - Tier 2]
+
+Error Path (Invalid Location):
+  1-3. Same as above
+  4. Send text: "" (empty)
+  5. AHG1 sets isValid=false (but continues anyway in MVP)
+  6. Time Picker still shows (no validation blocking)
+
+==============================================
+PYTHON VS N8N COMPARISON
+==============================================
+
+Python Function AHF2 (Lines 1111-1118):
+  • Sends lesson intro message
+  • Checks userStatus for stop
+  • Calls AHF3 if not stopped
+  ✓ n8n: Message sent, no stop check (user can't stop in n8n yet)
+
+Python Function AHF3 (Lines 1119-1128):
+  • Checks getIntent for "Traveling" vs local
+  • Sends different messages based on intent
+  • Sets lastMessage to "AHG1"
+  ⚠ n8n: Generic message only (no intent check yet)
+
+Python Function AHG1 (Lines 1130-1166):
+  • Parses zipcode OR Apple Maps link
+  • Geocodes using findGlobalGeocode
+  • Handles multiple results with geocode list picker
+  • Calls findStores for spatial search
+  • Sends store list picker OR time picker
+  ⚠ n8n: Simplified - validates text, directly to time picker
+
+Python Function AHH2 (Lines 1191-1199):
+  • Sends confirmation message
+  • Sends continue question
+  • Sends continue quick reply
+  • Sets lastMessage to "AHI1"
+  ✓ n8n: All 3 messages sent via separate nodes
+
+Python Function AHI1 (Lines 1201-1217):
+  • Checks selection: 1=skip, 0=continue
+  • If skip: jump to AHK1 with learn more QR
+  • If continue: send "so much more" message
+  • Calls AHI2 (Rich Links)
+  ✓ n8n: Logic inverted (Yes=continue, No=skip) but functionally equivalent
+
+==============================================
+FUTURE ENHANCEMENTS (TIER 3-4)
+==============================================
+
+Location Processing:
+  [ ] Integrate geocoding API (Google Maps, Mapbox)
+  [ ] Parse Apple Maps links for lat/long
+  [ ] Handle multiple geocode results
+  [ ] Add geocode list picker for ambiguous locations
+  [ ] Validate zipcode format (US: 5 digits, UK: postcode, etc.)
+
+Store Locator:
+  [ ] Load Apple Store database (lat, long, name, address)
+  [ ] Implement KDTree spatial search
+  [ ] Find 5 nearest stores
+  [ ] Send store list picker (AMB List Picker - Template TBD)
+  [ ] Handle store selection → time picker with store context
+
+Intent Handling:
+  [ ] Check user's intent (Traveling vs Local)
+  [ ] Send region-specific messages
+  [ ] Filter stores by region (Americas/EMEA/APAC)
+
+State Management:
+  [ ] Add userStatus stop check
+  [ ] Implement awkStop timing mechanism
+  [ ] Add state catcher for stuck users (AHF1, AHG1, AHH1)
+
+==============================================
+END OF DIAGRAM
+==============================================
+
+Total Nodes in Full Workflow: 92
+Nodes Added in This Implementation: 14
+Router Boolean Flags Added: 2
+State Transitions Added: 5
+Placeholders for Tier 2: 2

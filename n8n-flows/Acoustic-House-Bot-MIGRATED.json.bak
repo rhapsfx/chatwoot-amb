@@ -1,0 +1,936 @@
+{
+  "name": "Acoustic House Bot - Migrated to Custom Nodes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "acoustic-bot-migrated",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook",
+      "name": "Webhook",
+      "webhookId": "acoustic-bot-migrated"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.body || $json;\nconst content = (data.content || '').toLowerCase().trim();\nconst messageType = data.message_type;\nconst event = data.event;\nconst contentAttrs = data.content_attributes || {};\nconst conversation = data.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\n\nconsole.log('==========================================');\nconsole.log('Incoming webhook - Content:', content);\nconsole.log('Message Type:', messageType);\nconsole.log('Event:', event);\nconsole.log('Interactive Type:', contentAttrs.interactive_type);\nconsole.log('Bot State:', customAttrs.bot_state);\nconsole.log('==========================================');\n\n// Skip outgoing and updated messages\nif (event === 'message_updated' || messageType === 'outgoing') {\n  console.log('SKIPPING: outgoing or updated message');\n  return { json: { skip: true, reason: 'outgoing_or_updated' } };\n}\n\n// Determine route based on content and state\nlet route = 'UNKNOWN';\nlet nextState = customAttrs.bot_state || null;\n\n// Handle interactive responses\nif (contentAttrs.interactive_type === 'list_picker') {\n  const items = contentAttrs.interactive_data?.data?.['list-picker']?.selectedItems || [];\n  if (items.length > 0) {\n    const id = items[0].identifier;\n    console.log('List picker selection:', id);\n    \n    if (id === 'main_menu_guitar' || id.includes('guitar')) {\n      route = 'GUITAR';\n      nextState = 'guitar_selected';\n    } else if (id === 'main_menu_appointment' || id === 'book_appointment') {\n      route = 'TIME';\n      nextState = 'appointment_booking';\n    } else if (id === 'main_menu_location' || id.includes('location')) {\n      route = 'LOCATION';\n      nextState = 'location_request';\n    } else if (id === 'main_menu_features' || id.includes('features')) {\n      route = 'FEATURES';\n      nextState = 'features_shown';\n    } else if (id.includes('ar_')) {\n      route = 'AR';\n      nextState = 'ar_prompt';\n    } else if (id.includes('payment')) {\n      route = 'PAYMENT';\n      nextState = 'payment_request';\n    }\n  }\n}\n// Handle time picker responses\nelse if (contentAttrs.interactive_type === 'time_picker') {\n  route = 'CONFIRM';\n  nextState = 'appointment_confirmed';\n}\n// Handle form responses\nelse if (contentAttrs.interactive_type === 'form') {\n  route = 'NAME_COLLECTED';\n  nextState = 'name_collected';\n}\n// Handle quick reply responses\nelse if (contentAttrs.interactive_type === 'quick_reply') {\n  const reply = contentAttrs.interactive_data?.data?.['quick-reply']?.identifier || '';\n  console.log('Quick reply selection:', reply);\n  \n  if (reply.includes('region_')) {\n    route = 'REGION_SELECTED';\n    nextState = 'region_selected';\n  } else if (reply === 'ar_yes') {\n    route = 'AR_YES';\n    nextState = 'ar_accepted';\n  } else if (reply === 'ar_no') {\n    route = 'AR_NO';\n    nextState = 'ar_declined';\n  }\n}\n// Handle keyword triggers\nelse if (content === 'start' || content === 'hello' || content === 'hi' || content === 'help' || content === 'begin') {\n  route = 'WELCOME';\n  nextState = 'welcomed';\n} else if (content === 'menu' || content === 'main menu') {\n  route = 'MENU';\n  nextState = 'menu_shown';\n} else if (content === 'guitar' || content === 'guitars' || content === 'list picker') {\n  route = 'GUITAR';\n  nextState = 'guitar_list';\n} else if (content === 'time picker' || content === 'appointment' || content === 'time') {\n  route = 'TIME';\n  nextState = 'appointment_booking';\n} else if (content === 'location' || content === 'store' || content === 'stores') {\n  route = 'LOCATION';\n  nextState = 'location_request';\n} else if (content === 'apple pay' || content === 'payment' || content === 'pay') {\n  route = 'PAYMENT';\n  nextState = 'payment_request';\n} else if (content === 'summary' || content === 'features') {\n  route = 'FEATURES';\n  nextState = 'features_shown';\n} else if (content === 'startover' || content === 'start over' || content === 'restart') {\n  route = 'RESTART';\n  nextState = null;\n}\n\nconsole.log('==========================================');\nconsole.log('ROUTE DECISION:', route);\nconsole.log('NEXT STATE:', nextState);\nconsole.log('==========================================');\n\nreturn {\n  json: {\n    skip: false,\n    route: route,\n    nextState: nextState,\n    conversationId: conversation.id,\n    accountId: data.account?.id || 1,\n    rawContent: content,\n    rawEvent: event,\n    // Boolean flags for routing\n    isWelcome: route === 'WELCOME',\n    isMenu: route === 'MENU',\n    isRegionSelected: route === 'REGION_SELECTED',\n    isNameCollected: route === 'NAME_COLLECTED',\n    isGuitar: route === 'GUITAR',\n    isAR: route === 'AR',\n    isARYes: route === 'AR_YES',\n    isARNo: route === 'AR_NO',\n    isPayment: route === 'PAYMENT',\n    isTime: route === 'TIME',\n    isConfirm: route === 'CONFIRM',\n    isLocation: route === 'LOCATION',\n    isFeatures: route === 'FEATURES',\n    isRestart: route === 'RESTART',\n    isUnknown: route === 'UNKNOWN'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0],
+      "id": "router",
+      "name": "Router with State"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 0],
+      "id": "filter",
+      "name": "Should Process?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [600, 600],
+      "id": "skip",
+      "name": "Skip"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isWelcome }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [600, 0],
+      "id": "check-welcome",
+      "name": "Is Welcome?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isMenu }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [800, 0],
+      "id": "check-menu",
+      "name": "Is Menu?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isGuitar }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1000, 0],
+      "id": "check-guitar",
+      "name": "Is Guitar?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isAR }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1200, 0],
+      "id": "check-ar",
+      "name": "Is AR?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isPayment }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1400, 0],
+      "id": "check-payment",
+      "name": "Is Payment?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isTime }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1600, 0],
+      "id": "check-time",
+      "name": "Is Time?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isConfirm }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1800, 0],
+      "id": "check-confirm",
+      "name": "Is Confirm?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isLocation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2000, 0],
+      "id": "check-location",
+      "name": "Is Location?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isFeatures }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2200, 0],
+      "id": "check-features",
+      "name": "Is Features?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://app.chatwoot.com/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🎸 Welcome to Acoustic House!\n\nWe're your premier destination for premium acoustic guitars. I'm here to help you find the perfect instrument."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [800, -200],
+      "id": "welcome-msg-1",
+      "name": "Welcome Message 1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Chatwoot Bot API (HTTP Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://app.chatwoot.com/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Let me show you what we have to offer..."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1000, -200],
+      "id": "welcome-msg-2",
+      "name": "Welcome Message 2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Chatwoot Bot API (HTTP Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 1,
+        "title": "What would you like to do?",
+        "sections": {
+          "section": [
+            {
+              "title": "Main Menu",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "main_menu_guitar",
+                    "title": "Browse Guitars",
+                    "subtitle": "View our premium collection",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "main_menu_appointment",
+                    "title": "Book Appointment",
+                    "subtitle": "Visit our showroom",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "main_menu_location",
+                    "title": "Find Store",
+                    "subtitle": "Locate nearest store",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "main_menu_features",
+                    "title": "Features",
+                    "subtitle": "Learn about AMB features",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [1000, -100],
+      "id": "main-menu",
+      "name": "AMB Main Menu",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 2,
+        "title": "🎸 Here's our premium guitar collection:",
+        "sections": {
+          "section": [
+            {
+              "title": "Martin Guitars",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "guitar_martin_d28",
+                    "title": "Martin D-28",
+                    "subtitle": "$2,999 - Classic dreadnought",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "guitar_martin_om28",
+                    "title": "Martin OM-28",
+                    "subtitle": "$2,899 - Orchestra model",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            },
+            {
+              "title": "Taylor Guitars",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "guitar_taylor_814ce",
+                    "title": "Taylor 814ce",
+                    "subtitle": "$3,499 - Grand auditorium",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "guitar_taylor_714ce",
+                    "title": "Taylor 714ce",
+                    "subtitle": "$2,999 - Grand auditorium",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            },
+            {
+              "title": "Gibson Guitars",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "guitar_gibson_j45",
+                    "title": "Gibson J-45",
+                    "subtitle": "$2,899 - Round shoulder",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "guitar_gibson_hummingbird",
+                    "title": "Gibson Hummingbird",
+                    "subtitle": "$3,299 - Square shoulder",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [1200, -100],
+      "id": "guitar-list",
+      "name": "AMB Guitar List",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "📱 Would you like to see this guitar in AR (Augmented Reality) in your space?",
+        "items": {
+          "item": [
+            {
+              "identifier": "ar_yes",
+              "title": "Yes, show me!"
+            },
+            {
+              "identifier": "ar_no",
+              "title": "No thanks"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [1400, -100],
+      "id": "ar-prompt",
+      "name": "AMB AR Prompt",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 4,
+        "title": "💳 Ready to purchase? Tap to pay with Apple Pay:",
+        "merchantIdentifier": "merchant.com.acoustichouse",
+        "merchantName": "Acoustic House",
+        "countryCode": "US",
+        "currencyCode": "USD",
+        "amount": "3239.00",
+        "totalLabel": "Acoustic House",
+        "lineItems": {
+          "item": [
+            {
+              "label": "Selected Guitar",
+              "amount": "2999.00",
+              "type": "final"
+            },
+            {
+              "label": "Tax",
+              "amount": "240.00",
+              "type": "final"
+            },
+            {
+              "label": "Shipping",
+              "amount": "0.00",
+              "type": "final"
+            }
+          ]
+        },
+        "supportedNetworks": {
+          "networks": [
+            {
+              "network": "visa"
+            },
+            {
+              "network": "mastercard"
+            },
+            {
+              "network": "amex"
+            }
+          ]
+        },
+        "merchantCapabilities": {
+          "capabilities": [
+            {
+              "capability": "supports3DS"
+            }
+          ]
+        },
+        "requiredBillingContactFields": {
+          "fields": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "postalAddress"
+            }
+          ]
+        },
+        "requiredShippingContactFields": {
+          "fields": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "postalAddress"
+            },
+            {
+              "field": "phone"
+            },
+            {
+              "field": "email"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBApplePay",
+      "typeVersion": 1,
+      "position": [1600, -100],
+      "id": "payment",
+      "name": "AMB Apple Pay Request",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate time slots for next 7 weekdays\nconst now = new Date();\nconst slots = [];\nlet daysAdded = 0;\nlet currentDay = new Date(now);\n\nwhile (daysAdded < 7) {\n  currentDay.setDate(currentDay.getDate() + 1);\n  const dayOfWeek = currentDay.getDay();\n  \n  // Skip weekends\n  if (dayOfWeek === 0 || dayOfWeek === 6) continue;\n  \n  const dateStr = currentDay.toISOString().split('T')[0];\n  \n  // Add time slots for this day\n  const times = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];\n  times.forEach(time => {\n    const [hour, minute] = time.split(':');\n    const slotTime = new Date(currentDay);\n    slotTime.setHours(parseInt(hour), parseInt(minute), 0, 0);\n    \n    slots.push({\n      identifier: `${dateStr}_${time.replace(':', '')}`,\n      startTime: slotTime.toISOString(),\n      duration: 60  // 1 hour slots\n    });\n  });\n  \n  daysAdded++;\n}\n\nreturn {\n  json: {\n    ...($json || {}),\n    timeSlots: slots\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, -200],
+      "id": "generate-slots",
+      "name": "Generate Time Slots"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 5,
+        "title": "📅 Select a time to visit our showroom:",
+        "description": "Choose your preferred appointment time",
+        "availableSlots": {
+          "slot": "={{ $json.timeSlots }}"
+        },
+        "receivedMessage": {
+          "received_title": "Visit our showroom",
+          "received_subtitle": "Book your appointment"
+        },
+        "replyMessage": {
+          "reply_title": "Appointment booked!",
+          "reply_subtitle": "We look forward to seeing you"
+        }
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBTimePicker",
+      "typeVersion": 1,
+      "position": [2000, -200],
+      "id": "time-picker",
+      "name": "AMB Time Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://app.chatwoot.com/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "✅ Your appointment is confirmed! We'll send you a reminder before your visit.\n\n📍 Acoustic House Showroom\n123 Music Street\nSan Francisco, CA 94102\n\nSee you soon! 🎸"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2000, -100],
+      "id": "confirm",
+      "name": "Confirm Appointment",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Chatwoot Bot API (HTTP Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://app.chatwoot.com/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📍 To find stores near you, please share your zip code or city."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, -100],
+      "id": "location",
+      "name": "Location Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Chatwoot Bot API (HTTP Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 6,
+        "title": "✨ Here's what Apple Messages for Business can do:",
+        "sections": {
+          "section": [
+            {
+              "title": "Apple Messages for Business Features",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "feature_list_picker",
+                    "title": "📋 List Picker",
+                    "subtitle": "Interactive product catalogs",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_time_picker",
+                    "title": "📅 Time Picker",
+                    "subtitle": "Appointment booking",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_forms",
+                    "title": "📝 Forms",
+                    "subtitle": "Collect customer information",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_apple_pay",
+                    "title": "💳 Apple Pay",
+                    "subtitle": "Secure payments",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_rich_links",
+                    "title": "🔗 Rich Links",
+                    "subtitle": "Beautiful link previews",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_quick_replies",
+                    "title": "⚡ Quick Replies",
+                    "subtitle": "One-tap responses",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [2400, -100],
+      "id": "features",
+      "name": "AMB Features Summary",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2400, 100],
+      "id": "unknown",
+      "name": "Unknown Route"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Router with State", "type": "main", "index": 0 }]]
+    },
+    "Router with State": {
+      "main": [[{ "node": "Should Process?", "type": "main", "index": 0 }]]
+    },
+    "Should Process?": {
+      "main": [
+        [{ "node": "Is Welcome?", "type": "main", "index": 0 }],
+        [{ "node": "Skip", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Welcome?": {
+      "main": [
+        [{ "node": "Welcome Message 1", "type": "main", "index": 0 }],
+        [{ "node": "Is Menu?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Menu?": {
+      "main": [
+        [{ "node": "AMB Main Menu", "type": "main", "index": 0 }],
+        [{ "node": "Is Guitar?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Guitar?": {
+      "main": [
+        [{ "node": "AMB Guitar List", "type": "main", "index": 0 }],
+        [{ "node": "Is AR?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is AR?": {
+      "main": [
+        [{ "node": "AMB AR Prompt", "type": "main", "index": 0 }],
+        [{ "node": "Is Payment?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Payment?": {
+      "main": [
+        [{ "node": "AMB Apple Pay Request", "type": "main", "index": 0 }],
+        [{ "node": "Is Time?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Time?": {
+      "main": [
+        [{ "node": "Generate Time Slots", "type": "main", "index": 0 }],
+        [{ "node": "Is Confirm?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Confirm?": {
+      "main": [
+        [{ "node": "Confirm Appointment", "type": "main", "index": 0 }],
+        [{ "node": "Is Location?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Location?": {
+      "main": [
+        [{ "node": "Location Request", "type": "main", "index": 0 }],
+        [{ "node": "Is Features?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Features?": {
+      "main": [
+        [{ "node": "AMB Features Summary", "type": "main", "index": 0 }],
+        [{ "node": "Unknown Route", "type": "main", "index": 0 }]
+      ]
+    },
+    "Welcome Message 1": {
+      "main": [[{ "node": "Welcome Message 2", "type": "main", "index": 0 }]]
+    },
+    "Welcome Message 2": {
+      "main": [[{ "node": "AMB Main Menu", "type": "main", "index": 0 }]]
+    },
+    "Generate Time Slots": {
+      "main": [[{ "node": "AMB Time Picker", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "chatwoot"
+    },
+    {
+      "name": "apple-messages"
+    },
+    {
+      "name": "acoustic-house"
+    },
+    {
+      "name": "migrated"
+    }
+  ]
+}

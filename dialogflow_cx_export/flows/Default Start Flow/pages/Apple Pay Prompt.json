@@ -1,0 +1,67 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Apple Pay Prompt",
+  "displayName": "Apple Pay Prompt",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "Ready to make it yours? You can purchase the $session.params.guitar right here with Apple Pay."
+          ]
+        }
+      },
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "apple-pay",
+                "requestIdentifier": "applepay_1018",
+                "payment": {
+                  "merchantIdentifier": "merchant.com.chatwoot.demo",
+                  "lineItems": [
+                    {
+                      "label": "$session.params.guitar",
+                      "amount": "999.99",
+                      "type": "final"
+                    }
+                  ],
+                  "total": {
+                    "label": "Acoustic House",
+                    "amount": "999.99",
+                    "type": "final"
+                  },
+                  "merchantCapabilities": [
+                    "supports3DS"
+                  ],
+                  "supportedNetworks": [
+                    "visa",
+                    "masterCard",
+                    "amex"
+                  ],
+                  "countryCode": "US",
+                  "currencyCode": "USD",
+                  "requiredShippingContactFields": [
+                    "email",
+                    "phone",
+                    "postalAddress",
+                    "name"
+                  ],
+                  "requiredBillingContactFields": [
+                    "postalAddress"
+                  ]
+                }
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Lesson Introduction"
+    }
+  ]
+}

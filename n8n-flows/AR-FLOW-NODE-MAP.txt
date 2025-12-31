@@ -1,0 +1,150 @@
+# AR Flow Node Position Map
+
+This visual map shows the physical layout of nodes in the n8n canvas.
+
+Legend:
+  [Node Name] (node-id) @ [x, y]
+
+
+MAIN GUITAR SELECTION FLOW (Top area, y=-200):
+================================================================
+
+Parse Guitar Selection (parse-guitar-selection) @ [1350, -200]
+                    ↓
+Send Guitar Image (send-guitar-image) @ [1500, -200]
+                    ↓
+================================================================
+        AHC2: AR INTRODUCTION & FILE (y=-200)
+================================================================
+                    ↓
+AR Introduction (ar-introduction) @ [1650, -200]
+                    ↓
+Send AR File (send-ar-file) @ [1800, -200]
+                    ↓
+================================================================
+        AHC3: FIRST AR QUESTION (y=-200)
+================================================================
+                    ↓
+First AR Question (first-ar-question) @ [1950, -200]
+                    ↓
+AR View Question (ar-view-question) @ [2100, -200]
+                    ↓
+Set State: ar_view_asked (set-state-ar-view-asked) @ [2250, -200]
+
+
+[User responds, new webhook event]
+
+
+ROUTER CASCADE (Center area, y=0):
+================================================================
+
+Is Guitar? (check-guitar) @ [1000, 0]
+            ↓ (FALSE path)
+Is AR View Response? (check-ar-view-response) @ [1200, 0]
+            ↓ (FALSE path)
+Is AR Place Response? (check-ar-place-response) @ [1400, 0]
+            ↓ (FALSE path)
+Is Payment? (check-payment) @ [1600, 0]
+
+
+================================================================
+        AHD1: FIRST AR RESPONSE HANDLER (Upper area, y=-300/-400)
+================================================================
+
+Did View AR? (did-view-ar) @ [1350, -300]
+        ├─ TRUE (y=-400)
+        │
+        │   AR View Success (ar-view-success) @ [1500, -400]
+        │                   ↓
+        │                   └──────────────────────────────┐
+        │                                                   │
+        └─ FALSE (y=-200)                                  │
+                                                            │
+            AR View Instruction (ar-view-instruction) @ [1500, -200]
+                            ↓                               │
+            Second AR Question (second-ar-question-after-no) @ [1650, -300]
+                            ↓                               │
+                            └───────────────────────────────┘
+                                         ↓
+                    AR Place Question (ar-place-question) @ [1800, -300]
+                                         ↓
+                    Set State: ar_place_asked (set-state-ar-place-asked) @ [1950, -300]
+
+
+[User responds, new webhook event]
+
+
+================================================================
+        AHE1: SECOND AR RESPONSE HANDLER (Lower area, y=-400/-500)
+================================================================
+
+Did Place AR? (did-place-ar) @ [1550, -400]
+        ├─ TRUE (user said No, y=-500)
+        │
+        │   AR Place Instruction (ar-place-instruction) @ [1700, -500]
+        │                   ↓
+        │                   └──────────────────────┐
+        │                                          │
+        └─ FALSE (user said Yes, y=-400)          │
+                                                   │
+                            ┌──────────────────────┘
+                            ↓
+            Apple Pay Transition (apple-pay-transition) @ [1850, -400]
+                            ↓
+            AMB Apple Pay Request (payment) @ [1600, -100]
+
+
+================================================================
+        NODE COORDINATE SUMMARY
+================================================================
+
+X-axis (horizontal flow):
+  1350 - Parse Guitar Selection
+  1500 - Send Guitar Image
+  1650 - AR Introduction
+  1800 - Send AR File
+  1950 - First AR Question
+  2100 - AR View Question
+  2250 - Set State: ar_view_asked
+
+  [User responds, back to router]
+
+  1200 - Is AR View Response?
+  1350 - Did View AR?
+  1500 - AR View Success / AR View Instruction
+  1650 - Second AR Question (After No)
+  1800 - AR Place Question
+  1950 - Set State: ar_place_asked
+
+  [User responds, back to router]
+
+  1400 - Is AR Place Response?
+  1550 - Did Place AR?
+  1700 - AR Place Instruction
+  1850 - Apple Pay Transition
+  1600 - AMB Apple Pay Request
+
+Y-axis (vertical separation):
+  -500 - AR Place Instruction (lowest)
+  -400 - AR View Success, Did Place AR?, Apple Pay Transition
+  -300 - Did View AR?, Second AR Question, AR Place Question, Set State: ar_place_asked
+  -200 - Main flow line (Introduction, AR File, First Question, etc.)
+  -100 - Apple Pay Request
+     0 - Router cascade (Is AR View Response?, Is AR Place Response?)
+
+
+================================================================
+        FLOW PATTERNS
+================================================================
+
+Happy Path (both Yes):
+  [1500, -200] → [1650, -200] → [1800, -200] → [1950, -200] → [2100, -200]
+  [2250, -200] → (webhook) → [1200, 0] → [1350, -300] → [1500, -400] → [1800, -300]
+  [1950, -300] → (webhook) → [1400, 0] → [1550, -400] → [1850, -400] → [1600, -100]
+
+Complex Path (both No):
+  [1500, -200] → [1650, -200] → [1800, -200] → [1950, -200] → [2100, -200]
+  [2250, -200] → (webhook) → [1200, 0] → [1350, -300] → [1500, -200] → [1650, -300]
+  → [1800, -300] → [1950, -300] → (webhook) → [1400, 0] → [1550, -400] → [1700, -500]
+  → [1850, -400] → [1600, -100]
+

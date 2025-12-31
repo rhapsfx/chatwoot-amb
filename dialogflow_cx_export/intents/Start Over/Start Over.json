@@ -1,0 +1,6 @@
+{
+  "name": "projects/-/locations/-/agents/-/intents/00000000-0000-0000-0000-000000000001",
+  "displayName": "Start Over",
+  "priority": 500000,
+  "isFallback": false
+}

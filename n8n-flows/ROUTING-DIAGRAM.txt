@@ -1,0 +1,285 @@
+```
+ACOUSTIC HOUSE BOT - COMPLETE ROUTING DIAGRAM
+==============================================
+
+Webhook → Router with State (Enhanced) → Should Process?
+                                            ↓ (TRUE)
+                                         Routing Chain
+
+ROUTING CHAIN (Sequential IF Checks):
+=====================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TIER 1: CORE FLOWS (Existing)                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+Is Welcome?
+├─ TRUE → Welcome Message 1 → Welcome Message 2 → AMB Main Menu (341)
+└─ FALSE ↓
+
+Is Menu?
+├─ TRUE → AMB Main Menu (341)
+└─ FALSE ↓
+
+Is Guitar?
+├─ TRUE → AMB Guitar List (329) → Parse Guitar Selection → Send Guitar Image
+│         → AR Introduction → Send AR File (344) → First AR Question
+│         → AR View Question (QR) → Set State: ar_view_asked
+└─ FALSE ↓
+
+Is AR View Response?
+├─ TRUE → Did View AR?
+│         ├─ TRUE (YES) → AR View Success → AR Place Question → Set State: ar_place_asked
+│         └─ FALSE (NO) → AR View Instruction → Second AR Question → AR Place Question
+└─ FALSE ↓
+
+Is AR Place Response?
+├─ TRUE → Did Place AR?
+│         ├─ TRUE (YES) → AR Place Instruction → Apple Pay Transition → AMB Apple Pay (4)
+│         └─ FALSE (NO) → Apple Pay Transition → AMB Apple Pay (4)
+└─ FALSE ↓
+
+Is Payment?
+├─ TRUE → AMB Apple Pay Request (4)
+└─ FALSE ↓
+
+Is Time?
+├─ TRUE → AMB Time Picker (5)
+└─ FALSE ↓
+
+Is Confirm?
+├─ TRUE → Confirm Appointment Message
+└─ FALSE ↓
+
+Is Location?
+├─ TRUE → Location Request (ask for zip code)
+└─ FALSE ↓
+
+Is Features?
+├─ TRUE → AMB Features Summary (6)
+└─ FALSE ↓
+
+Is Region Selected?
+├─ TRUE → Parse Form Response (AHB1)
+└─ FALSE ↓
+
+Is Name Collected?
+├─ TRUE → Parse Form Response (AHB1) → Has Stage Name?
+│         ├─ TRUE → Ask Name Preference (AHB2) → Name Selection QR → Select Name
+│         │         → Update Name Attributes → Personalized Greeting (AHB3) → Guitar List
+│         └─ FALSE → Update Name Attributes → Personalized Greeting (AHB3) → Guitar List
+└─ FALSE ↓
+
+Is Name Selected?
+├─ TRUE → Select Name (AHB2) → Update Name Attributes → Personalized Greeting → Guitar List
+└─ FALSE ↓
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TIER 3: NEW MENU & KEYWORD ROUTING (New)                       │
+└─────────────────────────────────────────────────────────────────┘
+
+Is Intent Setup?
+├─ TRUE → Intent Setup Placeholder 🟡
+│         "🔧 Intent ID Setup feature coming in Tier 4!"
+└─ FALSE ↓
+
+Is AR Direct?
+├─ TRUE → AR Direct Send (Template 344) ✅
+│         "Check out this guitar in augmented reality!"
+└─ FALSE ↓
+
+Is Form?
+├─ TRUE → Form Direct Send 🟡
+│         "Let's help you find the perfect guitar!"
+└─ FALSE ↓
+
+Is Form Response?
+├─ TRUE → Parse Form Response → Update Name Attributes → Personalized Greeting
+└─ FALSE ↓
+
+Is Image Request?
+├─ TRUE → Image Request ✅
+│         "📸 Please share a photo or selfie with your guitar!"
+└─ FALSE ↓
+
+Is Documents?
+├─ TRUE → Send Documents ✅
+│         "📄 Here are the documents: metrics.numbers, document.pdf"
+└─ FALSE ↓
+
+Is Auth?
+├─ TRUE → Authentication Placeholder 🟡
+│         "🔐 Authentication feature coming in Tier 4!"
+└─ FALSE ↓
+
+Is iMessage App?
+├─ TRUE → iMessage App Placeholder 🟡
+│         "📱 iMessage App extension coming in Tier 4!"
+└─ FALSE ↓
+
+Is Wallet?
+├─ TRUE → Wallet Pass Placeholder 🟡
+│         "💳 Wallet pass feature coming in Tier 4!"
+└─ FALSE ↓
+
+Is Rich Link?
+├─ TRUE → Rich Link Demo ✅
+│         "Here's a rich link preview demo"
+└─ FALSE ↓
+
+Is Airport?
+├─ TRUE → Airport Rich Link ✅
+│         "✈️ Airport information rich link"
+└─ FALSE ↓
+
+Is Survey?
+├─ TRUE → CSAT Survey ✅
+│         "📊 How would you rate your experience today?"
+└─ FALSE ↓
+
+Is Quick Reply?
+├─ TRUE → Quick Reply Demo (Template 3) ✅
+│         "Try these quick replies!"
+└─ FALSE ↓
+
+Unknown Route
+└─ NoOp (end of routing chain)
+
+
+KEYWORD → ROUTE MAPPING:
+=========================
+
+START/WELCOME (5 keywords):
+  start, hello, hi, help, begin → WELCOME
+
+NAVIGATION (7 keywords):
+  menu, main menu → MENU
+  startover, start over, restart → RESTART
+  summary, features → FEATURES
+  stop → STOP
+
+INTERACTIVE FEATURES (18 keywords):
+  guitar, guitars, list picker, listpicker → GUITAR
+  time picker, timepicker, appointment, time → TIME
+  apple pay, payment, pay → PAYMENT
+  form, help me decide → FORM
+  rich link, richlink → RICH_LINK
+  quick reply, qr → QUICK_REPLY
+
+LOCATION/MEDIA (11 keywords):
+  location, locator, store, stores → LOCATION
+  ar, augmented reality → AR_DIRECT
+  wallet → WALLET
+  documents, docs → DOCUMENTS
+  image, photo, selfie → IMAGE_REQUEST
+
+AUTHENTICATION (7 keywords):
+  authenticate, authentication → AUTH
+  native auth → NATIVE_AUTH
+  server fail → SERVER_FAIL
+  server response → SERVER_RESPONSE
+  server unknown → SERVER_UNKNOWN
+
+SPECIAL DEMOS (6 keywords):
+  airport → AIRPORT
+  content payload → CONTENT_PAYLOAD
+  survey, csat → SURVEY
+  imessageapp, imessage app, imessageextension → IMESSAGE_APP
+
+MICRO FEATURES (7 keywords):
+  micro link → MICRO_LINK
+  micro map → MICRO_MAP
+  micro clip → MICRO_CLIP
+  micro region → MICRO_REGION
+  micro custom → MICRO_CUSTOM
+  micro auto, micro automation → MICRO_AUTO
+
+
+MENU SELECTION → ROUTE MAPPING:
+================================
+
+Main Menu (Template 341) - 12 Options:
+
+  menu_intent → INTENT_SETUP → Intent Setup Placeholder 🟡
+  menu_listpicker → GUITAR → AMB Guitar List (329) ✅
+  menu_ar → AR_DIRECT → AR Direct Send (344) ✅
+  menu_applepay → PAYMENT → AMB Apple Pay (4) ✅
+  menu_timepicker → TIME → AMB Time Picker (5) ✅
+  menu_form → FORM → Form Direct Send 🟡
+  menu_image → IMAGE_REQUEST → Image Request ✅
+  menu_documents → DOCUMENTS → Send Documents ✅
+  menu_authenticate → AUTH → Authentication Placeholder 🟡
+  menu_imessageapp → IMESSAGE_APP → iMessage App Placeholder 🟡
+  menu_wallet → WALLET → Wallet Pass Placeholder 🟡
+  menu_location → LOCATION → Location Request ✅
+
+
+BOOLEAN ROUTING FLAGS (30+):
+============================
+
+Core Navigation:
+  isWelcome, isMenu, isRestart, isStop, isUnknown
+
+Menu Selections (Tier 3.1):
+  isIntentSetup, isARDirect, isForm, isFormResponse, isImageRequest,
+  isDocuments, isAuth, isIMESSAGEApp, isWallet
+
+Interactive Features:
+  isGuitar, isGuitarSelected, isTime, isConfirm, isPayment, isLocation,
+  isFeatures, isRichLink, isQuickReply
+
+AR Flow:
+  isARViewYes, isARViewNo, isARPlaceYes, isARPlaceNo
+
+Name Collection Flow:
+  isRegionSelected, isNameCollected, isNameSelected
+
+Special Demos (Tier 3.2):
+  isAirport, isContentPayload, isSurvey
+
+Authentication Variants:
+  isNativeAuth, isServerFail, isServerResponse, isServerUnknown
+
+Micro Features:
+  isMicroLink, isMicroMap, isMicroClip, isMicroRegion,
+  isMicroCustom, isMicroAuto
+
+
+STATISTICS:
+===========
+
+Total Nodes: 92
+Total Connections: 72
+Total Routes: 73 (12 menu + 61 keywords)
+Router Code: ~350 lines / 11,308 characters
+Boolean Flags: 30+
+
+Node Type Breakdown:
+  - IF nodes: 32 (routing logic)
+  - HTTP Request: 34 (text messages)
+  - Code nodes: 7 (parsing/logic)
+  - Custom AMB nodes: 15 (templates)
+  - Webhook: 1
+  - NoOp: 3
+
+Feature Status:
+  ✅ Complete: 12 features (67%)
+  🟡 Placeholder: 6 features (33%)
+
+
+LEGEND:
+=======
+
+✅ = Fully implemented and tested
+🟡 = Placeholder node (Tier 4 required)
+→ = Data flow
+↓ = Routing chain continuation
+├─ = TRUE branch
+└─ = FALSE branch
+
+
+FILE LOCATION:
+==============
+
+/Users/rhaps/LocalGit/chatwoot/n8n-flows/Acoustic-House-Bot-MIGRATED.json
+```

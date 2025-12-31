@@ -1,0 +1,67 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR First Question",
+  "displayName": "AR First Question",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "chips",
+                "options": [
+                  {
+                    "text": "Yes, show me!",
+                    "event": {
+                      "name": "ar_view_yes",
+                      "languageCode": "en"
+                    }
+                  },
+                  {
+                    "text": "No, not now",
+                    "event": {
+                      "name": "ar_view_no",
+                      "languageCode": "en"
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Great! Here's the AR experience."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR Place Question"
+    },
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Okay, maybe next time! Let's proceed."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Apple Pay Prompt"
+    }
+  ]
+}

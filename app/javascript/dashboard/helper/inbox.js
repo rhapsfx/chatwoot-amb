@@ -12,6 +12,7 @@ export const INBOX_TYPES = {
   INSTAGRAM: 'Channel::Instagram',
   TIKTOK: 'Channel::Tiktok',
   VOICE: 'Channel::Voice',
+  APPLE_MESSAGES_FOR_BUSINESS: 'Channel::AppleMessagesForBusiness',
 };
 
 export const TWILIO_CHANNEL_MEDIUM = {
@@ -31,6 +32,7 @@ const INBOX_ICON_MAP_FILL = {
   [INBOX_TYPES.INSTAGRAM]: 'i-ri-instagram-fill',
   [INBOX_TYPES.TIKTOK]: 'i-ri-tiktok-fill',
   [INBOX_TYPES.VOICE]: 'i-ri-phone-fill',
+  [INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS]: 'i-ri-apple-fill',
 };
 
 const DEFAULT_ICON_FILL = 'i-ri-chat-1-fill';
@@ -47,6 +49,7 @@ const INBOX_ICON_MAP_LINE = {
   [INBOX_TYPES.INSTAGRAM]: 'i-ri-instagram-line',
   [INBOX_TYPES.TIKTOK]: 'i-ri-tiktok-line',
   [INBOX_TYPES.VOICE]: 'i-ri-phone-line',
+  [INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS]: 'i-ri-apple-line',
 };
 
 const DEFAULT_ICON_LINE = 'i-ri-chat-1-line';
@@ -100,6 +103,9 @@ export const getReadableInboxByType = (type, phoneNumber) => {
     case INBOX_TYPES.VOICE:
       return 'voice';
 
+    case INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS:
+      return 'apple_messages_for_business';
+
     default:
       return 'chat';
   }
@@ -144,6 +150,9 @@ export const getInboxClassByType = (type, phoneNumber) => {
 
     case INBOX_TYPES.VOICE:
       return 'phone';
+
+    case INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS:
+      return 'brand-apple';
 
     default:
       return 'chat';

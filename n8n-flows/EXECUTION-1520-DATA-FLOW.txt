@@ -1,0 +1,204 @@
+================================================================================
+n8n WORKFLOW DATA FLOW - Execution 1520 Fix
+================================================================================
+
+BEFORE FIX (BROKEN):
+--------------------
+
+┌─────────────────────────────────┐
+│  Webhook (Form Submission)      │
+│  └─ body.conversation.id        │
+│  └─ body.account.id             │
+└────────────┬────────────────────┘
+             │
+             ↓
+┌─────────────────────────────────┐
+│  AHB1 - Parse Form Response     │
+│  (Code Node)                    │
+│                                 │
+│  Outputs to $json:              │
+│  ├─ userName (from form)        │
+│  ├─ stageName (from form)       │
+│  ├─ hasStageName (boolean)      │
+│  ├─ conversationId ✅           │
+│  └─ accountId ✅                │
+└────────────┬────────────────────┘
+             │
+             ↓
+┌─────────────────────────────────┐
+│  Has Stage Name?                │
+│  (IF Node)                      │
+│                                 │
+│  Condition: hasStageName = true │
+│                                 │
+│  ⚠️  Should pass through data   │
+│  ⚠️  BUT conversationId missing │
+└────────────┬────────────────────┘
+             │ (true branch)
+             ↓
+┌─────────────────────────────────┐
+│  Update Name Attributes         │
+│  (HTTP Request)                 │
+│                                 │
+│  URL needs:                     │
+│  ├─ {{ $json.accountId }}       │
+│  │  ❌ UNDEFINED                │
+│  └─ {{ $json.conversationId }}  │
+│     ❌ UNDEFINED                │
+│                                 │
+│  ❌ REQUEST FAILS\!              │
+└─────────────────────────────────┘
+
+
+AFTER FIX (WORKING):
+--------------------
+
+┌─────────────────────────────────┐
+│  Webhook (Form Submission)      │
+│  └─ body.conversation.id        │
+│  └─ body.account.id             │
+└────────────┬────────────────────┘
+             │
+             ↓
+┌─────────────────────────────────┐
+│  AHB1 - Parse Form Response     │◄─────┐
+│  (Code Node)                    │      │
+│                                 │      │
+│  Outputs to $json:              │      │
+│  ├─ userName (from form)        │      │
+│  ├─ stageName (from form)       │      │
+│  ├─ hasStageName (boolean)      │      │
+│  ├─ conversationId ✅           │      │
+│  └─ accountId ✅                │      │
+└────────────┬────────────────────┘      │
+             │                           │
+             ↓                           │
+┌─────────────────────────────────┐      │
+│  Has Stage Name?                │      │
+│  (IF Node)                      │      │
+│                                 │      │
+│  Condition: hasStageName = true │      │
+│  (Only checks the condition)    │      │
+└────────────┬────────────────────┘      │
+             │ (true branch)             │
+             ↓                           │
+┌─────────────────────────────────┐      │
+│  Update Name Attributes         │      │
+│  (HTTP Request)                 │      │
+│                                 │      │
+│  URL uses:                      │      │
+│  ├─ {{ $("AHB1...").item.       │      │
+│  │    json.accountId }}         │──────┘
+│  │  ✅ DIRECT REFERENCE         │
+│  └─ {{ $("AHB1...").item.       │
+│      json.conversationId }}     │──────┘
+│     ✅ DIRECT REFERENCE         │
+│                                 │
+│  ✅ REQUEST SUCCEEDS\!           │
+└─────────────────────────────────┘
+
+
+KEY CONCEPTS:
+=============
+
+1. Node Reference Syntax
+   ----------------------
+   $("Node Name").item.json.fieldName
+   
+   This allows any node to access data from any upstream node,
+   bypassing intermediate nodes completely.
+
+2. Why This Fix Works
+   -------------------
+   - Does NOT rely on IF node to pass data
+   - Directly accesses source node output
+   - Guaranteed availability if source node executed
+   - More explicit and debuggable
+
+3. Data Flow
+   ----------
+   Old way: Parse → IF → Update (broken chain)
+   New way: Parse → IF (condition only)
+           Parse → Update (direct data reference)
+
+4. Best Practice
+   -------------
+   Use node references when:
+   - Data passes through branching nodes (IF, Switch)
+   - Need to access non-immediate upstream data
+   - Debugging data availability issues
+   
+   Use $json when:
+   - Simple linear flow
+   - Immediate upstream node
+   - No branching logic
+
+
+COMPLETE FIX DETAILS:
+=====================
+
+Changed in "Update Name Attributes" node:
+
+┌─────────────────────────────────────────────────────────────┐
+│ URL (BEFORE):                                               │
+├─────────────────────────────────────────────────────────────┤
+│ https://...accounts/{{ $json.accountId }}/                 │
+│            conversations/{{ $json.conversationId }}/...     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ URL (AFTER):                                                │
+├─────────────────────────────────────────────────────────────┤
+│ https://...accounts/                                        │
+│   {{ $("AHB1 - Parse Form Response").item.json.accountId }}/│
+│            conversations/                                   │
+│   {{ $("AHB1 - Parse Form Response").item.json.           │
+│      conversationId }}/...                                  │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Body Parameters (BEFORE):                                   │
+├─────────────────────────────────────────────────────────────┤
+│ custom_attributes[user_name]: {{ $json.userName || '' }}    │
+│ custom_attributes[stage_name]: {{ $json.stageName || '' }}  │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Body Parameters (AFTER):                                    │
+├─────────────────────────────────────────────────────────────┤
+│ custom_attributes[user_name]:                               │
+│   {{ $("AHB1 - Parse Form Response").item.json.userName || "" }}│
+│ custom_attributes[stage_name]:                              │
+│   {{ $("AHB1 - Parse Form Response").item.json.stageName || "" }}│
+└─────────────────────────────────────────────────────────────┘
+
+
+DEPLOYMENT:
+===========
+
+Run:
+  cd /Users/rhaps/LocalGit/chatwoot/n8n-flows
+  node deploy-fix-execution-1520.js
+
+The script will verify and deploy the fix.
+
+
+TESTING:
+========
+
+1. Submit form with both userName and stageName
+2. Verify workflow executes without errors  
+3. Check Chatwoot conversation custom attributes:
+   - user_name should be set
+   - stage_name should be set
+   - selected_name should equal stage_name
+
+Expected API call:
+  POST https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/1/
+       conversations/12345/custom_attributes
+  Body:
+    custom_attributes[user_name]=John
+    custom_attributes[stage_name]=DJ+John
+    custom_attributes[selected_name]=DJ+John
+
+================================================================================

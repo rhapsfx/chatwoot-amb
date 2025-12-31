@@ -1,0 +1,5614 @@
+{
+  "name": "Acoustic House Bot - Migrated to Custom Nodes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "acoustic-bot-migrated",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0c09df62-6c60-4ab3-91e5-32c47c2b8a73",
+      "name": "Webhook",
+      "webhookId": "acoustic-bot-migrated"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.body || $json;\nconst content = (data.content || '').toLowerCase().trim();\nconst messageType = data.message_type;\nconst event = data.event;\nconst contentAttrs = data.content_attributes || {};\nconst conversation = data.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\n\nconsole.log('==========================================');\nconsole.log('Incoming webhook - Content:', content);\nconsole.log('Message Type:', messageType);\nconsole.log('Event:', event);\nconsole.log('Interactive Type:', contentAttrs.interactive_type);\nconsole.log('Bot State:', customAttrs.bot_state);\nconsole.log('==========================================');\n\n\n\n\n// Skip outgoing and updated messages\nif (event === 'message_updated' || messageType === 'outgoing') {\n  console.log('SKIPPING: outgoing or updated message');\n  return { json: { skip: true, reason: 'outgoing_or_updated' } };\n}\n\n// Determine route based on content and state\nlet route = 'UNKNOWN';\nlet nextState = customAttrs.bot_state || null;\n\n// ============================================================\n// Region Selection Response (after AHA2)\n// ============================================================\nif (customAttrs.bot_state === 'region_asked') {\n  console.log('Handling region selection response');\n\n  // Check if this is a Quick Reply response\n  if (messageType === 'incoming') {\n    route = 'REGION_RESPONSE';\n    // Don't change state here - Parse Region will handle it\n    console.log('Route: REGION_RESPONSE');\n  }\n}\n\n// ============================================================\n// Guitar List Picker Response Detection\n// ============================================================\nif (customAttrs.bot_state === 'guitar_list_shown') {\n  console.log('Handling guitar selection response');\n  if (messageType === 'incoming') {\n    route = 'GUITAR_RESPONSE';\n    console.log('Route: GUITAR_RESPONSE');\n  }\n}\n\n// ============================================================\n// Apple Pay Response Detection\n// ============================================================\nif (customAttrs.bot_state === 'payment_request') {\n  console.log('Handling payment response');\n  if (messageType === 'incoming') {\n    route = 'PAYMENT_RESPONSE';\n    console.log('Route: PAYMENT_RESPONSE');\n  }\n}\n\n// ============================================================\n// Time Picker Response Detection\n// ============================================================\nif (customAttrs.bot_state === 'appointment_booking') {\n  console.log('Handling time selection response');\n  if (messageType === 'incoming') {\n    route = 'TIME_RESPONSE';\n    console.log('Route: TIME_RESPONSE');\n  }\n}\n\n// ============================================================\n// Name Selection Response Detection\n// ============================================================\nif (customAttrs.bot_state === 'name_selection_asked') {\n  console.log('Handling name selection response');\n  if (messageType === 'incoming') {\n    route = 'NAME_SELECTION_RESPONSE';\n    console.log('Route: NAME_SELECTION_RESPONSE');\n  }\n}\n\n// ============================================================\n// Form Response Detection (after form is shown)\n// ============================================================\nif (customAttrs.bot_state === 'form_shown') {\n  console.log('Handling form response');\n\n  // Check if this is an incoming message (form submission)\n  if (messageType === 'incoming') {\n    route = 'FORM_RESPONSE';\n    nextState = 'form_submitted';  // Set nextState for form responses\n    console.log('Route: FORM_RESPONSE');\n  }\n}\n\n// ============================================================\n// TIER 3.1: Handle Main Menu List Picker Selections (12 Options)\n// ============================================================\nif (contentAttrs.interactive_type === 'list_picker') {\n  const items = contentAttrs.interactive_data?.data?.['list-picker']?.selectedItems || [];\n  if (items.length > 0) {\n    const id = items[0].identifier;\n    console.log('List picker selection:', id);\n\n    // Main menu routing (template 341 - 12 options)\n    if (id === 'menu_intent') {\n      route = 'INTENT_SETUP';\n      nextState = 'intent_asked';\n    }\n    else if (id === 'menu_listpicker') {\n      route = 'GUITAR';\n      nextState = 'guitar_list_shown';\n    }\n    else if (id === 'menu_ar') {\n      route = 'AR_DIRECT';\n      nextState = 'ar_sent';\n    }\n    else if (id === 'menu_applepay') {\n      route = 'PAYMENT';\n      nextState = 'payment_request';\n    }\n    else if (id === 'menu_timepicker') {\n      route = 'TIME';\n      nextState = 'time_picker_shown';\n    }\n    else if (id === 'menu_form') {\n      route = 'FORM';\n      nextState = 'form_shown';\n    }\n    else if (id === 'menu_image') {\n      route = 'IMAGE_REQUEST';\n      nextState = 'image_requested';\n    }\n    else if (id === 'menu_documents') {\n      route = 'DOCUMENTS';\n      nextState = 'documents_sent';\n    }\n    else if (id === 'menu_authenticate') {\n      route = 'AUTH';\n      nextState = 'auth_requested';\n    }\n    else if (id === 'menu_imessageapp') {\n      route = 'IMESSAGE_APP';\n      nextState = 'imessage_shown';\n    }\n    else if (id === 'menu_wallet') {\n      route = 'WALLET';\n      nextState = 'wallet_shown';\n    }\n    else if (id === 'menu_location') {\n      route = 'LOCATION';\n      nextState = 'location_request';\n    }\n    // Guitar list selection (existing logic)\n    else if (id.includes('guitar_')) {\n      route = 'GUITAR_SELECTED';\n      nextState = 'guitar_selected';\n    }\n    // Other existing selections\n    else if (id.includes('ar_')) {\n      route = 'AR';\n      nextState = 'ar_prompt';\n    }\n  }\n}\n// Handle time picker responses\nelse if (contentAttrs.interactive_type === 'time_picker') {\n  route = 'CONFIRM';\n  nextState = 'appointment_confirmed';\n}\n// Handle form responses\nelse if (contentAttrs.interactive_type === 'form' || contentAttrs.interactive_type === 'apple_form_response') {\n  route = 'FORM_RESPONSE';\n  nextState = 'form_submitted';\n}\n// Handle quick reply responses\nelse if (contentAttrs.interactive_type === 'quick_reply') {\n  const reply = contentAttrs.interactive_data?.data?.['quick-reply']?.identifier || '';\n  console.log('Quick reply selection:', reply);\n\n  if (reply.includes('region_')) {\n    route = 'REGION_SELECTED';\n    nextState = 'region_selected';\n  } else if (reply === 'name_real' || reply === 'name_stage') {\n    route = 'NAME_SELECTED';\n    nextState = 'name_selected';\n  } else if (reply === 'ar_view_yes' || reply === '111') {\n    if (customAttrs.bot_state === 'ar_view_asked') {\n      route = 'AR_VIEW_YES';\n      nextState = 'ar_view_yes';\n    }\n    else if (customAttrs.bot_state === 'ar_place_asked') {\n      route = 'AR_PLACE_YES';\n      nextState = 'ar_place_yes';\n    }\n  } else if (reply === 'ar_view_no' || reply === '222') {\n    if (customAttrs.bot_state === 'ar_view_asked') {\n      route = 'AR_VIEW_NO';\n      nextState = 'ar_view_no';\n    }\n    else if (customAttrs.bot_state === 'ar_place_asked') {\n      route = 'AR_PLACE_NO';\n      nextState = 'ar_place_no';\n    }\n  }\n}\n\n// ============================================================\n// TIER 3.2: Text Message Keyword Handlers (40+ keywords)\n// ============================================================\n\n// Welcome/Start keywords\nelse if (content === 'start' || content === 'hello' || content === 'hi' || content === 'help' || content === 'begin') {\n  route = 'WELCOME';\n  nextState = 'welcomed';\n}\n\n// Menu and navigation\nelse if (content === 'menu' || content === 'main menu') {\n  route = 'MENU';\n  nextState = 'menu_shown';\n}\nelse if (content === 'startover' || content === 'start over' || content === 'restart') {\n  route = 'RESTART';\n  nextState = null;\n}\nelse if (content === 'summary' || content === 'features') {\n  route = 'FEATURES';\n  nextState = 'features_shown';\n}\nelse if (content === 'stop') {\n  route = 'STOP';\n  nextState = 'stopped';\n}\n\n// Interactive features - List Picker\nelse if (content === 'list picker' || content === 'listpicker' || content === 'guitar' || content === 'guitars') {\n  route = 'GUITAR';\n  nextState = 'guitar_list_shown';\n}\n\n// Interactive features - Time Picker\nelse if (content === 'time picker' || content === 'timepicker' || content === 'appointment' || content === 'time') {\n  route = 'TIME';\n  nextState = 'time_picker_shown';\n}\n\n// Interactive features - Apple Pay\nelse if (content === 'apple pay' || content === 'payment' || content === 'pay') {\n  route = 'PAYMENT';\n  nextState = 'payment_request';\n}\n\n// Interactive features - Forms\nelse if (content === 'form' || content === 'help me decide') {\n  route = 'FORM';\n  nextState = 'form_shown';\n}\n\n// Interactive features - Rich Link\nelse if (content === 'rich link' || content === 'richlink') {\n  route = 'RICH_LINK';\n  nextState = 'rich_link_shown';\n}\n\n// Interactive features - Quick Reply\nelse if (content === 'quick reply' || content === 'qr') {\n  route = 'QUICK_REPLY';\n  nextState = 'qr_shown';\n}\n\n// Location/Store features\nelse if (content === 'location' || content === 'locator' || content === 'store' || content === 'stores') {\n  route = 'LOCATION';\n  nextState = 'location_request';\n}\n\n// AR features\nelse if (content === 'ar' || content === 'augmented reality') {\n  route = 'AR_DIRECT';\n  nextState = 'ar_sent';\n}\n\n// Wallet features\nelse if (content === 'wallet') {\n  route = 'WALLET';\n  nextState = 'wallet_shown';\n}\n\n// Authentication features\nelse if (content === 'authenticate' || content === 'authentication') {\n  route = 'AUTH';\n  nextState = 'auth_requested';\n}\nelse if (content === 'native auth') {\n  route = 'NATIVE_AUTH';\n  nextState = 'native_auth_shown';\n}\nelse if (content === 'server fail') {\n  route = 'SERVER_FAIL';\n  nextState = 'server_fail_shown';\n}\nelse if (content === 'server response') {\n  route = 'SERVER_RESPONSE';\n  nextState = 'server_response_shown';\n}\nelse if (content === 'server unknown') {\n  route = 'SERVER_UNKNOWN';\n  nextState = 'server_unknown_shown';\n}\n\n// iMessage App features\nelse if (content === 'imessageapp' || content === 'imessage app' || content === 'imessageextension') {\n  route = 'IMESSAGE_APP';\n  nextState = 'imessage_shown';\n}\n\n// Special demo features\nelse if (content === 'airport') {\n  route = 'AIRPORT';\n  nextState = 'airport_shown';\n}\nelse if (content === 'content payload') {\n  route = 'CONTENT_PAYLOAD';\n  nextState = 'content_shown';\n}\nelse if (content === 'survey' || content === 'csat') {\n  route = 'SURVEY';\n  nextState = 'survey_shown';\n}\n\n// Document features\nelse if (content === 'documents' || content === 'docs') {\n  route = 'DOCUMENTS';\n  nextState = 'documents_sent';\n}\n\n// Image request\nelse if (content === 'image' || content === 'photo' || content === 'selfie') {\n  route = 'IMAGE_REQUEST';\n  nextState = 'image_requested';\n}\n\n// Micro features (advanced)\nelse if (content === 'micro link') {\n  route = 'MICRO_LINK';\n  nextState = 'micro_link_shown';\n}\nelse if (content === 'micro map') {\n  route = 'MICRO_MAP';\n  nextState = 'micro_map_shown';\n}\nelse if (content === 'micro clip') {\n  route = 'MICRO_CLIP';\n  nextState = 'micro_clip_shown';\n}\nelse if (content === 'micro region') {\n  route = 'MICRO_REGION';\n  nextState = 'micro_region_shown';\n}\nelse if (content === 'micro custom') {\n  route = 'MICRO_CUSTOM';\n  nextState = 'micro_custom_shown';\n}\nelse if (content === 'micro auto' || content === 'micro automation') {\n  route = 'MICRO_AUTO';\n  nextState = 'micro_auto_shown';\n}\n\nconsole.log('==========================================');\nconsole.log('ROUTE DECISION:', route);\nconsole.log('NEXT STATE:', nextState);\nconsole.log('==========================================');\n\nreturn {\n  json: {\n    skip: false,\n    route: route,\n    nextState: nextState,\n    conversationId: conversation.id,\n    accountId: data.account?.id || 1,\n    rawContent: content,\n    rawEvent: event,\n    botState: customAttrs.bot_state,\n\n    // ========== Boolean Routing Flags ==========\n\n    // Core navigation\n    isWelcome: route === 'WELCOME',\n    isMenu: route === 'MENU',\n    isRestart: route === 'RESTART',\n    isStop: route === 'STOP',\n    isAuth: route === 'AUTH',\n    isRichLink: route === 'RICH_LINK',\n    isShopify: route === 'SHOPIFY',\n    isBIA: route === 'BIA',\n    isCSAT: route === 'CSAT',\n    isIMessageApp: route === 'IMESSAGE_APP',\n    isUnknown: route === 'UNKNOWN',\n\n    // Menu selections (Tier 3.1)\n    isIntentSetup: route === 'INTENT_SETUP',\n    isARDirect: route === 'AR_DIRECT',\n    isForm: route === 'FORM',\n    isFormResponse: route === 'FORM_RESPONSE',\n    isImageRequest: route === 'IMAGE_REQUEST',\n    isDocuments: route === 'DOCUMENTS',\n    isAuth: route === 'AUTH',\n    isIMESSAGEApp: route === 'IMESSAGE_APP',\n    isWallet: route === 'WALLET',\n\n    // Interactive features (existing + new)\n    isGuitar: route === 'GUITAR',\n    isGuitarSelected: route === 'GUITAR_SELECTED',\n    isTime: route === 'TIME',\n    isConfirm: route === 'CONFIRM',\n    isPayment: route === 'PAYMENT',\n    isLocation: route === 'LOCATION',\n    isFeatures: route === 'FEATURES',\n    isRichLink: route === 'RICH_LINK',\n    isQuickReply: route === 'QUICK_REPLY',\n\n    // AR flow (existing)\n    isARViewYes: route === 'AR_VIEW_YES',\n    isARViewNo: route === 'AR_VIEW_NO',\n    isARPlaceYes: route === 'AR_PLACE_YES',\n    isARPlaceNo: route === 'AR_PLACE_NO',\n\n    // Name collection flow (existing)\n    isRegionSelected: route === 'REGION_SELECTED',\n    isNameCollected: route === 'NAME_COLLECTED',\n    isNameSelected: route === 'NAME_SELECTED',\n\n    // Special demos (Tier 3.2)\n    isAirport: route === 'AIRPORT',\n    isContentPayload: route === 'CONTENT_PAYLOAD',\n    isSurvey: route === 'SURVEY',\n\n    // Authentication variants\n    isNativeAuth: route === 'NATIVE_AUTH',\n    isServerFail: route === 'SERVER_FAIL',\n    isServerResponse: route === 'SERVER_RESPONSE',\n    isServerUnknown: route === 'SERVER_UNKNOWN',\n\n    // Micro features (advanced)\n    isMicroLink: route === 'MICRO_LINK',\n    isMicroMap: route === 'MICRO_MAP',\n    isMicroClip: route === 'MICRO_CLIP',\n    isMicroRegion: route === 'MICRO_REGION',\n    isMicroCustom: route === 'MICRO_CUSTOM',\n    isMicroAuto: route === 'MICRO_AUTO'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ],
+      "id": "b5edbc6e-6ee1-4712-a2eb-24f2fec0f53d",
+      "name": "Router with State"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "0ae56636-7049-441b-98c0-070e26d37da1",
+      "name": "Should Process?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        600,
+        600
+      ],
+      "id": "8fd20289-870e-4986-bd6a-8736b038cc9b",
+      "name": "Skip"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isWelcome }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        0
+      ],
+      "id": "1ec3e9b4-e5bb-4252-9378-9f42b974fcd2",
+      "name": "Is Welcome?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isMenu }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        0
+      ],
+      "id": "77beb97f-0c05-44d4-a021-f1c753a58bdb",
+      "name": "Is Menu?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isGuitar }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "2bfdf169-b0ba-4ebf-a515-7b7f06001cd9",
+      "name": "Is Guitar?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isPayment }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1400,
+        0
+      ],
+      "id": "15545051-b70b-4d0e-b082-1eb20dc92283",
+      "name": "Is Payment?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isTime }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        0
+      ],
+      "id": "6efcc1b5-8fe4-4940-8473-ece05c24601b",
+      "name": "Is Time?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isConfirm }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        0
+      ],
+      "id": "d1ed95b7-97cb-41d6-8b53-4ed509431a93",
+      "name": "Is Confirm?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isLocation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        0
+      ],
+      "id": "344bf73f-e6c6-40c1-977f-8bdcbbe8eedb",
+      "name": "Is Location?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isFeatures }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "2fdf3882-a2b3-4e06-a5a2-b795959f9110",
+      "name": "Is Features?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🎸 Welcome to Acoustic House!\n\nWe're your premier destination for premium acoustic guitars. I'm here to help you find the perfect instrument."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        800,
+        -200
+      ],
+      "id": "2a875aec-8759-4240-9ea7-7c8d3d3a91c4",
+      "name": "Welcome Message 1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Let me show you what we have to offer..."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1000,
+        -200
+      ],
+      "id": "c103af16-0bfd-4f84-ace8-7b567896a909",
+      "name": "Welcome Message 2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 341
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        -100
+      ],
+      "id": "bbce1943-8cb5-4832-ba4a-77051ebdee61",
+      "name": "AMB Main Menu",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 329
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        -100
+      ],
+      "id": "38cbdf1a-5144-4c1d-b87e-10e4eb25f68b",
+      "name": "AMB Guitar List",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 4,
+        "title": "💳 Ready to purchase? Tap to pay with Apple Pay:",
+        "merchantIdentifier": "merchant.com.acoustichouse",
+        "merchantName": "Acoustic House",
+        "countryCode": "US",
+        "currencyCode": "USD",
+        "amount": "3239.00",
+        "totalLabel": "Acoustic House",
+        "lineItems": {
+          "item": [
+            {
+              "label": "Selected Guitar",
+              "amount": "2999.00",
+              "type": "final"
+            },
+            {
+              "label": "Tax",
+              "amount": "240.00",
+              "type": "final"
+            },
+            {
+              "label": "Shipping",
+              "amount": "0.00",
+              "type": "final"
+            }
+          ]
+        },
+        "supportedNetworks": {
+          "networks": [
+            {
+              "network": "visa"
+            },
+            {
+              "network": "mastercard"
+            },
+            {
+              "network": "amex"
+            }
+          ]
+        },
+        "merchantCapabilities": {
+          "capabilities": [
+            {
+              "capability": "supports3DS"
+            }
+          ]
+        },
+        "requiredBillingContactFields": {
+          "fields": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "postalAddress"
+            }
+          ]
+        },
+        "requiredShippingContactFields": {
+          "fields": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "postalAddress"
+            },
+            {
+              "field": "phone"
+            },
+            {
+              "field": "email"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBApplePay",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        -100
+      ],
+      "id": "c88d8e17-02fe-4226-80d8-56a36b2c0c1f",
+      "name": "AMB Apple Pay Request",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 5
+      },
+      "type": "CUSTOM.chatwootAMBTimePicker",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        -200
+      ],
+      "id": "062b7dfc-3228-48a8-af02-1cd132a92176",
+      "name": "AMB Time Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "✅ Your appointment is confirmed! We'll send you a reminder before your visit.\n\n📍 Acoustic House Showroom\n123 Music Street\nSan Francisco, CA 94102\n\nSee you soon! 🎸"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        -100
+      ],
+      "id": "a53c20ce-3dea-4e39-94ee-4cd257309875",
+      "name": "Confirm Appointment",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📍 To find stores near you, please share your zip code or city."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2200,
+        -100
+      ],
+      "id": "afa38355-b9bc-45e1-b343-828c10cac43f",
+      "name": "Location Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 6,
+        "title": "✨ Here's what Apple Messages for Business can do:",
+        "sections": {
+          "section": [
+            {
+              "title": "Apple Messages for Business Features",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "feature_list_picker",
+                    "title": "📋 List Picker",
+                    "subtitle": "Interactive product catalogs",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_time_picker",
+                    "title": "📅 Time Picker",
+                    "subtitle": "Appointment booking",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_forms",
+                    "title": "📝 Forms",
+                    "subtitle": "Collect customer information",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_apple_pay",
+                    "title": "💳 Apple Pay",
+                    "subtitle": "Secure payments",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_rich_links",
+                    "title": "🔗 Rich Links",
+                    "subtitle": "Beautiful link previews",
+                    "image_identifier": "",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "feature_quick_replies",
+                    "title": "⚡ Quick Replies",
+                    "subtitle": "One-tap responses",
+                    "image_identifier": "",
+                    "style": "large"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        -100
+      ],
+      "id": "7f844328-f7d7-44ea-b1c0-9099b29c8e22",
+      "name": "AMB Features Summary",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        100
+      ],
+      "id": "ca986510-f9ad-40b2-80f4-d4ca0168d178",
+      "name": "Unknown Route"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Guitar List selection from interactive response\nconst webhookData = $('Webhook').item.json.body || $('Webhook').item.json;\nconst contentAttrs = webhookData.content_attributes || {};\nconst interactive = contentAttrs.interactive_data?.data?.['list-picker'] || {};\nconst selected = interactive.selectedItems?.[0] || {};\n\nconst guitarIdentifier = selected.identifier || '';\nconst guitarTitle = selected.title || '';\n\nconsole.log('=== Parse Guitar Selection ===');\nconsole.log('Guitar selected:', guitarIdentifier, guitarTitle);\nconsole.log('Account ID:', webhookData.account ? webhookData.account.id : 1);\nconsole.log('Conversation ID:', webhookData.conversation ? webhookData.conversation.id : null);\n\nreturn {\n  json: {\n    guitarIdentifier: guitarIdentifier,\n    guitarTitle: guitarTitle,\n    conversationId: webhookData.conversation?.id,\n    accountId: webhookData.account ? webhookData.account.id : 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1350,
+        -200
+      ],
+      "id": "82874ede-b475-4023-9658-697fd795f9e5",
+      "name": "Parse Guitar Selection"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 344
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        -200
+      ],
+      "id": "2e5d34fb-1596-490e-8376-621e2182b4fa",
+      "name": "Send Guitar Image",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isRegionSelected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2600,
+        0
+      ],
+      "id": "e38ec8bd-1e45-419b-97d2-97db06af65f9",
+      "name": "Is Region Selected?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isNameCollected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2800,
+        0
+      ],
+      "id": "24ca2df8-33ac-4580-9946-81540d0cbcdd",
+      "name": "Is Name Collected?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isNameSelected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3000,
+        0
+      ],
+      "id": "3160c3cb-ad29-4536-b2dd-5ef6253e9bb6",
+      "name": "Is Name Selected?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHB1 - Parse Help Me Decide Form Response\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst formData = contentAttrs.interactive_data?.data?.form || {};\nconst items = formData.items || [];\n\n// Extract name from field 4 (index 3)\nlet userName = '';\nlet stageName = '';\n\nif (items.length > 3 && items[3].items && items[3].items.length > 0) {\n  userName = items[3].items[0].value || '';\n}\n\n// Extract optional stage name from field 5 (index 4)\nif (items.length > 4 && items[4].items && items[4].items.length > 0) {\n  stageName = items[4].items[0].value || '';\n}\n\nconsole.log('AHB1 - Name:', userName, 'Stage Name:', stageName);\n\nreturn {\n  json: {\n    ...($json || {}),\n    userName: userName,\n    stageName: stageName,\n    hasStageName: stageName !== '',\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -200
+      ],
+      "id": "0cab5725-e4b2-4aa1-971c-cef182f65430",
+      "name": "AHB1 - Parse Form Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasStageName }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3000,
+        -200
+      ],
+      "id": "c5d8894b-f3bc-4b38-b933-892f422095b2",
+      "name": "Has Stage Name?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "How would you like to be addressed?"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3200,
+        -300
+      ],
+      "id": "b70a73e4-bfbe-4162-b6e2-c56ae1df85f9",
+      "name": "AHB2 - Ask Name Preference",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Choose how you'd like to be addressed:",
+        "items": {
+          "item": [
+            {
+              "identifier": "name_real",
+              "title": "Use my name"
+            },
+            {
+              "identifier": "name_stage",
+              "title": "Use stage name"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        3200,
+        -200
+      ],
+      "id": "e0d07db3-41b4-46de-b953-c337a3532250",
+      "name": "AHB2 - Name Selection Quick Reply",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHB2 - Select Name based on Quick Reply\nconst webhookData = $('Webhook').item.json.body || $('Webhook').item.json;\nconst contentAttrs = webhookData.content_attributes || {};\nconst quickReply = contentAttrs.interactive_data?.data?.['quick-reply'] || {};\nconst identifier = quickReply.identifier || '';\n\n// Get the previously stored names from custom attributes\nconst conversation = webhookData.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\n\nlet selectedName = '';\nif (identifier === 'name_real') {\n  selectedName = customAttrs.user_name || '';\n} else if (identifier === 'name_stage') {\n  selectedName = customAttrs.stage_name || '';\n}\n\nconsole.log('=== AHB2 - Select Name ===');\nconsole.log('Identifier:', identifier);\nconsole.log('Selected Name:', selectedName);\nconsole.log('Account ID:', webhookData.account ? webhookData.account.id : 1);\nconsole.log('Conversation ID:', conversation.id);\n\nreturn {\n  json: {\n    selectedName: selectedName,\n    nameSelection: identifier,\n    conversationId: conversation.id,\n    accountId: webhookData.account ? webhookData.account.id : 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        -100
+      ],
+      "id": "98ae309b-8919-4aba-82cc-3f8cc6508d67",
+      "name": "AHB2 - Select Name"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHB1_2 - Parse text name input (fallback when form capability not available)\nconst data = $json.body || $json;\nconst content = data.content || '';\n\n// Capitalize first letter\nconst name = content.charAt(0).toUpperCase() + content.slice(1);\n\nconsole.log('AHB1_2 - Text name:', name);\n\nreturn {\n  json: {\n    ...($json || {}),\n    selectedName: name,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        -400
+      ],
+      "id": "7f9b6a59-33e7-44e1-b395-a8a9cb5e1edb",
+      "name": "AHB1_2 - Parse Text Name"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[user_name]",
+              "value": "={{ $json.userName || '' }}"
+            },
+            {
+              "name": "custom_attributes[stage_name]",
+              "value": "={{ $json.stageName || '' }}"
+            },
+            {
+              "name": "custom_attributes[selected_name]",
+              "value": "={{ $json.selectedName || $json.userName || '' }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3400,
+        -200
+      ],
+      "id": "d8d6fd5c-0a7b-4d22-a642-5272d116f464",
+      "name": "Update Name Attributes",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=Hello {{ $json.selectedName || $json.userName || 'there' }}. We have some cool guitars we would like you to see."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3600,
+        -200
+      ],
+      "id": "594aa3a5-af81-4a7e-8878-47240b94b050",
+      "name": "AHB3 - Personalized Greeting",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Just in. We have this cool Stratocaster. Check it out!!!"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1650,
+        -200
+      ],
+      "id": "52b15a6c-2c18-48a0-89e0-77be6a9ba798",
+      "name": "AR Introduction",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 344
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        -200
+      ],
+      "id": "9ddbfe41-d2a8-4ced-abf4-297178d31dee",
+      "name": "Send AR File",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Did you click on the image and see the 3D augmented reality view of the guitar? (Yes | No)"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1950,
+        -200
+      ],
+      "id": "1a74ff7c-fbc9-4b6f-9ea6-7919dd1cd5ab",
+      "name": "First AR Question",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Did you click on the image and see the 3D AR view?",
+        "items": {
+          "item": [
+            {
+              "identifier": "ar_view_yes",
+              "title": "Yes"
+            },
+            {
+              "identifier": "ar_view_no",
+              "title": "No"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        -200
+      ],
+      "id": "b180bc72-a4df-4987-83f8-81fa878333ff",
+      "name": "AR View Question",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes",
+              "value": "={{ { bot_state: 'ar_view_asked' } }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2250,
+        -200
+      ],
+      "id": "a58c9912-a1b1-41f5-b4de-49cab4fae361",
+      "name": "Set State: ar_view_asked",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isARViewYes || $json.isARViewNo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "07b96f0a-4719-464a-8931-142bb969b858",
+      "name": "Is AR View Response?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isARViewYes }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1350,
+        -300
+      ],
+      "id": "00082766-df83-481f-86bd-8be54b08a901",
+      "name": "Did View AR?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Awesome! Did you select AR from the top of the image and set it down in front of you? (Yes | No)"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1500,
+        -400
+      ],
+      "id": "03ee565c-7e14-4edc-b3dd-8478e5bb6d92",
+      "name": "AR View Success",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Try tapping on the image to see the AR image of the guitar!"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1500,
+        -200
+      ],
+      "id": "fabf3428-f6ea-4f33-8199-8a057681995a",
+      "name": "AR View Instruction",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Did you select AR from the top of the image and set it down in front of you? (Yes | No)"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1650,
+        -300
+      ],
+      "id": "ec0fa948-49d8-4467-95c1-feae85e69fc5",
+      "name": "Second AR Question (After No)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Did you place the AR guitar in your space?",
+        "items": {
+          "item": [
+            {
+              "identifier": "ar_place_yes",
+              "title": "Yes"
+            },
+            {
+              "identifier": "ar_place_no",
+              "title": "No"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        -300
+      ],
+      "id": "22923c36-24d5-4b36-8e5d-f226915488c1",
+      "name": "AR Place Question",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes",
+              "value": "={{ { bot_state: 'ar_place_asked' } }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1950,
+        -300
+      ],
+      "id": "40722012-37cc-4b88-8c1f-711bfcc25459",
+      "name": "Set State: ar_place_asked",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isARPlaceYes || $json.isARPlaceNo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1400,
+        0
+      ],
+      "id": "43176e99-5f51-4333-8352-31039fed15fb",
+      "name": "Is AR Place Response?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isARPlaceNo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1550,
+        -400
+      ],
+      "id": "dd111c6c-77a1-4b73-9211-d73b7b92a34f",
+      "name": "Did Place AR?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Try tapping on the image to see the AR image of the guitar!"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1700,
+        -500
+      ],
+      "id": "902ff2a4-f06a-4509-8655-d6fd8f4f2d19",
+      "name": "AR Place Instruction",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Great, let's buy your new guitar."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1850,
+        -400
+      ],
+      "id": "9eee6684-8ab7-46d8-a131-fc3c9d6d28a8",
+      "name": "Apple Pay Transition",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "However, let's schedule a lesson with your guitar."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1800,
+        -100
+      ],
+      "id": "e81b35de-a5e1-487d-aa28-3ae087fce44f",
+      "name": "AHF2 - Schedule Lesson Intro",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "We can find the closest location for you, just message us your zipcode. Where are you?"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        -100
+      ],
+      "id": "87be29a9-c401-4389-8740-7e512f3f27a8",
+      "name": "AHF3 - Request Location",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes",
+              "value": "={{ { bot_state: 'location_requested' } }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2150,
+        -100
+      ],
+      "id": "ed4f0441-5f90-4ee2-a62a-dc84b1114e64",
+      "name": "Set State: location_requested",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse location text input (zipcode or city)\nconst data = $json.body || $json;\nconst content = data.content || '';\nconst location = content.trim();\n\nconsole.log('AHG1 - Location input:', location);\n\n// Simple validation: check if it looks like a zipcode or city name\nlet isValid = location.length > 0;\n\nreturn {\n  json: {\n    ...($json || {}),\n    location: location,\n    isValid: isValid,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        -300
+      ],
+      "id": "07c0b479-16e1-49de-b116-e23a48861787",
+      "name": "AHG1 - Parse Location"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Here are the available times at Apple Park."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2450,
+        -300
+      ],
+      "id": "56e7bc3b-6b6e-4feb-8c11-e1bec5ceac78",
+      "name": "AHG1 - Time Picker Intro",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes",
+              "value": "={{ { bot_state: 'time_confirmed' } }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2200,
+        -200
+      ],
+      "id": "4ed98c4d-43cf-417c-a186-45ac423a315e",
+      "name": "Set State: time_confirmed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Thank you, you're all set to learn to shread. 🤘"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2350,
+        -200
+      ],
+      "id": "3b1812fe-f328-4369-bbb2-ae749e64cf4a",
+      "name": "AHH2 - Lesson Confirmation",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Shall we continue?"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2500,
+        -200
+      ],
+      "id": "bde12279-33c9-4af7-934f-0b6303379f7a",
+      "name": "AHH2 - Continue Question",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Shall we continue?",
+        "items": {
+          "item": [
+            {
+              "identifier": "continue_yes",
+              "title": "Yes, continue"
+            },
+            {
+              "identifier": "continue_no",
+              "title": "No, skip"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        2650,
+        -200
+      ],
+      "id": "ba774504-6005-41cf-bfd7-f3cf18ea759b",
+      "name": "AHH2 - Continue Quick Reply",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes",
+              "value": "={{ { bot_state: 'continue_asked' } }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2800,
+        -200
+      ],
+      "id": "de8d99d2-45b5-42b2-9a34-790589ab4f89",
+      "name": "Set State: continue_asked",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isContinueResponse }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        100
+      ],
+      "id": "e7fcc6e4-c5c9-4cad-8277-78cc56f0622c",
+      "name": "Is Continue Response?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Continue Quick Reply Response\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst quickReply = contentAttrs.interactive_data?.data?.['quick-reply'] || {};\nconst identifier = quickReply.identifier || '';\n\nconsole.log('AHI1 - Continue identifier:', identifier);\n\nlet shouldContinue = identifier === 'continue_yes';\n\nreturn {\n  json: {\n    ...($json || {}),\n    shouldContinue: shouldContinue,\n    continueIdentifier: identifier,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        0
+      ],
+      "id": "85917806-e481-462a-87e2-bc9e6bba9b08",
+      "name": "AHI1 - Parse Continue Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldContinue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "6a35c2f5-4baa-4be0-a942-2508fe5df856",
+      "name": "AHI1 - Should Continue?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        -100
+      ],
+      "id": "f4ca7b62-0fb0-430f-ac84-680606b8b553",
+      "name": "AHI1 - Rich Links Placeholder"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Would you like to learn more about Apple Messages for Business?"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2400,
+        100
+      ],
+      "id": "db117ec4-f855-4d23-94e5-c28ee736212f",
+      "name": "AHI1 - Learn More Question",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Would you like to learn more?",
+        "items": {
+          "item": [
+            {
+              "identifier": "learn_more_yes",
+              "title": "Yes, tell me more"
+            },
+            {
+              "identifier": "learn_more_no",
+              "title": "No, thanks"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        2550,
+        100
+      ],
+      "id": "6aff75fa-9d47-4dd3-85d6-b52fcbddb96e",
+      "name": "AHI1 - Learn More Quick Reply",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isIntentSetup }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3200,
+        0
+      ],
+      "id": "11d35e49-e7b1-4bf0-be4d-c3a2173344d1",
+      "name": "Is Intent Setup?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isARDirect }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3400,
+        0
+      ],
+      "id": "5b4deb7c-9f65-4089-9b92-63d29a9b15c1",
+      "name": "Is AR Direct?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isForm }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        0
+      ],
+      "id": "0213c0bc-70e0-4b36-b4e9-ffd8cc1fa026",
+      "name": "Is Form?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isFormResponse }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3800,
+        0
+      ],
+      "id": "b9e43bd6-7ece-420d-b793-0835a6ba9143",
+      "name": "Is Form Response?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isImageRequest }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4000,
+        0
+      ],
+      "id": "aefdbe40-4535-4d82-a6e4-4a98b7c03d34",
+      "name": "Is Image Request?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isDocuments }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3200,
+        200
+      ],
+      "id": "b8195cb2-05f7-4682-8c54-d4414bd12446",
+      "name": "Is Documents?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isAuth }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3400,
+        200
+      ],
+      "id": "ec1433d2-47c8-4db2-a2c6-e3c9885305a5",
+      "name": "Is Auth?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isIMESSAGEApp }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        200
+      ],
+      "id": "6fbecf4b-de2f-4f74-a666-e38b34bb37e4",
+      "name": "Is iMessage App?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isWallet }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3800,
+        200
+      ],
+      "id": "33091222-d43c-4997-a191-93b67203b95a",
+      "name": "Is Wallet?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isRichLink }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4000,
+        200
+      ],
+      "id": "e4b7084e-347c-4144-8c3b-d19bd15fc149",
+      "name": "Is Rich Link?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isAirport }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3200,
+        400
+      ],
+      "id": "7ca75ebd-5e4b-4262-bcab-fff3c57bb100",
+      "name": "Is Airport?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isSurvey }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3400,
+        400
+      ],
+      "id": "9a2423ef-8202-4555-9b87-3a3b30c1c6db",
+      "name": "Is Survey?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isQuickReply }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        400
+      ],
+      "id": "88f90aef-9a46-4b52-a78e-cd58630008cb",
+      "name": "Is Quick Reply?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🔧 Intent ID Setup feature coming in Tier 4!\n\nThis will allow you to configure custom Intent IDs for Business Chat links."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3400,
+        -200
+      ],
+      "id": "f931224e-b615-4cb0-89e5-8b4fdfa16e8a",
+      "name": "Intent Setup Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 344
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        -200
+      ],
+      "id": "3c247e81-bd3a-4859-806a-6acab4361440",
+      "name": "AR Direct Send",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 343
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        3800,
+        -200
+      ],
+      "id": "06bdba13-f8be-4a29-8eaf-a634218c6401",
+      "name": "Form Direct Send",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📸 Please share a photo or selfie with your guitar!\n\nWe'd love to see you with your new instrument."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        -200
+      ],
+      "id": "cc52e67b-b2f4-4ec3-97db-44b8a585e515",
+      "name": "Image Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📄 Here are the documents you requested:\n\n• metrics.numbers - Sales performance data\n• document.pdf - Product catalog"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3400,
+        -50
+      ],
+      "id": "a9ee5a10-7a1d-4797-a6f8-627d27f2dfce",
+      "name": "Send Documents",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🔐 Authentication feature coming in Tier 4!\n\nThis will demonstrate OAuth and server-side authentication flows."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3600,
+        -50
+      ],
+      "id": "583c8561-8684-4fbc-a6d5-7138801b7522",
+      "name": "Authentication Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📱 iMessage App extension coming in Tier 4!\n\nThis will demonstrate custom iMessage app interactions."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3800,
+        -50
+      ],
+      "id": "38263731-0b0f-4e04-a2f1-bff88f515973",
+      "name": "iMessage App Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "💳 Wallet pass feature coming in Tier 4!\n\nThis will send a .pkpass file for Apple Wallet."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        -50
+      ],
+      "id": "3cec9a53-7a14-4683-a413-d1e718814291",
+      "name": "Wallet Pass Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Here's a rich link preview demo"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3400,
+        100
+      ],
+      "id": "da726637-2b1a-4e18-ae7a-6dbc6b189132",
+      "name": "Rich Link Demo",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "✈️ Airport information rich link"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3600,
+        100
+      ],
+      "id": "f59f10e6-7fa0-4e24-8783-45e89cdac805",
+      "name": "Airport Rich Link",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📊 How would you rate your experience today?\n\n1 = Poor, 5 = Excellent"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3800,
+        100
+      ],
+      "id": "c2c0941c-bd9b-49f0-a58c-78564d944e50",
+      "name": "CSAT Survey",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $('Router with State').item.json.accountId }}",
+        "conversationId": "={{ $('Router with State').item.json.conversationId }}",
+        "templateId": 3
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        4000,
+        100
+      ],
+      "id": "6e3c4ae1-9a9c-493d-8dd3-e1ca6d819cfc",
+      "name": "Quick Reply Demo",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHC1 - Guitar Picker Catcher\nconst data = $json.body || $json;\nconst conversation = data.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\nconst botState = customAttrs.bot_state || '';\nconst retryCount = customAttrs.retry_count || 0;\n\n// Check if we're in guitar_list state and user hasn't responded\nconst isGuitarState = botState === 'guitar_list';\nconst conversationId = conversation.id;\nconst accountId = data.account?.id || 1;\n\nreturn {\n  json: {\n    isGuitarState: isGuitarState,\n    retryCount: retryCount,\n    conversationId: conversationId,\n    accountId: accountId,\n    shouldPrompt: retryCount === 2,\n    shouldResend: retryCount === 3,\n    shouldAutoSelect: retryCount >= 5\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        -200
+      ],
+      "id": "1f374cd9-e5b5-4a96-bb6d-f5419b22b406",
+      "name": "AHC1 - Guitar Picker Catcher"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[retry_count]",
+              "value": "={{ $json.retryCount + 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        -200
+      ],
+      "id": "73a10ac8-06d0-48bb-8d6a-fb2a20323635",
+      "name": "AHC1 - Increment Retry Count",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldPrompt }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        -300
+      ],
+      "id": "1f945d3c-c7e3-4801-b8f4-1d60f4d55127",
+      "name": "AHC1 - Should Prompt?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Looks like we're waiting for you to select a guitar from the list above. Take your time! 🎸"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4400,
+        -400
+      ],
+      "id": "960ebf15-39b7-48a1-ade4-4be3bd9c9359",
+      "name": "AHC1 - Send Prompt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldResend }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        -200
+      ],
+      "id": "b3051e44-1b42-41e1-9871-851495351a77",
+      "name": "AHC1 - Should Resend?"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 329
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        -300
+      ],
+      "id": "5074905b-3aaa-4302-82cc-24d0dc61cd41",
+      "name": "AHC1 - Resend Guitar List",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldAutoSelect }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        -100
+      ],
+      "id": "1af3c6e0-2d18-4c1d-ab5c-1279a89a1606",
+      "name": "AHC1 - Should Auto-Select?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Okay, we'll just pretend you selected the Martin DC28E Dreadnought - it's a great choice! Let's continue..."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4400,
+        -200
+      ],
+      "id": "dc9ed704-5bb4-4aab-945d-3b70970b6470",
+      "name": "AHC1 - Auto-Select Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 344
+      },
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        4600,
+        -200
+      ],
+      "id": "978d229d-8549-45af-b81b-19783c7cc158",
+      "name": "AHC1 - Auto-Select Guitar Image",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHF1 - Apple Pay Catcher\nconst data = $json.body || $json;\nconst conversation = data.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\nconst botState = customAttrs.bot_state || '';\nconst retryCount = customAttrs.retry_count || 0;\nconst userName = customAttrs.selected_name || customAttrs.user_name || 'there';\n\n// Check if we're in payment_request state\nconst isPaymentState = botState === 'payment_request';\nconst conversationId = conversation.id;\nconst accountId = data.account?.id || 1;\n\nreturn {\n  json: {\n    isPaymentState: isPaymentState,\n    retryCount: retryCount,\n    conversationId: conversationId,\n    accountId: accountId,\n    userName: userName,\n    shouldSkipPayment: retryCount > 2\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        0
+      ],
+      "id": "ab57380b-01dc-43c3-a18d-22f57ad8b358",
+      "name": "AHF1 - Apple Pay Catcher"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[retry_count]",
+              "value": "={{ $json.retryCount + 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        0
+      ],
+      "id": "4861cb21-5845-484a-bfbe-3dc9a3f7e0fd",
+      "name": "AHF1 - Increment Retry Count",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldSkipPayment }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        0
+      ],
+      "id": "c7e82d1e-334a-4392-b483-11b756f2f34e",
+      "name": "AHF1 - Should Skip Payment?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=Just kidding {{ $json.userName }}! No payment was processed. This is just a demo. 😊\n\nLet's schedule a lesson with your new guitar instead!"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4400,
+        -100
+      ],
+      "id": "828d2025-297f-4df2-8bc6-8197d4753d9e",
+      "name": "AHF1 - Skip Payment Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// AHH1 - Time Picker Catcher\nconst data = $json.body || $json;\nconst conversation = data.conversation || {};\nconst customAttrs = conversation.custom_attributes || {};\nconst botState = customAttrs.bot_state || '';\nconst retryCount = customAttrs.retry_count || 0;\n\n// Check if we're in appointment_booking state\nconst isTimePickerState = botState === 'appointment_booking';\nconst conversationId = conversation.id;\nconst accountId = data.account?.id || 1;\n\nreturn {\n  json: {\n    isTimePickerState: isTimePickerState,\n    retryCount: retryCount,\n    conversationId: conversationId,\n    accountId: accountId,\n    shouldPrompt: retryCount === 2,\n    shouldResend: retryCount === 3,\n    shouldSkip: retryCount >= 5\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        200
+      ],
+      "id": "821e34df-66ad-453a-af8c-9b8dfef01677",
+      "name": "AHH1 - Time Picker Catcher"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[retry_count]",
+              "value": "={{ $json.retryCount + 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        200
+      ],
+      "id": "9ae81178-6472-40f4-9606-51e1b44bc260",
+      "name": "AHH1 - Increment Retry Count",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldPrompt }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        100
+      ],
+      "id": "f920c559-d2d5-430a-a2c8-1038c16c1e83",
+      "name": "AHH1 - Should Prompt?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Looks like we're waiting for you to select a time for your lesson. No rush! 📅"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4400,
+        0
+      ],
+      "id": "b3d69ad7-5959-47b4-984e-072f907a75ee",
+      "name": "AHH1 - Send Prompt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldResend }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        200
+      ],
+      "id": "6f63ae59-8b1b-4e74-8c5d-2253e449e541",
+      "name": "AHH1 - Should Resend?"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 5
+      },
+      "type": "CUSTOM.chatwootAMBTimePicker",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        100
+      ],
+      "id": "c00d9dd4-632c-475f-9cab-5e2b45ea97fd",
+      "name": "AHH1 - Resend Time Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldSkip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4200,
+        300
+      ],
+      "id": "dc131c4c-267d-4f5a-9c87-e4c055943554",
+      "name": "AHH1 - Should Skip?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "You must be a shredding pro already! 🎸🔥 We can skip the lesson and continue with the demo..."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4400,
+        200
+      ],
+      "id": "d77164ee-c371-437f-9f32-627729612d2f",
+      "name": "AHH1 - Skip Lesson Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store Locator - Geocoding Placeholder\nconst input = ($json.rawContent || '').trim();\nlet coordinates = { lat: 37.7749, lng: -122.4194 }; // SF default\n\n// Hardcoded zipcode mapping\nconst zipcodeMap = {\n  '94102': { lat: 37.7749, lng: -122.4194, city: 'San Francisco' },\n  '94103': { lat: 37.7749, lng: -122.4194, city: 'San Francisco' },\n  '10001': { lat: 40.7506, lng: -73.9971, city: 'New York' },\n  '90210': { lat: 34.0901, lng: -118.4065, city: 'Beverly Hills' },\n  '60601': { lat: 41.8858, lng: -87.6229, city: 'Chicago' },\n  '98101': { lat: 47.6097, lng: -122.3331, city: 'Seattle' }\n};\n\nif (zipcodeMap[input]) {\n  coordinates = zipcodeMap[input];\n}\n\n// Hardcoded store list (5 nearest)\nconst stores = [\n  {\n    identifier: 'store_sf_union',\n    title: 'Acoustic House - Union Square',\n    subtitle: '300 Post St, San Francisco, CA 94108 (0.8 miles)',\n    distance: 0.8\n  },\n  {\n    identifier: 'store_sf_soma',\n    title: 'Acoustic House - SOMA',\n    subtitle: '123 Townsend St, San Francisco, CA 94107 (1.2 miles)',\n    distance: 1.2\n  },\n  {\n    identifier: 'store_sf_marina',\n    title: 'Acoustic House - Marina',\n    subtitle: '2100 Chestnut St, San Francisco, CA 94123 (2.5 miles)',\n    distance: 2.5\n  },\n  {\n    identifier: 'store_sf_mission',\n    title: 'Acoustic House - Mission',\n    subtitle: '3045 24th St, San Francisco, CA 94110 (3.1 miles)',\n    distance: 3.1\n  },\n  {\n    identifier: 'store_oakland',\n    title: 'Acoustic House - Oakland',\n    subtitle: '1111 Broadway, Oakland, CA 94607 (12.5 miles)',\n    distance: 12.5\n  }\n];\n\nreturn {\n  json: {\n    coordinates: coordinates,\n    stores: stores,\n    conversationId: $json.conversationId,\n    accountId: $json.accountId\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -200
+      ],
+      "id": "dd216db3-f2b0-4cea-b1ed-782de5f6ac33",
+      "name": "Store Locator - Geocoding"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 7,
+        "title": "🏪 Stores Near You",
+        "sections": {
+          "section": [
+            {
+              "title": "Select a store to book your lesson",
+              "multipleSelection": false,
+              "items": {
+                "item": "={{ $json.stores }}"
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        -200
+      ],
+      "id": "5a6f4749-fc29-49c8-850e-5f0c53bac40a",
+      "name": "Store Locator - List Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Store Selection\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst interactive = contentAttrs.interactive_data?.data?.['list-picker'] || {};\nconst selected = interactive.selectedItems?.[0] || {};\n\nconst storeIdentifier = selected.identifier || '';\nconst storeTitle = selected.title || '';\n\nconsole.log('Store selected:', storeIdentifier, storeTitle);\n\nreturn {\n  json: {\n    storeIdentifier: storeIdentifier,\n    storeTitle: storeTitle,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -200
+      ],
+      "id": "dea9c449-19c4-42d2-94f6-2af7e8976e80",
+      "name": "Store Locator - Parse Selection"
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 5
+      },
+      "type": "CUSTOM.chatwootAMBTimePicker",
+      "typeVersion": 1,
+      "position": [
+        3000,
+        -200
+      ],
+      "id": "3523aa18-4bc7-4b71-8c95-8dd061cb14ba",
+      "name": "Store Locator - Time Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🔐 Authentication Demo\n\nThis feature demonstrates OAuth and authentication capabilities.\n\n⚠️ PLACEHOLDER: Real implementation requires OAuth server setup and Apple Business Chat authentication credentials."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4800,
+        -400
+      ],
+      "id": "50b5e808-6432-471f-ba3e-089cf10eb47b",
+      "name": "Auth - Explanation Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 8,
+        "title": "Authentication Options",
+        "sections": {
+          "section": [
+            {
+              "title": "Select an authentication method",
+              "multipleSelection": false,
+              "items": {
+                "item": [
+                  {
+                    "identifier": "auth_linkedin",
+                    "title": "LinkedIn OAuth",
+                    "subtitle": "Connect with LinkedIn (Placeholder)",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "auth_native",
+                    "title": "Native Auth",
+                    "subtitle": "iOS native authentication (Placeholder)",
+                    "style": "large"
+                  },
+                  {
+                    "identifier": "auth_server_side",
+                    "title": "Server-Side Auth",
+                    "subtitle": "Backend authentication (Placeholder)",
+                    "style": "large"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "images": {
+          "image": []
+        },
+        "receivedMessage": {},
+        "replyMessage": {}
+      },
+      "type": "CUSTOM.chatwootAMBListPicker",
+      "typeVersion": 1,
+      "position": [
+        5000,
+        -400
+      ],
+      "id": "4ab94c83-df47-4888-a850-431b082d40af",
+      "name": "Auth - Options List Picker",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Auth Selection\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst interactive = contentAttrs.interactive_data?.data?.['list-picker'] || {};\nconst selected = interactive.selectedItems?.[0] || {};\n\nconst authType = selected.identifier || '';\n\nlet message = '';\nif (authType === 'auth_linkedin') {\n  message = '✅ LinkedIn OAuth Selected\\n\\nTODO: Setup OAuth app at https://www.linkedin.com/developers/\\n- Implement OAuth callback handler\\n- Exchange for user profile data\\n- Store access tokens securely';\n} else if (authType === 'auth_native') {\n  message = '✅ Native Auth Selected\\n\\nTODO: Configure Apple Messages for Business native auth\\n- Requires native auth capability\\n- Handle auth tokens in backend\\n- iOS native authentication flow';\n} else if (authType === 'auth_server_side') {\n  message = '✅ Server-Side Auth Selected\\n\\nTODO: Setup auth server endpoint\\n- Implement token exchange\\n- Store user session data\\n- Provide auth status API';\n}\n\nreturn {\n  json: {\n    authType: authType,\n    message: message,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        -400
+      ],
+      "id": "45412cbc-af9a-4492-ba7d-80c1eaaa7de8",
+      "name": "Auth - Parse Selection"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5400,
+        -400
+      ],
+      "id": "f18dc492-f58e-4928-8b8c-618baf968469",
+      "name": "Auth - Send TODO Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🔗 Rich Link Demo - Website:\n\nhttps://register.apple.com/resources/messages/\n\n(Rich preview would display here with image, title, description)"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4800,
+        -200
+      ],
+      "id": "abc27916-ce30-43b4-8012-3c80ce7f9b7e",
+      "name": "Rich Link - Website",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📍 Rich Link Demo - Maps:\n\nhttps://maps.apple.com/?address=300+Post+St,San+Francisco,CA\n\n(Maps preview would display here with location, directions)"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5000,
+        -200
+      ],
+      "id": "72802769-c311-4813-b8a5-1595d64246df",
+      "name": "Rich Link - Maps",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📲 Rich Link Demo - App Clip:\n\nhttps://acoustichouse.example.com/clip\n\n⚠️ PLACEHOLDER: Requires App Clip registration and development\n\nTODO:\n- Register App Clip with Apple\n- Configure invocation URLs\n- Setup App Clip experience\n- Handle universal links"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5200,
+        -200
+      ],
+      "id": "5b23231d-8b0f-4daf-9df5-595d729f2f91",
+      "name": "Rich Link - App Clip",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📋 Rich Link Implementation TODO:\n\n1. Rich Link Microservice:\n   - Scrape URL metadata (og:title, og:image)\n   - Cache metadata for performance\n   - Serve via API endpoint\n\n2. Media Assets:\n   - Image hosting for hero images\n   - Video support\n   - CDN for performance\n\n3. External Services:\n   - Open Graph scraper\n   - Metadata API\n   - Link preview generator"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5400,
+        -200
+      ],
+      "id": "881726d7-67fb-43e3-96a6-52e4a03bcd4f",
+      "name": "Rich Link - TODO",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🛍️ Shopify Integration Demo\n\n⚠️ PLACEHOLDER: Would display product catalog here\n\nTODO:\n- Setup Shopify API credentials\n- Implement product sync\n- Handle cart and checkout\n- Webhook for order updates\n\nExternal Service: Shopify API"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4800,
+        0
+      ],
+      "id": "6cca0cbd-9f24-4cea-9a93-325752930608",
+      "name": "Shopify - Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🔐 Business Initiated Auth (BIA) Demo\n\n⚠️ PLACEHOLDER: Would request authentication here\n\nTODO:\n- Register BIA credentials with Apple\n- Setup encryption keys\n- Implement OAuth flow\n- Handle auth responses\n\nExternal Service: Apple BIA Registration"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5000,
+        0
+      ],
+      "id": "c978bc74-434a-4192-959d-3189f53b6ab5",
+      "name": "BIA - Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "⭐ How would you rate your experience today?"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5200,
+        0
+      ],
+      "id": "a7303427-d3d2-4c7a-ae1a-6bdad946513f",
+      "name": "CSAT - Survey Message",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "accountId": "={{ $json.accountId }}",
+        "conversationId": "={{ $json.conversationId }}",
+        "templateId": 3,
+        "summaryText": "Rate your experience:",
+        "items": {
+          "item": [
+            {
+              "identifier": "csat_5",
+              "title": "⭐⭐⭐⭐⭐ Excellent"
+            },
+            {
+              "identifier": "csat_4",
+              "title": "⭐⭐⭐⭐ Good"
+            },
+            {
+              "identifier": "csat_3",
+              "title": "⭐⭐⭐ Average"
+            },
+            {
+              "identifier": "csat_2",
+              "title": "⭐⭐ Poor"
+            },
+            {
+              "identifier": "csat_1",
+              "title": "⭐ Very Poor"
+            }
+          ]
+        }
+      },
+      "type": "CUSTOM.chatwootAMBQuickReply",
+      "typeVersion": 1,
+      "position": [
+        5400,
+        0
+      ],
+      "id": "ca883dea-c9d8-4191-9647-e3a231b8e9de",
+      "name": "CSAT - Quick Reply",
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "📱 iMessage App/Extension Demo\n\n⚠️ PLACEHOLDER: Would trigger iMessage app here\n\nTODO:\n- Develop iMessage app (Xcode)\n- Configure MSP for app bubbles\n- Handle interactive app data\n- Test on iOS devices\n\nExternal Service: iMessage App Development"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5600,
+        0
+      ],
+      "id": "50e301f8-4bbf-4ff4-b8ae-34c3abdcae67",
+      "name": "iMessage Extension - Placeholder",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      }
+    },
+    {
+      "id": "13eb9dd3-6320-49f2-9ec7-f325ee74e32c",
+      "name": "AHA2 - Region Selection",
+      "type": "CUSTOM.chatwootAMBTemplateMessage",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        400
+      ],
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "c1Q7oV1mUwnc9b5T",
+          "name": "Chatwoot Test Bot"
+        }
+      },
+      "parameters": {
+        "accountId": "={{ $(\"Router with State\").item.json.accountId }}",
+        "conversationId": "={{ $(\"Router with State\").item.json.conversationId }}",
+        "templateId": 340
+      }
+    },
+    {
+      "id": "90607051-9a1d-4b63-8851-dcd169d6a534",
+      "name": "Parse Region Selection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Parse region selection from Quick Reply response\nconst webhookData = $('Webhook').item.json.body || $('Webhook').item.json;\n\nconsole.log('=== Parse Region Selection ===');\n\n// Extract from webhook data\nconst content = (webhookData.content || '').toLowerCase().trim();\nconst contentAttrs = webhookData.content_attributes || {};\nconst conversation = webhookData.conversation || {};\nconst interactiveData = contentAttrs.interactive_data || {};\nconst quickReplyData = interactiveData.data ? interactiveData.data['quick-reply'] : null;\n\nconsole.log('Webhook content:', content);\n\n// Extract region from Quick Reply\nlet region = 'unknown';\n\n// Method 1: Check items array\nif (quickReplyData && quickReplyData.items && quickReplyData.items.length > 0) {\n  const selectedItem = quickReplyData.items[0];\n  const itemContent = (selectedItem.content || '').toLowerCase();\n  \n  console.log('Method 1 - Checking items array');\n  console.log('Item content:', itemContent);\n  \n  if (itemContent === 'emea') {\n    region = 'EMEA';\n    console.log('SUCCESS: Found EMEA');\n  } else if (itemContent === 'americas') {\n    region = 'Americas';\n    console.log('SUCCESS: Found Americas');\n  } else if (itemContent === 'apac') {\n    region = 'APAC';\n    console.log('SUCCESS: Found APAC');\n  }\n}\n\n// Method 2: Check identifier field\nif (region === 'unknown' && quickReplyData && quickReplyData.identifier) {\n  const identifier = quickReplyData.identifier.toLowerCase();\n  \n  console.log('Method 2 - Checking identifier');\n  console.log('Identifier:', identifier);\n  \n  if (identifier.includes('emea')) {\n    region = 'EMEA';\n    console.log('SUCCESS: Found EMEA');\n  } else if (identifier.includes('americas')) {\n    region = 'Americas';\n    console.log('SUCCESS: Found Americas');\n  } else if (identifier.includes('apac')) {\n    region = 'APAC';\n    console.log('SUCCESS: Found APAC');\n  }\n}\n\n// Method 3: Check value field\nif (region === 'unknown' && quickReplyData && quickReplyData.value) {\n  const value = quickReplyData.value.toLowerCase();\n  \n  console.log('Method 3 - Checking value');\n  console.log('Value:', value);\n  \n  if (value === 'emea') {\n    region = 'EMEA';\n    console.log('SUCCESS: Found EMEA');\n  } else if (value === 'americas') {\n    region = 'Americas';\n    console.log('SUCCESS: Found Americas');\n  } else if (value === 'apac') {\n    region = 'APAC';\n    console.log('SUCCESS: Found APAC');\n  }\n}\n\n// Method 4: Fallback to content text\nif (region === 'unknown') {\n  console.log('Method 4 - Checking content text');\n  console.log('Content:', content);\n  \n  if (content.includes('emea') || content === 'emea') {\n    region = 'EMEA';\n    console.log('SUCCESS: Found EMEA');\n  } else if (content.includes('americas') || content === 'americas') {\n    region = 'Americas';\n    console.log('SUCCESS: Found Americas');\n  } else if (content.includes('apac') || content === 'apac') {\n    region = 'APAC';\n    console.log('SUCCESS: Found APAC');\n  }\n}\n\nconsole.log('');\nconsole.log('FINAL RESULT - Region:', region);\nconsole.log('Account ID:', webhookData.account ? webhookData.account.id : 1);\nconsole.log('Conversation ID:', conversation.id);\nconsole.log('==============================');\n\nreturn {\n  json: {\n    accountId: webhookData.account ? webhookData.account.id : 1,\n    conversationId: conversation.id,\n    region: region,\n    userId: webhookData.sender ? webhookData.sender.id : null\n  }\n};"
+      }
+    },
+    {
+      "id": "1938c1a8-e0d5-42b4-b737-6eba17797824",
+      "name": "Update Region Attribute",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1600,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[region]",
+              "value": "={{ $json.region }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "030c5e3f-62ab-4045-a2de-3896e3162f55",
+      "name": "AHA3 - Region Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1800,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Thank you! Let's help you find your next guitar. 🎸"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fbc45f83-6c43-4975-904a-7626d665ab7c",
+      "name": "Has FORM Capability?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "form-capability",
+              "leftValue": "={{ true }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b4e29736-415f-431d-9bd6-add2e0bb48a2",
+      "name": "Set State: region_asked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1400,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "region_asked"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "98bdd84d-6c15-4603-94a4-d5d6b12004da",
+      "name": "Is Region Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        800,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "region-route",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "REGION_RESPONSE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d6de8c76-8421-4734-99ca-0d3f2b09e959",
+      "name": "Set State: form_shown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3800,
+        -100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "form_shown"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9df7eee1-abc8-402d-aa21-417300b3d866",
+      "name": "Set State: guitar_list_shown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "guitar_list_shown"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4b3be57c-ca2d-4624-9a40-b0def63a4407",
+      "name": "Set State: payment_request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1600,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "payment_request"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "176559d7-dae4-4b0c-8cdc-29b6a578d7b6",
+      "name": "Set State: time_picker_shown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        -100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "appointment_booking"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ed884a37-bedd-4477-ac7b-da888b684372",
+      "name": "Set State: name_selection_asked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3200,
+        -100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "custom_attributes[bot_state]",
+              "value": "name_selection_asked"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aaad29a8-a002-4729-8f66-e2a2c11e2c2e",
+      "name": "Is Guitar Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "guitar_response-check",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "GUITAR_RESPONSE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ce721685-06bd-4cfa-babb-c2e08ec02a6c",
+      "name": "Is Payment Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "payment_response-check",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "PAYMENT_RESPONSE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "649236d5-6d00-4f6c-9aa6-5366e76cd87c",
+      "name": "Is Time Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "time_response-check",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "TIME_RESPONSE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "036121a1-6120-4753-ad9d-320ba0496bbb",
+      "name": "Is Name Selection Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        800
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "name_selection_response-check",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "NAME_SELECTION_RESPONSE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Apple Pay Response\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst applePayData = contentAttrs.interactive_data?.data?.['apple-pay'] || {};\n\nconsole.log('=== Parse Payment Response ===');\nconsole.log('Apple Pay Data:', applePayData);\n\n// Extract payment status\nconst paymentStatus = applePayData.status || 'unknown';\nconst transactionId = applePayData.transactionIdentifier || '';\n\n// Extract billing/shipping info if present\nconst billingContact = applePayData.billingContact || {};\nconst shippingContact = applePayData.shippingContact || {};\n\nconsole.log('Payment Status:', paymentStatus);\nconsole.log('Transaction ID:', transactionId);\n\nreturn {\n  json: {\n    ...($json || {}),\n    paymentStatus: paymentStatus,\n    transactionId: transactionId,\n    billingContact: billingContact,\n    shippingContact: shippingContact,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        300
+      ],
+      "id": "7548e867-2ba5-402f-b583-825420136f6d",
+      "name": "Parse Payment Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Time Picker Response\nconst data = $json.body || $json;\nconst contentAttrs = data.content_attributes || {};\nconst timePickerData = contentAttrs.interactive_data?.data?.['time-picker'] || {};\n\nconsole.log('=== Parse Time Response ===');\nconsole.log('Time Picker Data:', timePickerData);\n\n// Extract selected time slot\nconst selectedSlot = timePickerData.selectedItem || {};\nconst eventIdentifier = selectedSlot.identifier || '';\nconst eventTitle = selectedSlot.title || '';\n\n// Parse the time from identifier or title\nlet selectedTime = '';\nlet selectedDate = '';\n\nif (eventIdentifier) {\n  // Format: \"slot_YYYYMMDD_HHMM\"\n  const parts = eventIdentifier.split('_');\n  if (parts.length >= 3) {\n    selectedDate = parts[1];  // YYYYMMDD\n    selectedTime = parts[2];  // HHMM\n  }\n}\n\nconsole.log('Selected Date:', selectedDate);\nconsole.log('Selected Time:', selectedTime);\nconsole.log('Event Title:', eventTitle);\n\nreturn {\n  json: {\n    ...($json || {}),\n    selectedDate: selectedDate,\n    selectedTime: selectedTime,\n    eventTitle: eventTitle,\n    eventIdentifier: eventIdentifier,\n    conversationId: data.conversation?.id,\n    accountId: data.account?.id || 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        500
+      ],
+      "id": "81074877-5f7f-4f2f-84be-f6b8aa908035",
+      "name": "Parse Time Response"
+    },
+    {
+      "id": "6832de70-8606-4b9b-b0a4-4195f6ab30d0",
+      "name": "Skip Form - No Capability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2200,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RQQuzy3scKeZsK8H",
+          "name": "n8n Local -Bot Chatwoot"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Looks like your device doesn't support forms, let's skip"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "0c09df62-6c60-4ab3-91e5-32c47c2b8a73": {
+      "main": [
+        [
+          {
+            "node": "b5edbc6e-6ee1-4712-a2eb-24f2fec0f53d",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b5edbc6e-6ee1-4712-a2eb-24f2fec0f53d": {
+      "main": [
+        [
+          {
+            "node": "98bdd84d-6c15-4603-94a4-d5d6b12004da",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "0ae56636-7049-441b-98c0-070e26d37da1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0ae56636-7049-441b-98c0-070e26d37da1": {
+      "main": [
+        [
+          {
+            "node": "1ec3e9b4-e5bb-4252-9378-9f42b974fcd2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "8fd20289-870e-4986-bd6a-8736b038cc9b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1ec3e9b4-e5bb-4252-9378-9f42b974fcd2": {
+      "main": [
+        [
+          {
+            "node": "2a875aec-8759-4240-9ea7-7c8d3d3a91c4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "77beb97f-0c05-44d4-a021-f1c753a58bdb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "77beb97f-0c05-44d4-a021-f1c753a58bdb": {
+      "main": [
+        [
+          {
+            "node": "bbce1943-8cb5-4832-ba4a-77051ebdee61",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "2bfdf169-b0ba-4ebf-a515-7b7f06001cd9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2bfdf169-b0ba-4ebf-a515-7b7f06001cd9": {
+      "main": [
+        [
+          {
+            "node": "38cbdf1a-5144-4c1d-b87e-10e4eb25f68b",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "07b96f0a-4719-464a-8931-142bb969b858",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15545051-b70b-4d0e-b082-1eb20dc92283": {
+      "main": [
+        [
+          {
+            "node": "c88d8e17-02fe-4226-80d8-56a36b2c0c1f",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6efcc1b5-8fe4-4940-8473-ece05c24601b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6efcc1b5-8fe4-4940-8473-ece05c24601b": {
+      "main": [
+        [
+          {
+            "node": "062b7dfc-3228-48a8-af02-1cd132a92176",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "d1ed95b7-97cb-41d6-8b53-4ed509431a93",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "d1ed95b7-97cb-41d6-8b53-4ed509431a93": {
+      "main": [
+        [
+          {
+            "node": "4ed98c4d-43cf-417c-a186-45ac423a315e",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "e7fcc6e4-c5c9-4cad-8277-78cc56f0622c",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "344bf73f-e6c6-40c1-977f-8bdcbbe8eedb": {
+      "main": [
+        [
+          {
+            "node": "07c0b479-16e1-49de-b116-e23a48861787",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "2fdf3882-a2b3-4e06-a5a2-b795959f9110",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2fdf3882-a2b3-4e06-a5a2-b795959f9110": {
+      "main": [
+        [
+          {
+            "node": "7f844328-f7d7-44ea-b1c0-9099b29c8e22",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "e38ec8bd-1e45-419b-97d2-97db06af65f9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2a875aec-8759-4240-9ea7-7c8d3d3a91c4": {
+      "main": [
+        [
+          {
+            "node": "c103af16-0bfd-4f84-ace8-7b567896a909",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "c103af16-0bfd-4f84-ace8-7b567896a909": {
+      "main": [
+        [
+          {
+            "node": "13eb9dd3-6320-49f2-9ec7-f325ee74e32c",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "38cbdf1a-5144-4c1d-b87e-10e4eb25f68b": {
+      "main": [
+        [
+          {
+            "node": "9df7eee1-abc8-402d-aa21-417300b3d866",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "82874ede-b475-4023-9658-697fd795f9e5": {
+      "main": [
+        [
+          {
+            "node": "2e5d34fb-1596-490e-8376-621e2182b4fa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2e5d34fb-1596-490e-8376-621e2182b4fa": {
+      "main": [
+        [
+          {
+            "node": "52b15a6c-2c18-48a0-89e0-77be6a9ba798",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9ddbfe41-d2a8-4ced-abf4-297178d31dee": {
+      "main": [
+        [
+          {
+            "node": "1a74ff7c-fbc9-4b6f-9ea6-7919dd1cd5ab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "e38ec8bd-1e45-419b-97d2-97db06af65f9": {
+      "main": [
+        [
+          {
+            "node": "0cab5725-e4b2-4aa1-971c-cef182f65430",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "24ca2df8-33ac-4580-9946-81540d0cbcdd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24ca2df8-33ac-4580-9946-81540d0cbcdd": {
+      "main": [
+        [
+          {
+            "node": "0cab5725-e4b2-4aa1-971c-cef182f65430",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "3160c3cb-ad29-4536-b2dd-5ef6253e9bb6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3160c3cb-ad29-4536-b2dd-5ef6253e9bb6": {
+      "main": [
+        [
+          {
+            "node": "98ae309b-8919-4aba-82cc-3f8cc6508d67",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ca986510-f9ad-40b2-80f4-d4ca0168d178",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0cab5725-e4b2-4aa1-971c-cef182f65430": {
+      "main": [
+        [
+          {
+            "node": "c5d8894b-f3bc-4b38-b933-892f422095b2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "c5d8894b-f3bc-4b38-b933-892f422095b2": {
+      "main": [
+        [
+          {
+            "node": "b70a73e4-bfbe-4162-b6e2-c56ae1df85f9",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "d8d6fd5c-0a7b-4d22-a642-5272d116f464",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b70a73e4-bfbe-4162-b6e2-c56ae1df85f9": {
+      "main": [
+        [
+          {
+            "node": "e0d07db3-41b4-46de-b953-c337a3532250",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "98ae309b-8919-4aba-82cc-3f8cc6508d67": {
+      "main": [
+        [
+          {
+            "node": "d8d6fd5c-0a7b-4d22-a642-5272d116f464",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "d8d6fd5c-0a7b-4d22-a642-5272d116f464": {
+      "main": [
+        [
+          {
+            "node": "594aa3a5-af81-4a7e-8878-47240b94b050",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "594aa3a5-af81-4a7e-8878-47240b94b050": {
+      "main": [
+        [
+          {
+            "node": "38cbdf1a-5144-4c1d-b87e-10e4eb25f68b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "52b15a6c-2c18-48a0-89e0-77be6a9ba798": {
+      "main": [
+        [
+          {
+            "node": "9ddbfe41-d2a8-4ced-abf4-297178d31dee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1a74ff7c-fbc9-4b6f-9ea6-7919dd1cd5ab": {
+      "main": [
+        [
+          {
+            "node": "b180bc72-a4df-4987-83f8-81fa878333ff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b180bc72-a4df-4987-83f8-81fa878333ff": {
+      "main": [
+        [
+          {
+            "node": "a58c9912-a1b1-41f5-b4de-49cab4fae361",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07b96f0a-4719-464a-8931-142bb969b858": {
+      "main": [
+        [
+          {
+            "node": "00082766-df83-481f-86bd-8be54b08a901",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "43176e99-5f51-4333-8352-31039fed15fb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "00082766-df83-481f-86bd-8be54b08a901": {
+      "main": [
+        [
+          {
+            "node": "03ee565c-7e14-4edc-b3dd-8478e5bb6d92",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fabf3428-f6ea-4f33-8199-8a057681995a",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03ee565c-7e14-4edc-b3dd-8478e5bb6d92": {
+      "main": [
+        [
+          {
+            "node": "22923c36-24d5-4b36-8e5d-f226915488c1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fabf3428-f6ea-4f33-8199-8a057681995a": {
+      "main": [
+        [
+          {
+            "node": "ec0fa948-49d8-4467-95c1-feae85e69fc5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ec0fa948-49d8-4467-95c1-feae85e69fc5": {
+      "main": [
+        [
+          {
+            "node": "22923c36-24d5-4b36-8e5d-f226915488c1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22923c36-24d5-4b36-8e5d-f226915488c1": {
+      "main": [
+        [
+          {
+            "node": "40722012-37cc-4b88-8c1f-711bfcc25459",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "43176e99-5f51-4333-8352-31039fed15fb": {
+      "main": [
+        [
+          {
+            "node": "dd111c6c-77a1-4b73-9211-d73b7b92a34f",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "15545051-b70b-4d0e-b082-1eb20dc92283",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dd111c6c-77a1-4b73-9211-d73b7b92a34f": {
+      "main": [
+        [
+          {
+            "node": "902ff2a4-f06a-4509-8655-d6fd8f4f2d19",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "9eee6684-8ab7-46d8-a131-fc3c9d6d28a8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "902ff2a4-f06a-4509-8655-d6fd8f4f2d19": {
+      "main": [
+        [
+          {
+            "node": "9eee6684-8ab7-46d8-a131-fc3c9d6d28a8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9eee6684-8ab7-46d8-a131-fc3c9d6d28a8": {
+      "main": [
+        [
+          {
+            "node": "c88d8e17-02fe-4226-80d8-56a36b2c0c1f",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "c88d8e17-02fe-4226-80d8-56a36b2c0c1f": {
+      "main": [
+        [
+          {
+            "node": "4b3be57c-ca2d-4624-9a40-b0def63a4407",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "e81b35de-a5e1-487d-aa28-3ae087fce44f": {
+      "main": [
+        [
+          {
+            "node": "87be29a9-c401-4389-8740-7e512f3f27a8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "87be29a9-c401-4389-8740-7e512f3f27a8": {
+      "main": [
+        [
+          {
+            "node": "ed4f0441-5f90-4ee2-a62a-dc84b1114e64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "062b7dfc-3228-48a8-af02-1cd132a92176": {
+      "main": [
+        [
+          {
+            "node": "176559d7-dae4-4b0c-8cdc-29b6a578d7b6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4ed98c4d-43cf-417c-a186-45ac423a315e": {
+      "main": [
+        [
+          {
+            "node": "a53c20ce-3dea-4e39-94ee-4cd257309875",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "a53c20ce-3dea-4e39-94ee-4cd257309875": {
+      "main": [
+        [
+          {
+            "node": "3b1812fe-f328-4369-bbb2-ae749e64cf4a",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3b1812fe-f328-4369-bbb2-ae749e64cf4a": {
+      "main": [
+        [
+          {
+            "node": "bde12279-33c9-4af7-934f-0b6303379f7a",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "bde12279-33c9-4af7-934f-0b6303379f7a": {
+      "main": [
+        [
+          {
+            "node": "ba774504-6005-41cf-bfd7-f3cf18ea759b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ba774504-6005-41cf-bfd7-f3cf18ea759b": {
+      "main": [
+        [
+          {
+            "node": "de8d99d2-45b5-42b2-9a34-790589ab4f89",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "e7fcc6e4-c5c9-4cad-8277-78cc56f0622c": {
+      "main": [
+        [
+          {
+            "node": "85917806-e481-462a-87e2-bc9e6bba9b08",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "344bf73f-e6c6-40c1-977f-8bdcbbe8eedb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "85917806-e481-462a-87e2-bc9e6bba9b08": {
+      "main": [
+        [
+          {
+            "node": "6a35c2f5-4baa-4be0-a942-2508fe5df856",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6a35c2f5-4baa-4be0-a942-2508fe5df856": {
+      "main": [
+        [
+          {
+            "node": "f4ca7b62-0fb0-430f-ac84-680606b8b553",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "db117ec4-f855-4d23-94e5-c28ee736212f",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "db117ec4-f855-4d23-94e5-c28ee736212f": {
+      "main": [
+        [
+          {
+            "node": "6aff75fa-9d47-4dd3-85d6-b52fcbddb96e",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07c0b479-16e1-49de-b116-e23a48861787": {
+      "main": [
+        [
+          {
+            "node": "56e7bc3b-6b6e-4feb-8c11-e1bec5ceac78",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "56e7bc3b-6b6e-4feb-8c11-e1bec5ceac78": {
+      "main": [
+        [
+          {
+            "node": "062b7dfc-3228-48a8-af02-1cd132a92176",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11d35e49-e7b1-4bf0-be4d-c3a2173344d1": {
+      "main": [
+        [
+          {
+            "node": "f931224e-b615-4cb0-89e5-8b4fdfa16e8a",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5b4deb7c-9f65-4089-9b92-63d29a9b15c1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5b4deb7c-9f65-4089-9b92-63d29a9b15c1": {
+      "main": [
+        [
+          {
+            "node": "3c247e81-bd3a-4859-806a-6acab4361440",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "0213c0bc-70e0-4b36-b4e9-ffd8cc1fa026",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "0213c0bc-70e0-4b36-b4e9-ffd8cc1fa026": {
+      "main": [
+        [
+          {
+            "node": "06bdba13-f8be-4a29-8eaf-a634218c6401",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "b9e43bd6-7ece-420d-b793-0835a6ba9143",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b9e43bd6-7ece-420d-b793-0835a6ba9143": {
+      "main": [
+        [
+          {
+            "node": "0cab5725-e4b2-4aa1-971c-cef182f65430",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "aefdbe40-4535-4d82-a6e4-4a98b7c03d34",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aefdbe40-4535-4d82-a6e4-4a98b7c03d34": {
+      "main": [
+        [
+          {
+            "node": "cc52e67b-b2f4-4ec3-97db-44b8a585e515",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "b8195cb2-05f7-4682-8c54-d4414bd12446",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b8195cb2-05f7-4682-8c54-d4414bd12446": {
+      "main": [
+        [
+          {
+            "node": "a9ee5a10-7a1d-4797-a6f8-627d27f2dfce",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ec1433d2-47c8-4db2-a2c6-e3c9885305a5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ec1433d2-47c8-4db2-a2c6-e3c9885305a5": {
+      "main": [
+        [
+          {
+            "node": "583c8561-8684-4fbc-a6d5-7138801b7522",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6fbecf4b-de2f-4f74-a666-e38b34bb37e4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6fbecf4b-de2f-4f74-a666-e38b34bb37e4": {
+      "main": [
+        [
+          {
+            "node": "38263731-0b0f-4e04-a2f1-bff88f515973",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "33091222-d43c-4997-a191-93b67203b95a",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "33091222-d43c-4997-a191-93b67203b95a": {
+      "main": [
+        [
+          {
+            "node": "3cec9a53-7a14-4683-a413-d1e718814291",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "e4b7084e-347c-4144-8c3b-d19bd15fc149",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "e4b7084e-347c-4144-8c3b-d19bd15fc149": {
+      "main": [
+        [
+          {
+            "node": "da726637-2b1a-4e18-ae7a-6dbc6b189132",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "7ca75ebd-5e4b-4262-bcab-fff3c57bb100",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7ca75ebd-5e4b-4262-bcab-fff3c57bb100": {
+      "main": [
+        [
+          {
+            "node": "f59f10e6-7fa0-4e24-8783-45e89cdac805",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "9a2423ef-8202-4555-9b87-3a3b30c1c6db",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9a2423ef-8202-4555-9b87-3a3b30c1c6db": {
+      "main": [
+        [
+          {
+            "node": "c2c0941c-bd9b-49f0-a58c-78564d944e50",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "88f90aef-9a46-4b52-a78e-cd58630008cb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "88f90aef-9a46-4b52-a78e-cd58630008cb": {
+      "main": [
+        [
+          {
+            "node": "6e3c4ae1-9a9c-493d-8dd3-e1ca6d819cfc",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ca986510-f9ad-40b2-80f4-d4ca0168d178",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13eb9dd3-6320-49f2-9ec7-f325ee74e32c": {
+      "main": [
+        [
+          {
+            "node": "b4e29736-415f-431d-9bd6-add2e0bb48a2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "90607051-9a1d-4b63-8851-dcd169d6a534": {
+      "main": [
+        [
+          {
+            "node": "1938c1a8-e0d5-42b4-b737-6eba17797824",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1938c1a8-e0d5-42b4-b737-6eba17797824": {
+      "main": [
+        [
+          {
+            "node": "030c5e3f-62ab-4045-a2de-3896e3162f55",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "030c5e3f-62ab-4045-a2de-3896e3162f55": {
+      "main": [
+        [
+          {
+            "node": "fbc45f83-6c43-4975-904a-7626d665ab7c",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fbc45f83-6c43-4975-904a-7626d665ab7c": {
+      "main": [
+        [
+          {
+            "node": "06bdba13-f8be-4a29-8eaf-a634218c6401",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6832de70-8606-4b9b-b0a4-4195f6ab30d0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "b4e29736-415f-431d-9bd6-add2e0bb48a2": {
+      "main": [
+        []
+      ]
+    },
+    "98bdd84d-6c15-4603-94a4-d5d6b12004da": {
+      "main": [
+        [
+          {
+            "node": "90607051-9a1d-4b63-8851-dcd169d6a534",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "06bdba13-f8be-4a29-8eaf-a634218c6401": {
+      "main": [
+        [
+          {
+            "node": "d6de8c76-8421-4734-99ca-0d3f2b09e959",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "d6de8c76-8421-4734-99ca-0d3f2b09e959": {
+      "main": [
+        []
+      ]
+    },
+    "9df7eee1-abc8-402d-aa21-417300b3d866": {
+      "main": [
+        []
+      ]
+    },
+    "4b3be57c-ca2d-4624-9a40-b0def63a4407": {
+      "main": [
+        []
+      ]
+    },
+    "176559d7-dae4-4b0c-8cdc-29b6a578d7b6": {
+      "main": [
+        []
+      ]
+    },
+    "e0d07db3-41b4-46de-b953-c337a3532250": {
+      "main": [
+        [
+          {
+            "node": "ed884a37-bedd-4477-ac7b-da888b684372",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ed884a37-bedd-4477-ac7b-da888b684372": {
+      "main": [
+        []
+      ]
+    },
+    "ce721685-06bd-4cfa-babb-c2e08ec02a6c": {
+      "main": [
+        [
+          {
+            "node": "7548e867-2ba5-402f-b583-825420136f6d",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "649236d5-6d00-4f6c-9aa6-5366e76cd87c": {
+      "main": [
+        [
+          {
+            "node": "81074877-5f7f-4f2f-84be-f6b8aa908035",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "6832de70-8606-4b9b-b0a4-4195f6ab30d0": {
+      "main": [
+        [
+          {
+            "node": "38cbdf1a-5144-4c1d-b87e-10e4eb25f68b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ca986510-f9ad-40b2-80f4-d4ca0168d178": {
+      "main": [
+        [
+          {
+            "node": "11d35e49-e7b1-4bf0-be4d-c3a2173344d1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "chatwoot"
+    },
+    {
+      "name": "apple-messages"
+    },
+    {
+      "name": "acoustic-house"
+    },
+    {
+      "name": "migrated"
+    }
+  ]
+}

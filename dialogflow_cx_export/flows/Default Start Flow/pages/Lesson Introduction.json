@@ -1,0 +1,22 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Lesson Introduction",
+  "displayName": "Lesson Introduction",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "As a thank you, we’d like to offer you a complimentary guitar lesson.",
+            "We have partner stores around the world."
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Location Request"
+    }
+  ]
+}

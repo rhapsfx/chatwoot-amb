@@ -1,0 +1,21 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Photo Intro",
+  "displayName": "Photo Intro",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "We love to see our guitars in their new homes!"
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Photo Request"
+    }
+  ]
+}

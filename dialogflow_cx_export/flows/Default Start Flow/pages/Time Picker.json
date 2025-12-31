@@ -1,0 +1,44 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Time Picker",
+  "displayName": "Time Picker",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "time-picker",
+                "requestIdentifier": "time_0319",
+                "event": {
+                  "location": {
+                    "latitude": 37.7749,
+                    "longitude": -122.4194,
+                    "title": "Guitar Center"
+                  }
+                }
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Your lesson is confirmed. We'll send you a reminder."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Continue Prompt"
+    }
+  ]
+}

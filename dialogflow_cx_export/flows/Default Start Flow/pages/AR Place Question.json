@@ -1,0 +1,67 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/AR Place Question",
+  "displayName": "AR Place Question",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "chips",
+                "options": [
+                  {
+                    "text": "Yes, it looks great!",
+                    "event": {
+                      "name": "ar_place_yes",
+                      "languageCode": "en"
+                    }
+                  },
+                  {
+                    "text": "I had trouble",
+                    "event": {
+                      "name": "ar_place_no",
+                      "languageCode": "en"
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Awesome! We hope you liked how it looked."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Apple Pay Prompt"
+    },
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "That's okay. It's a cool feature to try later!"
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Apple Pay Prompt"
+    }
+  ]
+}

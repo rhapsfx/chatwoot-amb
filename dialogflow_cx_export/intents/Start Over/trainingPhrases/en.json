@@ -1,0 +1,44 @@
+{
+  "trainingPhrases": [
+    {
+      "parts": [
+        {
+          "text": "start over"
+        }
+      ],
+      "repeatCount": 1
+    },
+    {
+      "parts": [
+        {
+          "text": "restart"
+        }
+      ],
+      "repeatCount": 1
+    },
+    {
+      "parts": [
+        {
+          "text": "begin again"
+        }
+      ],
+      "repeatCount": 1
+    },
+    {
+      "parts": [
+        {
+          "text": "reset"
+        }
+      ],
+      "repeatCount": 1
+    },
+    {
+      "parts": [
+        {
+          "text": "main menu"
+        }
+      ],
+      "repeatCount": 1
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "displayName": "AcousticHouseBot",
+  "defaultLanguageCode": "en",
+  "timeZone": "America/Los_Angeles",
+  "startFlow": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000",
+  "advancedSettings": {
+    "audioExportGcsDestination": {}
+  }
+}

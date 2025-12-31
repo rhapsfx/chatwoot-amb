@@ -1,0 +1,63 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Continue Prompt",
+  "displayName": "Continue Prompt",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "We have a few more things to show you."
+          ]
+        }
+      },
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "chips",
+                "options": [
+                  {
+                    "text": "Yes, continue",
+                    "event": {
+                      "name": "continue_yes",
+                      "languageCode": "en"
+                    }
+                  },
+                  {
+                    "text": "No, I’m done",
+                    "event": {
+                      "name": "continue_no",
+                      "languageCode": "en"
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Excellent! Let's keep going."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Photo Intro"
+    },
+    {
+      "condition": "true",
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Summary"
+    }
+  ]
+}

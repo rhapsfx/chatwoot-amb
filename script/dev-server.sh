@@ -8,12 +8,12 @@
 eval "$(rbenv init -)"
 
 # --- Ruby Version Check ---
-REQUIRED_RUBY_VERSION="3.3.9"
+REQUIRED_RUBY_VERSION="3.4.4"
 CURRENT_RUBY_VERSION=$(ruby --version | cut -d' ' -f2)
 
 if [ "$CURRENT_RUBY_VERSION" != "$REQUIRED_RUBY_VERSION" ]; then
     echo -e "\033[0;31m[ERROR] Incorrect Ruby version. Expected ${REQUIRED_RUBY_VERSION}, but found ${CURRENT_RUBY_VERSION}.\033[0m"
-    echo -e "\033[1;33mPlease install Ruby 3.3.9 and ensure it is the active version.\033[0m"
+    echo -e "\033[1;33mPlease install Ruby ${REQUIRED_RUBY_VERSION} and ensure it is the active version.\033[0m"
     echo -e "\033[1;33mIt is highly recommended to use a Ruby version manager like rbenv or asdf.\033[0m"
     exit 1
 fi

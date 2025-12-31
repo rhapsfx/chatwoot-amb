@@ -1,0 +1,80 @@
+{
+  "name": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/START_PAGE",
+  "displayName": "Start Page",
+  "entryFulfillment": {
+    "messages": [
+      {
+        "text": {
+          "text": [
+            "Thank you for contacting Acoustic Bot Prod.",
+            "Let's help you find your next guitar 🎸."
+          ]
+        }
+      },
+      {
+        "payload": {
+          "richContent": [
+            [
+              {
+                "type": "list",
+                "title": "Which region are you traveling from?",
+                "items": [
+                  {
+                    "type": "list_item",
+                    "title": "Americas",
+                    "event": {
+                      "name": "region_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "region": "Americas"
+                      }
+                    }
+                  },
+                  {
+                    "type": "list_item",
+                    "title": "EMEA",
+                    "event": {
+                      "name": "region_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "region": "EMEA"
+                      }
+                    }
+                  },
+                  {
+                    "type": "list_item",
+                    "title": "Asia Pacific",
+                    "event": {
+                      "name": "region_selected",
+                      "languageCode": "en",
+                      "parameters": {
+                        "region": "Asia Pacific"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "transitionRoutes": [
+    {
+      "condition": "true",
+      "triggerFulfillment": {
+        "messages": [
+          {
+            "text": {
+              "text": [
+                "Great! You selected $session.params.region."
+              ]
+            }
+          }
+        ]
+      },
+      "targetPage": "projects/-/locations/-/agents/-/flows/00000000-0000-0000-0000-000000000000/pages/Form or Name Prompt"
+    }
+  ]
+}
