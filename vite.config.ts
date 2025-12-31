@@ -44,6 +44,10 @@ if (isLibraryMode) {
 
 export default defineConfig({
   plugins: plugins,
+  server: {
+    host: '127.0.0.1', // Force IPv4 to avoid EPERM on ::1
+    port: 3036,
+  },
   build: {
     rollupOptions: {
       output: {

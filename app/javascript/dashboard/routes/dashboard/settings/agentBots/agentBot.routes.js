@@ -1,8 +1,10 @@
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import Bot from './Index.vue';
-import BotStudio from './BotStudio.vue';
 import { frontendURL } from '../../../../helper/URLHelper';
 import SettingsWrapper from '../SettingsWrapper.vue';
+
+// Lazy load BotStudio to avoid circular dependency with dashboard store/routes
+const BotStudio = () => import('./BotStudio.vue');
 
 export default {
   routes: [
@@ -33,7 +35,7 @@ export default {
       component: BotStudio,
       meta: {
         featureFlag: FEATURE_FLAGS.AGENT_BOTS,
-        permissions: ['administrator', AGENT_BOT_PERMISSIONS],
+        permissions: ['administrator'],
       },
     },
   ],

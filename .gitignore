@@ -119,3 +119,6 @@ CLEANUP_LIST.md
 
 # Code analysis cache
 .zingerv3/
+
+# Database backups with credentials (contain sensitive data)
+docs/backups/*.sql
