@@ -63,7 +63,7 @@ node_modules
 package-lock.json
 
 *.dump
-
+*.sql
 
 # cypress
 test/cypress/videos/*
