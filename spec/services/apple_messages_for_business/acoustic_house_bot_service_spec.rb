@@ -11,7 +11,76 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
   let(:conversation) { create(:conversation, inbox: inbox, account: account) }
   let(:contact) { conversation.contact }
   let(:message) { create(:message, conversation: conversation, account: account, message_type: :incoming) }
+
+  # Legacy mode service (backward compatibility)
   let(:service) { described_class.new(conversation, message) }
+
+  # Config-driven mode (new)
+  let(:bot_config) do
+    {
+      conversation_flow: { initial_state: 'AHA1', idle_timeout_minutes: 30 },
+      keyword_mappings: {
+        demo_keywords: { 'guitar' => 'handle_list_picker_demo' },
+        flow_control_keywords: { 'menu' => 'handle_menu' }
+      },
+      interactive_handlers: { 'qr_travel' => 'handle_region_selection' },
+      required_templates: { list: [], validation: { enabled: false } }
+    }
+  end
+  let(:agent_bot) do
+    create(:agent_bot, bot_type: :webhook, bot_config: bot_config, account: account)
+  end
+  let(:config_service) { described_class.new(conversation, message, agent_bot) }
+
+  describe '#initialize' do
+    context 'legacy mode (no bot provided)' do
+      it 'initializes with hardcoded config' do
+        expect { service }.not_to raise_error
+      end
+
+      it 'logs warning about legacy mode' do
+        expect(Rails.logger).to receive(:warn).with(/legacy mode/)
+        described_class.new(conversation, message)
+      end
+    end
+
+    context 'config-driven mode (bot provided)' do
+      it 'initializes with bot config' do
+        expect { config_service }.not_to raise_error
+      end
+
+      it 'validates config' do
+        expect_any_instance_of(described_class).to receive(:validate_config!)
+        described_class.new(conversation, message, agent_bot)
+      end
+
+      it 'raises error for invalid config' do
+        invalid_bot = create(:agent_bot, bot_type: :webhook, bot_config: {}, account: account)
+        expect do
+          described_class.new(conversation, message, invalid_bot)
+        end.to raise_error(StandardError, /Missing required config keys/)
+      end
+    end
+
+    context 'with explicit config override' do
+      let(:override_config) do
+        {
+          conversation_flow: { initial_state: 'AHA1', idle_timeout_minutes: 60 },
+          keyword_mappings: {
+            demo_keywords: { 'test' => 'handle_test' },
+            flow_control_keywords: { 'stop' => 'handle_stop' }
+          },
+          interactive_handlers: {},
+          required_templates: { list: [], validation: { enabled: false } }
+        }
+      end
+
+      it 'uses provided config over bot config' do
+        service_with_override = described_class.new(conversation, message, agent_bot, override_config)
+        expect(service_with_override.instance_variable_get(:@config)['conversation_flow']['idle_timeout_minutes']).to eq(60)
+      end
+    end
+  end
 
   describe '#process_message' do
     context 'when conversation times out' do

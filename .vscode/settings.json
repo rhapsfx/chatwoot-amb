@@ -1,6 +1,11 @@
 {
-    "cSpell.words": [
-        "chatwoot",
-        "dompurify"
-    ]
+  "cSpell.words": [
+    "chatwoot",
+    "dompurify"
+  ],
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+  "[log]": {
+    "files.encoding": "utf8"
+  }
 }

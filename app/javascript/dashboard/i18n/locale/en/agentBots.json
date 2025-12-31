@@ -13,13 +13,15 @@
     "BOT_CONFIGURATION": {
       "TITLE": "Select an agent bot",
       "DESC": "Assign an Agent Bot to your inbox. They can handle initial conversations and transfer them to a live agent when necessary.",
+      "SELECT_LABEL": "Select a bot to assign",
       "SUBMIT": "Update",
       "DISCONNECT": "Disconnect bot",
       "SUCCESS_MESSAGE": "Successfully updated the agent bot.",
       "DISCONNECTED_SUCCESS_MESSAGE": "Successfully disconnected the agent bot.",
       "ERROR_MESSAGE": "Could not update the agent bot. Please try again.",
       "DISCONNECTED_ERROR_MESSAGE": "Could not disconnect the agent bot. Please try again.",
-      "SELECT_PLACEHOLDER": "Select bot"
+      "SELECT_PLACEHOLDER": "Select bot",
+      "SELECT_ERROR": "Please select a bot to assign"
     },
     "ADD": {
       "TITLE": "Add Bot",
@@ -59,6 +61,12 @@
         "ERROR_MESSAGE": "Could not update bot. Please try again."
       }
     },
+    "DUPLICATE": {
+      "BUTTON_TEXT": "Duplicate",
+      "TITLE": "Duplicate bot",
+      "SUCCESS": "Bot duplicated successfully.",
+      "ERROR": "Could not duplicate bot. Please try again."
+    },
     "ACCESS_TOKEN": {
       "TITLE": "Access Token",
       "DESCRIPTION": "Copy the access token and save it securely",
@@ -79,6 +87,30 @@
         "LABEL": "Description",
         "PLACEHOLDER": "What does this bot do?"
       },
+      "BOT_TYPE": {
+        "LABEL": "Bot Type",
+        "WEBHOOK": "Webhook Bot",
+        "AMB": "Apple Messages Bot"
+      },
+      "BOT_CONFIG": {
+        "LABEL": "Bot Configuration",
+        "PLACEHOLDER": "Enter bot configuration as JSON",
+        "HELP": "Configure typing indicators, conversation timeout, and other bot behavior settings",
+        "HELP_LINK": "View configuration guide",
+        "TYPING_INDICATORS": {
+          "TITLE": "Typing Indicators",
+          "ENABLED": "Enable typing indicators",
+          "DELAY": "Typing delay (seconds)",
+          "DELAY_HELP": "Time to show 'typing...' indicator before sending message (0.1-5 seconds, recommended: 1.5)"
+        },
+        "CONVERSATION": {
+          "TITLE": "Conversation Settings",
+          "TIMEOUT": "Conversation timeout (minutes)",
+          "TIMEOUT_HELP": "Reset conversation after this many minutes of inactivity (default: 30 minutes)"
+        },
+        "ADVANCED_CONFIG": "Advanced Configuration (JSON)",
+        "ADVANCED_CONFIG_HELP": "Manually edit the complete bot configuration as JSON. Use this for advanced settings like keyword mappings and handler methods."
+      },
       "WEBHOOK_URL": {
         "LABEL": "Webhook URL",
         "PLACEHOLDER": "https://example.com/webhook",
@@ -87,17 +119,1008 @@
       "ERRORS": {
         "NAME": "Bot name is required",
         "URL": "Webhook URL is required",
-        "VALID_URL": "Please enter a valid URL starting with http:// or https://"
+        "VALID_URL": "Please enter a valid URL starting with http:// or https://",
+        "INVALID_JSON": "Invalid JSON format. Please check your configuration."
       },
       "CANCEL": "Cancel",
       "CREATE": "Create Bot",
-      "UPDATE": "Update Bot"
+      "UPDATE": "Update Bot",
+      "SAVE": "Save"
     },
     "WEBHOOK": {
       "DESCRIPTION": "Configure a webhook bot to integrate with your custom services. The bot will receive and process events from conversations and can respond to them."
     },
     "TYPES": {
-      "WEBHOOK": "Webhook bot"
+      "WEBHOOK": "Webhook bot",
+      "AMB": "Apple Messages"
+    },
+    "VERSION_HISTORY": "Version History",
+    "VERSION": "v{version}",
+    "MANAGE_INBOXES": "Manage Inboxes",
+    "DUPLICATE": "Duplicate Bot",
+    "INBOXES": "inboxes",
+    "VERSIONS": {
+      "TITLE": "Bot Versions",
+      "CREATE_NEW": "Save New Version",
+      "CREATE_SUCCESS": "Version created successfully",
+      "CREATE_ERROR": "Failed to create version",
+      "ACTIVATE": "Activate This Version",
+      "ACTIVATE_SUCCESS": "Version activated successfully",
+      "ACTIVATE_ERROR": "Failed to activate version",
+      "COMPARE": "Compare Versions",
+      "ARCHIVE": "Archive Version",
+      "ARCHIVE_SUCCESS": "Version archived successfully",
+      "ARCHIVE_ERROR": "Failed to archive version",
+      "RESTORE": "Restore Version",
+      "ACTIVE": "Active",
+      "ARCHIVED": "Archived",
+      "VERSION": "Version",
+      "NAME": "Name",
+      "TAG": "Tag",
+      "CREATED_BY": "Created by",
+      "CREATED_AT": "Created At",
+      "ACTIONS": "Actions",
+      "LOAD_ERROR": "Failed to load versions",
+      "COMPARE_ERROR": "Failed to compare versions",
+      "NO_VERSIONS": "No versions found. Create a version to get started.",
+      "INCLUDE_ARCHIVED": "Include archived versions",
+      "VERSION_NAME": "Version Name",
+      "VERSION_NAME_PLACEHOLDER": "e.g., 1.0.0, Release Candidate",
+      "DESCRIPTION": "Description",
+      "DESCRIPTION_PLACEHOLDER": "What changed in this version?",
+      "TAG": "Tag",
+      "TAG_PLACEHOLDER": "e.g., stable, beta, experimental"
+    },
+    "INBOX_MANAGER": {
+      "TITLE": "Inbox Assignments",
+      "SUBTITLE": "Manage inbox assignments for {name}",
+      "ASSIGN_INBOXES": "Assign to Inboxes",
+      "ASSIGN_DIALOG_TITLE": "Assign Bot to Inboxes",
+      "SELECT_INBOXES": "Select Inboxes",
+      "SELECT_VERSION": "Select Version",
+      "USE_CURRENT": "Use Current Version",
+      "VERSION": "Version",
+      "CURRENT": "Current",
+      "PRIORITY": "Priority",
+      "INBOX": "Inbox",
+      "BOT_NAME": "Bot",
+      "STATUS": "Status",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "TOGGLE_STATUS": "Toggle Status",
+      "UNASSIGN": "Remove Assignment",
+      "NO_INBOXES": "This bot is not assigned to any inboxes yet",
+      "ASSIGN_SUCCESS": "Bot assigned to inboxes successfully",
+      "ASSIGN_ERROR": "Failed to assign bot to inboxes",
+      "SELECT_INBOXES_ERROR": "Please select at least one inbox",
+      "UNASSIGN_SUCCESS": "Bot removed from inbox successfully",
+      "UNASSIGN_ERROR": "Failed to remove bot from inbox",
+      "VERSION_CHANGED": "Inbox version changed successfully",
+      "VERSION_CHANGE_ERROR": "Failed to change inbox version",
+      "STATUS_TOGGLE_ERROR": "Failed to toggle bot status",
+      "LOAD_ERROR": "Failed to load inbox assignments"
+    },
+    "OPEN_STUDIO": "Open Visual Studio",
+    "STUDIO": {
+      "TITLE": "Visual Bot Studio",
+      "SUBTITLE": "Design bot conversation flows visually",
+      "BACK_TO_BOTS": "Back to Bots",
+      "COMPILE_TEST": "Compile",
+      "SAVE": "Save",
+      "IMPORT_FROM_FLOW": "Import Flow",
+      "IMPORT_FROM_JSON": "Import JSON",
+      "EXPORT_TO_JSON": "Export JSON",
+      "BROWSE_TEMPLATES": "Flow Templates",
+      "BROWSE_HANDLERS": "Handlers",
+      "VALIDATE": "Validate",
+      "TEST": "Test",
+      "FLOW_SAVED": "Flow saved successfully",
+      "FLOW_COMPILED": "Flow compiled successfully",
+      "FLOW_IMPORTED": "Flow imported successfully from bot config",
+      "ERROR_LOADING_BOT": "Failed to load bot",
+      "ERROR_SAVING_FLOW": "Failed to save flow",
+      "ERROR_COMPILING_FLOW": "Failed to compile flow",
+      "ERROR_IMPORTING_FLOW": "Failed to import flow from bot config",
+      "NODE_PALETTE": "Nodes",
+      "DRAG_TO_CANVAS": "Drag nodes to canvas to build your flow",
+      "PALETTE_TIP": "Drag and drop nodes onto the canvas",
+      "NODE_PROPERTIES": "Node Properties",
+      "NODE_TYPE": "Type",
+      "NODE_ID": "ID",
+      "SELECT_NODE": "Select a node to view its properties",
+      "SEARCH_PLACEHOLDER": "Search nodes...",
+      "CLEAR_SEARCH": "Clear search",
+      "SEARCH_NODES": "Search nodes",
+      "NODES_FOUND": "{count} found",
+      "AUTO_LAYOUT_TITLE": "Auto-layout nodes",
+      "AUTO_LAYOUT": "Auto Layout",
+      "DELETE": "Delete",
+      "IMPORT_FLOW": {
+        "TITLE": "Import Flow",
+        "DESCRIPTION": "Select a saved flow to import into the canvas. This will replace the current flow.",
+        "SELECT_FLOW_ERROR": "Please select a flow to import",
+        "ERROR_LOADING": "Failed to load saved flows",
+        "ERROR": "Failed to import flow",
+        "INVALID_FLOW": "Invalid flow data",
+        "SUCCESS": "Flow imported successfully",
+        "NO_FLOWS": "No saved flows available. Save a flow first to import it later.",
+        "ACTIVE": "Active",
+        "NODES_COUNT": "{count} nodes",
+        "EDGES_COUNT": "{count} connections",
+        "IMPORT": "Import Flow",
+        "CONFIRM_TITLE": "Unsaved Changes",
+        "CONFIRM_MESSAGE": "You have unsaved changes in the current flow",
+        "CONFIRM_DESCRIPTION": "Importing a new flow will replace all current nodes and connections. Your unsaved changes will be lost.",
+        "CONFIRM_IMPORT": "Import Anyway"
+      }
+    },
+    "BOT_STUDIO": {
+      "TITLE": "Visual Bot Studio",
+      "BACK_TO_BOTS": "Back to Bots",
+      "COMPILE_TEST": "Compile & Test",
+      "SAVE_FLOW": "Save Flow",
+      "FLOW_SAVED": "Flow saved successfully",
+      "FLOW_COMPILED": "Flow compiled successfully",
+      "FLOW_COMPILE_ERROR": "Failed to compile flow",
+      "SEARCH": {
+        "PREVIOUS_RESULT": "Previous result",
+        "NEXT_RESULT": "Next result"
+      },
+      "NODE_PALETTE": {
+        "TITLE": "Add Nodes",
+        "STATE": "State",
+        "INTENT": "Intent",
+        "ACTION": "Action",
+        "TEMPLATE": "Template",
+        "CONDITION": "Condition"
+      },
+      "CONFIG_PANEL": {
+        "TITLE": "Configure Node",
+        "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "STATE": {
+          "STATE_ID": "State ID",
+          "STATE_ID_PLACEHOLDER": "e.g., AHA1",
+          "STATE_ID_HELP": "Unique identifier for this state",
+          "LABEL": "Label",
+          "LABEL_PLACEHOLDER": "e.g., Welcome Message",
+          "DESCRIPTION": "Description",
+          "DESCRIPTION_PLACEHOLDER": "Describe what happens in this state",
+          "ACTIONS": "Actions",
+          "ADD_ACTION": "Add Action",
+          "ACTION_TYPE": "Action Type",
+          "TEMPLATE_NAME": "Template Name",
+          "TEMPLATE_NAME_PLACEHOLDER": "e.g., ah_main_menu",
+          "REMOVE_ACTION": "Remove"
+        },
+        "INTENT": {
+          "KEYWORDS": "Keywords",
+          "KEYWORDS_PLACEHOLDER": "Enter keywords (comma-separated)",
+          "EXACT_MATCH": "Exact Match",
+          "CASE_SENSITIVE": "Case Sensitive"
+        },
+        "TEMPLATE": {
+          "TEMPLATE_NAME": "Template Name",
+          "TEMPLATE_TYPE": "Template Type"
+        },
+        "ACTION": {
+          "ACTION_TYPE": "Action Type",
+          "LABEL": "Label"
+        },
+        "CONDITION": {
+          "EXPRESSION": "Condition Expression",
+          "TRUE_LABEL": "True Branch Label",
+          "FALSE_LABEL": "False Branch Label"
+        }
+      }
+    },
+    "CONDITION_CONFIG": {
+      "CONDITION_TYPE_LABEL": "Condition Type",
+      "CONDITION_TYPES": {
+        "SIMPLE": "Simple Comparison",
+        "EXPRESSION": "Custom Expression"
+      },
+      "OPERATORS": {
+        "EQUALS": "Equals",
+        "NOT_EQUALS": "Not Equals",
+        "CONTAINS": "Contains",
+        "NOT_CONTAINS": "Does Not Contain",
+        "GREATER_THAN": "Greater Than",
+        "LESS_THAN": "Less Than",
+        "EXISTS": "Exists",
+        "NOT_EXISTS": "Does Not Exist"
+      },
+      "SIMPLE_CONDITION": {
+        "TITLE": "Define Simple Condition",
+        "FIELD_NAME": "Field Name",
+        "FIELD_NAME_PLACEHOLDER": "e.g., user_region, message_content",
+        "FIELD_NAME_MESSAGE": "The field or attribute to check",
+        "OPERATOR": "Operator",
+        "COMPARE_VALUE": "Compare Value",
+        "COMPARE_VALUE_PLACEHOLDER": "Enter value to compare against",
+        "GENERATED_EXPRESSION": "Generated Expression",
+        "CONFIGURE_FIELDS_MESSAGE": "Configure fields above to generate expression"
+      },
+      "CUSTOM_EXPRESSION": {
+        "LABEL": "Custom Expression",
+        "PLACEHOLDER": "e.g., user.region === 'Americas' && user.tier === 'premium'",
+        "MESSAGE": "JavaScript-like expression that evaluates to true or false"
+      },
+      "OUTPUT_LABELS": {
+        "TITLE": "Output Labels",
+        "TRUE_LABEL": "True Branch Label",
+        "TRUE_LABEL_PLACEHOLDER": "e.g., Yes, Match, Valid",
+        "FALSE_LABEL": "False Branch Label",
+        "FALSE_LABEL_PLACEHOLDER": "e.g., No, No Match, Invalid"
+      },
+      "INFO": {
+        "TITLE": "Condition Info",
+        "DESCRIPTION": "Conditions create branching logic in your bot flow. The condition evaluates to true or false, directing the conversation down different paths."
+      }
+    },
+    "VALIDATION": {
+      "TITLE": "Validation",
+      "VALIDATING": "Validating...",
+      "VALIDATING_MESSAGE": "Checking flow for errors",
+      "VALID": "Valid Flow",
+      "INVALID": "{count} errors found",
+      "WARNINGS": "{count} warnings",
+      "UNKNOWN": "Not validated",
+      "ERRORS": "Errors",
+      "WARNINGS": "Warnings",
+      "NO_ISSUES": "No validation issues",
+      "NO_ISSUES_DESCRIPTION": "Your flow is valid and ready to deploy",
+      "FIELD": "Field",
+      "VALIDATE_FLOW": "Validate Flow",
+      "VALIDATION_PASSED": "Validation passed successfully",
+      "VALIDATION_FAILED": "Validation failed with errors",
+      "SHOW": "Show Validation",
+      "HIDE": "Hide Validation",
+      "ERROR_TYPES": {
+        "EMPTY_FLOW": "Empty Flow",
+        "MISSING_STATE_NODES": "Missing State Nodes",
+        "MISSING_START_NODE": "Missing Start Node",
+        "MISSING_END_NODE": "Missing End Node",
+        "DUPLICATE_STATE_ID": "Duplicate State ID",
+        "INVALID_NODE_TYPE": "Invalid Node Type",
+        "MISSING_REQUIRED_FIELD": "Missing Required Field",
+        "INVALID_STATE_ID_FORMAT": "Invalid State ID Format",
+        "ISOLATED_STATE": "Isolated State",
+        "INVALID_KEYWORD": "Invalid Keyword",
+        "INVALID_TEMPLATE": "Invalid Template Reference",
+        "INVALID_ACTION_TYPE": "Invalid Action Type",
+        "INVALID_CONDITION_BRANCHES": "Invalid Condition Branches",
+        "START_NODE_NO_CONNECTION": "Start Node Not Connected",
+        "ORPHANED_NODE": "Orphaned Node",
+        "DEAD_END_NODE": "Dead End Node",
+        "CIRCULAR_REFERENCE": "Circular Reference",
+        "INVALID_STATE_TRANSITION": "Invalid State Transition"
+      }
+    },
+    "TEST_CONSOLE": {
+      "TITLE": "Test Console",
+      "TEST_FLOW": "Test Flow",
+      "RESET": "Reset",
+      "SEND": "Send",
+      "INPUT_PLACEHOLDER": "Type a message to test the bot...",
+      "EMPTY_STATE": "Start testing your bot flow",
+      "EMPTY_HINT": "Send a message to see how your bot responds based on the flow logic",
+      "PROCESSING": "Processing...",
+      "CURRENT_STATE": "Current State",
+      "STATE_LABEL": "State",
+      "EXECUTED_NODES": "Executed {count} node | Executed {count} nodes",
+      "ERROR": "Error",
+      "NO_FLOW": "No flow available to test"
+    },
+    "TEMPLATES": {
+      "TITLE": "Flow Templates",
+      "DESCRIPTION": "Choose a pre-built flow template to get started quickly. All templates can be customized after insertion.",
+      "CATEGORIES": {
+        "ALL": "All Templates",
+        "SUPPORT": "Customer Support",
+        "COMMERCE": "E-Commerce",
+        "SCHEDULING": "Scheduling",
+        "ENGAGEMENT": "Engagement",
+        "SALES": "Sales"
+      },
+      "NODES": "nodes",
+      "CONNECTIONS": "connections",
+      "SELECTED": "Selected",
+      "LOADING": "Loading templates...",
+      "RETRY": "Retry",
+      "NO_TEMPLATES": "No templates found in this category",
+      "FOOTER_TIP": "Templates can be edited after insertion",
+      "INSERT": "Insert Template",
+      "INSERT_SUCCESS": "Template inserted successfully",
+      "BROWSE_TEMPLATES": "Browse Templates",
+      "ACTION_TEMPLATES": {
+        "EDIT_TITLE": "Edit Action Template",
+        "CREATE_TITLE": "Create Action Template",
+        "NAME": "Template Name",
+        "NAME_PLACEHOLDER": "Enter template name (e.g., welcome_message, send_menu)",
+        "SELECT_TYPE": "Select Template Type",
+        "PARAMETERS": "Parameters",
+        "TYPE": "Type",
+        "ACTION": "Action",
+        "PREVIEW": "Preview",
+        "CREATE": "Create Template",
+        "EDITOR_COMING_SOON": "Editor for this template type coming soon",
+        "TYPES": {
+          "SEND_TEXT_MESSAGE": {
+            "NAME": "Send Text Message",
+            "DESCRIPTION": "Send a simple text message to the user",
+            "PARAMETERS": {
+              "MESSAGE": "Message",
+              "MESSAGE_PLACEHOLDER": "Enter the message text to send to the user",
+              "DELAY_SECONDS": "Delay (seconds)",
+              "DELAY_PLACEHOLDER": "Optional delay before sending (e.g., 0.5, 1, 2)",
+              "DELAY_HELP": "Add a typing indicator delay before sending this message (default: 0)"
+            }
+          },
+          "SEND_LIST_PICKER": {
+            "NAME": "Send List Picker",
+            "DESCRIPTION": "Send an interactive list picker for user selection",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "List Picker Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved list picker template to send to the user",
+              "TEMPLATE": "List Picker Template",
+              "WAIT_FOR_RESPONSE": "Wait for user response before continuing",
+              "WAIT_FOR_RESPONSE_HELP": "If enabled, the bot will pause and wait for the user to select an option before proceeding to the next step"
+            },
+            "NO_TEMPLATES": "No list picker templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load list picker templates. Please try again.",
+            "LOADING": "Loading list picker templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_TIME_PICKER": {
+            "NAME": "Send Time Picker",
+            "DESCRIPTION": "Send a time picker for scheduling appointments",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "Time Picker Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved time picker template to send to the user",
+              "TEMPLATE": "Time Picker Template",
+              "TIMEZONE_OFFSET": "Timezone Offset",
+              "TIMEZONE_PLACEHOLDER": "Hours from UTC",
+              "TIMEZONE_HELP": "Example: -8 for PST (UTC-8), +1 for CET (UTC+1)",
+              "LOCATION": "Location (Optional)",
+              "LOCATION_NAME_PLACEHOLDER": "Location name",
+              "LATITUDE_PLACEHOLDER": "Latitude",
+              "LONGITUDE_PLACEHOLDER": "Longitude",
+              "LOCATION_HELP": "Add location context for the time picker (e.g., 'Apple Park, 37.334606, -122.009102')"
+            },
+            "NO_TEMPLATES": "No time picker templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load time picker templates. Please try again.",
+            "LOADING": "Loading time picker templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_FORM": {
+            "NAME": "Send Form",
+            "DESCRIPTION": "Send a form for collecting user information",
+            "PARAMETERS": {
+              "TEMPLATE_ID": "Form Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved form template to send to the user",
+              "TEMPLATE": "Form Template",
+              "PRE_FILL_DATA": "Pre-fill Data (Optional)",
+              "PRE_FILL_PLACEHOLDER": "{\n  \"fieldName\": \"defaultValue\"\n}",
+              "PRE_FILL_HELP": "JSON object containing default values to pre-fill form fields",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            },
+            "NO_TEMPLATES": "No form templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load form templates. Please try again.",
+            "LOADING": "Loading form templates...",
+            "RETRY": "Retry"
+          },
+          "SEND_RICH_LINK": {
+            "NAME": "Send Rich Link",
+            "DESCRIPTION": "Send a rich link with image and metadata",
+            "PARAMETERS": {
+              "URL": "URL",
+              "URL_PLACEHOLDER": "https://example.com/product",
+              "URL_HELP": "The web URL to link to (must start with https://)",
+              "TITLE": "Title",
+              "TITLE_PLACEHOLDER": "Link title (e.g., Check out our store)",
+              "SUBTITLE": "Subtitle (Optional)",
+              "SUBTITLE_PLACEHOLDER": "Additional description text",
+              "IMAGE_URL": "Image URL (Optional)",
+              "IMAGE_URL_PLACEHOLDER": "https://example.com/image.jpg",
+              "IMAGE_URL_HELP": "URL to an image to display with the link"
+            }
+          },
+          "SEND_QUICK_REPLY": {
+            "NAME": "Send Quick Reply",
+            "DESCRIPTION": "Send quick reply buttons for fast responses",
+            "PARAMETERS": {
+              "TEMPLATE": "Quick Reply Template",
+              "SELECT_TEMPLATE": "Select a template...",
+              "TEMPLATE_HELP": "Choose a saved quick reply template to send to the user",
+              "MESSAGE": "Message",
+              "MESSAGE_PLACEHOLDER": "Enter message text",
+              "REQUEST_ID": "Request ID",
+              "REQUEST_ID_PLACEHOLDER": "Enter request identifier",
+              "REQUEST_ID_HELP": "Unique identifier for tracking this quick reply request",
+              "ITEMS": "Quick Reply Items",
+              "NO_ITEMS": "No items added yet. Click 'Add Item' to create quick reply options.",
+              "ADD_ITEM": "Add Item",
+              "REMOVE_ITEM": "Remove",
+              "ITEM_TITLE": "Button Text",
+              "ITEM_TITLE_PLACEHOLDER": "Display text",
+              "ITEM_VALUE": "Value",
+              "ITEM_VALUE_PLACEHOLDER": "Internal value"
+            },
+            "NO_TEMPLATES": "No quick reply templates found. Create a template first.",
+            "ERROR_LOADING": "Failed to load quick reply templates. Please try again.",
+            "LOADING": "Loading quick reply templates...",
+            "RETRY": "Retry"
+          },
+          "UPDATE_ATTRIBUTES": {
+            "NAME": "Update Attributes",
+            "DESCRIPTION": "Update conversation custom attributes",
+            "PARAMETERS": {
+              "ATTRIBUTES": "Attributes (JSON)",
+              "ATTRIBUTES_PLACEHOLDER": "{\n  \"key\": \"value\"\n}",
+              "ATTRIBUTES_HELP": "JSON object containing attributes to update",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            }
+          },
+          "CONDITIONAL_BRANCH": {
+            "NAME": "Conditional Branch",
+            "DESCRIPTION": "Branch conversation flow based on conditions",
+            "PARAMETERS": {
+              "CONDITION_TYPE": "Condition Type",
+              "EXPRESSION": "Expression",
+              "EXPRESSION_PLACEHOLDER": "Enter conditional expression"
+            }
+          },
+          "SEND_APPLE_PAY": {
+            "NAME": "Send Apple Pay",
+            "DESCRIPTION": "Request payment via Apple Pay",
+            "PARAMETERS": {
+              "MERCHANT_ID": "Merchant ID",
+              "MERCHANT_ID_PLACEHOLDER": "merchant.com.example.store",
+              "MERCHANT_ID_HELP": "Your Apple Pay merchant identifier (register at developer.apple.com)",
+              "ITEM_NAME": "Item Name",
+              "ITEM_NAME_PLACEHOLDER": "Premium Subscription",
+              "AMOUNT": "Amount",
+              "AMOUNT_PLACEHOLDER": "0.00",
+              "AMOUNT_HELP": "Payment amount (e.g., 19.99, 100.00)",
+              "CURRENCY": "Currency",
+              "CURRENCY_PLACEHOLDER": "USD",
+              "CURRENCY_HELP": "ISO 4217 currency code (USD, EUR, GBP, etc.)",
+              "DESCRIPTION": "Description",
+              "DESCRIPTION_PLACEHOLDER": "Payment description"
+            }
+          },
+          "API_CALL": {
+            "NAME": "API Call",
+            "DESCRIPTION": "Make an HTTP API call to external service",
+            "PARAMETERS": {
+              "URL": "API URL",
+              "URL_PLACEHOLDER": "https://api.example.com/endpoint",
+              "METHOD": "HTTP Method",
+              "SELECT_METHOD": "Select method...",
+              "HEADERS": "Headers (Optional)",
+              "HEADERS_PLACEHOLDER": "{ \"Authorization\": \"Bearer token\" }",
+              "HEADERS_HELP": "JSON object containing HTTP headers",
+              "BODY": "Request Body (Optional)",
+              "BODY_PLACEHOLDER": "{ \"key\": \"value\" }",
+              "BODY_HELP": "JSON object containing request body",
+              "STORE_RESPONSE_IN": "Store Response In (Optional)",
+              "STORE_RESPONSE_IN_PLACEHOLDER": "api_response",
+              "STORE_RESPONSE_IN_HELP": "Conversation attribute name to store the API response",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "EXAMPLE": "Example:"
+            }
+          },
+          "SEND_IMESSAGE_APP": {
+            "NAME": "Send iMessage App",
+            "DESCRIPTION": "Launch an iMessage app extension",
+            "PARAMETERS": {
+              "APP_ID": "App Bundle ID",
+              "APP_ID_PLACEHOLDER": "com.example.app.MessagesExtension",
+              "APP_ID_HELP": "iMessage app bundle identifier (e.g., com.shazam.Shazam.MessagesExtension)",
+              "APP_NAME": "App Name",
+              "APP_NAME_PLACEHOLDER": "Guitar Tuner",
+              "APP_ICON_URL": "App Icon URL (Optional)",
+              "APP_ICON_URL_PLACEHOLDER": "https://example.com/icon.png",
+              "LAUNCH_URL": "Launch URL (Optional)",
+              "LAUNCH_URL_PLACEHOLDER": "imessage-app://open?feature=tuner",
+              "LAUNCH_URL_HELP": "Deep link URL to launch specific app feature",
+              "DATA": "App Data (Optional)",
+              "DATA_PLACEHOLDER": "{ \"key\": \"value\" }",
+              "FORMAT_JSON": "Format JSON",
+              "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+              "KNOWN_APPS_TITLE": "Common iMessage Apps:",
+              "KNOWN_APPS": {
+                "SHAZAM": "• Shazam: com.shazam.Shazam.MessagesExtension",
+                "APPLE_MUSIC": "• Apple Music: com.apple.Music.MessagesExtension",
+                "PHOTOS": "• Photos: com.apple.mobileslideshow.PhotosMessagesApp"
+              }
+            }
+          },
+          "SEND_APP_CLIP": {
+            "NAME": "Send App Clip",
+            "DESCRIPTION": "Share an App Clip experience",
+            "PARAMETERS": {
+              "APP_CLIP_URL": "App Clip URL",
+              "APP_CLIP_URL_PLACEHOLDER": "https://example.com/clips/guitar-tuner",
+              "APP_CLIP_URL_HELP": "URL to invoke App Clip (must be registered in App Store Connect)",
+              "TITLE": "Title",
+              "TITLE_PLACEHOLDER": "Try our Guitar Tuner",
+              "SUBTITLE": "Subtitle (Optional)",
+              "SUBTITLE_PLACEHOLDER": "Tune your guitar without installing an app",
+              "IMAGE_URL": "Hero Image URL (Optional)",
+              "IMAGE_URL_PLACEHOLDER": "https://example.com/hero.png",
+              "IMAGE_URL_HELP": "Hero image displayed in App Clip card",
+              "ACTION_TITLE": "Button Text (Optional)",
+              "ACTION_TITLE_PLACEHOLDER": "Open",
+              "ACTION_TITLE_HELP": "Text shown on action button (default: \"Open\")",
+              "INFO_TITLE": "About App Clips:",
+              "INFO_TEXT": "App Clips are lightweight experiences (max 10MB) that let users access your app's functionality without installation. They're perfect for quick interactions like tuning a guitar, making a reservation, or viewing product details."
+            }
+          }
+        }
+      }
+    },
+    "EDITORS": {
+      "EDIT_STATE_NODE": "Edit State Node",
+      "EDIT_INTENT_NODE": "Edit Intent Node",
+      "EDIT_TEMPLATE_NODE": "Edit Template Node",
+      "EDIT_ACTION_NODE": "Edit Action Node",
+      "EDIT_CONDITION_NODE": "Edit Condition Node",
+      "STATE_ID": "State ID",
+      "STATE_ID_HELP": "Unique identifier for this state (e.g., AHA1, WELCOME_STATE, MAIN_MENU)",
+      "LABEL": "Label",
+      "LABEL_HELP": "Human-readable name for this node (shown in the canvas)",
+      "LABEL_DESCRIPTION": "Descriptive name shown in the canvas",
+      "DESCRIPTION": "Description",
+      "HANDLER_METHOD": "Handler Method",
+      "HANDLER_METHOD_HELP": "The method name in AcousticHouseBotService that will handle this state (e.g., handle_welcome, handle_region_prompt)",
+      "HANDLER_METHOD_INTENT_HELP": "Optional: Handler method to call when keywords match (e.g., handle_menu_request)",
+      "HANDLER_METHOD_ACTION_HELP": "Handler method to execute for this action",
+      "VIEW_HANDLER_METHODS": "View Handler Methods Reference",
+      "ACTIONS_FUTURE_PHASE": "Actions will be configurable in a future phase",
+      "KEYWORDS": "Keywords",
+      "KEYWORDS_TRIGGER_HELP": "Enter keywords that will trigger this intent (one per line or comma-separated)",
+      "MATCHING_OPTIONS": "Matching Options",
+      "CONDITION_EXPRESSION": "Condition Expression",
+      "CONDITION_EXPRESSION_HELP": "Enter a boolean expression to evaluate (e.g., state == 'active', count > 0)",
+      "TRUE_PATH_LABEL": "True Path Label",
+      "FALSE_PATH_LABEL": "False Path Label",
+      "ACTION_TYPE": "Action Type",
+      "SEND_MESSAGE": "Send Message",
+      "TRANSITION_STATE": "Transition to State",
+      "CALL_API": "Call API",
+      "SET_VARIABLE": "Set Variable",
+      "PARAMETERS_JSON": "Parameters (JSON)",
+      "PARAMETERS_DESCRIPTION": "Action parameters in JSON format (e.g., {\"message\": \"Hello\", \"state_id\": \"NEXT_STATE\"})",
+      "TEMPLATE_TYPE": "Template Type",
+      "LIST_PICKER": "List Picker",
+      "TIME_PICKER": "Time Picker",
+      "FORM": "Form",
+      "RICH_LINK": "Rich Link",
+      "APPLE_PAY": "Apple Pay",
+      "TEMPLATE_TYPE_HELP": "Select the type of interactive message template to use",
+      "TEMPLATE_NAME": "Template Name",
+      "SELECT_TEMPLATE": "Select a template",
+      "NO_TEMPLATES_FOUND": "No {templateType} templates found",
+      "TEMPLATE_NAME_HELP": "Select a saved template to use for this node",
+      "SAVE_CHANGES": "Save Changes",
+      "CANCEL": "Cancel"
+    },
+    "NODE_CONFIG": {
+      "ACTIONS": "Actions",
+      "ACTIONS_HELP": "Configure the actions to execute when this state node is reached",
+      "ADD_ACTION": "Add Action",
+      "ADD_FIRST_ACTION": "Add First Action",
+      "NO_ACTIONS": "No actions configured",
+      "ACTION_NUMBER": "Action {number}",
+      "ACTION_TYPE": "Action Type",
+      "SELECT_ACTION_TYPE": "Select action type...",
+      "SELECT_TEMPLATE": "Select Template",
+      "CHOOSE_TEMPLATE": "Choose a template...",
+      "TEMPLATE_NUMBER": "Template {number}",
+      "TEMPLATES_SEQUENCE": "Templates Sequence",
+      "ADD_TEMPLATE": "Add Template",
+      "NO_TEMPLATES_ADDED": "No templates added yet",
+      "TEMPLATE_TYPE": "Type",
+      "TEMPLATE_PARAMETERS": "Template Parameters",
+      "PARAMETER_NAME": "{name}:",
+      "EDIT_TEMPLATE": "Edit template configuration",
+      "SHOW_DETAILS": "Show template details",
+      "HIDE_DETAILS": "Hide template details",
+      "RETRY": "Retry",
+      "ADD": "Add",
+      "EXACT_MATCH": "Exact Match",
+      "CASE_SENSITIVE": "Case Sensitive",
+      "LOADING_TEMPLATES": "Loading templates..."
+    },
+    "HANDLER_METHODS": {
+      "TITLE": "Handler Methods",
+      "BROWSE_HANDLERS": "Browse Handler Methods",
+      "SELECT_HANDLER": "Select Handler Method",
+      "HELP_TEXT": "The method name in AcousticHouseBotService that will handle this state (e.g., handle_welcome, handle_menu)",
+      "SEARCH_PLACEHOLDER": "Search handler methods...",
+      "SEARCH_HANDLERS": "Search handlers",
+      "CLEAR_SEARCH": "Clear search",
+      "NO_RESULTS": "No handler methods found",
+      "NO_RESULTS_MESSAGE": "Try adjusting your search or filters",
+      "METHODS_FOUND": "{count} handler methods found",
+      "LOADING": "Loading handler methods...",
+      "ERROR_LOADING": "Failed to load handler methods",
+      "HANDLER_TYPES": {
+        "TITLE": "Handler Types",
+        "STATE": "State Handler",
+        "KEYWORD": "Keyword Handler",
+        "INTERACTIVE": "Interactive Handler",
+        "ACTION": "Action Handler",
+        "STATE_DESCRIPTION": "Handles bot states and conversation flow",
+        "KEYWORD_DESCRIPTION": "Responds to specific keywords or phrases",
+        "INTERACTIVE_DESCRIPTION": "Handles interactive message responses",
+        "ACTION_DESCRIPTION": "Performs actions like API calls or data updates"
+      },
+      "STATUS": {
+        "TITLE": "Status",
+        "STABLE": "Stable",
+        "EXPERIMENTAL": "Experimental",
+        "DEPRECATED": "Deprecated",
+        "STABLE_DESCRIPTION": "Production-ready, fully tested",
+        "EXPERIMENTAL_DESCRIPTION": "Under development, use with caution",
+        "DEPRECATED_DESCRIPTION": "No longer recommended for use"
+      },
+      "CATEGORIES": {
+        "TITLE": "Categories",
+        "ALL": "All Categories",
+        "ONBOARDING": "Onboarding",
+        "NAVIGATION": "Navigation",
+        "FORMS": "Forms",
+        "DEMOS": "Demos",
+        "PAYMENTS": "Payments",
+        "AR": "Augmented Reality",
+        "ONBOARDING_DESCRIPTION": "Welcome flows and initial setup",
+        "NAVIGATION_DESCRIPTION": "Menu navigation and option selection",
+        "FORMS_DESCRIPTION": "Form handling and data collection",
+        "DEMOS_DESCRIPTION": "Interactive demos and showcases",
+        "PAYMENTS_DESCRIPTION": "Payment processing and transactions",
+        "AR_DESCRIPTION": "AR experiences and interactions"
+      },
+      "FILTERS": {
+        "HANDLER_TYPE": "Handler Type",
+        "CATEGORY": "Category",
+        "STATUS": "Status",
+        "ALL": "All",
+        "SHOW_FILTERS": "Show Filters",
+        "HIDE_FILTERS": "Hide Filters",
+        "CLEAR_FILTERS": "Clear All Filters",
+        "ACTIVE_FILTERS": "{count} active filters"
+      },
+      "VALIDATION": {
+        "REQUIRED": "Handler method is required",
+        "NOT_FOUND": "Handler method not found",
+        "INVALID": "Invalid handler method",
+        "INVALID_FORMAT": "Handler method name must be a valid Ruby method name",
+        "DID_YOU_MEAN": "Did you mean '{suggestion}'?",
+        "SUGGESTIONS_AVAILABLE": "Similar handler methods found",
+        "METHOD_EXISTS": "This handler method is already defined",
+        "METHOD_UNAVAILABLE": "This handler method is not available"
+      },
+      "DETAILS": {
+        "TITLE": "Handler Details",
+        "DESCRIPTION": "Description",
+        "METHOD_NAME": "Method Name",
+        "HANDLER_TYPE": "Handler Type",
+        "CATEGORY": "Category",
+        "STATUS": "Status",
+        "TRIGGERS": "Triggers",
+        "TRIGGERS_DESCRIPTION": "Keywords, states, or events that activate this handler",
+        "DEPENDENCIES": "Dependencies",
+        "DEPENDENCIES_DESCRIPTION": "Required services, data, or configurations",
+        "TAGS": "Tags",
+        "SOURCE": "Source",
+        "SOURCE_DESCRIPTION": "Service class and method location",
+        "PARAMETERS": "Parameters",
+        "PARAMETERS_DESCRIPTION": "Expected input parameters",
+        "RETURNS": "Returns",
+        "RETURNS_DESCRIPTION": "Expected output or side effects",
+        "EXAMPLES": "Examples",
+        "EXAMPLES_DESCRIPTION": "Usage examples and patterns",
+        "NOTES": "Notes",
+        "NOTES_DESCRIPTION": "Additional information and best practices",
+        "NO_TRIGGERS": "No triggers defined",
+        "NO_DEPENDENCIES": "No dependencies",
+        "NO_TAGS": "No tags",
+        "NO_PARAMETERS": "No parameters required",
+        "NO_EXAMPLES": "No examples available"
+      },
+      "ACTIONS": {
+        "SELECT": "Select This Handler",
+        "VIEW_DETAILS": "View Details",
+        "VIEW_SOURCE": "View Source Code",
+        "COPY_NAME": "Copy Method Name",
+        "COPY_SUCCESS": "Handler method name copied to clipboard",
+        "USE_HANDLER": "Use This Handler",
+        "LEARN_MORE": "Learn More"
+      },
+      "EMPTY_STATE": {
+        "TITLE": "No Handler Methods Available",
+        "MESSAGE": "Configure handler methods in the bot service to see them here",
+        "ACTION": "View Documentation"
+      },
+      "DIALOG": {
+        "TITLE": "Select Handler Method",
+        "SUBTITLE": "Choose a handler method for this state node",
+        "CANCEL": "Cancel",
+        "SELECT": "Select Handler",
+        "SELECTED_HANDLER": "Selected Handler",
+        "NO_SELECTION": "No handler selected"
+      },
+      "PREVIEW": {
+        "TITLE": "Handler Preview",
+        "METHOD_SIGNATURE": "Method Signature",
+        "IMPLEMENTATION": "Implementation",
+        "IMPLEMENTATION_PREVIEW": "Implementation details available in source code"
+      },
+      "GROUPS": {
+        "CORE_HANDLERS": "Core Handlers",
+        "NAVIGATION_HANDLERS": "Navigation Handlers",
+        "INTERACTIVE_HANDLERS": "Interactive Handlers",
+        "DEMO_HANDLERS": "Demo Handlers",
+        "UTILITY_HANDLERS": "Utility Handlers"
+      },
+      "HELP": {
+        "TITLE": "Handler Methods Help",
+        "WHAT_ARE_HANDLERS": "What are Handler Methods?",
+        "WHAT_ARE_HANDLERS_DESCRIPTION": "Handler methods are Ruby methods in the bot service that process conversation states, respond to user inputs, and manage the bot's behavior.",
+        "HOW_TO_SELECT": "How to Select a Handler",
+        "HOW_TO_SELECT_DESCRIPTION": "Browse or search for a handler method, view its details to understand what it does, then select it to assign it to your state node.",
+        "HANDLER_TYPES_GUIDE": "Handler Types Guide",
+        "HANDLER_TYPES_GUIDE_DESCRIPTION": "Different handler types serve different purposes. State handlers manage conversation flow, keyword handlers respond to specific phrases, interactive handlers process user selections, and action handlers perform operations.",
+        "BEST_PRACTICES": "Best Practices",
+        "BEST_PRACTICES_DESCRIPTION": "Use descriptive handler method names, check dependencies before assigning handlers, prefer stable handlers for production flows, and test handlers thoroughly before deployment."
+      },
+      "REFERENCE": {
+        "TITLE": "Handler Methods Reference",
+        "VIEW_FULL_REFERENCE": "View Full Reference",
+        "DOCUMENTATION": "Documentation",
+        "API_REFERENCE": "API Reference"
+      },
+      "BROWSER": {
+        "TITLE": "Browse Handler Methods",
+        "DESCRIPTION": "Browse and search available handler methods for your bot service. Select a handler to view details or insert into your flow.",
+        "SEARCH_PLACEHOLDER": "Search handlers by name, description, or tags...",
+        "LOADING_HANDLERS": "Loading handlers...",
+        "RETRY": "Retry",
+        "NO_HANDLERS_FOUND": "No handlers found matching your criteria",
+        "CLEAR_FILTERS_BUTTON": "Clear Filters",
+        "ALL_TYPES": "All Types",
+        "ALL_STATUS": "All Status",
+        "SORT_BY": "Sort By",
+        "SORT_ALPHABETICAL": "Alphabetical",
+        "TRIGGERS_SUFFIX": "triggers",
+        "DEPENDENCIES_SUFFIX": "deps",
+        "MATCH_SUFFIX": "match",
+        "STATES_LABEL": "States:",
+        "KEYWORDS_LABEL": "Keywords:",
+        "INTERACTIVE_IDS_LABEL": "Interactive IDs:",
+        "TEMPLATES_LABEL": "Templates:",
+        "ATTRIBUTES_LABEL": "Attributes:",
+        "SERVICES_LABEL": "Services:",
+        "METHOD_LABEL": "Method",
+        "HANDLERS_SHOWN": "{count} handlers shown",
+        "OF_TOTAL": "of {total} total",
+        "SELECT_HANDLER_BUTTON": "Select Handler",
+        "CANCEL": "Cancel"
+      }
+    },
+    "HANDLER_TYPES": {
+      "STATE": "State Handler",
+      "KEYWORD": "Keyword Handler",
+      "INTERACTIVE": "Interactive Handler",
+      "ACTION": "Action Handler"
+    },
+    "HANDLER_CATEGORIES": {
+      "ONBOARDING": "Onboarding",
+      "NAVIGATION": "Navigation",
+      "FORMS": "Forms",
+      "DEMO": "Demo",
+      "PRODUCT": "Product",
+      "PAYMENTS": "Payments",
+      "AR": "Augmented Reality",
+      "UNCATEGORIZED": "Uncategorized"
+    },
+    "HANDLER_SELECTOR": {
+      "LABEL": "Handler Method",
+      "PLACEHOLDER": "Search handler methods...",
+      "HELPER_TEXT": "Type at least 2 characters to search",
+      "NO_RESULTS": "No handler methods found",
+      "NO_RESULTS_HINT": "Try a different search term",
+      "SEARCH_ERROR": "Failed to search handler methods",
+      "VALIDATION_ERROR": "Failed to validate handler method",
+      "REQUIRED_ERROR": "Handler method is required"
+    },
+    "ACTION_TEMPLATES": {
+      "TYPES": {
+        "SEND_QUICK_REPLY": {
+          "PARAMETERS": {
+            "MESSAGE": "Message",
+            "MESSAGE_PLACEHOLDER": "Enter message text",
+            "REQUEST_ID": "Request ID",
+            "REQUEST_ID_PLACEHOLDER": "Enter request identifier",
+            "REQUEST_ID_HELP": "Unique identifier for tracking this quick reply request",
+            "ITEMS": "Quick Reply Items",
+            "NO_ITEMS": "No items added yet. Click 'Add Item' to create quick reply options.",
+            "ITEM_TITLE_PLACEHOLDER": "Display text",
+            "ITEM_VALUE_PLACEHOLDER": "Value",
+            "ADD_ITEM": "Add Item",
+            "REMOVE_ITEM": "Remove item"
+          }
+        },
+        "UPDATE_ATTRIBUTES": {
+          "PARAMETERS": {
+            "ATTRIBUTES": "Attributes (JSON)",
+            "ATTRIBUTES_PLACEHOLDER": "{\n  \"key\": \"value\"\n}",
+            "ATTRIBUTES_HELP": "JSON object containing attributes to update on the conversation",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          }
+        },
+        "SEND_LIST_PICKER": {
+          "PARAMETERS": {
+            "TEMPLATE": "List Picker Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved list picker template to send to the user",
+            "WAIT_FOR_RESPONSE": "Wait for user response before continuing",
+            "WAIT_FOR_RESPONSE_HELP": "If enabled, the bot will pause and wait for the user to select an option before proceeding to the next step"
+          },
+          "NO_TEMPLATES": "No list picker templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load list picker templates. Please try again.",
+          "LOADING": "Loading list picker templates...",
+          "RETRY": "Retry"
+        },
+        "SEND_TIME_PICKER": {
+          "PARAMETERS": {
+            "TEMPLATE": "Time Picker Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved time picker template to send to the user",
+            "TIMEZONE_OFFSET": "Timezone Offset",
+            "TIMEZONE_PLACEHOLDER": "Hours from UTC",
+            "TIMEZONE_HELP": "Example: -8 for PST (UTC-8), +1 for CET (UTC+1)",
+            "LOCATION": "Location (Optional)",
+            "LOCATION_NAME_PLACEHOLDER": "Location name",
+            "LATITUDE_PLACEHOLDER": "Latitude",
+            "LONGITUDE_PLACEHOLDER": "Longitude",
+            "LOCATION_HELP": "Add location context for the time picker (e.g., 'Apple Park, 37.334606, -122.009102')"
+          },
+          "NO_TEMPLATES": "No time picker templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load time picker templates. Please try again.",
+          "LOADING": "Loading time picker templates...",
+          "RETRY": "Retry"
+        },
+        "SEND_FORM": {
+          "PARAMETERS": {
+            "TEMPLATE": "Form Template",
+            "SELECT_TEMPLATE": "Select a template...",
+            "TEMPLATE_HELP": "Choose a saved form template to send to the user",
+            "PRE_FILL_DATA": "Pre-fill Data (Optional)",
+            "PRE_FILL_PLACEHOLDER": "{\n  \"fieldName\": \"defaultValue\"\n}",
+            "PRE_FILL_HELP": "JSON object containing default values to pre-fill form fields",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          },
+          "NO_TEMPLATES": "No form templates found. Create a template first.",
+          "ERROR_LOADING": "Failed to load form templates. Please try again.",
+          "LOADING": "Loading form templates...",
+          "RETRY": "Retry"
+        },
+        "CONDITIONAL_BRANCH": {
+          "PARAMETERS": {
+            "CONDITION_TYPE": "Condition Type",
+            "SELECT_TYPE": "Select condition type...",
+            "TYPES": {
+              "ATTRIBUTE_EQUALS": "Attribute Equals",
+              "ATTRIBUTE_CONTAINS": "Attribute Contains",
+              "MESSAGE_CONTAINS": "Message Contains",
+              "CUSTOM_EXPRESSION": "Custom Expression"
+            },
+            "ATTRIBUTE_NAME": "Attribute Name",
+            "ATTRIBUTE_NAME_PLACEHOLDER": "custom_attribute_key",
+            "ATTRIBUTE_VALUE": "Expected Value",
+            "ATTRIBUTE_VALUE_PLACEHOLDER": "value to check",
+            "MESSAGE_TEXT": "Search Text",
+            "MESSAGE_TEXT_PLACEHOLDER": "text to search for in message",
+            "MESSAGE_TEXT_HELP": "Case-insensitive search",
+            "CUSTOM_EXPRESSION": "Ruby Expression",
+            "CUSTOM_EXPRESSION_PLACEHOLDER": "@conversation.custom_attributes['key'] == 'value'",
+            "CUSTOM_EXPRESSION_WARNING": "⚠️ Advanced: Use Ruby syntax. Has access to @conversation and @message variables.",
+            "TRUE_ACTION": "True Action (Optional)",
+            "TRUE_ACTION_PLACEHOLDER": "Template ID to execute if condition is true",
+            "TRUE_ACTION_HELP": "ID of BotActionTemplate to execute if condition evaluates to true",
+            "FALSE_ACTION": "False Action (Optional)",
+            "FALSE_ACTION_PLACEHOLDER": "Template ID to execute if condition is false",
+            "FALSE_ACTION_HELP": "ID of BotActionTemplate to execute if condition evaluates to false",
+            "PREVIEW": "Preview:"
+          },
+          "PREVIEW": {
+            "ATTRIBUTE_EQUALS": "If conversation attribute '{attribute}' equals '{value}'",
+            "ATTRIBUTE_CONTAINS": "If conversation attribute '{attribute}' contains '{value}'",
+            "MESSAGE_CONTAINS": "If message contains '{text}'",
+            "CUSTOM_EXPRESSION": "If custom expression evaluates to true: {expression}",
+            "SELECT_TYPE": "Select a condition type"
+          }
+        },
+        "API_CALL": {
+          "PARAMETERS": {
+            "URL": "API URL",
+            "URL_PLACEHOLDER": "https://api.example.com/endpoint",
+            "METHOD": "HTTP Method",
+            "SELECT_METHOD": "Select method...",
+            "HEADERS": "Headers (Optional)",
+            "HEADERS_PLACEHOLDER": "{ \"Authorization\": \"Bearer token\" }",
+            "HEADERS_HELP": "JSON object containing HTTP headers",
+            "BODY": "Request Body (Optional)",
+            "BODY_PLACEHOLDER": "{ \"key\": \"value\" }",
+            "BODY_HELP": "JSON object containing request body",
+            "STORE_RESPONSE_IN": "Store Response In (Optional)",
+            "STORE_RESPONSE_IN_PLACEHOLDER": "api_response",
+            "STORE_RESPONSE_IN_HELP": "Conversation attribute name to store the API response",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "EXAMPLE": "Example:"
+          }
+        },
+        "SEND_IMESSAGE_APP": {
+          "PARAMETERS": {
+            "APP_ID": "App Bundle ID",
+            "APP_ID_PLACEHOLDER": "com.example.app.MessagesExtension",
+            "APP_ID_HELP": "iMessage app bundle identifier (e.g., com.shazam.Shazam.MessagesExtension)",
+            "APP_NAME": "App Name",
+            "APP_NAME_PLACEHOLDER": "Guitar Tuner",
+            "APP_ICON_URL": "App Icon URL (Optional)",
+            "APP_ICON_URL_PLACEHOLDER": "https://example.com/icon.png",
+            "LAUNCH_URL": "Launch URL (Optional)",
+            "LAUNCH_URL_PLACEHOLDER": "imessage-app://open?feature=tuner",
+            "LAUNCH_URL_HELP": "Deep link URL to launch specific app feature",
+            "DATA": "App Data (Optional)",
+            "DATA_PLACEHOLDER": "{ \"key\": \"value\" }",
+            "FORMAT_JSON": "Format JSON",
+            "JSON_ERROR": "Invalid JSON format. Please check your syntax.",
+            "KNOWN_APPS_TITLE": "Common iMessage Apps:",
+            "KNOWN_APPS": {
+              "SHAZAM": "• Shazam: com.shazam.Shazam.MessagesExtension",
+              "APPLE_MUSIC": "• Apple Music: com.apple.Music.MessagesExtension",
+              "PHOTOS": "• Photos: com.apple.mobileslideshow.PhotosMessagesApp"
+            }
+          }
+        },
+        "SEND_APP_CLIP": {
+          "PARAMETERS": {
+            "APP_CLIP_URL": "App Clip URL",
+            "APP_CLIP_URL_PLACEHOLDER": "https://example.com/clips/guitar-tuner",
+            "APP_CLIP_URL_HELP": "URL to invoke App Clip (must be registered in App Store Connect)",
+            "TITLE": "Title",
+            "TITLE_PLACEHOLDER": "Try our Guitar Tuner",
+            "SUBTITLE": "Subtitle (Optional)",
+            "SUBTITLE_PLACEHOLDER": "Tune your guitar without installing an app",
+            "IMAGE_URL": "Hero Image URL (Optional)",
+            "IMAGE_URL_PLACEHOLDER": "https://example.com/hero.png",
+            "IMAGE_URL_HELP": "Hero image displayed in App Clip card",
+            "ACTION_TITLE": "Button Text (Optional)",
+            "ACTION_TITLE_PLACEHOLDER": "Open",
+            "ACTION_TITLE_HELP": "Text shown on action button (default: \"Open\")",
+            "INFO_TITLE": "About App Clips:",
+            "INFO_TEXT": "App Clips are lightweight experiences (max 10MB) that let users access your app's functionality without installation. They're perfect for quick interactions like tuning a guitar, making a reservation, or viewing product details."
+          }
+        }
+      }
     }
   }
 }

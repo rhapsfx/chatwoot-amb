@@ -219,6 +219,17 @@ en:
         open: 'Conversation was marked open by %{user_name}'
       agent_bot:
         error_moved_to_open: 'Conversation was marked open by system due to an error with the agent bot.'
+      bot_flow:
+        fallback_response: "I'm not sure how to respond to that."
+        oauth:
+          provider_not_enabled: "%{provider} OAuth is not enabled for this inbox."
+          sign_in_prompt: "Sign in with %{provider} to continue"
+          unavailable: "Sorry, authentication is unavailable. Please try again."
+        attachment:
+          photo_received: "Awesome photo! #photooftheday #instadaily"
+        template:
+          select_store: "Select an Apple Store"
+          schedule_lesson: "Schedule a lesson"
       status:
         resolved: 'Conversation was marked resolved by %{user_name}'
         contact_resolved: 'Conversation was resolved by %{contact_name}'

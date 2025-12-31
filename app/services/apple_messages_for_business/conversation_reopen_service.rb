@@ -31,7 +31,7 @@ class AppleMessagesForBusiness::ConversationReopenService
       Rails.logger.info "[AMB ConversationReopen] Unblocked contact #{contact.id}"
 
       # Broadcast contact update to refresh UI
-      contact.dispatch_contact_updated_event
+      contact.dispatch_update_event
     end
 
     Rails.logger.info "[AMB ConversationReopen] Successfully re-enabled messages for source_id: #{@source_id}"

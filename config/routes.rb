@@ -77,6 +77,63 @@ Rails.application.routes.draw do
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
             delete :avatar, on: :member
             post :reset_access_token, on: :member
+            post :duplicate, on: :member
+
+            # Nested version management
+            resources :versions, controller: 'agent_bots/versions', only: [:index, :show, :create] do
+              member do
+                post :activate
+                post :archive
+                post :restore
+                get 'compare/:other_id', action: :compare
+              end
+            end
+
+            # Nested inbox association management
+            resources :inboxes, controller: 'agent_bots/inboxes' do
+              member do
+                post :assign_version
+                post :clear_version
+                patch :config_override, action: :update_config_override
+              end
+              collection do
+                post :bulk_assign
+              end
+            end
+
+            # Nested flow management
+            resources :flows, controller: 'agent_bots/flows' do
+              collection do
+                get :templates
+                post :import_from_bot_config
+              end
+              member do
+                post :compile
+                post :validate
+                post :simulate
+                get :preview
+                patch 'nodes/:node_id', action: :update_node
+                # Version management
+                post :create_version
+                post :publish
+                post :unpublish
+                post :restore
+                get :versions
+                get :version_tree
+                get 'compare/:other_id', action: :compare
+              end
+            end
+
+            # Handler methods for bot execution
+            resources :handler_methods, controller: 'agent_bots/handler_methods', only: [:index, :show] do
+              collection do
+                post :validate
+                get :search
+              end
+            end
+
+            # Bot Action Templates for state node actions
+            resources :bot_action_templates, controller: 'agent_bots/bot_action_templates', only: [:index, :show, :update]
           end
           resources :contact_inboxes, only: [] do
             collection do

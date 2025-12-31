@@ -56,6 +56,23 @@ const store = useStore();
 
 const activeTab = ref('quick_reply');
 
+// Theme detection for tab icons
+const isDarkMode = ref(false);
+const updateTheme = () => {
+  isDarkMode.value = document.body.classList.contains('dark');
+};
+
+// Initialize theme and watch for changes
+onMounted(() => {
+  updateTheme();
+  // Watch for theme changes
+  const observer = new MutationObserver(updateTheme);
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+});
+
 // Template selector state
 const showTemplateSelector = ref(false);
 const templateSearchKey = ref('');

@@ -7,6 +7,10 @@ json.message_type message.message_type_before_type_cast
 json.content_type message.content_type
 json.status message.status
 json.content_attributes message.content_attributes
+# CRITICAL: Preserve exact key names in apple_msp_payload (e.g., 'quick-reply' with hyphen)
+# jbuilder automatically camelizes nested hash keys
+# We must use json.set! with the raw hash to prevent jbuilder from processing it
+json.set! 'appleMspPayload', message.apple_msp_payload if message.apple_msp_payload.present?
 json.created_at message.created_at.to_i
 json.private message.private
 json.source_id message.source_id

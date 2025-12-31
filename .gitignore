@@ -101,3 +101,21 @@ CLAUDE.local.md
 .histoire
 .pnpm-store/*
 local/
+
+# Temporary script files (keep deploy* scripts)
+script/*
+!script/deploy*.sh
+!script/deploy-*.sh
+
+# Temporary documentation and status files
+*_STATUS.md
+*_COMPLETE.md
+*_FIX.md
+*_REPORT.md
+*_INDEX.md
+*_SUMMARY.md
+CLEANUP_LIST.md
+
+
+# Code analysis cache
+.zingerv3/
