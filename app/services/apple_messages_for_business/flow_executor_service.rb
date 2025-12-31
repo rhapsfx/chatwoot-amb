@@ -70,6 +70,18 @@ class AppleMessagesForBusiness::FlowExecutorService
 
       # Mark interaction as processed
       mark_interaction_processed(interactive_value)
+    else
+      # Even without extracted interactive value, check for duplicate messages
+      # This handles cases where Apple sends the same message multiple times
+      # Use conversation + content as key (not state, since state changes after first message)
+      message_key = "conv:#{@conversation.id}:#{@message.content}"
+      if interaction_already_processed?(message_key)
+        log_info '[FlowExecutor] 🔒 Message already processed, skipping duplicate'
+        return { success: true, skipped: true, nodes_executed: [], current_state: @current_state, messages_sent: 0 }
+      end
+
+      # Mark message as processed
+      mark_interaction_processed(message_key)
     end
 
     # Track execution
@@ -95,7 +107,51 @@ class AppleMessagesForBusiness::FlowExecutorService
       # Mark that we're processing an interactive response
       @processing_interactive_response = true
       messages_sent = execute_intent_node(waiting_intent)
+    elsif interactive_value && (outgoing_edge = find_outgoing_edge_from_current_state)
+      # If no intent but this is an interactive response from a waiting action,
+      # automatically follow the outgoing edge to continue the flow
+      log_info '[FlowExecutor] 🔀 Interactive response received, following outgoing edge from current state'
+      target_node = find_node_by_id(outgoing_edge['target'])
+      if target_node && target_node['type'] == 'state'
+        @current_state = target_node.dig('data', 'state_id') || target_node['id']
+        log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
+        @executed_nodes << target_node['id']
+        # Mark that we're processing an interactive response
+        @processing_interactive_response = true
+        messages_sent = execute_state_node(target_node)
+      end
+    elsif state_was_waiting_for_input? && (outgoing_edge = find_outgoing_edge_from_current_state)
+      # If current state was waiting for input (e.g., sent list picker, quick reply),
+      # and we received a message, follow the outgoing edge even if interactive data wasn't extracted
+      log_info '[FlowExecutor] 📬 Message received in waiting state, following outgoing edge'
+      log_info "[FlowExecutor] 🔍 Outgoing edge target: #{outgoing_edge['target']}"
+      target_node = find_node_by_id(outgoing_edge['target'])
+      log_info "[FlowExecutor] 🔍 Target node found: #{target_node.present?}, type: #{target_node&.dig('type')}"
+
+      if target_node
+        @executed_nodes << target_node['id']
+        @processing_interactive_response = true
+
+        case target_node['type']
+        when 'state'
+          @current_state = target_node.dig('data', 'state_id') || target_node['id']
+          log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
+          messages_sent = execute_state_node(target_node)
+        when 'condition'
+          log_info "[FlowExecutor] 🔀 Evaluating condition: #{target_node.dig('data', 'label')}"
+          messages_sent = execute_condition_node(target_node)
+        else
+          log_warn "[FlowExecutor] ⚠️ Unknown target node type: #{target_node['type']}"
+        end
+      else
+        log_warn "[FlowExecutor] ⚠️ Target node not found: #{outgoing_edge['target']}"
+      end
     else
+      # DEBUG: Log why we're falling through to else
+      was_waiting = state_was_waiting_for_input?
+      has_edge = find_outgoing_edge_from_current_state.present?
+      log_info "[FlowExecutor] 🔍 Falling through to state processing - was_waiting: #{was_waiting}, has_edge: #{has_edge}"
+
       # Process current state
       state_node = find_state_node(@current_state)
       if state_node
@@ -210,6 +266,52 @@ class AppleMessagesForBusiness::FlowExecutorService
     @nodes.find { |n| n['id'] == waiting_intent_id }
   end
 
+  # Find outgoing edge from current state
+  # Used to automatically transition when interactive response is received
+  # @return [Hash, nil] The outgoing edge, or nil if none found
+  def find_outgoing_edge_from_current_state
+    current_state_node = find_state_node(@current_state)
+    return nil unless current_state_node
+
+    @edges.find { |e| e['source'] == current_state_node['id'] }
+  end
+
+  # Check if current state was waiting for user input
+  # Returns true if the state sends interactive messages (list picker, quick reply, etc.)
+  # @return [Boolean] true if state was waiting for input
+  def state_was_waiting_for_input?
+    current_state_node = find_state_node(@current_state)
+    return false unless current_state_node
+
+    state_data = current_state_node['data'] || {}
+    handler = state_data['handler']
+    actions = state_data['actions'] || []
+
+    # List of handlers that send waiting messages
+    waiting_handlers = %w[
+      send_guitar_list_picker
+      send_time_picker
+      send_apple_pay_request
+      build_time_picker
+      build_store_list_picker
+      send_store_quick_reply
+      handle_form_or_name_prompt
+      handle_text_name_input
+    ]
+
+    # Check if direct handler sends interactive messages
+    return true if handler.present? && waiting_handlers.include?(handler)
+
+    # Check if any action is a waiting action type
+    waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
+    return true if actions.any? { |action| waiting_action_types.include?(action['type']) }
+
+    # Check if any execute_custom_code action uses a waiting handler
+    actions.any? do |action|
+      action['type'] == 'execute_custom_code' && waiting_handlers.include?(action['handler'])
+    end
+  end
+
   # Find initial state from flow
   def find_initial_state
     # Look for node marked as initial
@@ -277,7 +379,7 @@ class AppleMessagesForBusiness::FlowExecutorService
       exact_match = node.dig('data', 'exact_match')
       case_sensitive = node.dig('data', 'case_sensitive')
 
-      log_info "[FlowExecutor] 🔎 Checking intent '#{node.dig('data', 'label')}': keywords=#{keywords.inspect}, exact_match=#{exact_match}"
+      log_info "[FlowExecutor] 🔎 Checking intent '#{node.dig('data', 'label')}': keywords=#{keywords.inspect}, exact_match=#{exact_match.inspect}"
 
       keywords.any? do |keyword|
         keyword_str = case_sensitive ? keyword.to_s : keyword.to_s.downcase
@@ -367,12 +469,37 @@ class AppleMessagesForBusiness::FlowExecutorService
 
     # Execute actions (can contain template references)
     has_waiting_action = false
+
+    # Handlers that send interactive messages requiring user input
+    waiting_handlers = %w[
+      send_guitar_list_picker
+      send_time_picker
+      send_apple_pay_request
+      build_time_picker
+      build_store_list_picker
+      send_store_quick_reply
+      handle_form_or_name_prompt
+      handle_text_name_input
+    ]
+
+    # Check if direct handler sends interactive messages
+    if handler.present? && waiting_handlers.include?(handler)
+      has_waiting_action = true
+      log_info "[FlowExecutor] 🔍 Handler '#{handler}' sends waiting message"
+    end
+
     actions.each_with_index do |action, index|
       messages_sent += execute_action(action)
 
       # Track if this action requires waiting for user input
       waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
       has_waiting_action = true if waiting_action_types.include?(action['type'])
+
+      # Check if execute_custom_code handler sends interactive messages
+      if action['type'] == 'execute_custom_code' && waiting_handlers.include?(action['handler'])
+        has_waiting_action = true
+        log_info "[FlowExecutor] 🔍 Custom handler '#{action['handler']}' sends waiting message"
+      end
 
       # Add delay between actions (except after last action)
       if index < actions.length - 1
@@ -388,33 +515,28 @@ class AppleMessagesForBusiness::FlowExecutorService
       return messages_sent
     end
 
-    # Handle transitions - automatically follow edges to next state
+    # Handle transitions - automatically follow edges to next state/condition
     outgoing_edge = @edges.find { |e| e['source'] == node['id'] }
     if outgoing_edge
       target_node = find_node_by_id(outgoing_edge['target'])
-      if target_node && target_node['type'] == 'state'
-        @current_state = target_node.dig('data', 'state_id') || target_node['id']
-        log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
 
-        # CRITICAL FIX: If we're processing an interactive response and the target state has a handler,
-        # we should NOT execute the handler with the interactive response message.
-        # Instead, wait for the next user message to execute that state's handler.
-        # Check both direct handlers and execute_custom_code actions
-        target_has_handler = target_node.dig('data', 'handler').present? ||
-                             target_node.dig('data', 'actions')&.any? { |a| a['type'] == 'execute_custom_code' }
+      if target_node
+        case target_node['type']
+        when 'state'
+          @current_state = target_node.dig('data', 'state_id') || target_node['id']
+          log_info "[FlowExecutor] ➡️ Auto-transitioning to state: #{@current_state}"
 
-        if @processing_interactive_response && target_has_handler
-          log_info '[FlowExecutor] 🛑 Stopping auto-transition chain - target state has handler that expects new user input'
-          log_info "[FlowExecutor] 📍 Current state set to: #{@current_state}, waiting for next user message"
+          # CRITICAL: Actually execute the target node to continue the flow
+          # This enables automatic handler chaining via visual edges
+          log_info '[FlowExecutor] 🎬 Executing target state node after transition'
           @executed_nodes << target_node['id']
-          return messages_sent
-        end
+          messages_sent += execute_state_node(target_node)
 
-        # CRITICAL: Actually execute the target node to continue the flow
-        # This enables automatic handler chaining via visual edges
-        log_info '[FlowExecutor] 🎬 Executing target state node after transition'
-        @executed_nodes << target_node['id']
-        messages_sent += execute_state_node(target_node)
+        when 'condition'
+          log_info "[FlowExecutor] 🔀 Evaluating condition: #{target_node.dig('data', 'label')}"
+          @executed_nodes << target_node['id']
+          messages_sent += execute_condition_node(target_node)
+        end
       end
     end
 
@@ -724,6 +846,96 @@ class AppleMessagesForBusiness::FlowExecutorService
     messages_sent
   end
 
+  # Execute condition node
+  # Evaluates the condition and follows the appropriate outgoing edge
+  # @param [Hash] node The condition node
+  # @return [Integer] Number of messages sent
+  def execute_condition_node(node)
+    condition_type = node.dig('data', 'condition_type')
+    messages_sent = 0
+
+    log_info "[FlowExecutor] 🔍 Condition type: #{condition_type}"
+
+    case condition_type
+    when 'capability_check'
+      # Check if contact has specific capability
+      capability = node.dig('data', 'capability')
+      capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
+      has_capability = capabilities.include?(capability)
+
+      log_info "[FlowExecutor] 🔍 Checking capability: #{capability}, has it: #{has_capability}"
+
+      # Find outgoing edges - typically labeled 'true' or 'false', or custom labels
+      outgoing_edges = @edges.select { |e| e['source'] == node['id'] }
+
+      # Route based on capability
+      target_edge = if has_capability
+                      # Look for edge labeled with true-like values
+                      outgoing_edges.find do |e|
+                        label = e['label']&.downcase
+                        label&.include?('support') || label&.include?('yes') || label&.include?('true')
+                      end
+                    else
+                      # Look for edge labeled with false-like values
+                      outgoing_edges.find do |e|
+                        label = e['label']&.downcase
+                        label&.include?('no') || label&.include?('false') || label&.include?('text')
+                      end
+                    end
+
+      if target_edge
+        target_node = find_node_by_id(target_edge['target'])
+        if target_node && target_node['type'] == 'state'
+          @current_state = target_node.dig('data', 'state_id') || target_node['id']
+          log_info "[FlowExecutor] ➡️ Condition routed to state: #{@current_state} (edge: #{target_edge['label']})"
+          @executed_nodes << target_node['id']
+          messages_sent = execute_state_node(target_node)
+        end
+      else
+        log_warn "[FlowExecutor] ⚠️ No matching outgoing edge found for condition result: #{has_capability}"
+      end
+
+    when 'count_check'
+      # Evaluate count and route based on value
+      result = evaluate_count_condition(node)
+      if result
+        target_node = find_node_by_id(result)
+        if target_node && target_node['type'] == 'state'
+          @current_state = target_node.dig('data', 'state_id') || target_node['id']
+          log_info "[FlowExecutor] ➡️ Count condition routed to state: #{@current_state}"
+          @executed_nodes << target_node['id']
+          messages_sent = execute_state_node(target_node)
+        end
+      end
+
+    when 'comparison'
+      # Evaluate comparison and route
+      result = evaluate_comparison_condition(node)
+      outgoing_edges = @edges.select { |e| e['source'] == node['id'] }
+
+      target_edge = if result
+                      outgoing_edges.find { |e| e['label']&.downcase&.include?('true') || e['label']&.downcase&.include?('yes') }
+                    else
+                      outgoing_edges.find { |e| e['label']&.downcase&.include?('false') || e['label']&.downcase&.include?('no') }
+                    end
+
+      if target_edge
+        target_node = find_node_by_id(target_edge['target'])
+        if target_node && target_node['type'] == 'state'
+          @current_state = target_node.dig('data', 'state_id') || target_node['id']
+          log_info "[FlowExecutor] ➡️ Comparison routed to state: #{@current_state}"
+          @executed_nodes << target_node['id']
+          messages_sent = execute_state_node(target_node)
+        end
+      end
+
+    else
+      log_warn "[FlowExecutor] ⚠️ Unknown condition type: #{condition_type}"
+    end
+
+    messages_sent
+  end
+
   # Find template by name
   def find_template(template_name)
     log_info "[FlowExecutor] 🔎 Searching for template: '#{template_name}' in account #{@account.id}"
@@ -1006,9 +1218,15 @@ class AppleMessagesForBusiness::FlowExecutorService
     end
 
     # Create AcousticHouseBotService instance
+    # When processing interactive responses during auto-transition, pass nil message
+    # This ensures handlers treat it as "first time in state" rather than "user response"
+    message_for_handler = @processing_interactive_response ? nil : @message
+
+    log_info '[FlowExecutor] 🧹 Clearing message context for handler (interactive response being processed)' if @processing_interactive_response
+
     service = AppleMessagesForBusiness::AcousticHouseBotService.new(
       @conversation,
-      @message,
+      message_for_handler,
       @flow.agent_bot,
       @flow.agent_bot.bot_config
     )
@@ -1031,18 +1249,49 @@ class AppleMessagesForBusiness::FlowExecutorService
         target_state = result[:transition_to]
         log_info "[FlowExecutor] 🔀 Handler requested transition to: #{target_state}"
 
-        # Update current state
+        # CRITICAL: Mark message as consumed to prevent it from being processed again
+        # The handler has consumed the user's message, so subsequent handlers in the
+        # transition chain should see "no message" and ask for new input
+        log_info '[FlowExecutor] 🧹 Message consumed by handler - clearing context for transition chain'
+        @processing_interactive_response = true
+
+        # Add delay for handlers that send AR files or attachments
+        # These need extra time for file upload and delivery before next message
+        handlers_with_attachments = %w[
+          handle_ar_introduction
+          handle_ar_response
+          send_ar_file
+        ]
+
+        if handlers_with_attachments.include?(handler_name)
+          log_info '[FlowExecutor] ⏱️  Waiting for AR file delivery (3s delay)'
+          sleep 3.0
+        end
+
+        # Update current state (both instance variable and database)
+        @current_state = target_state
         @conversation.custom_attributes ||= {}
         @conversation.custom_attributes['current_state'] = target_state
         @conversation.save!
 
-        # Find and execute the target state
+        # Find and execute the target node (could be state or condition)
         target_node = @flow_data['nodes'].find { |n| n['id'] == target_state }
         if target_node
-          log_info "[FlowExecutor] ➡️ Transitioning to state: #{target_state}"
-          return execute_state_node(target_node)
+          log_info "[FlowExecutor] ➡️ Transitioning to: #{target_state} (type: #{target_node['type']})"
+
+          # Execute the appropriate node type
+          case target_node['type']
+          when 'state'
+            return execute_state_node(target_node)
+          when 'condition'
+            @executed_nodes << target_node['id']
+            return execute_condition_node(target_node)
+          else
+            log_error "[FlowExecutor] ❌ Unknown node type: #{target_node['type']}"
+            return 0
+          end
         else
-          log_error "[FlowExecutor] ❌ Target state not found: #{target_state}"
+          log_error "[FlowExecutor] ❌ Target node not found: #{target_state}"
           return 0
         end
       end
