@@ -10,13 +10,20 @@ import { getAllowedFileTypesByChannel } from '@chatwoot/utils';
 import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
 import VideoCallButton from '../VideoCallButton.vue';
 import AIAssistanceButton from '../AIAssistanceButton.vue';
+import AppleMessagesButton from '../AppleMessagesButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
   name: 'ReplyBottomPanel',
-  components: { NextButton, FileUpload, VideoCallButton, AIAssistanceButton },
+  components: {
+    NextButton,
+    FileUpload,
+    VideoCallButton,
+    AIAssistanceButton,
+    AppleMessagesButton,
+  },
   mixins: [inboxMixin],
   props: {
     isNote: {
@@ -129,6 +136,7 @@ export default {
     'selectWhatsappTemplate',
     'selectContentTemplate',
     'toggleQuotedReply',
+    'sendAppleMessage',
   ],
   setup() {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
@@ -376,6 +384,11 @@ export default {
         :is-private-note="isOnPrivateNote"
         :message="message"
         @replace-text="replaceText"
+      />
+      <AppleMessagesButton
+        v-if="!isOnPrivateNote"
+        :inbox="inbox"
+        @send-apple-message="$emit('sendAppleMessage', $event)"
       />
       <transition name="modal-fade">
         <div

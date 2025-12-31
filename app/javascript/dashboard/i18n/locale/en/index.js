@@ -1,6 +1,7 @@
 import advancedFilters from './advancedFilters.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
+import appleMessages from './appleMessages.json';
 import attributesMgmt from './attributesMgmt.json';
 import auditLogs from './auditLogs.json';
 import automation from './automation.json';
@@ -12,6 +13,7 @@ import companies from './companies.json';
 import components from './components.json';
 import contact from './contact.json';
 import contactFilters from './contactFilters.json';
+import contentTemplates from './contentTemplates.json';
 import conversation from './conversation.json';
 import csatMgmt from './csatMgmt.json';
 import customRole from './customRole.json';
@@ -27,6 +29,7 @@ import integrations from './integrations.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
+import mfa from './mfa.json';
 import report from './report.json';
 import resetPassword from './resetPassword.json';
 import search from './search.json';
@@ -35,15 +38,15 @@ import settings from './settings.json';
 import signup from './signup.json';
 import sla from './sla.json';
 import teamsSettings from './teamsSettings.json';
+import templates from './templates.json';
 import whatsappTemplates from './whatsappTemplates.json';
-import contentTemplates from './contentTemplates.json';
-import mfa from './mfa.json';
 import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
   ...agentBots,
   ...agentMgmt,
+  ...appleMessages,
   ...attributesMgmt,
   ...auditLogs,
   ...automation,
@@ -55,6 +58,7 @@ export default {
   ...components,
   ...contact,
   ...contactFilters,
+  ...contentTemplates,
   ...conversation,
   ...csatMgmt,
   ...customRole,
@@ -70,6 +74,7 @@ export default {
   ...labelsMgmt,
   ...login,
   ...macros,
+  ...mfa,
   ...report,
   ...resetPassword,
   ...search,
@@ -78,8 +83,7 @@ export default {
   ...signup,
   ...sla,
   ...teamsSettings,
+  ...templates,
   ...whatsappTemplates,
-  ...contentTemplates,
-  ...mfa,
   ...yearInReview,
 };
