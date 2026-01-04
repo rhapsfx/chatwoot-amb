@@ -127,7 +127,7 @@ def add_state_machine_nodes(workflow):
             },
             "parameters": {
                 "method": "POST",
-                "url": f"=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{{{ $('Router with State').item.json.accountId }}}}/conversations/{{{{ $('Router with State').item.json.conversationId }}}}/custom_attributes",
+                "url": f"=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{{{ $('Router with State').item.json.accountId }}}}/conversations/{{{{ $('Router with State').item.json.conversationId }}}}/custom_attributes",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpHeaderAuth",
                 "sendBody": True,

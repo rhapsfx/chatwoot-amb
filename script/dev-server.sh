@@ -40,11 +40,11 @@ NGROK_SUBDOMAIN=""  # Set this to use a custom subdomain (requires ngrok account
 NGROK_CONFIG_FILE="$HOME/.ngrok2/ngrok.yml"  # Default ngrok config location
 
 # Public access configuration
-CUSTOM_DOMAIN="liquid-m3-pro.tail367da4.ts.net"  # Your custom domain
+CUSTOM_DOMAIN="macbook-pro-14-perso.tail367da4.ts.net"  # Your custom domain
 USE_CUSTOM_DOMAIN=false  # Set to false to use Tailscale Funnel or ngrok
 USE_TAILSCALE_FUNNEL=true  # Set to true to use Tailscale Funnel, false for ngrok
 TAILSCALE_PORT=10750
-DEFAULT_TAILSCALE_URL="liquid-m3-pro.tail367da4.ts.net"  # Default Tailscale URL
+DEFAULT_TAILSCALE_URL="macbook-pro-14-perso.tail367da4.ts.net"  # Default Tailscale URL
 
 # Rails configuration files
 RAILS_ENV_FILE=".env"
@@ -435,7 +435,7 @@ start_sidekiq() {
     mkdir -p log
     
     # Set hostname for sidekiq_alive gem identification
-    export HOSTNAME="liquid-m3-pro-dev"
+    export HOSTNAME="macbook-pro-14-perso-dev"
     
     # Start Sidekiq in background (newer versions don't support -d flag)
     nohup bundle exec sidekiq > log/sidekiq.log 2>&1 &

@@ -22,7 +22,7 @@ puts
 
 # Generate the permanent webhook URL (without MSP ID)
 # The business_id is sent in the destination-id header by Apple
-new_base_url = 'https://liquid-m3-pro.tail367da4.ts.net'
+new_base_url = 'https://macbook-pro-14-perso.tail367da4.ts.net'
 new_webhook_url = "#{new_base_url}/webhooks/apple_messages_for_business"
 
 puts '🔄 Updating to new webhook URL:'

@@ -27,7 +27,7 @@ def add_skip_form_message(workflow):
         },
         "parameters": {
             "method": "POST",
-            "url": "=https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
+            "url": "=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
             "authentication": "genericCredentialType",
             "genericAuthType": "httpHeaderAuth",
             "sendBody": True,

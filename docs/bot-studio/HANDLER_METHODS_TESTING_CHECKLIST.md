@@ -75,14 +75,14 @@ UID="your-uid-here"
 curl -H "access-token: $ACCESS_TOKEN" \
      -H "client: $CLIENT" \
      -H "uid: $UID" \
-     "https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods" \
+     "https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods" \
      | jq
 
 # Test search endpoint
 curl -H "access-token: $ACCESS_TOKEN" \
      -H "client: $CLIENT" \
      -H "uid: $UID" \
-     "https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods/search?q=welcome" \
+     "https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods/search?q=welcome" \
      | jq
 
 # Test validate endpoint
@@ -92,7 +92,7 @@ curl -X POST \
      -H "uid: $UID" \
      -H "Content-Type: application/json" \
      -d '{"method_name":"handle_welcome","handler_type":"state"}' \
-     "https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods/validate" \
+     "https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/$ACCOUNT_ID/agent_bots/$BOT_ID/handler_methods/validate" \
      | jq
 ```
 
@@ -160,7 +160,7 @@ tail -50 log/development.log | grep -i "401\|unauthorized\|pundit"
 ### Test 4: Component Visibility
 
 1. **Navigate to Bot Studio**:
-   - Go to https://liquid-m3-pro.tail367da4.ts.net/app/accounts/1/settings/agent-bots/15/studio
+   - Go to https://macbook-pro-14-perso.tail367da4.ts.net/app/accounts/1/settings/agent-bots/15/studio
    - Wait for Bot Studio to load
 
 2. **Add State Node**:

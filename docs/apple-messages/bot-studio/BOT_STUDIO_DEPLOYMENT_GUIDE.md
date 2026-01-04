@@ -39,7 +39,7 @@ rails runner "bot = AgentBot.first; puts bot.bot_flows.class"
 
 1. **Navigate to Bot List**:
    ```
-   https://liquid-m3-pro.tail367da4.ts.net/app/accounts/1/settings/agent-bots
+   https://macbook-pro-14-perso.tail367da4.ts.net/app/accounts/1/settings/agent-bots
    ```
 
 2. **Find an Apple Messages Bot** (not a system bot)
@@ -602,7 +602,7 @@ pnpm install                          # Install frontend deps
 # Testing
 rails runner "puts BotFlow.count"                    # Check flows
 curl http://localhost:3000/api/v1/.../flows          # Test API
-open http://liquid-m3-pro.tail367da4.ts.net/...     # Open UI
+open http://macbook-pro-14-perso.tail367da4.ts.net/...     # Open UI
 
 # Deployment
 ./script/deploy-backend-enhanced.sh   # Deploy Ruby changes

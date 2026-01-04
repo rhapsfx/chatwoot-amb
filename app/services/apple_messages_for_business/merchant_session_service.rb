@@ -86,7 +86,7 @@ class AppleMessagesForBusiness::MerchantSessionService
     # - initiativeContext: Payment gateway URL WITH https:// prefix
 
     # Get domain name without https:// prefix (CRITICAL for Messages for Business)
-    domain = merchant_domain # e.g., "liquid-m3-pro.tail367da4.ts.net"
+    domain = merchant_domain # e.g., "macbook-pro-14-perso.tail367da4.ts.net"
 
     # Payment gateway URL with https:// prefix
     # This is the endpoint that will receive payment authorization callbacks

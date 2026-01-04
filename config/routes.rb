@@ -151,6 +151,15 @@ Rails.application.routes.draw do
             end
           end
           resources :canned_responses, only: [:index, :create, :update, :destroy]
+          resources :templates, only: [:index, :create, :show, :update, :destroy] do
+            member do
+              post :render_template
+              post :attach_files
+              post :remove_attachment
+              post :reorder_attachments
+              get :validate_images
+            end
+          end
           resources :automation_rules, only: [:index, :create, :show, :update, :destroy] do
             post :clone
           end

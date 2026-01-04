@@ -194,7 +194,7 @@ TESTING:
    - selected_name should equal stage_name
 
 Expected API call:
-  POST https://liquid-m3-pro.tail367da4.ts.net/api/v1/accounts/1/
+  POST https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/1/
        conversations/12345/custom_attributes
   Body:
     custom_attributes[user_name]=John

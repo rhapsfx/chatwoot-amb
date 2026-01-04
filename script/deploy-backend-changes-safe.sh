@@ -111,7 +111,7 @@ fi
 echo ""
 echo "Step 1.7: Configuring Apple Pay for inbox 11 on production..."
 echo "  → Merchant ID: MS58PRCFSS.com.apple.apple-pay-matthieu"
-echo "  → Merchant Domain: liquid-m3-pro.tail367da4.ts.net"
+echo "  → Merchant Domain: macbook-pro-14-perso.tail367da4.ts.net"
 echo "  → Certificate: /opt/chatwoot/certs/apple_pay/apple_pay_cert.pem"
 echo "  → Private Key: /opt/chatwoot/certs/apple_pay/apple_pay_private.key"
 
