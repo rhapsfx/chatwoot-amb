@@ -41,12 +41,24 @@ const hasChildren = computed(
 
 const accessibleItems = computed(() => {
   if (!hasChildren.value) return [];
-  return props.children.filter(child => {
+  const items = props.children.filter(child => {
     // If a item has no link, it means it's just a subgroup header
     // So we don't need to check for permissions here, because there's nothing to
     // access here anyway
-    return child.to && isAllowed(child.to);
+    const allowed = child.to && isAllowed(child.to);
+    if (props.name === 'Settings') {
+      // eslint-disable-next-line no-console
+      console.log(
+        `Settings child: ${child.name}, to: ${JSON.stringify(child.to)}, allowed: ${allowed}`
+      );
+    }
+    return allowed;
   });
+  if (props.name === 'Settings') {
+    // eslint-disable-next-line no-console
+    console.log(`Settings accessibleItems length: ${items.length}`);
+  }
+  return items;
 });
 
 const hasAccessibleChildren = computed(() => {
@@ -138,10 +150,10 @@ onMounted(async () => {
     class="grid gap-1 text-sm cursor-pointer select-none"
   >
     <SidebarGroupHeader
-      :icon
-      :name
-      :label
-      :to
+      :icon="icon"
+      :name="name"
+      :label="label"
+      :to="to"
       :getter-keys="getterKeys"
       :is-active="isActive"
       :has-active-child="hasActiveChild"

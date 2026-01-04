@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__name__get_node_essentials",
+      "Read(//Users/rhaps/LocalGit/chatwoot/script/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/_apple/Acoustic-House-Bot-origin/acoustichouse/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/app/controllers/api/v1/accounts/conversations/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/app/services/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/docs/apple-messages/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/_apple/Acoustic-House-Bot-origin/**)",
+      "Bash(ls:*)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/**)",
+      "Bash(python3:*)",
+      "Bash(sqlite3:*)",
+      "Bash(bundle exec rubocop:*)",
+      "Bash(ruby -c:*)",
+      "Bash(bundle exec ruby:*)",
+      "Bash(rails runner:*)",
+      "Bash(chmod:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

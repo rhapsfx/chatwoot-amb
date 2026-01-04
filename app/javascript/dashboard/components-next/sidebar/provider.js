@@ -15,8 +15,13 @@ export function useSidebarContext() {
   const { shouldShow } = usePolicy();
 
   const resolvePath = to => {
-    if (to) return router.resolve(to)?.path || '/';
-    return '/';
+    if (!to) return '/';
+    try {
+      return router.resolve(to)?.path || '/';
+    } catch (e) {
+      // Route not found; gracefully return home path
+      return '/';
+    }
   };
 
   // Helper to find route definition by name without resolving
@@ -34,7 +39,12 @@ export function useSidebarContext() {
       return targetRoute?.meta?.permissions ?? [];
     }
 
-    return router.resolve(to)?.meta?.permissions ?? [];
+    try {
+      return router.resolve(to)?.meta?.permissions ?? [];
+    } catch (e) {
+      // Route not found; gracefully return empty permissions
+      return [];
+    }
   };
 
   const resolveFeatureFlag = to => {
@@ -46,7 +56,12 @@ export function useSidebarContext() {
       return targetRoute?.meta?.featureFlag || '';
     }
 
-    return router.resolve(to)?.meta?.featureFlag || '';
+    try {
+      return router.resolve(to)?.meta?.featureFlag || '';
+    } catch (e) {
+      // Route not found; gracefully return empty feature flag
+      return '';
+    }
   };
 
   const resolveInstallationType = to => {
@@ -58,7 +73,12 @@ export function useSidebarContext() {
       return targetRoute?.meta?.installationTypes || [];
     }
 
-    return router.resolve(to)?.meta?.installationTypes || [];
+    try {
+      return router.resolve(to)?.meta?.installationTypes || [];
+    } catch (e) {
+      // Route not found; gracefully return empty installation types
+      return [];
+    }
   };
 
   const isAllowed = to => {

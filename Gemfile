@@ -61,6 +61,7 @@ gem 'aws-actionmailbox-ses', '~> 0'
 ##-- gems for database --#
 gem 'groupdate'
 gem 'pg'
+gem 'fiddle'
 gem 'redis'
 gem 'redis-namespace'
 # super fast record imports in bulk

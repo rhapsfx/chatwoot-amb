@@ -386,10 +386,10 @@ start_rails() {
 
     # Wait and check for Rails to start with multiple retries
     local attempts=0
-    local max_attempts=15
+    local max_attempts=45
     local port_ready=false
 
-    print_status "Waiting for Rails server to start..."
+    print_status "Waiting for Rails server to start (increased timeout to 45s)..."
 
     while [ $attempts -lt $max_attempts ]; do
         if lsof -i :10750 > /dev/null 2>&1; then

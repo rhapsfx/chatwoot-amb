@@ -1,4 +1,21 @@
 import { createApp } from 'vue';
+
+// Enable Vue devtools in local development environments or when running on local hosts.
+// This helps debugging when the app is served in production mode locally.
+try {
+  const host = window?.location?.hostname || '';
+  const isLocalHost =
+    ['localhost', '127.0.0.1'].includes(host) ||
+    host.endsWith('.local') ||
+    host.includes('dev');
+  if (isLocalHost) {
+    // Allow Vue devtools even for production builds running locally
+    // eslint-disable-next-line no-undef, no-underscore-dangle
+    window.__VUE_PROD_DEVTOOLS__ = true;
+  }
+} catch (e) {
+  // ignore in non-browser contexts
+}
 import { createI18n } from 'vue-i18n';
 
 import axios from 'axios';
@@ -45,6 +62,19 @@ sync(store, router);
 const pinia = createPinia();
 
 const app = createApp(App);
+// Enable runtime devtools for local development
+try {
+  const host = window?.location?.hostname || '';
+  const isLocalHost =
+    ['localhost', '127.0.0.1'].includes(host) ||
+    host.endsWith('.local') ||
+    host.includes('dev');
+  if (isLocalHost) {
+    app.config.devtools = true;
+  }
+} catch (e) {
+  // ignore when not available
+}
 app.use(i18n);
 app.use(store);
 app.use(pinia);
