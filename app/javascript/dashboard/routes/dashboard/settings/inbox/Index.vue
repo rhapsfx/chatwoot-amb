@@ -15,6 +15,24 @@ import ChannelName from './components/ChannelName.vue';
 import ChannelIcon from 'next/icon/ChannelIcon.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 
+const AMB_CHANNEL_TYPE = 'Channel::AppleMessagesForBusiness';
+
+const getAmbStartUrl = inbox => {
+  if (!inbox) return null;
+
+  // Check flat business_id property (from API response)
+  if (inbox.business_id) {
+    return `https://bcrw.apple.com/urn:biz:${inbox.business_id}`;
+  }
+
+  // Check channel object contains business_id
+  if (inbox.channel?.business_id) {
+    return `https://bcrw.apple.com/urn:biz:${inbox.channel.business_id}`;
+  }
+
+  return null;
+};
+
 const getters = useStoreGetters();
 const store = useStore();
 const { t } = useI18n();
@@ -126,6 +144,26 @@ const openDelete = inbox => {
                     :channel-type="inbox.channel_type"
                     :medium="inbox.medium"
                   />
+                  <div
+                    v-if="inbox.channel_type === AMB_CHANNEL_TYPE"
+                    class="mt-1"
+                  >
+                    <p class="text-sm text-n-slate-11 break-words">
+                      <strong>{{
+                        $t('INBOX_MGMT.APPLE_MESSAGES_STARTER_LINK')
+                      }}</strong>
+                      <a
+                        v-if="getAmbStartUrl(inbox)"
+                        :href="getAmbStartUrl(inbox)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-n-blue-9 underline ml-1"
+                      >
+                        {{ getAmbStartUrl(inbox) }}
+                      </a>
+                      <span v-else class="text-sm text-n-slate-10">—</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </td>

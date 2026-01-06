@@ -135,3 +135,9 @@ if resource.channel_type == 'Channel::Voice'
   json.voice_call_webhook_url resource.channel.try(:voice_call_webhook_url)
   json.voice_status_webhook_url resource.channel.try(:voice_status_webhook_url)
 end
+
+## Apple Messages for Business Channel Attributes
+if resource.channel_type == 'Channel::AppleMessagesForBusiness'
+  json.business_id resource.channel.try(:business_id)
+  json.msp_id resource.channel.try(:msp_id)
+end

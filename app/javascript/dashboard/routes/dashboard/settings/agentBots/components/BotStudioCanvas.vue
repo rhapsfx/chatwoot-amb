@@ -1037,14 +1037,27 @@ const onNodeClick = event => {
     searchQuery.value = '';
     currentSearchIndex.value = 0;
   }
-  emit('nodeSelected', event.node);
+  // Emit a non-reactive, plain object to parent to avoid passing Vue proxies
+  const safeNode = {
+    id: event.node.id,
+    type: event.node.type,
+    position: event.node.position ? { ...event.node.position } : {},
+    data: event.node.data ? JSON.parse(JSON.stringify(event.node.data)) : {},
+  };
+  emit('nodeSelected', safeNode);
 };
 
 // Handle node double-click (for editing)
 const onNodeDoubleClick = event => {
   // Update highlight to show the clicked node
   highlightedNodeIds.value = [event.node.id];
-  emit('nodeSelected', event.node);
+  const safeNode = {
+    id: event.node.id,
+    type: event.node.type,
+    position: event.node.position ? { ...event.node.position } : {},
+    data: event.node.data ? JSON.parse(JSON.stringify(event.node.data)) : {},
+  };
+  emit('nodeSelected', safeNode);
 };
 
 // Initialize
