@@ -1,7 +1,7 @@
 {
   "parameters": {
     "method": "POST",
-    "url": "=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $(\"AHB1 - Parse Form Response\").item.json.accountId }}/conversations/{{ $(\"AHB1 - Parse Form Response\").item.json.conversationId }}/custom_attributes",
+    "url": "=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $(\"AHB1 - Parse Form Response\").item.json.accountId }}/conversations/{{ $(\"AHB1 - Parse Form Response\").item.json.conversationId }}/custom_attributes",
     "authentication": "genericCredentialType",
     "genericAuthType": "httpHeaderAuth",
     "sendBody": true,

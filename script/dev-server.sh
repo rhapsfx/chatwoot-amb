@@ -4,6 +4,11 @@
 # Chatwoot Development Server Management Script
 # This script manages the Rails server and Sidekiq with the correct Ruby version
 
+# Source user's shell configuration to load PATH and aliases
+if [ -f ~/.zshrc ]; then
+    source ~/.zshrc
+fi
+
 # Set the correct Ruby path
 eval "$(rbenv init -)"
 
@@ -40,11 +45,11 @@ NGROK_SUBDOMAIN=""  # Set this to use a custom subdomain (requires ngrok account
 NGROK_CONFIG_FILE="$HOME/.ngrok2/ngrok.yml"  # Default ngrok config location
 
 # Public access configuration
-CUSTOM_DOMAIN="macbook-pro-14-perso.tail367da4.ts.net"  # Your custom domain
+CUSTOM_DOMAIN="mac-studio.tail367da4.ts.net"  # Your custom domain
 USE_CUSTOM_DOMAIN=false  # Set to false to use Tailscale Funnel or ngrok
 USE_TAILSCALE_FUNNEL=true  # Set to true to use Tailscale Funnel, false for ngrok
 TAILSCALE_PORT=10750
-DEFAULT_TAILSCALE_URL="macbook-pro-14-perso.tail367da4.ts.net"  # Default Tailscale URL
+DEFAULT_TAILSCALE_URL="mac-studio.tail367da4.ts.net"  # Default Tailscale URL
 
 # Rails configuration files
 RAILS_ENV_FILE=".env"
@@ -826,32 +831,58 @@ show_tailscale_status() {
         return 1
     fi
 
-    if echo "$tailscale_funnel_output" | grep -q "no funnel configured"; then
-        echo -e "${YELLOW}⚠ Funnel enabled but not configured${NC}"
-        echo -e "Start with: ${YELLOW}tailscale funnel $TAILSCALE_PORT${NC}"
-        return 0
-    fi
+    # Check if funnel is active (look for "Funnel on:" which indicates funnel capability is enabled)
+    if echo "$tailscale_funnel_output" | grep -q "Funnel on:" ; then
+        # Funnel capability is enabled
+        echo -e "${GREEN}✓ Funnel is active${NC}"
 
-    if echo "$tailscale_funnel_output" | grep -q "Funnel on"; then
+        # Check if there's actually a serve config (daemon mode) or if it's running foreground
+        if echo "$tailscale_funnel_output" | grep -q "No serve config"; then
+            # "No serve config" means either:
+            # 1. Not configured at all, OR
+            # 2. Running as foreground process in another terminal (which is our case)
+            # To distinguish, we check if any process is running tailscale funnel
+            if pgrep -f "tailscale funnel [0-9]" > /dev/null 2>&1; then
+                echo -e "${GREEN}✓ Port 10750 is being funneled (foreground process)${NC}"
+                echo -e "\n${BLUE}Note:${NC} Tailscale Funnel is running in a separate terminal."
+                echo -e "Keep that terminal open for external access to remain active."
+            else
+                echo -e "${YELLOW}⚠ Funnel enabled but not configured${NC}"
+                echo -e "Start with: ${YELLOW}tailscale funnel $TAILSCALE_PORT${NC}"
+                return 0
+            fi
+        else
+            # Show active funnels (daemon mode)
+            echo -e "\n${BLUE}Active Funnels:${NC}"
+            echo "$tailscale_funnel_output" | grep -E "(https://.*\.ts\.net|proxy)" | while read -r line; do
+                echo -e "  ${GREEN}$line${NC}"
+            done
+
+            # Check if our specific port is being funneled
+            # Match patterns like "10750", ":10750", "http://127.0.0.1:10750", or "127.0.0.1:10750"
+            if echo "$tailscale_funnel_output" | grep -qE "10750|127\.0\.0\.1.*10750"; then
+                echo -e "\n${GREEN}✓ Port 10750 is being funneled${NC}"
+            else
+                echo -e "\n${YELLOW}⚠ Port 10750 is not being funneled${NC}"
+                echo -e "Run: ${YELLOW}tailscale funnel 10750${NC}"
+            fi
+        fi
+    elif echo "$tailscale_funnel_output" | grep -qE "(https://.*\.ts\.net|proxy http)" ; then
+        # Funnel is active based on URL/proxy patterns
         echo -e "${GREEN}✓ Funnel is active${NC}"
 
         # Show active funnels
         echo -e "\n${BLUE}Active Funnels:${NC}"
-        echo "$tailscale_funnel_output" | grep -E "(https://.*\.ts\.net|:[0-9]+)" | while read -r line; do
-            if [[ "$line" =~ https://.*\.ts\.net ]]; then
-                local url=$(echo "$line" | grep -oE 'https://[^[:space:]]*\.ts\.net[^[:space:]]*')
-                echo -e "  ${GREEN}$url${NC}"
-            elif [[ "$line" =~ :[0-9]+ ]]; then
-                echo -e "  ${BLUE}$line${NC}"
-            fi
+        echo "$tailscale_funnel_output" | grep -E "(https://.*\.ts\.net|proxy)" | while read -r line; do
+            echo -e "  ${GREEN}$line${NC}"
         done
 
         # Check if our specific port is being funneled
-        if echo "$tailscale_funnel_output" | grep -q ":$TAILSCALE_PORT"; then
-            echo -e "\n${GREEN}✓ Port $TAILSCALE_PORT is being funneled${NC}"
+        if echo "$tailscale_funnel_output" | grep -qE "10750|127\.0\.0\.1.*10750"; then
+            echo -e "\n${GREEN}✓ Port 10750 is being funneled${NC}"
         else
-            echo -e "\n${YELLOW}⚠ Port $TAILSCALE_PORT is not being funneled${NC}"
-            echo -e "Run: ${YELLOW}tailscale funnel $TAILSCALE_PORT${NC}"
+            echo -e "\n${YELLOW}⚠ Port 10750 is not being funneled${NC}"
+            echo -e "Run: ${YELLOW}tailscale funnel 10750${NC}"
         fi
     else
         echo -e "${YELLOW}⚠ Funnel status unclear${NC}"

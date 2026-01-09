@@ -38,7 +38,7 @@ http.get(getOptions, (res) => {
     }
 
     console.log('Updating node parameters...');
-    workflow.nodes[nodeIndex].parameters.url = '=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $("AHB1 - Parse Form Response").item.json.accountId }}/conversations/{{ $("AHB1 - Parse Form Response").item.json.conversationId }}/custom_attributes';
+    workflow.nodes[nodeIndex].parameters.url = '=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $("AHB1 - Parse Form Response").item.json.accountId }}/conversations/{{ $("AHB1 - Parse Form Response").item.json.conversationId }}/custom_attributes';
     workflow.nodes[nodeIndex].parameters.bodyParameters.parameters = [
       { name: 'custom_attributes[user_name]', value: '={{ $("AHB1 - Parse Form Response").item.json.userName || "" }}' },
       { name: 'custom_attributes[stage_name]', value: '={{ $("AHB1 - Parse Form Response").item.json.stageName || "" }}' },

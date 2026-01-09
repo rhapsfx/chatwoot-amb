@@ -110,7 +110,7 @@ def create_update_region_node():
         },
         "parameters": {
             "method": "POST",
-            "url": "=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+            "url": "=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
             "authentication": "genericCredentialType",
             "genericAuthType": "httpHeaderAuth",
             "sendBody": True,
@@ -141,7 +141,7 @@ def create_thank_you_message_node():
         },
         "parameters": {
             "method": "POST",
-            "url": "=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
+            "url": "=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $('Parse Region Selection').item.json.accountId }}/conversations/{{ $('Parse Region Selection').item.json.conversationId }}/messages",
             "authentication": "genericCredentialType",
             "genericAuthType": "httpHeaderAuth",
             "sendBody": True,

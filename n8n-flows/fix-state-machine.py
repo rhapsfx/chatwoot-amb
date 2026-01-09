@@ -42,7 +42,7 @@ def fix_state_machine(input_path: str, output_path: str = None):
         },
         "parameters": {
             "method": "POST",
-            "url": "=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
+            "url": "=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $('Router with State').item.json.accountId }}/conversations/{{ $('Router with State').item.json.conversationId }}/custom_attributes",
             "authentication": "genericCredentialType",
             "genericAuthType": "httpHeaderAuth",
             "sendBody": True,

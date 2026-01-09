@@ -96,7 +96,15 @@ class Message < ApplicationRecord
     input_csat: 9,
     integrations: 10,
     sticker: 11,
-    voice_call: 12
+    voice_call: 12,
+    apple_list_picker: 13,
+    apple_time_picker: 14,
+    apple_quick_reply: 15,
+    apple_form: 16,
+    apple_custom_app: 17,
+    apple_rich_link: 18,
+    apple_pay: 19,
+    apple_authentication: 20
   }
   enum status: { sent: 0, delivered: 1, read: 2, failed: 3 }
   # [:submitted_email, :items, :submitted_values] : Used for bot message types
@@ -110,7 +118,7 @@ class Message < ApplicationRecord
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data], coder: JSON
 
-  store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
+  store :external_source_ids, accessors: [:slack, :apple_messages], coder: JSON, prefix: :external_source_id
 
   scope :created_since, ->(datetime) { where('created_at > ?', datetime) }
   scope :chat, -> { where.not(message_type: :activity).where(private: false) }

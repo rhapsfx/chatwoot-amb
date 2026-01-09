@@ -1897,11 +1897,11 @@ docker run -d \
 - This ensures n8n can reach external APIs regardless of your network configuration
 
 **Accessing Chatwoot via Tailscale:**
-If your Chatwoot instance is on Tailscale (e.g., `https://macbook-pro-14-perso.tail367da4.ts.net`), the DNS configuration allows n8n to resolve Tailscale hostnames:
+If your Chatwoot instance is on Tailscale (e.g., `https://mac-studio.tail367da4.ts.net`), the DNS configuration allows n8n to resolve Tailscale hostnames:
 
 ```javascript
 // In n8n HTTP Request node
-URL: https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/1/bot_templates/send_message
+URL: https://mac-studio.tail367da4.ts.net/api/v1/accounts/1/bot_templates/send_message
 ```
 
 #### 7. Duplicate Messages from Quick Reply/Interactive Responses

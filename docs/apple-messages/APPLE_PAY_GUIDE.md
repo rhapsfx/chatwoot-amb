@@ -889,8 +889,8 @@ tail -f log/development.log | grep "Apple Pay"
 
 ```log
 [Apple Pay] Making merchant session request for Messages for Business
-[Apple Pay] Domain Name: macbook-pro-14-perso.tail367da4.ts.net
-[Apple Pay] Payment Gateway URL: https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/1/apple_pay/payment_gateway
+[Apple Pay] Domain Name: mac-studio.tail367da4.ts.net
+[Apple Pay] Payment Gateway URL: https://mac-studio.tail367da4.ts.net/api/v1/accounts/1/apple_pay/payment_gateway
 [Apple Pay] Merchant ID: com.apple.apple-pay-matthieu
 [Apple Pay] Apple response code: 200
 [AMB ApplePay] Merchant session created successfully

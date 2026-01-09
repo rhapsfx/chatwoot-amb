@@ -51,7 +51,7 @@ http.get(getOptions, (res) => {
     console.log('Updating node to reference "Router with State" instead of "AHB1 - Parse Form Response"...');
 
     // CORRECT FIX: Reference "Router with State" which is available in ALL flow paths
-    workflow.nodes[nodeIndex].parameters.url = '=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $("Router with State").item.json.accountId }}/conversations/{{ $("Router with State").item.json.conversationId }}/custom_attributes';
+    workflow.nodes[nodeIndex].parameters.url = '=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $("Router with State").item.json.accountId }}/conversations/{{ $("Router with State").item.json.conversationId }}/custom_attributes';
     workflow.nodes[nodeIndex].parameters.bodyParameters.parameters = [
       { name: 'custom_attributes[user_name]', value: '={{ $("AHB1 - Parse Form Response").item.json.userName || "" }}' },
       { name: 'custom_attributes[stage_name]', value: '={{ $("AHB1 - Parse Form Response").item.json.stageName || "" }}' },

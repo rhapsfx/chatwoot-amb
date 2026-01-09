@@ -71,7 +71,7 @@ The IF node checks: `$json.hasStageName === true`
 **Update Name Attributes Node** (HTTP Request):
 
 ```
-URL: https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes
+URL: https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes
 
 Body Parameters:
   custom_attributes[user_name]: {{ $json.userName || '' }}
@@ -88,7 +88,7 @@ Body Parameters:
 **Updated Configuration**:
 
 ```
-URL: https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $("AHB1 - Parse Form Response").item.json.accountId }}/conversations/{{ $("AHB1 - Parse Form Response").item.json.conversationId }}/custom_attributes
+URL: https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $("AHB1 - Parse Form Response").item.json.accountId }}/conversations/{{ $("AHB1 - Parse Form Response").item.json.conversationId }}/custom_attributes
 
 Body Parameters:
   custom_attributes[user_name]: {{ $("AHB1 - Parse Form Response").item.json.userName || "" }}

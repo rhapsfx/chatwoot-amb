@@ -20,7 +20,7 @@ console.log();
 
 // CORRECT FIX: Reference "Router with State" for conversationId and accountId
 // These are available in ALL flow paths (REGION_RESPONSE, NAME_SELECTION, etc.)
-workflow.nodes[nodeIndex].parameters.url = '=https://macbook-pro-14-perso.tail367da4.ts.net/api/v1/accounts/{{ $("Router with State").item.json.accountId }}/conversations/{{ $("Router with State").item.json.conversationId }}/custom_attributes';
+workflow.nodes[nodeIndex].parameters.url = '=https://mac-studio.tail367da4.ts.net/api/v1/accounts/{{ $("Router with State").item.json.accountId }}/conversations/{{ $("Router with State").item.json.conversationId }}/custom_attributes';
 
 // Body parameters can still reference AHB1 - Parse Form Response because
 // by the time this node runs (after "Has Stage Name?" IF node), the form
