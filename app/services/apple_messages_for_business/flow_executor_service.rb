@@ -61,6 +61,8 @@ class AppleMessagesForBusiness::FlowExecutorService
 
     if interactive_value
       log_info "[FlowExecutor] 📱 Interactive response detected: #{interactive_value}"
+      log_info "[FlowExecutor] 🔍 Idempotency check (interactive) - conversation_id=#{@conversation.id}, message_id=#{@message.id}, current_state=#{@current_state}"
+      log_info "[FlowExecutor] 🔍 Idempotency cache key: #{generate_interaction_cache_key(interactive_value)}"
 
       # Idempotency guard: Check if we've already processed this interaction
       if interaction_already_processed?(interactive_value)
@@ -75,6 +77,8 @@ class AppleMessagesForBusiness::FlowExecutorService
       # This handles cases where Apple sends the same message multiple times
       # Use conversation + content as key (not state, since state changes after first message)
       message_key = "conv:#{@conversation.id}:#{@message.content}"
+      log_info "[FlowExecutor] 🔍 Idempotency check (message) - conversation_id=#{@conversation.id}, message_id=#{@message.id}, current_state=#{@current_state}"
+      log_info "[FlowExecutor] 🔍 Idempotency cache key: #{generate_interaction_cache_key(message_key)}"
       if interaction_already_processed?(message_key)
         log_info '[FlowExecutor] 🔒 Message already processed, skipping duplicate'
         return { success: true, skipped: true, nodes_executed: [], current_state: @current_state, messages_sent: 0 }
@@ -1195,8 +1199,10 @@ class AppleMessagesForBusiness::FlowExecutorService
   # @param [String] interactive_value The interaction identifier
   # @return [String] The cache key
   def generate_interaction_cache_key(interactive_value)
-    # Create hash of conversation ID and interaction data
-    interaction_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{interactive_value}")
+    # Create hash of conversation ID, message identity, and interaction data
+    # Include message source_id when present to avoid skipping distinct Apple events
+    message_identity = @message&.source_id || @message&.id || 'unknown_message'
+    interaction_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{message_identity}:#{interactive_value}")
     "flow_executor:#{@flow.id}:interaction:#{interaction_hash}"
   end
 

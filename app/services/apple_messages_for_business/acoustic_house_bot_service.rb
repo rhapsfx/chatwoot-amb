@@ -2269,7 +2269,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_text_message(content)
     with_typing_indicator do
-      Messages::MessageBuilder.new(
+      log_info "[Bot] 📤 send_text_message: #{utf8_encode(content)}"
+      message = Messages::MessageBuilder.new(
         message_sender,
         @conversation,
         bot_message_params(
@@ -2277,6 +2278,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           content: content
         )
       ).perform
+      log_info "[Bot] 📤 send_text_message result: id=#{message&.id}, persisted=#{message&.persisted?}, errors=#{message&.errors&.full_messages}"
     end
   end
 
