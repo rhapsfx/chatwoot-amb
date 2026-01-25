@@ -1331,30 +1331,8 @@ class AppleMessagesForBusiness::IncomingMessageService
         Rails.logger.error "[Bot] ❌ Flow execution failed: #{result[:error]}"
       end
     else
-      # LEGACY: Use old service (will be deprecated)
-      Rails.logger.info '[Bot] 📜 No active flow found - using legacy AcousticHouseBotService'
-      Rails.logger.warn '[Bot] ⚠️  Consider creating a visual flow in Bot Studio for this bot'
-
-      bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
-        @conversation,
-        @message,
-        configured_bot,
-        configured_bot.bot_config
-      )
-
-      # Form responses should go through process_message (where content_type is checked)
-      # Other interactive responses go through process_interactive_response
-      if @message.content_type == 'apple_form_response'
-        Rails.logger.info '[Bot] Form response detected - using process_message'
-        bot_service.process_message
-      elsif @idr_data.present? || @params['interactiveData'].present?
-        Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
-        interactive_data = @params['interactiveData'].presence || @idr_data
-        bot_service.process_interactive_response(interactive_data)
-      else
-        Rails.logger.info '[Bot] Regular message - using process_message'
-        bot_service.process_message
-      end
+      Rails.logger.info '[Bot] 📜 No active flow found - skipping legacy AcousticHouseBotService'
+      Rails.logger.warn '[Bot] ⚠️  Create a visual flow in Bot Studio to enable AMB bot processing'
     end
   rescue StandardError => e
     log_error "[Bot] ❌ Error processing message: #{e.message}"

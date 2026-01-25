@@ -34,10 +34,11 @@
 #   - build_time_picker: Generate time picker with location data from conversation attributes
 #
 class AppleMessagesForBusiness::TemplateExecutorService
-  def initialize(template:, conversation:, message:)
+  def initialize(template:, conversation:, message:, sender: nil)
     @template = template
     @conversation = conversation
     @message = message
+    @sender = sender
     @account = @template.account
     @inbox = @conversation.inbox
     @channel = @inbox.channel
@@ -141,9 +142,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       inbox_id: @inbox.id,
       message_type: :outgoing,
       content: content,
-      content_type: 'text',
-      sender: @account.administrators.first # Bot sends as first admin
-    )
+      content_type: 'text'
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -195,9 +195,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: list_picker_data['received_title'] || 'Select an option',
       content_type: 'apple_list_picker',
-      content_attributes: list_picker_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: list_picker_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -255,9 +254,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: time_picker_data['received_title'] || 'Select a time',
       content_type: 'apple_time_picker',
-      content_attributes: time_picker_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: time_picker_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -312,9 +310,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: form_data['title'] || 'Please fill out this form',
       content_type: 'apple_form',
-      content_attributes: form_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: form_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -363,9 +360,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: params['title'],
       content_type: 'apple_rich_link',
-      content_attributes: rich_link_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: rich_link_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -421,9 +417,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: params['message'],
       content_type: 'apple_quick_reply',
-      content_attributes: quick_reply_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: quick_reply_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -613,9 +608,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: params['app_name'],
       content_type: 'apple_custom_app',
-      content_attributes: imessage_app_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: imessage_app_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -665,9 +659,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: params['title'],
       content_type: 'apple_rich_link',
-      content_attributes: app_clip_data,
-      sender: @account.administrators.first
-    )
+      content_attributes: app_clip_data
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -742,9 +735,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: I18n.t('messages.activity.bot_flow.template.select_store'),
       content_type: 'apple_list_picker',
-      content_attributes: content_attrs,
-      sender: @account.administrators.first
-    )
+      content_attributes: content_attrs
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -823,9 +815,8 @@ class AppleMessagesForBusiness::TemplateExecutorService
       message_type: :outgoing,
       content: I18n.t('messages.activity.bot_flow.template.schedule_lesson'),
       content_type: 'apple_time_picker',
-      content_attributes: content_attrs,
-      sender: @account.administrators.first
-    )
+      content_attributes: content_attrs
+    ).tap { |message| message.update!(message_sender_params) }
 
     # Send via Apple Messages
     dest_id = destination_id
@@ -970,6 +961,15 @@ class AppleMessagesForBusiness::TemplateExecutorService
     log_error '[TemplateExecutor] Cannot send message - no apple_messages_source_id found' unless destination_id_value
 
     destination_id_value
+  end
+
+  def message_sender_params
+    return { sender: @account.administrators.first } if @sender.blank?
+
+    {
+      sender_type: @sender.class.name,
+      sender_id: @sender.id
+    }
   end
 
   # Logging helpers

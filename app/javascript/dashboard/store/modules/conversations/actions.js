@@ -26,7 +26,12 @@ export const hasMessageFailedWithExternalError = pendingMessage => {
   //    In this case, the message will have a status of failed and an external error. So we need to retry that message
   const { content_attributes: contentAttributes, status } = pendingMessage;
   const externalError = contentAttributes?.external_error ?? '';
-  return status === MESSAGE_STATUS.FAILED && externalError !== '';
+  const externalErrorCode = contentAttributes?.external_error_code ?? '';
+  return (
+    status === MESSAGE_STATUS.FAILED &&
+    externalError !== '' &&
+    externalErrorCode !== 'SEND_IN_PROGRESS'
+  );
 };
 
 // actions

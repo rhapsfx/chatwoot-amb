@@ -307,13 +307,29 @@ class AppleMessagesForBusiness::FlowExecutorService
     return true if handler.present? && waiting_handlers.include?(handler)
 
     # Check if any action is a waiting action type
-    waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
-    return true if actions.any? { |action| waiting_action_types.include?(action['type']) }
+    return true if actions.any? { |action| action_requires_waiting?(action) }
 
     # Check if any execute_custom_code action uses a waiting handler
     actions.any? do |action|
       action['type'] == 'execute_custom_code' && waiting_handlers.include?(action['handler'])
     end
+  end
+
+  def action_requires_waiting?(action)
+    waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
+    return true if waiting_action_types.include?(action['type'])
+
+    return true if action['wait_for_response'] == true
+
+    return false unless action['type'] == 'execute_template'
+
+    template_id = action['template_id']
+    return false if template_id.blank?
+
+    template = BotActionTemplate.find_by(id: template_id, account: @account)
+    return false unless template
+
+    %w[send_list_picker send_time_picker send_form send_quick_reply].include?(template.template_type)
   end
 
   # Find initial state from flow
@@ -496,8 +512,7 @@ class AppleMessagesForBusiness::FlowExecutorService
       messages_sent += execute_action(action)
 
       # Track if this action requires waiting for user input
-      waiting_action_types = %w[send_quick_reply send_list_picker send_time_picker send_form apple_form]
-      has_waiting_action = true if waiting_action_types.include?(action['type'])
+      has_waiting_action = true if action_requires_waiting?(action)
 
       # Check if execute_custom_code handler sends interactive messages
       if action['type'] == 'execute_custom_code' && waiting_handlers.include?(action['handler'])
@@ -601,9 +616,9 @@ class AppleMessagesForBusiness::FlowExecutorService
       log_info "[FlowExecutor] ⚠️  Handler #{handler_name} has chaining logic - skipping metadata, using direct call"
     end
 
-    # PRIORITY 4: Direct service call (for complex handlers)
-    log_info "[FlowExecutor] 🎯 Using direct service call for handler: #{handler_name}"
-    execute_handler_via_service(handler_name)
+    # PRIORITY 4: Direct service call disabled (legacy AcousticHouseBotService)
+    log_warn "[FlowExecutor] ⚠️ Legacy handler execution disabled: #{handler_name}"
+    0
   end
 
   # Execute BotActionTemplate using TemplateExecutorService
@@ -613,7 +628,8 @@ class AppleMessagesForBusiness::FlowExecutorService
     executor = AppleMessagesForBusiness::TemplateExecutorService.new(
       template: template,
       conversation: @conversation,
-      message: @message
+      message: @message,
+      sender: @flow.agent_bot
     )
 
     messages_sent = executor.execute
@@ -659,6 +675,9 @@ class AppleMessagesForBusiness::FlowExecutorService
 
   # Execute handler by calling method directly on AcousticHouseBotService
   def execute_handler_via_service(handler_name)
+    log_warn "[FlowExecutor] ⚠️ Legacy handler execution disabled: #{handler_name}"
+    return 0
+
     # Instantiate AcousticHouseBotService to call the handler method
     # This allows us to reuse existing handler logic
     bot_service = AppleMessagesForBusiness::AcousticHouseBotService.new(
@@ -784,13 +803,12 @@ class AppleMessagesForBusiness::FlowExecutorService
       Messages::MessageBuilder.new(
         nil, # user (bot context, no specific user)
         @conversation,
-        {
+        bot_message_params(
           content: title,
           message_type: :outgoing,
           content_type: 'apple_quick_reply',
-          content_attributes: content_attributes,
-          sender: @flow.agent_bot
-        }
+          content_attributes: content_attributes
+        )
       ).perform
 
       log_info '[FlowExecutor] ✅ Quick reply message created and queued for sending'
@@ -1002,13 +1020,12 @@ class AppleMessagesForBusiness::FlowExecutorService
     message = Messages::MessageBuilder.new(
       nil, # user (bot context, no specific user)
       @conversation,
-      {
+      bot_message_params(
         content: template_data['text'] || template.name,
         message_type: :outgoing,
         content_type: content_type,
-        content_attributes: template_data,
-        sender: @flow.agent_bot
-      }
+        content_attributes: template_data
+      )
     ).perform
 
     log_info "[FlowExecutor] ✅ Message created (ID: #{message.id}) and queued for sending"
@@ -1025,13 +1042,24 @@ class AppleMessagesForBusiness::FlowExecutorService
     mb = Messages::MessageBuilder.new(
       nil, # user (bot context)
       @conversation,
-      {
+      bot_message_params(
         content: text,
-        message_type: :outgoing,
-        sender: @flow.agent_bot
-      }
+        message_type: :outgoing
+      )
     )
     mb.perform
+  end
+
+  # Helper method to build message params with bot sender metadata
+  def bot_message_params(base_params)
+    agent_bot = @flow.agent_bot
+
+    return base_params if agent_bot.blank?
+
+    base_params.merge(
+      sender_type: 'AgentBot',
+      sender_id: agent_bot.id
+    )
   end
 
   # Helper: Find node by ID
@@ -1223,91 +1251,8 @@ class AppleMessagesForBusiness::FlowExecutorService
       return 0
     end
 
-    # Create AcousticHouseBotService instance
-    # When processing interactive responses during auto-transition, pass nil message
-    # This ensures handlers treat it as "first time in state" rather than "user response"
-    message_for_handler = @processing_interactive_response ? nil : @message
-
-    log_info '[FlowExecutor] 🧹 Clearing message context for handler (interactive response being processed)' if @processing_interactive_response
-
-    service = AppleMessagesForBusiness::AcousticHouseBotService.new(
-      @conversation,
-      message_for_handler,
-      @flow.agent_bot,
-      @flow.agent_bot.bot_config
-    )
-
-    # Check if handler exists
-    unless service.respond_to?(handler_name.to_sym, true)
-      log_error "[FlowExecutor] ❌ Custom handler '#{handler_name}' not found in AcousticHouseBotService"
-      return 0
-    end
-
-    # Invoke handler using send
-    log_info "[FlowExecutor] 🔧 Executing custom handler: #{handler_name}"
-
-    begin
-      result = service.send(handler_name.to_sym)
-      log_info "[FlowExecutor] ✅ Custom handler executed successfully: #{handler_name}"
-
-      # Check if handler requested a state transition
-      if result.is_a?(Hash) && result[:transition_to]
-        target_state = result[:transition_to]
-        log_info "[FlowExecutor] 🔀 Handler requested transition to: #{target_state}"
-
-        # CRITICAL: Mark message as consumed to prevent it from being processed again
-        # The handler has consumed the user's message, so subsequent handlers in the
-        # transition chain should see "no message" and ask for new input
-        log_info '[FlowExecutor] 🧹 Message consumed by handler - clearing context for transition chain'
-        @processing_interactive_response = true
-
-        # Add delay for handlers that send AR files or attachments
-        # These need extra time for file upload and delivery before next message
-        handlers_with_attachments = %w[
-          handle_ar_introduction
-          handle_ar_response
-          send_ar_file
-        ]
-
-        if handlers_with_attachments.include?(handler_name)
-          log_info '[FlowExecutor] ⏱️  Waiting for AR file delivery (3s delay)'
-          sleep 3.0
-        end
-
-        # Update current state (both instance variable and database)
-        @current_state = target_state
-        @conversation.custom_attributes ||= {}
-        @conversation.custom_attributes['current_state'] = target_state
-        @conversation.save!
-
-        # Find and execute the target node (could be state or condition)
-        target_node = @flow_data['nodes'].find { |n| n['id'] == target_state }
-        if target_node
-          log_info "[FlowExecutor] ➡️ Transitioning to: #{target_state} (type: #{target_node['type']})"
-
-          # Execute the appropriate node type
-          case target_node['type']
-          when 'state'
-            return execute_state_node(target_node)
-          when 'condition'
-            @executed_nodes << target_node['id']
-            return execute_condition_node(target_node)
-          else
-            log_error "[FlowExecutor] ❌ Unknown node type: #{target_node['type']}"
-            return 0
-          end
-        else
-          log_error "[FlowExecutor] ❌ Target node not found: #{target_state}"
-          return 0
-        end
-      end
-
-      1 # Return 1 to indicate handler was called (actual message count may vary)
-    rescue StandardError => e
-      log_error "[FlowExecutor] ❌ Error executing custom handler #{handler_name}: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      0
-    end
+    log_warn "[FlowExecutor] ⚠️ execute_custom_code is disabled (legacy handler: #{handler_name})"
+    0
   end
 
   # ============================================================================

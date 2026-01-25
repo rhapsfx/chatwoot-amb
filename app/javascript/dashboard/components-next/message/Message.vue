@@ -140,6 +140,10 @@ const showContextMenu = ref(false);
 const { t } = useI18n();
 const route = useRoute();
 
+const isSendInProgressError = computed(
+  () => props.contentAttributes?.externalErrorCode === 'SEND_IN_PROGRESS'
+);
+
 /**
  * Computes the message variant based on props
  * @type {import('vue').ComputedRef<'user'|'agent'|'activity'|'private'|'bot'|'template'>}
@@ -158,7 +162,8 @@ const variant = computed(() => {
     return MESSAGE_VARIANTS.EMAIL;
   }
 
-  if (props.status === MESSAGE_STATUS.FAILED) return MESSAGE_VARIANTS.ERROR;
+  if (props.status === MESSAGE_STATUS.FAILED && !isSendInProgressError.value)
+    return MESSAGE_VARIANTS.ERROR;
   if (props.contentAttributes?.isUnsupported)
     return MESSAGE_VARIANTS.UNSUPPORTED;
 
@@ -256,7 +261,8 @@ const gridTemplate = computed(() => {
 });
 
 const shouldGroupWithNext = computed(() => {
-  if (props.status === MESSAGE_STATUS.FAILED) return false;
+  if (props.status === MESSAGE_STATUS.FAILED && !isSendInProgressError.value)
+    return false;
 
   return props.groupWithNext;
 });
@@ -529,7 +535,7 @@ provideMessageContext({
         <Component :is="componentToRender" />
       </div>
       <MessageError
-        v-if="contentAttributes.externalError"
+        v-if="contentAttributes.externalError && !isSendInProgressError"
         class="[grid-area:meta]"
         :class="flexOrientationClass"
         :error="contentAttributes.externalError"

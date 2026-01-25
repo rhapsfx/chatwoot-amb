@@ -147,13 +147,13 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
       # Store error in BOTH content_attributes (for UI display) and additional_attributes (for backend reference)
       message.update!(
         status: :failed,
-        content_attributes: message.content_attributes.merge(external_error: response[:error]),
-        additional_attributes: message.additional_attributes.merge(external_error: response[:error])
+        content_attributes: message.content_attributes.merge(external_error: response[:error], external_error_code: response[:error_code]),
+        additional_attributes: message.additional_attributes.merge(external_error: response[:error], external_error_code: response[:error_code])
       )
     else
       message.update!(
         status: :failed,
-        content_attributes: { external_error: response[:error] }
+        content_attributes: { external_error: response[:error], external_error_code: response[:error_code] }
       )
     end
   end

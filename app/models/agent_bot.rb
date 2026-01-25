@@ -132,15 +132,9 @@ class AgentBot < ApplicationRecord
     true
   end
 
-  def process_amb_bot(conversation, message)
-    config = effective_config(inbox_id: conversation.inbox_id)
-
-    AppleMessagesForBusiness::AcousticHouseBotService.new(
-      conversation,
-      message,
-      self,
-      config
-    ).process_message
+  def process_amb_bot(_conversation, _message)
+    Rails.logger.info "[AgentBot] AMB processing via AcousticHouseBotService is disabled (bot_id: #{id})"
+    false
   end
 
   def validate_amb_config
