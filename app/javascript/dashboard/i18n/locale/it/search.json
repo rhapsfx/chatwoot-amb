@@ -1,0 +1,32 @@
+{
+  "SEARCH": {
+    "TABS": {
+      "ALL": "Tutti",
+      "CONTACTS": "Contatti",
+      "CONVERSATIONS": "Conversazioni",
+      "MESSAGES": "Messaggi",
+      "ARTICLES": "Articoli"
+    },
+    "SECTION": {
+      "CONTACTS": "Contatti",
+      "CONVERSATIONS": "Conversazioni",
+      "MESSAGES": "Messaggi",
+      "ARTICLES": "Articoli"
+    },
+    "VIEW_MORE": "Mostra di più",
+    "LOAD_MORE": "Carica altro",
+    "SEARCHING_DATA": "Ricerca",
+    "LOADING_DATA": "Caricamento",
+    "EMPTY_STATE": "Nessun {item} trovato per la ricerca '{query}'",
+    "EMPTY_STATE_FULL": "Nessun risultato trovato per la ricerca '{query}'",
+    "PLACEHOLDER_KEYBINDING": "/ per evidenziare",
+    "INPUT_PLACEHOLDER": "Digita 3 o più caratteri da cercare",
+    "EMPTY_STATE_DEFAULT": "Ricerca per id conversazione, email, numero di telefono, messaggi per risultati di ricerca migliori. ",
+    "BOT_LABEL": "Bot",
+    "READ_MORE": "Leggi di più",
+    "WROTE": "ha scritto:",
+    "FROM": "da",
+    "EMAIL": "email",
+    "EMAIL_SUBJECT": "oggetto"
+  }
+}

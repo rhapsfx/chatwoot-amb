@@ -1,0 +1,262 @@
+{
+  "name": "Bulk Template Sending - Newsletter",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-1",
+      "name": "Schedule - Every Monday at 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://your-crm-api.com/api/customers/active",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "Fetch Active Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "CRM API Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "split-1",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "item-lists-1",
+      "name": "Loop Over Customers",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare data for each customer\nconst customer = $json;\n\nreturn {\n  conversation_id: customer.chatwoot_conversation_id,\n  customer_name: customer.name,\n  customer_email: customer.email,\n  vip_status: customer.is_vip ? 'VIP' : 'Standard',\n  account_created: new Date(customer.created_at).toLocaleDateString(),\n  promo_code: customer.is_vip ? 'VIP20' : 'STANDARD10'\n};"
+      },
+      "id": "function-1",
+      "name": "Prepare Customer Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "accountId": 1,
+        "conversationId": "={{$json.conversation_id}}",
+        "templateSelection": "id",
+        "templateId": 456,
+        "parameters": {
+          "parameter": [
+            {
+              "key": "customer_name",
+              "value": "={{$json.customer_name}}"
+            },
+            {
+              "key": "vip_status",
+              "value": "={{$json.vip_status}}"
+            },
+            {
+              "key": "promo_code",
+              "value": "={{$json.promo_code}}"
+            },
+            {
+              "key": "account_created",
+              "value": "={{$json.account_created}}"
+            }
+          ]
+        },
+        "additionalOptions": {}
+      },
+      "id": "template-message-1",
+      "name": "Send Newsletter",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBFileAttachment",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-1",
+      "name": "Wait Between Sends",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "webhookId": "wait-between-sends"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate results from all sends\nconst items = $input.all();\n\nconst summary = {\n  total_sent: items.length,\n  successful: items.filter(i => !i.json.error).length,\n  failed: items.filter(i => i.json.error).length,\n  total_attachments: items.reduce((sum, i) => sum + (i.json.metadata?.attachments_sent || 0), 0),\n  timestamp: new Date().toISOString()\n};\n\nreturn { json: summary };"
+      },
+      "id": "function-2",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate summary report\nconst summary = $json;\n\nconst report = `\n📊 Newsletter Sending Report\n================================\n\nDate: ${summary.timestamp}\n\n✅ Total Sent: ${summary.total_sent}\n✓ Successful: ${summary.successful}\n✗ Failed: ${summary.failed}\n📎 Total Attachments: ${summary.total_attachments}\n\nSuccess Rate: ${((summary.successful / summary.total_sent) * 100).toFixed(1)}%\n`;\n\nconsole.log(report);\n\nreturn {\n  json: {\n    report: report,\n    summary: summary\n  }\n};"
+      },
+      "id": "function-3",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "Schedule - Every Monday at 9 AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Customers": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Customers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Customers": {
+      "main": [
+        [
+          {
+            "node": "Prepare Customer Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Customer Data": {
+      "main": [
+        [
+          {
+            "node": "Send Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Newsletter": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Sends": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "instanceId": "bulk-newsletter-example"
+  },
+  "tags": [
+    {
+      "name": "chatwoot"
+    },
+    {
+      "name": "template"
+    },
+    {
+      "name": "bulk"
+    },
+    {
+      "name": "newsletter"
+    }
+  ]
+}
