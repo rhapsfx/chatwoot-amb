@@ -67,12 +67,15 @@ channel.payment_settings['apple_pay'] ||= {}
   channel.payment_settings['apple_pay']['merchant_identity_private_key'] = key_content
 
   # Ensure merchant identifier/domain are present (fallback to ENV)
-  channel.payment_settings['apple_pay']['merchant_identifier'] =
-    channel.payment_settings['apple_pay']['merchant_identifier'].presence ||
-    ENV['APPLE_PAY_MERCHANT_IDENTIFIER']
+  raw_merchant_id = channel.payment_settings['apple_pay']['merchant_identifier'].presence ||
+                    ENV['APPLE_PAY_MERCHANT_IDENTIFIER']
+
+  merchant_id = raw_merchant_id
+
+  channel.payment_settings['apple_pay']['merchant_identifier'] = merchant_id
 
   # Ensure business registration merchant identifier is set (top-level)
-  channel.payment_settings['merchantIdentifier'] = channel.payment_settings['apple_pay']['merchant_identifier']
+  channel.payment_settings['merchantIdentifier'] = merchant_id
 
   channel.payment_settings['apple_pay']['merchant_domain'] = 'msp.rhaps.net'
 
@@ -137,14 +140,14 @@ echo "======================================================================="
 echo "✅ DEPLOYMENT COMPLETE"
 echo "======================================================================="
 echo ""
-echo "Apple Pay should now work in inbox 11."
+echo "Apple Pay should now work in inbox 16."
 echo ""
 echo "To test:"
 echo "  1. Send 'apple pay' message to the bot"
 echo "  2. Bot should send Apple Pay payment request successfully"
 echo ""
 echo "To check logs:"
-echo "  ./script/check_bot_logs.sh"
+echo "  docker logs chatwoot-worker --since 10m | grep -i \"apple pay\""
 echo ""
 
 rm -f /tmp/update_apple_pay_certs.rb

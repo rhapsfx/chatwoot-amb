@@ -250,10 +250,8 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
 
   # Get the string merchant identifier (used in applePay config)
   def merchant_identifier_string
-    full_identifier = @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
-                      ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
-
-    full_identifier
+    @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
+      ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
   end
 
   # Build receivedMessage (message bubble shown before payment)

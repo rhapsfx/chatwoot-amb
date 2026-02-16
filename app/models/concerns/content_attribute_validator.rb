@@ -25,7 +25,8 @@ class ContentAttributeValidator < ActiveModel::Validator
                             :required_billing_fields, :required_shipping_fields,
                             :requires_shipping, :requires_billing,
                             :received_title, :received_subtitle, :received_style,
-                            :received_image_identifier].freeze
+                            :received_image_identifier, :reply_style,
+                            :reply_image_identifier, :reply_title, :reply_subtitle].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
   ALLOWED_APPLE_FORM_KEYS = [:title, :description, :request_identifier, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
                              :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary].freeze

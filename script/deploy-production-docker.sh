@@ -4,6 +4,25 @@ set -euo pipefail
 COMPOSE_FILE="docker-compose.production.yml"
 BUILD_STAMP_FILE="tmp/.docker-production-build"
 GIT_HEAD="$(git rev-parse HEAD)"
+CERTS_DIR="certs/apple_pay"
+CERTS_BACKUP_DIR="tmp/apple_pay_certs_backup"
+
+restore_certs_if_missing() {
+  if [ -d "$CERTS_BACKUP_DIR" ]; then
+    if [ ! -f "$CERTS_DIR/apple_pay_cert.pem" ] || [ ! -f "$CERTS_DIR/apple_pay_private.key" ]; then
+      echo "=== Restoring Apple Pay certs from backup ==="
+      mkdir -p "$CERTS_DIR"
+      cp -f "$CERTS_BACKUP_DIR"/* "$CERTS_DIR"/ 2>/dev/null || true
+    fi
+  fi
+}
+
+trap restore_certs_if_missing EXIT
+
+if [ -d "$CERTS_DIR" ]; then
+  mkdir -p "$CERTS_BACKUP_DIR"
+  cp -f "$CERTS_DIR"/* "$CERTS_BACKUP_DIR"/ 2>/dev/null || true
+fi
 
 FORCE_BUILD=false
 if [ "${1:-}" = "--force" ] || [ "${1:-}" = "-f" ]; then
