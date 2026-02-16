@@ -75,7 +75,7 @@ Rails.application.configure do
 
   # Disable host check during development and allow Tailscale domain
   config.hosts = nil
-  config.hosts << "liquid-m3-pro.tail367da4.ts.net" if config.hosts
+  config.hosts << "mac-studio.tail367da4.ts.net" if config.hosts
   config.force_ssl = false
   
   # GitHub Codespaces configuration

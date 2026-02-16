@@ -812,7 +812,7 @@ Rails commands can modify database state, trigger side effects, or perform opera
 ## Remote Server Deployment
 
 **Production Server**: msp.rhaps.net (Docker-based deployment)
-**Development Server**: liquid-m3-pro.tail367da4.ts.net (Tailscale Funnel via `script/dev-server.sh`)
+**Development Server**: mac-studio.tail367da4.ts.net (Tailscale Funnel via `script/dev-server.sh`)
 
 ### 📖 Complete Deployment Documentation
 
@@ -961,7 +961,7 @@ ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.pro
 ### Local Development Server
 
 **Script**: `script/dev-server.sh`
-**Domain**: liquid-m3-pro.tail367da4.ts.net (Tailscale Funnel)
+**Domain**: mac-studio.tail367da4.ts.net (Tailscale Funnel)
 **Management**: `./script/dev-server.sh {start|start-public|stop|restart|status|help}`
 
 The dev server automatically:

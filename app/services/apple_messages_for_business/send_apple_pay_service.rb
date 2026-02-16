@@ -253,13 +253,7 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     full_identifier = @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
                       ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
 
-    # Strip team prefix if present
-    # Format: MS58PRCFSS.com.apple.apple-pay-matthieu → com.apple.apple-pay-matthieu
-    if full_identifier&.include?('.')
-      full_identifier.split('.', 2).last
-    else
-      full_identifier
-    end
+    full_identifier
   end
 
   # Build receivedMessage (message bubble shown before payment)

@@ -20,9 +20,9 @@ RUN apt-get update -qq && \
     ca-certificates \
     tzdata \
     shared-mime-info \
-    git && \
-    curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
-    apt-get install -y nodejs && \
+    git \
+    nodejs \
+    npm && \
     rm -rf /var/lib/apt/lists/*
 
 # Set production environment
@@ -41,10 +41,8 @@ WORKDIR /app
 # ============================================
 FROM base AS node-builder
 
-# Install Node.js 23.x and pnpm 10.x
-RUN curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g pnpm@10.2.0
+# Install pnpm 10.x
+RUN npm install -g pnpm@10.2.0
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
@@ -67,9 +65,8 @@ COPY vite.config.ts ./
 COPY tailwind.config.js ./
 COPY postcss.config.js ./
 
-# Build frontend assets with Vite directly (with increased memory limit)
-# Using 3GB heap size for local builds (adjust for server environment)
-RUN NODE_OPTIONS="--max-old-space-size=3072" npx vite build --mode=production
+# Build frontend assets with Vite directly (increase heap for build)
+RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --mode=production
 
 # ============================================
 # Stage 4: Ruby Dependencies

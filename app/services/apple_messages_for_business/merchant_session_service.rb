@@ -189,16 +189,8 @@ class AppleMessagesForBusiness::MerchantSessionService
   end
 
   def merchant_identifier
-    full_identifier = @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
-                      ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
-
-    # For Messages for Business, use only the merchant ID portion without team prefix
-    # Format: MS58PRCFSS.com.apple.apple-pay-matthieu → com.apple.apple-pay-matthieu
-    if full_identifier&.include?('.')
-      full_identifier.split('.', 2).last
-    else
-      full_identifier
-    end
+    @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
+      ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
   end
 
   def merchant_domain

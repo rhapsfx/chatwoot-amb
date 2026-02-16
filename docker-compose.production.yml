@@ -6,6 +6,9 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: chatwoot-postgres
+    platform: linux/arm64
+    networks:
+      - cloudflare_rhaps_prod_net
     environment:
       POSTGRES_DB: chatwoot_production
       POSTGRES_USER: chatwoot_user
@@ -24,6 +27,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: chatwoot-redis
+    platform: linux/arm64
+    networks:
+      - cloudflare_rhaps_prod_net
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -37,11 +43,14 @@ services:
 
   # Rails Web Application
   web:
-    image: chatwoot:production
+    image: chatwoot:production-web
+    build:
+      context: .
+      dockerfile: Dockerfile.production
     container_name: chatwoot-web
+    platform: linux/arm64
     networks:
-      - default
-      - npm-network
+      - cloudflare_rhaps_prod_net
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +62,11 @@ services:
       RAILS_SERVE_STATIC_FILES: "true"
       RAILS_LOG_TO_STDOUT: "true"
       SECRET_KEY_BASE: "${SECRET_KEY_BASE:-dummy_secret_key_base_for_testing_only_replace_in_production}"
+
+      # Apple Maps Server API
+      APPLE_MAPS_TEAM_ID: "${APPLE_MAPS_TEAM_ID}"
+      APPLE_MAPS_KEY_ID: "${APPLE_MAPS_KEY_ID}"
+      APPLE_MAPS_PRIVATE_KEY: "${APPLE_MAPS_PRIVATE_KEY}"
 
       # Database Configuration
       POSTGRES_HOST: postgres
@@ -85,13 +99,17 @@ services:
       # Mailer Configuration
       MAILER_SENDER_EMAIL: "Chatwoot <rhaps@icloud.com>"
 
+      # Apple Pay Configuration
+      APPLE_PAY_MERCHANT_DOMAIN: "${APPLE_PAY_MERCHANT_DOMAIN}"
+      APPLE_PAY_MERCHANT_IDENTIFIER: "${APPLE_PAY_MERCHANT_IDENTIFIER}"
+      APPLE_PAY_TEST_MODE: "${APPLE_PAY_TEST_MODE}"
+
     ports:
       - "3000:8080"
     volumes:
       - ./storage:/app/storage
       - ./log:/app/log
       - ./tmp:/app/tmp
-      - ./public/vite:/app/public/vite:ro
     command: >
       sh -c "
         echo 'Waiting for database to be ready...' &&
@@ -109,9 +127,15 @@ services:
 
   # Sidekiq Worker
   worker:
-    image: chatwoot:production
+    image: chatwoot:production-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.production
     container_name: chatwoot-worker
     hostname: chatwoot-worker
+    platform: linux/arm64
+    networks:
+      - cloudflare_rhaps_prod_net
     ports:
       - "7433:7433"
     depends_on:
@@ -134,6 +158,11 @@ services:
       REDIS_URL: redis://redis:6379
       ACTIVE_STORAGE_SERVICE: local
 
+      # Apple Maps Server API
+      APPLE_MAPS_TEAM_ID: "${APPLE_MAPS_TEAM_ID}"
+      APPLE_MAPS_KEY_ID: "${APPLE_MAPS_KEY_ID}"
+      APPLE_MAPS_PRIVATE_KEY: "${APPLE_MAPS_PRIVATE_KEY}"
+
       # Frontend URL for email links
       FRONTEND_URL: https://msp.rhaps.net
 
@@ -147,6 +176,11 @@ services:
       SMTP_ENABLE_STARTTLS_AUTO: "true"
       SMTP_OPENSSL_VERIFY_MODE: peer
       MAILER_SENDER_EMAIL: "Chatwoot <rhaps@icloud.com>"
+
+      # Apple Pay Configuration
+      APPLE_PAY_MERCHANT_DOMAIN: "${APPLE_PAY_MERCHANT_DOMAIN}"
+      APPLE_PAY_MERCHANT_IDENTIFIER: "${APPLE_PAY_MERCHANT_IDENTIFIER}"
+      APPLE_PAY_TEST_MODE: "${APPLE_PAY_TEST_MODE}"
     volumes:
       - ./storage:/app/storage
       - ./log:/app/log
@@ -160,6 +194,6 @@ volumes:
     driver: local
 
 networks:
-  npm-network:
+  cloudflare_rhaps_prod_net:
     external: true
-    name: npm-network
+    name: cloudflare_rhaps_prod_net

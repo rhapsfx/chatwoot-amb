@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy Apple Pay merchant certificates to production and configure inbox
+# Deploy Apple Pay merchant certificates to local production Docker and configure inbox
 
 set -e
 
@@ -24,15 +24,15 @@ echo "   Cert: certs/apple_pay/apple_pay_cert.pem"
 echo "   Key:  certs/apple_pay/apple_pay_private.key"
 echo ""
 
-# Create certificate update script
+# Create certificate update script (runs inside container)
 cat > /tmp/update_apple_pay_certs.rb << 'RUBY'
 puts "=" * 70
 puts "🔐 UPDATING APPLE PAY CERTIFICATES FOR INBOX 11"
 puts "=" * 70
 
 # Read certificate and key from files
-cert_path = '/opt/chatwoot/certs/apple_pay/apple_pay_cert.pem'
-key_path = '/opt/chatwoot/certs/apple_pay/apple_pay_private.key'
+cert_path = '/app/certs/apple_pay/apple_pay_cert.pem'
+key_path = '/app/certs/apple_pay/apple_pay_private.key'
 
 unless File.exist?(cert_path)
   puts "❌ Certificate file not found: #{cert_path}"
@@ -51,8 +51,8 @@ puts "\n✅ Certificate files loaded"
 puts "   Cert size: #{cert_content.bytesize} bytes"
 puts "   Key size: #{key_content.bytesize} bytes"
 
-# Update inbox 11's channel
-inbox = Inbox.find(11)
+  # Update inbox channel
+  inbox = Inbox.find(16)
 channel = inbox.channel
 
 puts "\n📥 Updating Inbox ##{inbox.id}: #{inbox.name}"
@@ -63,8 +63,21 @@ channel.payment_settings ||= {}
 channel.payment_settings['apple_pay'] ||= {}
 
 # Update certificate and key
-channel.payment_settings['apple_pay']['merchant_identity_certificate'] = cert_content
-channel.payment_settings['apple_pay']['merchant_identity_private_key'] = key_content
+  channel.payment_settings['apple_pay']['merchant_identity_certificate'] = cert_content
+  channel.payment_settings['apple_pay']['merchant_identity_private_key'] = key_content
+
+  # Ensure merchant identifier/domain are present (fallback to ENV)
+  channel.payment_settings['apple_pay']['merchant_identifier'] =
+    channel.payment_settings['apple_pay']['merchant_identifier'].presence ||
+    ENV['APPLE_PAY_MERCHANT_IDENTIFIER']
+
+  # Ensure business registration merchant identifier is set (top-level)
+  channel.payment_settings['merchantIdentifier'] = channel.payment_settings['apple_pay']['merchant_identifier']
+
+  channel.payment_settings['apple_pay']['merchant_domain'] = 'msp.rhaps.net'
+
+  # Also set top-level merchantDomain for legacy access paths
+  channel.payment_settings['merchantDomain'] = channel.payment_settings['apple_pay']['merchant_domain']
 
 # Save changes
 if channel.save
@@ -100,33 +113,24 @@ end
 puts "\n" + "=" * 70
 RUBY
 
-echo "Step 1: Creating certs directory on production server..."
-ssh root@msp.rhaps.net 'mkdir -p /opt/chatwoot/certs/apple_pay'
-
-echo "Step 2: Copying certificates to production server..."
-scp -q certs/apple_pay/apple_pay_cert.pem root@msp.rhaps.net:/opt/chatwoot/certs/apple_pay/
-scp -q certs/apple_pay/apple_pay_private.key root@msp.rhaps.net:/opt/chatwoot/certs/apple_pay/
-
-echo "✅ Certificates copied to production"
-echo ""
-
-echo "Step 3: Updating database configuration..."
-scp -q /tmp/update_apple_pay_certs.rb root@msp.rhaps.net:/tmp/
-
-ssh root@msp.rhaps.net 'bash -s' << 'REMOTE_SCRIPT'
-cd /opt/chatwoot
+echo "Step 1: Copying certificates into local production container..."
 WEB_CONTAINER=$(docker compose -f docker-compose.production.yml ps -q web)
 
-# Copy certs into container
-echo "   → Copying certificates into container..."
-docker cp /opt/chatwoot/certs/apple_pay $WEB_CONTAINER:/opt/chatwoot/certs/
+if [ -z "$WEB_CONTAINER" ]; then
+    echo "❌ Web container not running"
+    exit 1
+fi
 
-# Copy and run update script
-echo "   → Running database update..."
-docker cp /tmp/update_apple_pay_certs.rb $WEB_CONTAINER:/tmp/
+echo "   → Creating certs directory in container..."
+docker exec "$WEB_CONTAINER" mkdir -p /app/certs/apple_pay
 
-docker exec $WEB_CONTAINER bundle exec rails runner /tmp/update_apple_pay_certs.rb RAILS_ENV=production 2>&1 | grep -v "INFO --"
-REMOTE_SCRIPT
+echo "   → Copying certificates..."
+docker cp certs/apple_pay/apple_pay_cert.pem "$WEB_CONTAINER":/app/certs/apple_pay/
+docker cp certs/apple_pay/apple_pay_private.key "$WEB_CONTAINER":/app/certs/apple_pay/
+
+echo "Step 2: Updating database configuration..."
+docker cp /tmp/update_apple_pay_certs.rb "$WEB_CONTAINER":/tmp/
+docker exec "$WEB_CONTAINER" bundle exec rails runner /tmp/update_apple_pay_certs.rb RAILS_ENV=production 2>&1 | grep -v "INFO --"
 
 echo ""
 echo "======================================================================="
