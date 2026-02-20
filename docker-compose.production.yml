@@ -6,6 +6,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: chatwoot-postgres
+    restart: unless-stopped
     platform: linux/arm64
     networks:
       - cloudflare_rhaps_prod_net
@@ -27,6 +28,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: chatwoot-redis
+    restart: unless-stopped
     platform: linux/arm64
     networks:
       - cloudflare_rhaps_prod_net
@@ -48,6 +50,7 @@ services:
       context: .
       dockerfile: Dockerfile.production
     container_name: chatwoot-web
+    restart: unless-stopped
     platform: linux/arm64
     networks:
       - cloudflare_rhaps_prod_net
@@ -133,6 +136,7 @@ services:
       dockerfile: Dockerfile.production
     container_name: chatwoot-worker
     hostname: chatwoot-worker
+    restart: unless-stopped
     platform: linux/arm64
     networks:
       - cloudflare_rhaps_prod_net
