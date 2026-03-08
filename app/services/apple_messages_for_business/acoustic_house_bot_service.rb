@@ -263,10 +263,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       # After handling the interactive response, process the updated state
       # This allows state transitions to continue (e.g., AHC1 → AHC2 → handle_ar_introduction)
       # However, skip process_state for states that are explicitly waiting for new user input
+      # or for menu selections where the handler has already sent the demo response.
       waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
+      skip_process_state_for_request_ids = %w[lp_menu_0319]
 
       if waiting_states.include?(@bot_state)
         log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
+      elsif skip_process_state_for_request_ids.include?(request_id)
+        log_info "[Bot] 🔄 Request #{request_id} handled by menu selection - skipping process_state"
       else
         log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
         process_state
@@ -2917,6 +2921,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           content_type: 'apple_rich_link',
           content_attributes: {
             'url' => url,
+            'title' => 'Open App Clip',
             'rich_link_data_ref' => {
               'url' => url
             }

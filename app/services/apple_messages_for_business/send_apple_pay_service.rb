@@ -110,7 +110,6 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     payload = build_apple_msp_payload(message_id, merchant_session_result)
 
     # Send to Apple MSP gateway
-    Rails.logger.info "[AMB ApplePay] Payload JSON: #{payload.to_json}"
     response = send_to_apple_gateway(payload, message_id)
 
     if response.success?

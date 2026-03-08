@@ -180,6 +180,22 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
         service.process_interactive_response(interactive_data)
       end
     end
+
+    context 'with menu requestIdentifier format' do
+      let(:interactive_data) do
+        {
+          'data' => {
+            'requestIdentifier' => 'lp_menu_0319'
+          }
+        }
+      end
+
+      it 'handles menu selection without calling process_state' do
+        expect(service).to receive(:handle_menu_selection).with(interactive_data)
+        expect(service).not_to receive(:process_state)
+        service.process_interactive_response(interactive_data)
+      end
+    end
   end
 
   describe '#schedule_delayed_action' do
@@ -526,6 +542,19 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
     it 'routes menu selection 10 to iMessage app handler' do
       expect(service).to receive(:handle_imessage_app)
       service.send(:handle_menu_selection, interactive_data)
+    end
+  end
+
+  describe '#send_app_clip' do
+    it 'creates an apple_rich_link message with required title' do
+      service.send(:send_app_clip, url: 'https://chibi.app')
+      created_message = conversation.messages.where(content_type: 'apple_rich_link').order(:created_at).last
+
+      expect(created_message).to be_present
+      expect(created_message.content_type).to eq('apple_rich_link')
+      expect(created_message.content_attributes['url']).to eq('https://chibi.app')
+      expect(created_message.content_attributes['title']).to eq('Open App Clip')
+      expect(created_message.content_attributes['rich_link_data_ref']).to eq({ 'url' => 'https://chibi.app' })
     end
   end
 
