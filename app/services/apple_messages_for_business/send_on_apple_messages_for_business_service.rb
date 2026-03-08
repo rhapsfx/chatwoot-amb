@@ -143,17 +143,16 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
     if response[:success]
       message.update!(source_id: response[:message_id])
     elsif message.content_type.start_with?('apple_')
-      # For Apple Messages content types, preserve original content_attributes
-      # Store error in BOTH content_attributes (for UI display) and additional_attributes (for backend reference)
+      # Preserve strict Apple content_attributes; store failures in message-level fields.
       message.update!(
         status: :failed,
-        content_attributes: message.content_attributes.merge(external_error: response[:error]),
-        additional_attributes: message.additional_attributes.merge(external_error: response[:error])
+        external_error: response[:error],
+        additional_attributes: (message.additional_attributes || {}).merge(external_error: response[:error])
       )
     else
       message.update!(
         status: :failed,
-        content_attributes: { external_error: response[:error] }
+        external_error: response[:error]
       )
     end
   end

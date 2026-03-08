@@ -547,6 +547,19 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
 
   describe '#send_app_clip' do
     it 'creates an apple_rich_link message with required title' do
+      allow_any_instance_of(AppleMessagesForBusiness::ConstructPayloadService)
+        .to receive(:perform)
+        .and_return(
+          success: true,
+          rich_link_data_ref: {
+            'signature_data' => { 'signature' => 'test-signature' },
+            'reference_id' => 'test-ref-id',
+            'cert_chain' => ['cert1'],
+            'signature_base64' => 'test-base64'
+          },
+          version: 1
+        )
+
       service.send(:send_app_clip, url: 'https://chibi.app')
       created_message = conversation.messages.where(content_type: 'apple_rich_link').order(:created_at).last
 
@@ -554,7 +567,12 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
       expect(created_message.content_type).to eq('apple_rich_link')
       expect(created_message.content_attributes['url']).to eq('https://chibi.app')
       expect(created_message.content_attributes['title']).to eq('Open App Clip')
-      expect(created_message.content_attributes['rich_link_data_ref']).to eq({ 'url' => 'https://chibi.app' })
+      expect(created_message.content_attributes['rich_link_data_ref']).to include(
+        'signature_data',
+        'reference_id',
+        'cert_chain',
+        'signature_base64'
+      )
     end
   end
 

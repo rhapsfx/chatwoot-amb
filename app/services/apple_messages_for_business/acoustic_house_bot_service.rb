@@ -79,7 +79,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'auth' => :handle_authentication_menu,
     'oauth' => :handle_authentication_menu,
     'shazam' => :handle_imessage_app,
-    'appclip' => :handle_app_clip_demo
+    'appclip' => :handle_app_clip_demo,
+    'app clip' => :handle_app_clip_demo
   }.freeze
 
   # Keywords that control flow (reset, navigation, etc.)
@@ -2908,6 +2909,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # If these requirements aren't met, iOS will display it as a regular rich link
     log_info "[Bot] Sending App Clip: #{utf8_encode(url)}"
 
+    channel = @conversation.inbox.channel
+    rich_link_data_ref = build_app_clip_rich_link_data_ref(channel: channel, url: url)
+
     with_typing_indicator do
       # Create message with App Clip content
       # NOTE: Message will be automatically sent via after_commit callback
@@ -2922,9 +2926,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           content_attributes: {
             'url' => url,
             'title' => 'Open App Clip',
-            'rich_link_data_ref' => {
-              'url' => url
-            }
+            'rich_link_data_ref' => rich_link_data_ref
           }
         )
       ).perform
@@ -2932,6 +2934,25 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send App Clip: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+  end
+
+  def build_app_clip_rich_link_data_ref(channel:, url:)
+    return { 'url' => url } unless channel
+
+    construct_result = AppleMessagesForBusiness::ConstructPayloadService.new(
+      channel: channel,
+      url: url
+    ).perform
+
+    if construct_result[:success] && construct_result[:rich_link_data_ref].present?
+      construct_result[:rich_link_data_ref]
+    else
+      log_warn "[Bot] App Clip constructPayload failed: #{construct_result[:error] || 'unknown error'}"
+      { 'url' => url }
+    end
+  rescue StandardError => e
+    log_warn "[Bot] App Clip constructPayload exception: #{e.message}"
+    { 'url' => url }
   end
 
   def image_url_for_asset(image_asset)
