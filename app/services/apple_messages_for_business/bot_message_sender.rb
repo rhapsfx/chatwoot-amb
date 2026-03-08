@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'base64'
+
 module AppleMessagesForBusiness
   # Owns all outgoing message construction and delivery for the bot.
   # Methods here must NOT update bot_state or call handler methods —
@@ -247,6 +249,11 @@ module AppleMessagesForBusiness
     end
 
     def send_apple_messages_rich_link
+      # Use pre-encoded image_data so OG scraping in SendRichLinkService cannot
+      # clobber our image with an inaccessible Apple-CDN URL.
+      image_data = encode_demo_image('heroImage.png')
+      log_info "[Bot] 🔗 Rich link image_data present: #{image_data.present?} (#{image_data&.length || 0} chars)"
+
       with_typing_indicator do
         Messages::MessageBuilder.new(
           message_sender,
@@ -258,7 +265,8 @@ module AppleMessagesForBusiness
             content_attributes: {
               'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
               'title' => 'Apple Messages for Business',
-              'image_url' => image_url_for_asset('heroImage.png')
+              'image_data' => image_data,
+              'image_mime_type' => 'image/png'
             }.compact
           )
         ).perform
@@ -933,6 +941,21 @@ module AppleMessagesForBusiness
       fallback_identifier
     end
     # rubocop:enable Metrics/MethodLength
+
+    # Reads a static demo asset from public/demo_files/apple_messages/ and returns
+    # it as a raw base64 string (no data-URI prefix) suitable for content_attributes['image_data'].
+    def encode_demo_image(filename)
+      file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
+      unless File.exist?(file_path)
+        log_warn "[Bot] Demo image not found: #{file_path}"
+        return nil
+      end
+
+      Base64.strict_encode64(File.binread(file_path))
+    rescue StandardError => e
+      log_warn "[Bot] Could not encode demo image #{filename}: #{e.message}"
+      nil
+    end
 
     # Directly write a conversation attribute (bypasses state_manager for simple writes).
     def set_conv_attr(key, value)

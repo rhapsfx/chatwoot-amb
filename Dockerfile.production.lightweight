@@ -1,7 +1,7 @@
 # Chatwoot Production Dockerfile - LIGHTWEIGHT VERSION
 # Skips asset compilation - expects pre-built assets in public/vite
 
-FROM ruby:3.3.9-slim AS base
+FROM ruby:3.4.4-slim AS base
 
 # Install essential system packages INCLUDING Node.js
 RUN apt-get update -qq && \

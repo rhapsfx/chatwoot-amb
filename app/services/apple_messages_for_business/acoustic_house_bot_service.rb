@@ -1441,7 +1441,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_documents_intro
     # AHJ2: Send metrics.numbers
-    send_text_message('In Messages for Business, we can also share documents like these forms.')
+    send_text_message('In Messages for Business, we can also share documents like these ones.')
     send_document('metrics.numbers')
 
     # Check if we're in demo mode - if so, send PDF and stop

@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Ruby Base Image
 # ============================================
-FROM ruby:3.3.9-slim AS base
+FROM ruby:3.4.4-slim AS base
 
 # Install essential system packages including Node.js for ExecJS runtime
 RUN apt-get update -qq && \
