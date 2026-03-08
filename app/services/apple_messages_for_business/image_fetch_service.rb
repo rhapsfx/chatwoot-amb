@@ -126,16 +126,21 @@ class AppleMessagesForBusiness::ImageFetchService
   end
 
   def fetch_from_embedded(identifier)
-    embedded = @embedded_images.find { |img| img['identifier'] == identifier }
+    embedded = @embedded_images.find do |img|
+      next false unless img.is_a?(Hash)
 
-    return nil unless embedded && embedded['data'].present?
+      img['identifier'] == identifier || img[:identifier] == identifier
+    end
+
+    embedded_data = embedded&.dig('data') || embedded&.dig(:data)
+    return nil if embedded.blank? || embedded_data.blank?
 
     log_info "[ImageFetch] ✅ Found in embedded: #{identifier}"
 
     {
       identifier: identifier,
-      data: embedded['data'], # Already base64
-      description: embedded['description'] || identifier,
+      data: embedded_data, # Already base64
+      description: embedded['description'] || embedded[:description] || identifier,
       source: 'embedded'
     }
   rescue StandardError => e

@@ -32,11 +32,15 @@ module AppleMessagesForBusiness
     end
 
     def all_blocks
-      @storage_strategy.all_blocks
+      metadata_blocks = StorageStrategies::MetadataStrategy.new(@template).all_blocks
+      content_block_blocks = StorageStrategies::ContentBlocksStrategy.new(@template).all_blocks
+
+      # Content blocks take precedence for duplicate block types.
+      metadata_blocks.merge(content_block_blocks)
     end
 
     def image_identifiers
-      @storage_strategy.image_identifiers
+      all_blocks.values.flat_map { |block_data| extract_image_identifiers(block_data) }.uniq
     end
 
     # Storage information (for debugging/monitoring)
@@ -102,40 +106,14 @@ module AppleMessagesForBusiness
 
     # Collect all image identifiers from data (works for all block types)
     def collect_image_identifiers(data)
-      identifiers = []
-
-      # List picker: sections items
-      if data['sections'].present?
-        data['sections'].each do |section|
-          (section['items'] || []).each do |item|
-            identifiers << item['image_identifier'] if item['image_identifier'].present?
-          end
-        end
-      end
-
-      # Form: pages items options
-      if data['pages'].present?
-        data['pages'].each do |page|
-          (page['items'] || []).each do |item|
-            next unless %w[singleSelect multiSelect].include?(item['item_type'])
-
-            (item['options'] || []).each do |option|
-              identifiers << option['image_identifier'] if option['image_identifier'].present?
-            end
-          end
-        end
-      end
-
-      # Time picker/Form: received/reply images
-      identifiers << data['received_image_identifier'] if data['received_image_identifier'].present?
-      identifiers << data['reply_image_identifier'] if data['reply_image_identifier'].present?
-
-      identifiers.compact.uniq
+      extract_image_identifiers(data)
     end
 
     def determine_storage_strategy
       # Priority 1: Check if template has explicit storage preference
-      return create_strategy(@template.metadata['storage_strategy']) if @template.metadata&.dig('storage_strategy')
+      if @template.metadata.is_a?(Hash) && @template.metadata['storage_strategy'].present?
+        return create_strategy(@template.metadata['storage_strategy'])
+      end
 
       # Priority 2: Check for existing data and use its format
       return StorageStrategies::ContentBlocksStrategy.new(@template) if has_content_blocks?
@@ -152,8 +130,10 @@ module AppleMessagesForBusiness
     end
 
     def has_metadata_content?
-      @template.metadata.present? &&
-        @template.metadata['apple_message_content'].present?
+      return false unless @template.metadata.is_a?(Hash)
+
+      @template.metadata['apple_message_content'].present? ||
+        @template.metadata.any? { |key, value| value.is_a?(Hash) && !%w[apple_message_content apple_message_content_archived].include?(key) }
     end
 
     def create_strategy(strategy_name)
@@ -165,6 +145,48 @@ module AppleMessagesForBusiness
       else
         raise ArgumentError, "Unknown storage strategy: #{strategy_name}"
       end
+    end
+
+    # Backward-compatible helper used by specs and internal callers.
+    def detect_storage_strategy(block_type)
+      return @template.metadata['storage_strategy'] if @template.metadata.is_a?(Hash) && @template.metadata['storage_strategy'].present?
+      return 'metadata' if @template.metadata.is_a?(Hash) && @template.metadata[block_type].is_a?(Hash)
+      return 'metadata' if @template.metadata.is_a?(Hash) && @template.metadata.dig('apple_message_content', 'content_attributes',
+                                                                                    block_type).is_a?(Hash)
+      return 'content_blocks' if @template.content_blocks.where(block_type: block_type).exists?
+
+      'metadata'
+    end
+
+    # Recursively extract image identifiers from rich nested structures.
+    def extract_image_identifiers(data)
+      identifiers = []
+
+      case data
+      when Hash
+        data.each do |key, value|
+          key_name = key.to_s
+          if %w[image_identifier received_image_identifier reply_image_identifier].include?(key_name) && value.present?
+            identifiers << value
+            next
+          end
+
+          if key_name == 'images' && value.is_a?(Array)
+            value.each do |image|
+              next unless image.is_a?(Hash)
+
+              identifier = image['identifier'] || image[:identifier]
+              identifiers << identifier if identifier.present?
+            end
+          end
+
+          identifiers.concat(extract_image_identifiers(value))
+        end
+      when Array
+        data.each { |item| identifiers.concat(extract_image_identifiers(item)) }
+      end
+
+      identifiers.compact.uniq
     end
   end
 end

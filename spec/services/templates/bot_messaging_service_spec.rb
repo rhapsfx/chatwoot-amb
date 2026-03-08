@@ -153,7 +153,7 @@ RSpec.describe Templates::BotMessagingService do
           service.send(:attach_template_files_to_message, message, attachments_data.map do |a|
             { blob_id: template_with_attachments.attachments.first.blob.id, filename: a[:filename], content_type: a[:content_type] }
           end)
-        end.to change { message.attachments.count }.by(1)
+        end.to change { message.attachments.count }.by(2)
       end
 
       it 'continues on partial attachment failure' do

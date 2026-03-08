@@ -30,21 +30,17 @@ module AppleMessagesForBusiness
       end
 
       def all_blocks
-        @template.content_blocks.order(:order_index).map do |block|
-          {
-            'block_type' => block.block_type,
-            'properties' => normalize_properties(block.properties || {}),
-            'order_index' => block.order_index
-          }
+        @template.content_blocks.order(:order_index).to_h do |block|
+          [block.block_type, normalize_properties(block.properties || {})]
         end
       end
 
       def image_identifiers
-        @template.extract_image_identifiers_from_blocks
+        @template.extract_image_identifiers_from_blocks || []
       end
 
       def complexity_score
-        @template.content_blocks.count
+        all_blocks.size
       end
     end
   end

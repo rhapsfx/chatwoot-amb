@@ -14,6 +14,11 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
 
   before do
     allow(HTTParty).to receive(:post).and_return(double(success?: true, code: 200, body: '{}'))
+    allow_any_instance_of(AppleMessagesForBusiness::SendRichLinkService)
+      .to receive(:scrape_open_graph_data).and_return(
+        success: false,
+        error: 'Not scraping'
+      )
   end
 
   describe '#perform' do

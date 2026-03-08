@@ -82,25 +82,22 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive'
         }
       end
+      let(:payload) { base_payload }
 
       it 'fails when interactiveData is missing' do
-        base_payload
-
         expect { validator.validate! }
           .to raise_error(described_class::ValidationError, /Interactive message missing interactiveData/)
       end
 
       it 'fails when bid is missing' do
-        base_payload.merge(interactiveData: {})
+        payload[:interactiveData] = { data: { placeholder: true } }
 
         expect { validator.validate! }
           .to raise_error(described_class::ValidationError, /interactiveData missing bid/)
       end
 
       it 'fails when data object is missing for Apple types' do
-        base_payload.merge(
-          interactiveData: { bid: 'com.apple.messages' }
-        )
+        payload[:interactiveData] = { bid: 'com.apple.messages' }
 
         expect { validator.validate! }
           .to raise_error(described_class::ValidationError, /interactiveData missing data/)
@@ -118,7 +115,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive',
           interactiveData: {
             bid: 'com.apple.messages',
-            data: {}
+            data: { placeholder: true }
           }
         }
       end
@@ -132,7 +129,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
         payload[:interactiveData][:data][:listPicker] = {}
 
         expect { validator.validate! }
-          .to raise_error(described_class::ValidationError, /List picker must have at least one section/)
+          .to raise_error(described_class::ValidationError, /List picker data missing listPicker field/)
       end
 
       it 'fails when sections is not an array' do
@@ -210,7 +207,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive',
           interactiveData: {
             bid: 'com.apple.messages',
-            data: {}
+            data: { placeholder: true }
           }
         }
       end
@@ -224,7 +221,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
         payload[:interactiveData][:data][:event] = {}
 
         expect { validator.validate! }
-          .to raise_error(described_class::ValidationError, /Time picker event must have at least one timeslot/)
+          .to raise_error(described_class::ValidationError, /Time picker data missing event field/)
       end
 
       it 'validates timeslot structure' do
@@ -288,7 +285,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive',
           interactiveData: {
             bid: 'com.apple.messages',
-            data: {}
+            data: { placeholder: true }
           }
         }
       end
@@ -339,7 +336,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive',
           interactiveData: {
             bid: 'com.apple.messages',
-            data: {}
+            data: { placeholder: true }
           }
         }
       end
@@ -353,7 +350,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
         payload[:interactiveData][:data][:dynamic] = {}
 
         expect { validator.validate! }
-          .to raise_error(described_class::ValidationError, /Form data missing dynamic.data field/)
+          .to raise_error(described_class::ValidationError, /Form data missing dynamic field/)
       end
 
       it 'validates page structure' do
@@ -448,7 +445,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
           type: 'interactive',
           interactiveData: {
             bid: 'com.apple.messages',
-            data: {}
+            data: { placeholder: true }
           }
         }
       end
@@ -464,7 +461,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
         }
 
         expect { validator.validate! }
-          .to raise_error(described_class::ValidationError, /OAuth2 missing scope field/)
+          .to raise_error(described_class::ValidationError, /Authentication missing oauth2 field/)
       end
 
       it 'validates OAuth2 responseType' do
@@ -600,7 +597,7 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
                 ]
               },
               images: [
-                { identifier: 'img1', data: 'base64data' }
+                { identifier: 'img1', data: Base64.strict_encode64('test image bytes') }
               ]
             }
           }
@@ -608,9 +605,11 @@ RSpec.describe AppleMessagesForBusiness::PayloadValidatorService do
       end
 
       it 'logs payload summary after successful validation' do
-        expect(Rails.logger).to receive(:info).with(/Payload summary:.*"section_count":2.*"total_items":3.*"image_count":1/)
-
+        allow(Rails.logger).to receive(:info)
         validator.validate!
+        expect(Rails.logger).to have_received(:info).with(/Payload summary:.*"section_count":2/)
+        expect(Rails.logger).to have_received(:info).with(/Payload summary:.*"total_items":3/)
+        expect(Rails.logger).to have_received(:info).with(/Payload summary:.*"image_count":1/)
       end
     end
 

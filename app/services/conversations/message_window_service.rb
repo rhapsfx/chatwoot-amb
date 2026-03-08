@@ -43,9 +43,10 @@ class Conversations::MessageWindowService
   end
 
   def api_messaging_window
-    return if @conversation.inbox.channel.additional_attributes['agent_reply_time_window'].blank?
+    channel_attrs = @conversation.inbox.channel.respond_to?(:additional_attributes) ? @conversation.inbox.channel.additional_attributes : {}
+    return if channel_attrs['agent_reply_time_window'].blank?
 
-    @conversation.inbox.channel.additional_attributes['agent_reply_time_window'].to_i.hours
+    channel_attrs['agent_reply_time_window'].to_i.hours
   end
 
   # Check medium of the inbox to determine the messaging window

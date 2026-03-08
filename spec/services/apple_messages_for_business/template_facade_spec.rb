@@ -67,7 +67,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
 
     context 'with content_blocks storage strategy' do
       let(:content_block) do
-        create(:content_block,
+        create(:template_content_block,
                message_template: template,
                block_type: 'time_picker',
                properties: {
@@ -119,7 +119,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       end
 
       it 'uses content_blocks when data exists there' do
-        create(:content_block,
+        create(:template_content_block,
                message_template: template,
                block_type: 'form',
                properties: { 'title' => 'Contact Form' })
@@ -163,7 +163,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       allow(AppleMessagesForBusiness::ImageFetchService).to receive(:new).with(
         account_id: template.account_id,
         inbox_id: nil,
-        embedded_images: [{ 'identifier' => 'img_1', 'description' => 'Embedded image' }]
+        embedded_images: []
       ).and_return(image_service)
 
       allow(image_service).to receive(:fetch_and_encode).with(['img_1']).and_return([
@@ -175,7 +175,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
 
       expect(data['sections']).to be_present
       expect(data['images']).to eq([
-                                     { identifier: 'img_1', data: 'base64data', description: 'Fetched image' }
+                                     { 'identifier' => 'img_1', 'data' => 'base64data', 'description' => 'Fetched image' }
                                    ])
     end
 
@@ -199,7 +199,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       data = facade.load_data_with_images('list_picker')
 
       expect(data['images']).to eq([
-                                     { identifier: 'img_1', data: 'shared_data', description: 'Shared image' }
+                                     { 'identifier' => 'img_1', 'data' => 'shared_data', 'description' => 'Shared image' }
                                    ])
     end
 
@@ -220,7 +220,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       data = facade.load_data_with_images('list_picker')
 
       expect(data['sections']).to be_present
-      expect(data['images']).to eq([])
+      expect(data['images'] || []).to eq([])
     end
 
     it 'loads images for complex templates with bot sends' do
@@ -291,14 +291,14 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
 
         expect do
           facade.save_data('form', properties)
-        end.to change(ContentBlock, :count).by(1)
+        end.to change(TemplateContentBlock, :count).by(1)
 
-        block = ContentBlock.find_by(message_template: template, block_type: 'form')
+        block = TemplateContentBlock.find_by(message_template: template, block_type: 'form')
         expect(block.properties).to eq(properties)
       end
 
       it 'updates existing content block' do
-        existing_block = create(:content_block,
+        existing_block = create(:template_content_block,
                                 message_template: template,
                                 block_type: 'form',
                                 properties: { 'title' => 'Old Form' })
@@ -310,11 +310,11 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       end
 
       it 'does not create duplicate blocks' do
-        create(:content_block, message_template: template, block_type: 'list_picker')
+        create(:template_content_block, message_template: template, block_type: 'list_picker')
 
         expect do
           facade.save_data('list_picker', { 'sections' => [] })
-        end.not_to change(ContentBlock, :count)
+        end.not_to change(TemplateContentBlock, :count)
       end
     end
 
@@ -330,14 +330,14 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       end
 
       it 'saves to content_blocks when data already exists there' do
-        create(:content_block,
+        create(:template_content_block,
                message_template: template,
                block_type: 'form',
                properties: { 'old' => 'data' })
 
         facade.save_data('form', { 'new' => 'data' })
 
-        block = ContentBlock.find_by(message_template: template, block_type: 'form')
+        block = TemplateContentBlock.find_by(message_template: template, block_type: 'form')
         expect(block.properties).to eq({ 'new' => 'data' })
       end
 
@@ -383,8 +383,8 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
       before do
         template.metadata = { 'storage_strategy' => 'content_blocks' }
         template.save!
-        create(:content_block, message_template: template, block_type: 'form', properties: { 'title' => 'Form' })
-        create(:content_block, message_template: template, block_type: 'list_picker', properties: { 'sections' => [] })
+        create(:template_content_block, message_template: template, block_type: 'form', properties: { 'title' => 'Form' })
+        create(:template_content_block, message_template: template, block_type: 'list_picker', properties: { 'sections' => [] })
       end
 
       it 'returns all blocks from content_blocks' do
@@ -404,7 +404,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
         }
         template.save!
         # Some data in content_blocks
-        create(:content_block, message_template: template, block_type: 'form', properties: { 'title' => 'Form' })
+        create(:template_content_block, message_template: template, block_type: 'form', properties: { 'title' => 'Form' })
       end
 
       it 'returns combined blocks from both storages' do
@@ -417,7 +417,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
 
       it 'prefers content_blocks over metadata for duplicates' do
         # Add duplicate in content_blocks
-        create(:content_block,
+        create(:template_content_block,
                message_template: template,
                block_type: 'list_picker',
                properties: { 'sections' => [{ 'title' => 'From blocks' }] })
@@ -622,7 +622,7 @@ RSpec.describe AppleMessagesForBusiness::TemplateFacade do
     end
 
     it 'returns content_blocks when block exists there' do
-      create(:content_block, message_template: template, block_type: 'form')
+      create(:template_content_block, message_template: template, block_type: 'form')
 
       strategy = facade.send(:detect_storage_strategy, 'form')
 

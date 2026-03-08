@@ -4,8 +4,7 @@ module AppleMessagesForBusiness
   module StorageStrategies
     class MetadataStrategy < BaseStrategy
       def load_data(block_type)
-        content_attrs = @template.metadata
-                                 &.dig('apple_message_content', 'content_attributes') || {}
+        content_attrs = metadata_content_attributes
 
         # NEW UNIFIED FORMAT: Check if data is in flat format (has 'sections', 'event', 'pages' directly)
         # This indicates the template uses the new unified storage format
@@ -46,22 +45,24 @@ module AppleMessagesForBusiness
                        {}
                      end
 
-        # Return normalized (snake_case) data
-        normalize_properties(block_data)
+        # Return normalized (snake_case) data without embedded images.
+        normalize_properties(block_data).except('images')
       end
 
       def save_data(block_type, properties)
-        # Ensure metadata structure exists
         @template.metadata ||= {}
-        @template.metadata['apple_message_content'] ||= {}
-        @template.metadata['apple_message_content']['content_attributes'] ||= {}
 
+        # Ensure metadata structure exists
         # Normalize properties to snake_case for storage
         normalized = normalize_properties(properties)
 
-        # Store in metadata
-        attrs = @template.metadata['apple_message_content']['content_attributes']
-        attrs[block_type] = normalized
+        if @template.metadata['apple_message_content'].present?
+          @template.metadata['apple_message_content']['content_attributes'] ||= {}
+          @template.metadata['apple_message_content']['content_attributes'][block_type] = normalized
+        else
+          # Backward-compatible top-level storage for legacy templates/tests
+          @template.metadata[block_type] = normalized
+        end
 
         # Add storage metadata
         @template.metadata['storage_strategy'] = 'metadata'
@@ -71,22 +72,16 @@ module AppleMessagesForBusiness
       end
 
       def all_blocks
-        content_attrs = @template.metadata
-                                 &.dig('apple_message_content', 'content_attributes') || {}
-
-        content_attrs.map do |block_type, properties|
-          {
-            'block_type' => block_type,
-            'properties' => normalize_properties(properties)
-          }
-        end
+        metadata_content_attributes
+          .select { |_block_type, properties| properties.is_a?(Hash) }
+          .transform_values { |properties| normalize_properties(properties) }
       end
 
       def image_identifiers
         identifiers = Set.new
 
-        all_blocks.each do |block|
-          identifiers.merge(extract_identifiers_from_block(block))
+        all_blocks.each do |block_type, properties|
+          identifiers.merge(extract_identifiers_from_block(block_type, properties))
         end
 
         identifiers.to_a.compact
@@ -98,10 +93,18 @@ module AppleMessagesForBusiness
 
       private
 
-      def extract_identifiers_from_block(block)
+      def metadata_content_attributes
+        metadata = @template.metadata
+        return {} unless metadata.is_a?(Hash)
+
+        nested_attrs = metadata.dig('apple_message_content', 'content_attributes')
+        return nested_attrs if nested_attrs.is_a?(Hash)
+
+        metadata.except('storage_strategy', 'last_updated', 'apple_message_content', 'apple_message_content_archived')
+      end
+
+      def extract_identifiers_from_block(type, props)
         identifiers = []
-        props = block['properties']
-        type = block['block_type']
 
         case type
         when 'list_picker'
@@ -113,10 +116,16 @@ module AppleMessagesForBusiness
               identifiers << item['image_identifier']
             end
           end
+          (props['images'] || []).each do |image|
+            identifiers << image['identifier']
+          end
 
         when 'time_picker', 'form'
           identifiers << props['received_image_identifier']
           identifiers << props['reply_image_identifier']
+          (props['images'] || []).each do |image|
+            identifiers << image['identifier']
+          end
         end
 
         identifiers.compact

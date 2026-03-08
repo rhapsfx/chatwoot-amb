@@ -57,6 +57,8 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def validate_required_fields
+    return unless @payload.is_a?(Hash)
+
     case @payload[:type]
     when 'text'
       validate_text_message
@@ -323,6 +325,8 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def validate_iso8601_dates
+    return unless @payload.is_a?(Hash)
+
     # Validate ISO 8601 date formats in time picker timeslots
     return unless @message_type == 'apple_time_picker'
 
@@ -367,6 +371,8 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def validate_base64_images
+    return unless @payload.is_a?(Hash)
+
     # Validate base64 encoding for images in interactive messages
     # Handle both string and symbol keys for nested access
     interactive_data = @payload[:interactiveData] || @payload['interactiveData']
@@ -423,6 +429,8 @@ class AppleMessagesForBusiness::PayloadValidatorService
   end
 
   def log_payload_summary
+    return unless @payload.is_a?(Hash)
+
     summary = {
       type: @payload[:type],
       message_type: @message_type,
@@ -435,10 +443,10 @@ class AppleMessagesForBusiness::PayloadValidatorService
     when 'apple_list_picker'
       list_picker = @payload[:interactiveData]&.dig(:data, :listPicker)
       summary[:section_count] = list_picker&.dig(:sections)&.length || 0
-      summary[:total_items] = list_picker&.dig(:sections)&.sum { |s| s['items']&.length || 0 } || 0
+      summary[:total_items] = list_picker&.dig(:sections)&.sum { |s| (s[:items] || s['items'])&.length || 0 } || 0
     when 'apple_time_picker'
       event = @payload[:interactiveData]&.dig(:data, :event)
-      summary[:timeslot_count] = event&.dig('timeslots')&.length || 0
+      summary[:timeslot_count] = (event&.dig(:timeslots) || event&.dig('timeslots'))&.length || 0
     when 'apple_quick_reply'
       quick_reply = @payload[:interactiveData]&.dig(:data, :'quick-reply')
       summary[:item_count] = quick_reply&.dig(:items)&.length || 0

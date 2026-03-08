@@ -149,7 +149,7 @@ class LogSanitizerService
     # Check if a key suggests it contains heavy data
     # Match as standalone word or at the end (e.g., 'image_data', 'data')
     def looks_like_heavy_data_key?(key)
-      key.to_s.match?(/\b(data|image|content|file|attachment|base64|binary|blob)\b/i)
+      key.to_s.match?(/data|image|content|file|attachment|base64|binary|blob/i)
     end
 
     # Truncate a large string with metadata
