@@ -200,6 +200,20 @@ module AppleMessagesForBusiness
     def send_rich_link(url:, image_asset:, title:)
       log_info "[Bot] Sending rich link: #{utf8_encode(url)} (#{utf8_encode(title)})"
 
+      # Embed image as base64 so OG scraping in SendRichLinkService cannot
+      # replace it with an SVG or otherwise unsupported image from the target URL.
+      image_data = encode_demo_image(image_asset)
+      log_info "[Bot] 🔗 Rich link image_data present: #{image_data.present?} (#{image_data&.length || 0} chars)"
+
+      content_attrs = { 'url' => url, 'title' => title }
+      if image_data.present?
+        content_attrs['image_data'] = image_data
+        content_attrs['image_mime_type'] = mime_type_for_image_asset(image_asset)
+      else
+        # Fallback to URL-based image when file not found locally
+        content_attrs['image_url'] = image_url_for_asset(image_asset)
+      end
+
       with_typing_indicator do
         Messages::MessageBuilder.new(
           message_sender,
@@ -208,11 +222,7 @@ module AppleMessagesForBusiness
             message_type: :outgoing,
             content: url,
             content_type: 'apple_rich_link',
-            content_attributes: {
-              'url' => url,
-              'title' => title,
-              'image_url' => image_url_for_asset(image_asset)
-            }.compact
+            content_attributes: content_attrs.compact
           )
         ).perform
       end
@@ -889,6 +899,15 @@ module AppleMessagesForBusiness
       end
     end
 
+    def mime_type_for_image_asset(filename)
+      case File.extname(filename.to_s).downcase
+      when '.png'  then 'image/png'
+      when '.gif'  then 'image/gif'
+      when '.webp' then 'image/webp'
+      else 'image/jpeg'
+      end
+    end
+
     def build_app_clip_rich_link_data_ref(channel:, url:)
       return { 'url' => url } unless channel
 
@@ -945,6 +964,8 @@ module AppleMessagesForBusiness
     # Reads a static demo asset from public/demo_files/apple_messages/ and returns
     # it as a raw base64 string (no data-URI prefix) suitable for content_attributes['image_data'].
     def encode_demo_image(filename)
+      return nil if filename.blank?
+
       file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
       unless File.exist?(file_path)
         log_warn "[Bot] Demo image not found: #{file_path}"
