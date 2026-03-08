@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class AppleMessagesForBusiness::AcousticHouseBotService
-  IDLE_TIMEOUT = 30.minutes
+  include AppleMessagesForBusiness::BotLogging
 
   # Template dependencies for deployment automation
   # These templates must exist for the bot to function correctly
@@ -126,11 +126,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'qr_oauth_provider' => :handle_oauth_provider_selection
   }.freeze
 
+  # Allowlists of methods callable via dispatch — prevents arbitrary method invocation through send()
+  ALLOWED_KEYWORD_HANDLERS = (DEMO_KEYWORDS.values + FLOW_CONTROL_KEYWORDS.values).uniq.freeze
+  ALLOWED_INTERACTIVE_HANDLERS = INTERACTIVE_HANDLERS.values.freeze
+
   def initialize(conversation, message)
     @conversation = conversation
     @message = message
     @contact = conversation.contact
-    @bot_state = get_bot_state
+    @state_manager = AppleMessagesForBusiness::BotStateManager.new(conversation)
+    @sender = AppleMessagesForBusiness::BotMessageSender.new(conversation)
+    @bot_state = @state_manager.current_state
     @lang = detect_language
   end
 
@@ -259,22 +265,21 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     handler_method = INTERACTIVE_HANDLERS[request_id]
     if handler_method
       log_info "[Bot] ✅ Found handler: #{handler_method}"
-      send(handler_method, interactive_data)
+      safe_execute(context: "interactive(#{request_id})") do
+        dispatch_interactive_handler(handler_method, interactive_data)
 
-      # After handling the interactive response, process the updated state
-      # This allows state transitions to continue (e.g., AHC1 → AHC2 → handle_ar_introduction)
-      # However, skip process_state for states that are explicitly waiting for new user input
-      # or for menu selections where the handler has already sent the demo response.
-      waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
-      skip_process_state_for_request_ids = %w[lp_menu_0319]
+        # After handling the interactive response, process the updated state
+        waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
+        skip_process_state_for_request_ids = %w[lp_menu_0319]
 
-      if waiting_states.include?(@bot_state)
-        log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
-      elsif skip_process_state_for_request_ids.include?(request_id)
-        log_info "[Bot] 🔄 Request #{request_id} handled by menu selection - skipping process_state"
-      else
-        log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
-        process_state
+        if waiting_states.include?(@bot_state)
+          log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
+        elsif skip_process_state_for_request_ids.include?(request_id)
+          log_info "[Bot] 🔄 Request #{request_id} handled by menu selection - skipping process_state"
+        else
+          log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
+          process_state
+        end
       end
     else
       log_warn "[Bot] ❌ No handler for requestId: #{request_id}"
@@ -284,112 +289,76 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   private
 
-  # UTF-8 safe logging methods (inlined from Utf8Logging concern for deployment compatibility)
-  def utf8_encode(obj)
-    case obj
-    when String
-      obj.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
-    when Hash
-      obj.transform_keys { |k| utf8_encode(k) }
-         .transform_values { |v| utf8_encode(v) }
-    when Array
-      obj.map { |item| utf8_encode(item) }
-    when NilClass
-      nil
-    else
-      obj.to_s.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
-    end
+  # === Error handling ===
+
+  # Centralized error wrapper for all bot handler calls.
+  # Catches DB errors and unexpected exceptions, sends a user-facing message,
+  # and optionally transitions to a fallback state before re-raising.
+  def safe_execute(context:, fallback_state: nil)
+    yield
+  rescue ActiveRecord::RecordInvalid => e
+    log_error "[Bot] 💾 DB error in #{context}: #{e.message}"
+    send_text_message("We're having a brief issue, please try again.")
+  rescue StandardError => e
+    log_error "[Bot] ❌ Error in #{context}: #{e.message}"
+    log_error e.backtrace.first(5).join("\n")
+    Sentry.capture_exception(e) if defined?(Sentry)
+    update_bot_state(fallback_state) if fallback_state
+    send_text_message("Something went wrong. Type 'menu' to continue.")
   end
 
-  def log_info(message)
-    Rails.logger.info(utf8_encode(message))
-  end
-
-  def log_warn(message)
-    Rails.logger.warn(utf8_encode(message))
-  end
-
-  def log_error(message)
-    Rails.logger.error(utf8_encode(message))
-  end
-
-  def log_debug(message)
-    Rails.logger.debug(utf8_encode(message))
-  end
-
-  # Ensure UTF-8 encoding for log output to prevent mojibake
-  def utf8_encode(obj)
-    case obj
-    when String
-      obj.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
-    when Hash
-      obj.transform_keys { |k| utf8_encode(k) }
-         .transform_values { |v| utf8_encode(v) }
-    when Array
-      obj.map { |item| utf8_encode(item) }
-    when NilClass
-      nil
-    else
-      # For other objects, convert to string and encode
-      obj.to_s.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
-    end
-  end
-
-  # Safe logging wrapper that ensures UTF-8 encoding
-  def log_info(message)
-    Rails.logger.info(utf8_encode(message))
-  end
-
-  def log_warn(message)
-    Rails.logger.warn(utf8_encode(message))
-  end
+  # === Delegation to BotStateManager ===
 
   def get_bot_state
-    attrs = @conversation.custom_attributes || {}
-    last_updated = attrs['bot_state_updated_at']
-
-    # Reset if timed out
-    return 'AHA1' if last_updated && Time.zone.parse(last_updated) < IDLE_TIMEOUT.ago
-
-    attrs['bot_state'] || 'AHA1'
+    @state_manager.current_state
   end
 
   def update_bot_state(new_state)
-    @conversation.custom_attributes ||= {}
-    @conversation.custom_attributes['bot_state'] = new_state
-    @conversation.custom_attributes['bot_state_updated_at'] = Time.current.iso8601
-    @conversation.save!
-    @bot_state = new_state
+    @bot_state = @state_manager.update(new_state)
   end
 
   def conversation_timed_out?
-    attrs = @conversation.custom_attributes || {}
-    last_updated = attrs['bot_state_updated_at']
-
-    return false unless last_updated
-
-    Time.zone.parse(last_updated) < IDLE_TIMEOUT.ago
+    @state_manager.timed_out?
   end
 
   def reset_to_welcome
     log_info '[Bot] 🔄 reset_to_welcome - Clearing all flow attributes'
-
-    # Clear all flow-related conversation attributes
-    # This ensures a truly fresh start without cached data
-    @conversation.custom_attributes ||= {}
-    @conversation.custom_attributes.delete('region')
-    @conversation.custom_attributes.delete('customer_name')
-    @conversation.custom_attributes.delete('stage_name')
-    @conversation.custom_attributes.delete('delivery_address')
-    @conversation.custom_attributes.delete('selected_guitar')
-    @conversation.custom_attributes.delete('selected_timeslot')
-    @conversation.custom_attributes.delete('selected_store')
-
-    # Reset state and retry count
-    update_bot_state('AHA1')
-    reset_retry_count
-
+    @bot_state = @state_manager.full_reset
     log_info '[Bot] ✅ Flow attributes cleared, ready for fresh start'
+  end
+
+  def get_conversation_attribute(key)
+    @state_manager.get_attribute(key)
+  end
+
+  def update_conversation_attribute(key, value)
+    @state_manager.set_attribute(key, value)
+  end
+
+  def increment_retry_count
+    @state_manager.increment_retry_count
+  end
+
+  def reset_retry_count
+    @state_manager.reset_retry_count
+  end
+
+  def dispatch_keyword_handler(method_name)
+    unless ALLOWED_KEYWORD_HANDLERS.include?(method_name)
+      log_warn "[Bot] ⛔ Blocked unsafe keyword handler: #{method_name}"
+      return
+    end
+
+    send(method_name)
+  end
+
+  def dispatch_interactive_handler(method_name, interactive_data)
+    unless ALLOWED_INTERACTIVE_HANDLERS.include?(method_name)
+      log_warn "[Bot] ⛔ Blocked unsafe interactive handler: #{method_name}"
+      return
+    end
+
+    send(method_name, interactive_data)
   end
 
   def handle_keyword_message
@@ -400,7 +369,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Check if it's a demo keyword (isolated template execution)
     if DEMO_KEYWORDS.key?(keyword)
       handler_method = DEMO_KEYWORDS[keyword]
-      send(handler_method)
+      dispatch_keyword_handler(handler_method)
 
       # Set special state for large form to handle its response differently
       if handler_method == :handle_large_form_demo
@@ -415,7 +384,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Check if it's a flow control keyword
     if FLOW_CONTROL_KEYWORDS.key?(keyword)
       handler_method = FLOW_CONTROL_KEYWORDS[keyword]
-      send(handler_method)
+      dispatch_keyword_handler(handler_method)
       return true
     end
 
@@ -425,97 +394,98 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # State machine flow
   def process_state
     log_info "[Bot] ⚙️ process_state - Handling state: #{@bot_state}"
+    safe_execute(context: "process_state(#{@bot_state})") do
+      # If bot is stopped, don't process state - wait for start/startover keyword
+      if @bot_state == 'STOPPED'
+        log_info '[Bot] 🛑 Bot is stopped, waiting for start/startover command'
+        return
+      end
 
-    # If bot is stopped, don't process state - wait for start/startover keyword
-    if @bot_state == 'STOPPED'
-      log_info '[Bot] 🛑 Bot is stopped, waiting for start/startover command'
-      return
-    end
+      # If in demo mode, don't process state - wait for reset keyword
+      if @bot_state == 'DEMO_MODE'
+        send_text_message("Type 'startover' to begin the full experience, or try another demo keyword (form, ar, list picker, etc.)")
+        return
+      end
 
-    # If in demo mode, don't process state - wait for reset keyword
-    if @bot_state == 'DEMO_MODE'
-      send_text_message("Type 'startover' to begin the full experience, or try another demo keyword (form, ar, list picker, etc.)")
-      return
-    end
-
-    case @bot_state
-    when 'AHA1'
-      handle_welcome
-    when 'AHA2'
-      handle_region_prompt
-    when 'AHA3'
-      handle_form_or_name_prompt
-    when 'AHB1'
-      handle_form_response
-    when 'AHB1_2'
-      handle_text_name_input
-    when 'AHB2'
-      handle_name_preference_catcher
-    when 'AHB3'
-      handle_guitar_list_prompt
-    when 'AHC1'
-      handle_guitar_list_catcher
-    when 'AHC2'
-      handle_ar_introduction
-    when 'AHC3'
-      handle_ar_first_question
-    when 'AHD1'
-      handle_ar_view_catcher
-    when 'AHE1'
-      handle_ar_place_catcher
-    when 'AHE2'
-      handle_apple_pay_prompt
-    when 'AHF1'
-      handle_apple_pay_catcher
-    when 'AHF1_skip'
-      # Waiting for skip payment quick reply response
-      # No action needed - response will route through interactive handler
-      send_text_message("Please select 'Skip Payment' or 'Try Again' from the options above.")
-    when 'AHF2'
-      handle_lesson_introduction
-    when 'AHF3'
-      handle_location_request
-    when 'AHG1'
-      handle_location_response
-    when 'AHG2'
-      # Store selection state - waiting for list picker response
-      # Interactive handler will process the selection
-      send_text_message('Please select a store from the list above.')
-    when 'AHH1'
-      handle_time_picker_catcher
-    when 'AHH2'
-      handle_continue_prompt
-    when 'AHI1'
-      handle_rich_links
-    when 'AHJ1'
-      # Waiting for photo quick reply response or photo attachment
-      # This state is handled by interactive response handler (qr_photo) or attachment handler
-      # No action needed - user already instructed to send photo after clicking Yes
-    when 'AHJ2'
-      handle_documents_intro
-    when 'AHJ3'
-      handle_pdf_document
-    when 'AHJ4'
-      handle_learn_more_prompt
-    when 'AHK0'
-      # Waiting for learn more quick reply response
-      # Interactive handler will process the response
-      send_text_message('Please select Yes or No from the options above.')
-    when 'AHK1'
-      handle_summary
-    when 'AHK2'
-      handle_final_message
-    when 'AHK3'
-      handle_register_rich_link
-    when 'AH-restart'
-      # Flow restart - go back to welcome
-      handle_welcome
-    else
-      # Unknown state - reset
-      log_warn "Unknown bot state: #{@bot_state}, resetting to welcome"
-      reset_to_welcome
-      handle_welcome
-    end
+      case @bot_state
+      when 'AHA1'
+        handle_welcome
+      when 'AHA2'
+        handle_region_prompt
+      when 'AHA3'
+        handle_form_or_name_prompt
+      when 'AHB1'
+        handle_form_response
+      when 'AHB1_2'
+        handle_text_name_input
+      when 'AHB2'
+        handle_name_preference_catcher
+      when 'AHB3'
+        handle_guitar_list_prompt
+      when 'AHC1'
+        handle_guitar_list_catcher
+      when 'AHC2'
+        handle_ar_introduction
+      when 'AHC3'
+        handle_ar_first_question
+      when 'AHD1'
+        handle_ar_view_catcher
+      when 'AHE1'
+        handle_ar_place_catcher
+      when 'AHE2'
+        handle_apple_pay_prompt
+      when 'AHF1'
+        handle_apple_pay_catcher
+      when 'AHF1_skip'
+        # Waiting for skip payment quick reply response
+        # No action needed - response will route through interactive handler
+        send_text_message("Please select 'Skip Payment' or 'Try Again' from the options above.")
+      when 'AHF2'
+        handle_lesson_introduction
+      when 'AHF3'
+        handle_location_request
+      when 'AHG1'
+        handle_location_response
+      when 'AHG2'
+        # Store selection state - waiting for list picker response
+        # Interactive handler will process the selection
+        send_text_message('Please select a store from the list above.')
+      when 'AHH1'
+        handle_time_picker_catcher
+      when 'AHH2'
+        handle_continue_prompt
+      when 'AHI1'
+        handle_rich_links
+      when 'AHJ1'
+        # Waiting for photo quick reply response or photo attachment
+        # This state is handled by interactive response handler (qr_photo) or attachment handler
+        # No action needed - user already instructed to send photo after clicking Yes
+      when 'AHJ2'
+        handle_documents_intro
+      when 'AHJ3'
+        handle_pdf_document
+      when 'AHJ4'
+        handle_learn_more_prompt
+      when 'AHK0'
+        # Waiting for learn more quick reply response
+        # Interactive handler will process the response
+        send_text_message('Please select Yes or No from the options above.')
+      when 'AHK1'
+        handle_summary
+      when 'AHK2'
+        handle_final_message
+      when 'AHK3'
+        handle_register_rich_link
+      when 'AH-restart'
+        # Flow restart - go back to welcome
+        handle_welcome
+      else
+        # Unknown state - reset
+        log_warn "Unknown bot state: #{@bot_state}, resetting to welcome"
+        reset_to_welcome
+        handle_welcome
+      end
+    end # safe_execute
   end
 
   # === AHA States (Welcome Flow) ===
@@ -2054,169 +2024,92 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     false
   end
 
+  # === Delegation to BotMessageSender ===
+  # All implementations live in BotMessageSender; these wrappers keep handler
+  # methods in the orchestrator unchanged.
+
   def send_text_message(content)
-    with_typing_indicator do
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: content
-        )
-      ).perform
-    end
+    @sender.send_text_message(content)
   end
 
-  def send_quick_reply(title:, request_id:, items:, message: nil)
-    log_info "[Bot] 📤 Sending quick reply: #{utf8_encode(title)} (request_id: #{request_id})"
-    log_info "[Bot] 📤 Called from: #{caller[0..3].join("\n")}"
+  def send_quick_reply(**)
+    @sender.send_quick_reply(**)
+  end
 
-    # If message parameter is provided, send it as a text message first
-    if message.present?
-      log_info "[Bot] 📤 Sending text message before quick reply: #{utf8_encode(message)}"
-      send_text_message(message)
-    end
+  def send_ar_view_question
+    @sender.send_ar_view_question
+  end
 
-    with_typing_indicator do
-      # Create outgoing message with quick reply content
-      # NOTE: SendReplyJob will automatically send this to Apple MSP via after_create callback
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: title,
-          content_type: 'apple_quick_reply',
-          content_attributes: {
-            'request_identifier' => request_id,
-            'summary_text' => title,
-            'received_title' => title,
-            'reply_title' => 'Selected: ${item.title}',
-            'items' => items.map do |item|
-              {
-                'title' => item[:title],
-                'identifier' => request_id
-              }
-            end
-          }
-        )
-      ).perform
-    end
+  def send_ar_place_question
+    @sender.send_ar_place_question
+  end
 
-    # Message will be automatically sent by SendReplyJob (after_create callback)
-    # No need to manually call SendQuickReplyService
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send quick reply: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+  def send_ar_file
+    @sender.send_ar_file
+  end
+
+  def send_document(filename)
+    @sender.send_document(filename)
+  end
+
+  def send_rich_link(**)
+    @sender.send_rich_link(**)
+  end
+
+  def send_app_clip(**)
+    @sender.send_app_clip(**)
+  end
+
+  def send_apple_messages_rich_link
+    @sender.send_apple_messages_rich_link
+  end
+
+  def send_delivery_confirmation(address_data, customer_name = nil)
+    @sender.send_delivery_confirmation(address_data, customer_name)
   end
 
   def send_guitar_list_picker
-    # Get guitar list picker template by name
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_guitar_list_picker'
-    )
+    @sender.send_guitar_list_picker
+  end
 
-    unless template
-      Rails.logger.error utf8_encode("[Bot] Guitar List Picker template 'ah_guitar_list_picker' not found")
-      send_text_message('Guitar selection temporarily unavailable.')
-      return
-    end
+  def send_large_content_form
+    @sender.send_large_content_form
+  end
 
-    log_info "[Bot] Sending Guitar List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+  def send_summary_list_picker
+    @sender.send_summary_list_picker
+  end
 
-    # Use TemplateFacade with image loading (latest implementation)
-    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+  def send_menu_list_picker
+    @sender.send_menu_list_picker
+  end
 
-    # Load data WITH images using the new method (replaces manual fetch_and_encode_images)
-    data = facade.load_data_with_images('list_picker')
+  def send_lesson_time_picker(location)
+    @sender.send_lesson_time_picker(location)
+  end
 
-    log_info "[Bot] 🎸 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
-    log_info "[Bot] 🎸 Loaded template with #{data['images']&.length || 0} images"
+  def send_store_quick_reply(stores, user_coordinates)
+    @sender.send_store_quick_reply(stores, user_coordinates)
+  end
 
-    # All data is in snake_case format with images included
-    sections = data['sections'] || []
-    images = data['images'] || []
-    received_image_id = data['received_image_identifier']
-    reply_image_id = data['reply_image_identifier']
-    received_title = data['received_title']
-    received_subtitle = data['received_subtitle']
-    received_style = data['received_style']
-    reply_title = data['reply_title']
-    reply_subtitle = data['reply_subtitle']
-    reply_style = data['reply_style']
+  def send_store_selection_list_picker(stores, user_coordinates)
+    @sender.send_store_selection_list_picker(stores, user_coordinates)
+  end
 
-    if sections.blank?
-      Rails.logger.error utf8_encode('[Bot] Guitar List Picker template has no sections')
-      send_text_message('Guitar selection temporarily unavailable.')
-      return
-    end
+  def send_apple_pay_request(guitar_name)
+    @sender.send_apple_pay_request(guitar_name)
+  end
 
-    # Build content attributes with all components (images already loaded by facade)
-    content_attrs = {
-      'sections' => sections,
-      'images' => images,
-      'request_identifier' => 'lp_guitar_0319'
-    }
-
-    # Add received_message fields
-    if received_title.present?
-      content_attrs['received_title'] = received_title
-      content_attrs['received_subtitle'] = received_subtitle
-      content_attrs['received_image_identifier'] = received_image_id
-      content_attrs['received_style'] = received_style
-    end
-
-    # Add reply_message fields
-    if reply_title.present?
-      content_attrs['reply_title'] = reply_title
-      content_attrs['reply_subtitle'] = reply_subtitle
-      content_attrs['reply_image_identifier'] = reply_image_id
-      content_attrs['reply_style'] = reply_style
-    end
-
-    # Create outgoing message with list picker content including images
-    # NOTE: Message will be automatically sent via after_commit callback
-    # which routes to SendListPickerService based on content_type
-    Messages::MessageBuilder.new(
-      message_sender,
-      @conversation,
-      bot_message_params(
-        message_type: :outgoing,
-        content: 'Select a guitar',
-        content_type: 'apple_list_picker',
-        content_attributes: content_attrs
-      )
-    ).perform
-
-    log_info '[Bot] Guitar List Picker sent successfully'
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send guitar list picker: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+  def send_oauth_authentication(provider)
+    @sender.send_oauth_authentication(provider)
   end
 
   def fetch_and_encode_images(identifiers)
-    return [] if identifiers.empty?
+    @sender.fetch_and_encode_images(identifiers)
+  end
 
-    # Use ImageFetchService with three-tier fallback
-    # Bot doesn't use embedded images - all images come from storage
-    images = AppleMessagesForBusiness::ImageFetchService.new(
-      account_id: @conversation.account_id,
-      inbox_id: @conversation.inbox_id,
-      embedded_images: [] # Bot doesn't use embedded images
-    ).fetch_and_encode(identifiers)
-
-    log_info "[Bot] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
-    log_info "[Bot] 🖼️ Found #{images.count}/#{identifiers.count} images"
-
-    # Convert from ImageFetchService format (symbol keys) to SendListPickerService format (string keys)
-    images.map do |image|
-      {
-        'identifier' => image[:identifier],
-        'data' => image[:data],
-        'description' => image[:description] || ''
-      }
-    end
+  def with_typing_indicator(&)
+    @sender.with_typing_indicator(&)
   end
 
   def send_guitar_info_form
@@ -2270,61 +2163,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Fallback to guitar list on error
     update_bot_state('AHB3')
     handle_guitar_list_prompt
-  end
-
-  def send_large_content_form
-    # Send large content form by name
-    # Force reload to bust any Rails caching
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_large_form_demo'
-    )&.reload
-
-    unless template
-      Rails.logger.error utf8_encode("[Bot] Large Content Form template 'ah_large_form_demo' not found")
-      send_text_message('Large content form is not available.')
-      return
-    end
-
-    log_info "[Bot] 📋 Sending Large Content Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
-
-    # Use BotRendererService to properly render the template
-    renderer = Templates::BotRendererService.new(
-      template_id: template.id,
-      parameters: {},
-      channel_type: 'apple_messages_for_business'
-    )
-
-    rendered = renderer.render_for_bot
-
-    # CRITICAL: Ensure content_type is 'apple_form' so IncomingMessageService can detect form responses
-    rendered[:content_type] = 'apple_form' if rendered[:content_type] != 'apple_form'
-
-    # Add request_identifier for proper routing to handle_large_form_response
-    rendered[:content_attributes]['request_identifier'] = 'form_large_content' if rendered[:content_attributes]['request_identifier'].blank?
-
-    log_info "[Bot] 📋 Form content_type: #{rendered[:content_type]}"
-    log_info "[Bot] 📋 Form request_identifier: #{utf8_encode(rendered[:content_attributes]['request_identifier'])}"
-
-    # Create outgoing message with form content
-    with_typing_indicator do
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: rendered[:content],
-          content_type: rendered[:content_type],
-          content_attributes: rendered[:content_attributes]
-        )
-      ).perform
-    end
-
-    # Form will be automatically sent via SendReplyJob callback
-    log_info '[Bot] 📋 Large Content Form sent successfully'
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] ❌ Failed to send large content form: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
   def handle_large_form_response(content_attributes)
@@ -2422,793 +2260,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end.join("\n")
   end
 
-  def send_summary_list_picker
-    # Get summary list picker template by name
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_summary'
-    )
-
-    unless template
-      Rails.logger.error utf8_encode("[Bot] Summary List Picker template 'ah_summary' not found")
-      send_text_message('Summary temporarily unavailable.')
-      return
-    end
-
-    log_info "[Bot] Sending Summary List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
-
-    # UNIFIED APPROACH: Use TemplateFacade for consistent data access
-    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
-    data = facade.load_data('list_picker')
-
-    log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
-
-    # All data is now in consistent snake_case format
-    sections = data['sections'] || []
-    received_image_id = data['received_image_identifier']
-    reply_image_id = data['reply_image_identifier']
-    received_title = data['received_title']
-    received_subtitle = data['received_subtitle']
-    received_style = data['received_style']
-    reply_title = data['reply_title']
-    reply_subtitle = data['reply_subtitle']
-    reply_style = data['reply_style']
-    images_array = data['images']
-
-    log_info "[Bot] 📋 Sections present: #{sections.present?}, count: #{sections&.length || 0}"
-
-    if sections.blank?
-      Rails.logger.error utf8_encode('[Bot] Summary List Picker template has no sections')
-      send_text_message('Summary temporarily unavailable.')
-      return
-    end
-
-    # Build content_attrs from extracted variables
-    content_attrs = {
-      'sections' => sections,
-      'request_identifier' => 'lp_summary_0319'
-    }
-
-    # Add received_message fields if present
-    if received_title.present?
-      content_attrs['received_title'] = received_title
-      content_attrs['received_subtitle'] = received_subtitle
-      content_attrs['received_image_identifier'] = received_image_id
-      content_attrs['received_style'] = received_style
-    end
-
-    # Add reply_message fields if present
-    if reply_title.present?
-      content_attrs['reply_title'] = reply_title
-      content_attrs['reply_subtitle'] = reply_subtitle
-      content_attrs['reply_image_identifier'] = reply_image_id
-      content_attrs['reply_style'] = reply_style
-    end
-
-    # Clean up images array - only keep allowed keys
-    if images_array.is_a?(Array)
-      content_attrs['images'] = images_array.map do |image|
-        {
-          'identifier' => image['identifier'],
-          'data' => image['data'],
-          'description' => image['description']
-        }.compact
-      end
-    end
-
-    # NOTE: Message will be automatically sent via after_commit callback
-    # which routes to SendListPickerService based on content_type
-    Messages::MessageBuilder.new(
-      message_sender,
-      @conversation,
-      bot_message_params(
-        message_type: :outgoing,
-        content: 'Feature Sheet',
-        content_type: 'apple_list_picker',
-        content_attributes: content_attrs
-      )
-    ).perform
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send summary list picker: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def send_menu_list_picker
-    # Get menu list picker template by name
-    log_info "[Bot] 🔍 Looking for menu template 'ah_main_menu' in account: #{@conversation.account_id}"
-
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_main_menu'
-    )
-
-    unless template
-      # Debug: Check if template exists globally (different account)
-      global_template = MessageTemplate.find_by(name: 'ah_main_menu')
-      if global_template
-        Rails.logger.error utf8_encode("[Bot] ⚠️  Menu template 'ah_main_menu' EXISTS but in account #{global_template.account_id}, not #{@conversation.account_id}")
-        Rails.logger.error utf8_encode("[Bot] 💡 Inbox: #{@conversation.inbox_id}, Conversation: #{@conversation.id}")
-      else
-        Rails.logger.error utf8_encode("[Bot] ❌ Menu List Picker template 'ah_main_menu' not found in ANY account")
-      end
-      send_text_message('Menu temporarily unavailable.')
-      return
-    end
-
-    log_info "📋 [Bot] Sending Menu List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
-
-    # Use TemplateFacade with image loading (latest implementation)
-    facade = AppleMessagesForBusiness::TemplateFacade.new(template)
-
-    # Load data WITH images using the new method (replaces manual fetch_and_encode_images)
-    data = facade.load_data_with_images('list_picker')
-
-    log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
-    log_info "[Bot] 📋 Loaded template with #{data['images']&.length || 0} images"
-
-    # All data is in snake_case format with images included
-    sections = data['sections'] || []
-    images = data['images'] || []
-    received_image_id = data['received_image_identifier']
-    reply_image_id = data['reply_image_identifier']
-    received_title = data['received_title']
-    received_subtitle = data['received_subtitle']
-    received_style = data['received_style']
-    reply_title = data['reply_title']
-    reply_subtitle = data['reply_subtitle']
-    reply_style = data['reply_style']
-
-    log_info "[Bot] 📋 Sections present: #{sections.present?}, count: #{sections&.length || 0}"
-
-    if sections.blank?
-      Rails.logger.error utf8_encode('[Bot] ❌ Menu List Picker template has no sections')
-      send_text_message('Menu temporarily unavailable.')
-      return
-    end
-
-    # Build content attributes with all components (images already loaded by facade)
-    content_attrs = {
-      'sections' => sections,
-      'images' => images,
-      'request_identifier' => 'lp_menu_0319'
-    }
-
-    # Add received_message fields
-    if received_title.present?
-      content_attrs['received_title'] = received_title
-      content_attrs['received_subtitle'] = received_subtitle
-      content_attrs['received_image_identifier'] = received_image_id
-      content_attrs['received_style'] = received_style
-    end
-
-    # Add reply_message fields
-    if reply_title.present?
-      content_attrs['reply_title'] = reply_title
-      content_attrs['reply_subtitle'] = reply_subtitle
-      content_attrs['reply_image_identifier'] = reply_image_id
-      content_attrs['reply_style'] = reply_style
-    end
-
-    # Create outgoing message with list picker content including images
-    # NOTE: Message will be automatically sent via after_commit callback
-    # which routes to SendListPickerService based on content_type
-    Messages::MessageBuilder.new(
-      message_sender,
-      @conversation,
-      bot_message_params(
-        message_type: :outgoing,
-        content: 'Select an option',
-        content_type: 'apple_list_picker',
-        content_attributes: content_attrs
-      )
-    ).perform
-
-    log_info '[Bot] Menu List Picker sent successfully'
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send menu list picker: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def send_ar_file
-    # Use AR guitar template by name
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_ar_guitar'
-    )
-
-    unless template
-      Rails.logger.error utf8_encode("[Bot] AR template 'ah_ar_guitar' not found - sending placeholder")
-      send_text_message('[AR File: Template not found]')
-      return
-    end
-
-    log_info "[Bot] 🎸 Sending AR content (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
-
-    # Check if template has AR file attached
-    unless template.attachments.attached?
-      Rails.logger.error utf8_encode('[Bot] AR template has no attachments - sending placeholder')
-      send_text_message('[AR File: No AR file attached to template]')
-      return
-    end
-
-    with_typing_indicator do
-      # Build message params
-      sender = message_sender
-      params = bot_message_params(
-        message_type: :outgoing,
-        content: 'Check out this guitar in AR!',
-        content_type: 'text',
-        account_id: @conversation.account_id,
-        inbox_id: @conversation.inbox_id,
-        conversation_id: @conversation.id
-      )
-      params[:sender] = sender
-
-      # Create message WITHOUT saving (build, not create)
-      message = @conversation.messages.build(params)
-
-      # Copy AR file attachment(s) from template BEFORE saving message
-      template.attachments.each do |template_attachment|
-        # Download the file from template's ActiveStorage
-        file_data = template_attachment.download
-
-        # Create new attachment for the message
-        message_attachment = message.attachments.build(
-          account_id: message.account_id,
-          file_type: :file
-        )
-
-        # Attach the file
-        message_attachment.file.attach(
-          io: StringIO.new(file_data),
-          filename: template_attachment.filename.to_s,
-          content_type: template_attachment.content_type
-        )
-
-        log_info "[Bot] 🎸 Attached AR file: #{utf8_encode(template_attachment.filename.to_s)} (#{template_attachment.content_type})"
-      end
-
-      # NOW save the message - this triggers after_commit with attachments already present
-      # The after_commit will see attachments and wait 2 seconds before sending
-      message.save!
-
-      log_info "[Bot] 🎸 AR message saved with #{message.attachments.count} attachment(s)"
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send AR file: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-    send_text_message('[AR File: Error sending AR content]')
-  end
-
-  def send_ar_view_question
-    # Send question with quick reply (message parameter handles text + buttons together)
-    send_quick_reply(
-      title: 'AR Preview',
-      request_id: 'qr_view_ar',
-      message: 'Did you experience the AR preview in your environment?',
-      items: [
-        { title: 'Yes', identifier: '111' },
-        { title: 'No', identifier: '222' }
-      ]
-    )
-  end
-
-  def send_ar_place_question
-    # Send question with quick reply (message parameter handles text + buttons together)
-    send_quick_reply(
-      title: 'Did you place the AR object?',
-      request_id: 'qr_place_ar',
-      message: 'Did you select AR from the top of the image and set it down in front of you?',
-      items: [
-        { title: 'Yes', identifier: '111' },
-        { title: 'No', identifier: '222' }
-      ]
-    )
-  end
-
-  def send_apple_pay_request(guitar_name)
-    with_typing_indicator do
-      # Get guitar image identifier based on selected guitar
-      # Uses guitar_lespaul as fallback for demo mode and unmatched guitars
-      image_identifier = get_guitar_image_identifier(guitar_name)
-
-      log_info "[Bot] 💳 Apple Pay request for '#{utf8_encode(guitar_name)}' with image: #{image_identifier}"
-
-      payment_data = {
-        'request_identifier' => 'applepay_1018',
-        'merchant_name' => 'Acoustic House',
-        'currency_code' => 'USD',
-        'country_code' => 'US',
-        'line_items' => [
-          {
-            'label' => guitar_name,
-            'amount' => '0.01',
-            'type' => 'final'
-          }
-        ],
-        'total' => {
-          'label' => 'Acoustic House',
-          'amount' => '0.01',
-          'type' => 'final'
-        },
-        'received_title' => "Buy your new #{guitar_name}",
-        'received_subtitle' => 'test payment',
-        'received_style' => 'large',
-        'received_image_identifier' => image_identifier,
-        'reply_style' => 'large',
-        'reply_image_identifier' => image_identifier
-      }
-
-      # Call SendApplePayService directly (synchronously) so we can handle errors
-      service = AppleMessagesForBusiness::SendApplePayService.new(
-        channel: @conversation.inbox.channel,
-        destination_id: @conversation.contact_inbox.source_id,
-        payment_data: payment_data
-      )
-
-      log_info '[Bot] 💳 Calling SendApplePayService.perform...'
-      response = service.perform
-      log_info "[Bot] 💳 SendApplePayService returned: #{response.inspect}"
-      log_info "[Bot] 💳 Response is Hash: #{response.is_a?(Hash)}"
-      log_info "[Bot] 💳 Response[:success]: #{response[:success].inspect}"
-      log_info "[Bot] 💳 Response[:success] == true: #{response[:success] == true}"
-
-      # If service succeeded, create message record without triggering SendReplyJob
-      if response[:success]
-        # Clean up payment_data for storage - remove keys that aren't needed in database
-        stored_payment_data = payment_data.except('request_identifier', 'reply_image_identifier')
-
-        # Create message directly to avoid double-send via SendReplyJob
-        message_params = bot_message_params(
-          message_type: :outgoing,
-          content: "Buy your new #{guitar_name}",
-          content_type: 'apple_pay',
-          content_attributes: stored_payment_data,
-          source_id: response[:message_id],
-          sender: message_sender,
-          account_id: @conversation.account_id,
-          inbox_id: @conversation.inbox_id,
-          conversation_id: @conversation.id
-        )
-
-        # Use create without ! to avoid exception if message already exists
-        message = @conversation.messages.create(message_params)
-
-        if message.persisted?
-          log_info '[Bot] ✅ Apple Pay message created successfully'
-        else
-          log_warn "[Bot] ⚠️ Apple Pay message creation failed: #{message.errors.full_messages.join(', ')}"
-          log_warn '[Bot] ⚠️ Payment was delivered to device, continuing anyway...'
-        end
-
-        log_info '[Bot] ✅ Apple Pay sent successfully - returning { success: true }'
-        return_value = { success: true }
-        log_info "[Bot] 💳 About to return: #{return_value.inspect}"
-        return_value
-      else
-        log_info "[Bot] ❌ Apple Pay failed: #{utf8_encode(response[:error])}"
-        log_info "[Bot] 💳 About to return response: #{response.inspect}"
-        response
-      end
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] 💳 Exception in send_apple_pay_request: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-    error_return = { success: false, error: e.message }
-    log_info "[Bot] 💳 Returning error: #{error_return.inspect}"
-    error_return
-  end
-
-  def send_document(filename)
-    # Load document file from public/demo_files/apple_messages/
-    file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
-
-    unless File.exist?(file_path)
-      Rails.logger.error utf8_encode("[Bot] Document not found: #{file_path}")
-      return
-    end
-
-    log_info "[Bot] Sending document: #{utf8_encode(filename)}"
-
-    with_typing_indicator do
-      # Build message params
-      sender = message_sender
-      params = bot_message_params(
-        message_type: :outgoing,
-        content: '',  # Empty content - attachment will display filename
-        content_type: 'text',
-        account_id: @conversation.account_id,
-        inbox_id: @conversation.inbox_id,
-        conversation_id: @conversation.id
-      )
-      params[:sender] = sender
-
-      # Create message WITHOUT saving (build, not create)
-      message = @conversation.messages.build(params)
-
-      # Read file data and attach using StringIO (avoids file handle closing issues)
-      file_data = File.binread(file_path)
-
-      message_attachment = message.attachments.build(
-        account_id: message.account_id,
-        file_type: :file
-      )
-
-      # Attach the file using StringIO
-      message_attachment.file.attach(
-        io: StringIO.new(file_data),
-        filename: filename,
-        content_type: mime_type_for_filename(filename)
-      )
-
-      log_info "[Bot] Attached file: #{utf8_encode(filename)} (#{file_data.size} bytes)"
-
-      # NOW save the message - this triggers after_commit with attachments already present
-      message.save!
-
-      log_info "[Bot] Document message saved with #{message.attachments.count} attachment(s)"
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send document: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def mime_type_for_filename(filename)
-    case File.extname(filename).downcase
-    when '.pdf'
-      'application/pdf'
-    when '.numbers'
-      'application/vnd.apple.numbers'
-    when '.pages'
-      'application/vnd.apple.pages'
-    when '.key'
-      'application/vnd.apple.keynote'
-    else
-      'application/octet-stream'
-    end
-  end
-
-  def send_rich_link(url:, image_asset:, title:)
-    # Send a rich link message with URL, image, and title
-    # Image asset is optional (can be nil or a filename)
-    log_info "[Bot] Sending rich link: #{utf8_encode(url)} (#{utf8_encode(title)})"
-
-    with_typing_indicator do
-      # Create message with rich link content
-      # NOTE: Message will be automatically sent via after_commit callback
-      # which routes to SendRichLinkService based on content_type
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: url,
-          content_type: 'apple_rich_link',
-          content_attributes: {
-            'url' => url,
-            'title' => title,
-            'image_url' => image_url_for_asset(image_asset)
-          }.compact
-        )
-      ).perform
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send rich link: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def send_app_clip(url:)
-    # Send an App Clip using richLinkDataRef format
-    # This triggers App Clip invocation instead of standard rich link
-    #
-    # IMPORTANT: The URL must have a properly configured App Clip:
-    # 1. App Clip must be registered in App Store Connect
-    # 2. AASA file must exist at: https://domain/.well-known/apple-app-site-association
-    # 3. App Clip must be associated with the domain
-    #
-    # If these requirements aren't met, iOS will display it as a regular rich link
-    log_info "[Bot] Sending App Clip: #{utf8_encode(url)}"
-
-    channel = @conversation.inbox.channel
-    rich_link_data_ref = build_app_clip_rich_link_data_ref(channel: channel, url: url)
-
-    with_typing_indicator do
-      # Create message with App Clip content
-      # NOTE: Message will be automatically sent via after_commit callback
-      # SendRichLinkService will use richLinkDataRef mode (lines 207-212)
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: url,
-          content_type: 'apple_rich_link',
-          content_attributes: {
-            'url' => url,
-            'title' => 'Open App Clip',
-            'rich_link_data_ref' => rich_link_data_ref
-          }
-        )
-      ).perform
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send App Clip: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def build_app_clip_rich_link_data_ref(channel:, url:)
-    return { 'url' => url } unless channel
-
-    construct_result = AppleMessagesForBusiness::ConstructPayloadService.new(
-      channel: channel,
-      url: url
-    ).perform
-
-    if construct_result[:success] && construct_result[:rich_link_data_ref].present?
-      construct_result[:rich_link_data_ref]
-    else
-      log_warn "[Bot] App Clip constructPayload failed: #{construct_result[:error] || 'unknown error'}"
-      { 'url' => url }
-    end
-  rescue StandardError => e
-    log_warn "[Bot] App Clip constructPayload exception: #{e.message}"
-    { 'url' => url }
-  end
-
-  def image_url_for_asset(image_asset)
-    # Map image asset filename to public URL
-    # For now, return nil if no asset (Apple will fetch og:image from URL)
-    return nil if image_asset.blank?
-
-    # If it's already a full URL, return as-is
-    return image_asset if image_asset.start_with?('http://', 'https://')
-
-    # For demo assets in public directory, construct URL if we have a base URL
-    # Try to get the frontend URL from installation config
-    base_url = ENV.fetch('FRONTEND_URL', nil) || @conversation.inbox&.channel&.webhook_url&.match(%r{^https?://[^/]+})&.to_s
-
-    if base_url.present?
-      # Construct full URL for the asset
-      "#{base_url}/demo_files/apple_messages/#{image_asset}"
-    else
-      # No base URL available - return nil to let Apple fetch from target URL's og:image
-      nil
-    end
-  end
-
-  def get_conversation_attribute(key)
-    attrs = @conversation.custom_attributes || {}
-    attrs[key]
-  end
-
-  def increment_retry_count
-    attrs = @conversation.custom_attributes || {}
-    count = (attrs['retry_count'] || 0) + 1
-
-    @conversation.custom_attributes ||= {}
-    @conversation.custom_attributes['retry_count'] = count
-    @conversation.save!
-
-    count
-  end
-
-  def reset_retry_count
-    @conversation.custom_attributes ||= {}
-    @conversation.custom_attributes['retry_count'] = 0
-    @conversation.save!
-  end
-
-  def update_conversation_attribute(key, value)
-    @conversation.custom_attributes ||= {}
-    @conversation.custom_attributes[key] = value
-    @conversation.save!
-  end
-
-  # Helper method to build message params with bot sender
-  def bot_message_params(base_params)
-    agent_bot = bot_user
-
-    # Only add sender_type and sender_id if we have an AgentBot
-    if agent_bot.present?
-      base_params.merge(
-        sender_type: 'AgentBot',
-        sender_id: agent_bot.id
-      )
-    else
-      # No bot assigned - messages will be sent as the user (agent)
-      base_params
-    end
-  end
-
-  # Helper method to get sender for MessageBuilder
-  def message_sender
-    # Return AgentBot if available, otherwise fall back to first user
-    bot_user.presence || @conversation.account.users.first
-  end
-
-  def bot_user
-    # Return the AgentBot associated with this inbox, or nil
-    @conversation.inbox.agent_bot
-  end
-
-  # Typing indicator methods
-  def apple_messages_channel?
-    @conversation.inbox.channel.is_a?(Channel::AppleMessagesForBusiness)
-  end
-
-  def send_typing_indicator(action)
-    return unless TYPING_INDICATORS_ENABLED
-    return unless apple_messages_channel?
-
-    # Get the Apple Messages source ID from contact's additional attributes
-    apple_source_urn = @conversation.contact&.additional_attributes&.dig('apple_messages_source_id')
-    return unless apple_source_urn # Need destination ID
-
-    # Extract the UUID from the URN format (urn:biz:UUID)
-    destination_id = apple_source_urn.sub(/^urn:biz:/, '')
-
-    service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
-      channel: @conversation.inbox.channel,
-      destination_id: destination_id,
-      action: action
-    )
-
-    result = service.perform
-    log_info "[AcousticHouseBot] Typing indicator #{action}: #{result[:success] ? 'success' : utf8_encode(result[:error])}"
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[AcousticHouseBot] Failed to send typing indicator: #{e.message}")
-    # Don't fail the message sending if typing indicator fails
-  end
-
-  # Extract address information from form response
-  # Looks for common address field patterns (street, city, state, zip, address, etc.)
-  def extract_address_from_form(form_data)
-    return nil if form_data.blank?
-
-    address_fields = {}
-
-    # Common address field patterns
-    field_patterns = {
-      street: ['street', 'address', 'addr', 'line 1', 'address line'],
-      city: %w[city town],
-      state: %w[state province region],
-      zip: ['zip', 'postal', 'postcode', 'zip code', 'postal code'],
-      country: ['country']
-    }
-
-    # Search through form sections for address fields
-    form_data.each do |section|
-      title = section['title']&.downcase || ''
-      value = section.dig('items', 0, 'value')
-
-      next unless value.present?
-
-      # Match against patterns
-      field_patterns.each do |field_type, patterns|
-        if patterns.any? { |pattern| title.include?(pattern) }
-          address_fields[field_type] = value
-          break
-        end
-      end
-    end
-
-    # Return nil if no address fields found
-    return nil if address_fields.empty?
-
-    # Return formatted address hash
-    address_fields
-  end
-
-  # Send delivery confirmation message with address
-  def send_delivery_confirmation(address_data, customer_name = nil)
-    return unless address_data.present?
-
-    # Build formatted address string
-    address_parts = []
-    address_parts << address_data[:street] if address_data[:street].present?
-    address_parts << address_data[:city] if address_data[:city].present?
-    address_parts << address_data[:state] if address_data[:state].present?
-    address_parts << address_data[:zip] if address_data[:zip].present?
-    address_parts << address_data[:country] if address_data[:country].present?
-
-    formatted_address = address_parts.join(', ')
-
-    # Build confirmation message
-    message = if customer_name.present?
-                "Perfect #{customer_name}! Your order will be delivered to: #{formatted_address}"
-              else
-                "Perfect! Your order will be delivered to: #{formatted_address}"
-              end
-
-    send_text_message(message)
-
-    log_info "[Bot] 📦 Sent delivery confirmation for address: #{utf8_encode(formatted_address)}"
-  end
-
-  def with_typing_indicator
-    return yield unless TYPING_INDICATORS_ENABLED
-
-    send_typing_indicator(:start)
-    sleep(TYPING_INDICATOR_DELAY)
-    result = yield
-    send_typing_indicator(:end)
-    result
-  rescue StandardError => e
-    send_typing_indicator(:end) # Always end typing indicator
-    raise e
-  end
-
-  # === Phase 3 Helper Methods ===
-
-  def geocode_zipcode(zipcode)
-    # MVP: Hardcoded zipcode lookup
-    location = LOCATION_DATABASE[zipcode.strip]
-
-    # Default fallback: Apple Park
-    location || LOCATION_DATABASE['95014']
-  end
-
-  def send_lesson_time_picker(location)
-    guitar = get_conversation_attribute('selected_guitar') || 'guitar'
-
-    # Generate timeslots 7-8 days from now
-    day1 = 7.days.from_now.to_date
-    day2 = 8.days.from_now.to_date
-
-    timeslots = [
-      { 'identifier' => '0', 'start_time' => "#{day1}T15:30#{location[:timezone_offset]}", 'duration' => 3600 },
-      { 'identifier' => '1', 'start_time' => "#{day1}T17:00#{location[:timezone_offset]}", 'duration' => 3600 },
-      { 'identifier' => '2', 'start_time' => "#{day1}T19:30#{location[:timezone_offset]}", 'duration' => 3600 },
-      { 'identifier' => '3', 'start_time' => "#{day2}T15:00#{location[:timezone_offset]}", 'duration' => 3600 },
-      { 'identifier' => '4', 'start_time' => "#{day2}T17:30#{location[:timezone_offset]}", 'duration' => 3600 },
-      { 'identifier' => '5', 'start_time' => "#{day2}T19:00#{location[:timezone_offset]}", 'duration' => 3600 }
-    ]
-
-    # Define image identifier for time picker (must be pre-loaded via upload_time_picker_image.rb)
-    time_picker_image_id = 'time_picker_lesson'
-
-    # NOTE: Time pickers use image identifiers only (received_image_identifier, reply_image_identifier)
-    # Unlike list pickers, they do NOT use an 'images' array in content_attributes
-    # The images must be pre-uploaded to AppleListPickerImage model by identifier
-
-    with_typing_indicator do
-      # Create message with time picker content
-      # NOTE: Message will be automatically sent via after_commit callback
-      # which routes to SendTimePickerService based on content_type
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: "Schedule a lesson with your #{guitar}",
-          content_type: 'apple_time_picker',
-          content_attributes: {
-            'request_identifier' => 'time_0319',
-            'received_title' => "Schedule a lesson with your #{guitar}",
-            'received_subtitle' => location[:name],
-            'received_image_identifier' => time_picker_image_id,
-            'reply_title' => 'Thank you!',
-            'reply_image_identifier' => time_picker_image_id,
-            'event' => {
-              'identifier' => SecureRandom.uuid,
-              'title' => "Guitar Lesson - #{guitar}",
-              'location' => {
-                'latitude' => location[:latitude],
-                'longitude' => location[:longitude],
-                'radius' => 300.0,
-                'title' => location[:name]
-              },
-              'timeslots' => timeslots
-            }
-          }
-        )
-      ).perform
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send time picker: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
   def send_single_store_rich_link(store, _user_coordinates)
     # Single store found - send as Apple Maps rich link and proceed directly to time picker
     log_info "[Bot] 📍 Single store found: #{utf8_encode(store[:name])}"
@@ -3258,119 +2309,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     update_bot_state('AHH1')
   rescue StandardError => e
     Rails.logger.error utf8_encode("[Bot] Failed to send single store rich link: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def send_store_quick_reply(stores, user_coordinates)
-    # 2-5 stores - send as quick reply buttons
-    log_info "[Bot] 🏪 Sending #{stores.length} stores as quick reply"
-
-    # Store minimal stores data
-    minimal_stores = stores.map do |store|
-      {
-        'id' => store[:id],
-        'name' => store[:name],
-        'latitude' => store[:latitude],
-        'longitude' => store[:longitude],
-        'distance_km' => store[:distance_km]
-      }
-    end
-    update_conversation_attribute('available_stores', minimal_stores.to_json)
-    update_conversation_attribute('store_search_lat', user_coordinates[:latitude])
-    update_conversation_attribute('store_search_lon', user_coordinates[:longitude])
-
-    # Build quick reply items
-    items = stores.map.with_index do |store, index|
-      {
-        title: store[:name],
-        value: index.to_s
-      }
-    end
-
-    # Send quick reply
-    send_quick_reply(
-      title: "Select your nearest Apple Store (#{stores.length} found)",
-      request_id: 'qr_store_selection',
-      items: items
-    )
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send store quick reply: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
-  def send_store_selection_list_picker(stores, user_coordinates)
-    return if stores.blank?
-
-    # Image identifier for Apple Store logo
-    apple_store_image_id = 'apple_store_logo'
-
-    # Build list picker sections with store items (including image identifier)
-    items = stores.map.with_index do |store, index|
-      {
-        'identifier' => index.to_s,
-        'title' => store[:name],
-        'subtitle' => "#{store[:distance_km]} km away • #{store[:formatted_address]}",
-        'style' => 'large',
-        'image_identifier' => apple_store_image_id
-      }
-    end
-
-    sections = [
-      {
-        'title' => 'Nearby Apple Stores',
-        'multiple_selection' => false,
-        'items' => items
-      }
-    ]
-
-    # Store search coordinates in conversation attributes for later use
-    update_conversation_attribute('store_search_lat', user_coordinates[:latitude])
-    update_conversation_attribute('store_search_lon', user_coordinates[:longitude])
-
-    # Store minimal stores data (without long addresses) to avoid exceeding attribute length limit
-    minimal_stores = stores.map do |store|
-      {
-        'id' => store[:id],
-        'name' => store[:name],
-        'latitude' => store[:latitude],
-        'longitude' => store[:longitude],
-        'distance_km' => store[:distance_km]
-      }
-    end
-    update_conversation_attribute('available_stores', minimal_stores.to_json)
-
-    # Fetch and encode the Apple Store logo image
-    images = fetch_and_encode_images([apple_store_image_id])
-
-    log_info "[Bot] 🏪 Encoded #{images.length} images for store selection list picker"
-
-    with_typing_indicator do
-      # Create message with list picker content
-      # NOTE: Message will be automatically sent via after_commit callback
-      # which routes to SendListPickerService based on content_type
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: 'Select an Apple Store',
-          content_type: 'apple_list_picker',
-          content_attributes: {
-            'request_identifier' => 'lp_store_selection',
-            'sections' => sections,
-            'images' => images,
-            'received_title' => 'Select a Store',
-            'received_subtitle' => "Found #{stores.length} stores nearby",
-            'received_image_identifier' => apple_store_image_id,
-            'reply_title' => 'Great choice!',
-            'reply_subtitle' => 'Let\'s schedule your lesson',
-            'reply_image_identifier' => apple_store_image_id
-          }
-        )
-      ).perform
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send store selection list picker: #{e.message}")
     Rails.logger.error utf8_encode(e.backtrace.join("\n"))
   end
 
@@ -3604,31 +2542,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     update_bot_state('AHG1')
   end
 
-  def send_apple_messages_rich_link
-    with_typing_indicator do
-      # Create message with rich link
-      # NOTE: Message will be automatically sent via after_commit callback
-      # which routes to SendRichLinkService based on content_type
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: 'https://register.apple.com/resources/messages/messaging-documentation/',
-          content_type: 'apple_rich_link',
-          content_attributes: {
-            'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
-            'title' => 'Apple Messages for Business',
-            'image_url' => image_url_for_asset('heroImage.png')
-          }.compact
-        )
-      ).perform
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send rich link: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-  end
-
   def detect_language
     locale = @conversation.additional_attributes&.dig('locale')
 
@@ -3710,57 +2623,6 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       all_available: missing.empty?
     }
   end
-
-  # Map guitar names to their corresponding image identifiers
-  # Returns the image identifier for the guitar, or fallback image
-  # @param guitar_name [String] The name of the selected guitar
-  # @return [String] The image identifier to use
-  # rubocop:disable Metrics/MethodLength
-  def get_guitar_image_identifier(guitar_name)
-    return nil if guitar_name.blank?
-
-    # Default fallback image (Les Paul) - used when no match found or in demo mode
-    fallback_identifier = 'guitar_lespaul'
-
-    # Guitar name to image identifier mapping
-    # Based on the guitar list picker template (ID 371) items
-    guitar_image_map = {
-      # Exact matches from guitar list picker
-      'Fender American Elite Stratocaster' => 'guitar_stratocaster',
-      'Gibson ES-335' => 'guitar_gibson_es335',
-      'Martin DC28E Dreadnought' => 'guitar_martin_dreadnought',
-      'Gibson Les Paul Standard' => 'guitar_lespaul',
-      'PRS Custom 24' => 'guitar_prs_custom24',
-      'Taylor 814ce' => 'guitar_taylor',
-
-      # Partial match patterns (for when guitar name is abbreviated)
-      'Stratocaster' => 'guitar_stratocaster',
-      'Les Paul' => 'guitar_lespaul',
-      'Martin' => 'guitar_martin_dreadnought',
-      'Dreadnought' => 'guitar_martin_dreadnought',
-      'Gibson' => 'guitar_lespaul',
-      'Fender' => 'guitar_stratocaster',
-      'PRS' => 'guitar_prs_custom24',
-      'Taylor' => 'guitar_taylor',
-
-      # Demo mode guitars
-      'Demo Guitar - Fender Stratocaster' => 'guitar_stratocaster'
-    }
-
-    # Try exact match first
-    return guitar_image_map[guitar_name] if guitar_image_map.key?(guitar_name)
-
-    # Try partial match (find first key that guitar_name includes)
-    match = guitar_image_map.find { |key, _value| guitar_name.include?(key) }
-    return match[1] if match
-
-    # Log when using fallback
-    Rails.logger.info "[Bot] 🎸 No image found for guitar '#{guitar_name}', using fallback: #{fallback_identifier}"
-
-    # Return fallback image
-    fallback_identifier
-  end
-  # rubocop:enable Metrics/MethodLength
 
   def handle_imessage_app(_interactive_data = nil)
     log_info '[Bot] 🎵 handle_imessage_app called - Sending Shazam extension'
@@ -3904,48 +2766,5 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_oauth_authentication('facebook')
     update_bot_state('DEMO_MODE')
-  end
-
-  def send_oauth_authentication(provider)
-    log_info "[Bot] 🔐 Sending OAuth authentication for provider: #{provider}"
-
-    # Build authentication data
-    authentication_data = {
-      'provider' => provider
-    }
-
-    # Create custom message text based on provider
-    message_content = case provider.downcase
-                      when 'linkedin'
-                        'Sign in with LinkedIn to access your professional profile'
-                      when 'google'
-                        'Sign in with Google to continue'
-                      when 'facebook'
-                        'Sign in with Facebook to continue'
-                      else
-                        "Sign in with #{provider.capitalize} to continue"
-                      end
-
-    # Use SendAuthenticationService to send OAuth request
-    service = AppleMessagesForBusiness::SendAuthenticationService.new(
-      channel: @conversation.inbox.channel,
-      destination_id: @conversation.contact_inbox.source_id,
-      authentication_data: authentication_data,
-      message_content: message_content
-    )
-
-    result = service.perform
-
-    if result[:success]
-      log_info '[Bot] ✅ OAuth authentication message sent successfully'
-    else
-      error_msg = result[:error] || 'unknown error'
-      log_warn "[Bot] ❌ OAuth authentication failed: #{error_msg}"
-      send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
-    end
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] ❌ Exception in send_oauth_authentication: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-    send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
   end
 end
