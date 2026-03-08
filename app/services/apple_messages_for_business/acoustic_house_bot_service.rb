@@ -268,7 +268,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       safe_execute(context: "interactive(#{request_id})") do
         dispatch_interactive_handler(handler_method, interactive_data)
 
-        # After handling the interactive response, process the updated state
+        # After handling the interactive response, process the updated state.
+        # Skip if: handler is waiting for user input, menu selection handled it,
+        # or handler put us in DEMO_MODE (it already sent its own completion message).
         waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
         skip_process_state_for_request_ids = %w[lp_menu_0319]
 
@@ -276,6 +278,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
           log_info "[Bot] 🔄 State #{@bot_state} is waiting for user input - skipping process_state"
         elsif skip_process_state_for_request_ids.include?(request_id)
           log_info "[Bot] 🔄 Request #{request_id} handled by menu selection - skipping process_state"
+        elsif @bot_state == 'DEMO_MODE'
+          log_info '[Bot] 🔄 Handler completed in DEMO_MODE - skipping process_state to avoid duplicate message'
         else
           log_info "[Bot] 🔄 Interactive handler complete, processing updated state: #{@bot_state}"
           process_state
@@ -628,6 +632,27 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Normal flow: Ask for name preference via quick reply
     update_bot_state('AHB2')
     handle_name_preference_prompt
+  end
+
+  def extract_address_from_form(form_data)
+    return nil if form_data.blank?
+
+    street_section = form_data.find { |section| section['title']&.downcase&.include?('street') || section['title']&.downcase&.include?('address') }
+    city_section = form_data.find { |section| section['title']&.downcase == 'city' || section['title']&.downcase&.include?('city') }
+    state_section = form_data.find { |section| section['title']&.downcase == 'state' || section['title']&.downcase&.include?('state') }
+    zip_section = form_data.find do |section|
+      title = section['title']&.downcase
+      title&.include?('zip') || title&.include?('postal')
+    end
+
+    address = {
+      street: street_section&.dig('items', 0, 'value'),
+      city: city_section&.dig('items', 0, 'value'),
+      state: state_section&.dig('items', 0, 'value'),
+      zip: zip_section&.dig('items', 0, 'value')
+    }.compact
+
+    address.presence
   end
 
   def handle_text_name_input
@@ -2045,6 +2070,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_ar_file
+    template = MessageTemplate.find_by(
+      account_id: @conversation.account_id,
+      name: 'ah_ar_guitar'
+    )
+
+    unless template
+      send_text_message('[AR File: Template not found]')
+      return
+    end
+
     @sender.send_ar_file
   end
 
@@ -2069,6 +2104,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def send_guitar_list_picker
+    template = MessageTemplate.find_by(
+      account_id: @conversation.account_id,
+      name: 'ah_guitar_list_picker'
+    )
+
+    unless template
+      send_text_message('Guitar selection temporarily unavailable.')
+      return
+    end
+
     @sender.send_guitar_list_picker
   end
 
