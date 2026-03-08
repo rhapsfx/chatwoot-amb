@@ -212,7 +212,7 @@ rails runner "puts Message.last.inspect"
 
 **User must run manually**:
 ```bash
-./script/deploy-backend-changes-safe.sh
+./script/deploy-production-docker.sh
 ./script/deploy-assets-only.sh
 ```
 

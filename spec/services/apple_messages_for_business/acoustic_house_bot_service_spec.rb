@@ -182,6 +182,27 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
     end
   end
 
+  describe '#schedule_delayed_action' do
+    include ActiveJob::TestHelper
+
+    before do
+      ActiveJob::Base.queue_adapter = :test
+      ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+    end
+
+    it 'enqueues a delayed bot action job' do
+      service.send(:schedule_delayed_action, :send_learn_more_documents, delay: 1.0)
+
+      job = ActiveJob::Base.queue_adapter.enqueued_jobs.last
+      expect(job[:job]).to eq(AppleMessagesForBusiness::BotDelayedActionJob)
+      expect(job[:args].first).to include(
+        'conversation_id' => conversation.id,
+        'method_name' => 'send_learn_more_documents'
+      )
+      expect(job[:at]).to be_present
+    end
+  end
+
   describe '#handle_guitar_selection (idempotency guard)' do
     let(:interactive_data) do
       {
@@ -396,6 +417,12 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
 
   describe '#handle_keyword_message' do
     context 'with demo keywords' do
+      it 'returns true for "IMessage" keyword' do
+        message.update!(content: 'IMessage')
+        allow(service).to receive(:handle_imessage_app)
+        expect(service.send(:handle_keyword_message)).to be true
+      end
+
       it 'returns true for "guitar" keyword' do
         message.update!(content: 'guitar')
         allow(service).to receive(:handle_list_picker_demo)
@@ -461,6 +488,44 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
         message.update!(content: '')
         expect(service.send(:handle_keyword_message)).to be false
       end
+    end
+  end
+
+  describe '#handle_menu_selection' do
+    let(:interactive_data) do
+      {
+        'data' => {
+          'listPicker' => {
+            'sections' => [
+              {
+                'title' => 'Menu',
+                'items' => [
+                  { 'identifier' => 'act_introduction', 'title' => '1. Introduction with Intent ID' },
+                  { 'identifier' => 'act_imessage_app', 'title' => '10. iMessage App' }
+                ]
+              },
+              {
+                'title' => 'You Selected',
+                'items' => [
+                  { 'identifier' => 'act_imessage_app', 'title' => '10. iMessage App' }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    end
+
+    before do
+      allow(Redis::Alfred).to receive(:get).and_return(nil)
+      allow(Redis::Alfred).to receive(:setex)
+      allow(service).to receive(:send_text_message)
+      allow(service).to receive(:update_bot_state)
+    end
+
+    it 'routes menu selection 10 to iMessage app handler' do
+      expect(service).to receive(:handle_imessage_app)
+      service.send(:handle_menu_selection, interactive_data)
     end
   end
 

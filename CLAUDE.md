@@ -706,7 +706,7 @@ Frontend (camelCase)
 ### Deployment
 
 The image architecture is deployed via standard deployment scripts:
-- `./script/deploy-backend-changes-safe.sh` - Deploys models, services, controllers
+- `./script/deploy-production-docker.sh` - Deploys models, services, controllers
 - Frontend assets deployed via Vite build
 
 **Database Migrations**:
@@ -830,7 +830,7 @@ Rails commands can modify database state, trigger side effects, or perform opera
 
 We have two primary deployment scripts for different scenarios:
 
-#### 1. `script/quick_rebuild.sh` - Full Docker Image Rebuild
+#### 1. `script/deploy-production-docker.sh` - Full Docker Image Rebuild
 
 **Use when:**
 - ✅ Modified `Dockerfile.production` or Docker infrastructure
@@ -842,15 +842,15 @@ We have two primary deployment scripts for different scenarios:
 **Usage:**
 ```bash
 # Standard rebuild (uses cache)
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 
 # Clean rebuild (no cache, for infrastructure changes)
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 **Time**: 5-15 minutes | **Requirements**: 4GB+ heap, 3.7GB RAM + 4GB swap
 
-#### 2. `script/deploy-backend-enhanced.sh` - Hot-Patch Backend Deployment
+#### 2. `script/deploy-production-docker.sh` - Hot-Patch Backend Deployment
 
 **Use when:**
 - ✅ Modified Ruby code only (services, controllers, models, jobs)
@@ -861,7 +861,7 @@ We have two primary deployment scripts for different scenarios:
 
 **Usage:**
 ```bash
-./script/deploy-backend-enhanced.sh
+./script/deploy-production-docker.sh
 ```
 
 **Time**: 1-3 minutes | **Requirements**: Containers must be running
@@ -870,27 +870,27 @@ We have two primary deployment scripts for different scenarios:
 
 **Fix backend bug (Ruby code only):**
 ```bash
-./script/deploy-backend-enhanced.sh
+./script/deploy-production-docker.sh
 ```
 
 **Add new gem dependency:**
 ```bash
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 ```
 
 **Update frontend UI:**
 ```bash
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 ```
 
 **Update Dockerfile configuration:**
 ```bash
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 **Deploy with database migration:**
 ```bash
-./script/deploy-backend-enhanced.sh  # Runs migrations automatically
+./script/deploy-production-docker.sh  # Runs migrations automatically
 ```
 
 ### Deployment Workflow
@@ -927,7 +927,7 @@ We have two primary deployment scripts for different scenarios:
 - **NEVER run deployment scripts through Claude** - SSH and rsync are blocked by sandbox
 - **ALWAYS ask user to run deployment scripts manually** in their terminal
 - **Always commit before deploying** - Version control is critical for rollbacks
-- **Choose the right script** - Using `quick_rebuild.sh` for simple code changes wastes 10+ minutes
+- **Choose the right script** - Using `deploy-production-docker.sh` for simple code changes wastes 10+ minutes
 - **Monitor during deployment** - Watch logs in separate terminal to catch issues early
 - **Verify after deployment** - Check container health, application endpoints, and feature functionality
 - **Environment-specific configs**:

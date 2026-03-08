@@ -2227,7 +2227,7 @@ cp -r . ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/
 
 # Deploy to production (syncs to /opt/n8n/data/)
 cd /Users/rhaps/LocalGit/chatwoot
-./script/deploy-backend-changes-safe.sh
+./script/deploy-production-docker.sh
 ```
 
 **The deployment script automatically**:
@@ -2337,7 +2337,7 @@ ssh root@msp.rhaps.net "docker exec n8n ls -la /home/node/.n8n/custom/node_modul
 **Redeploy Custom Nodes**:
 ```bash
 # From local machine
-./script/deploy-backend-changes-safe.sh
+./script/deploy-production-docker.sh
 ```
 
 ### Security Considerations

@@ -110,6 +110,7 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     payload = build_apple_msp_payload(message_id, merchant_session_result)
 
     # Send to Apple MSP gateway
+    Rails.logger.info "[AMB ApplePay] Payload JSON: #{payload.to_json}"
     response = send_to_apple_gateway(payload, message_id)
 
     if response.success?
@@ -179,12 +180,13 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
   end
 
   # Build the paymentRequest structure according to Apple Pay specification
-  def build_payment_request(merchant_session_data = nil)
-    # Build in snake_case (CaseTransformer will convert to camelCase)
+  def build_payment_request(_merchant_session_data = nil)
+    # Per Apple's reference implementation (14_send_apple_pay_request.py):
+    # merchantIdentifier, supportedNetworks, merchantCapabilities go inside paymentRequest.applePay
     request = {
       'line_items' => build_line_items,
       'total' => build_total,
-      'apple_pay' => build_apple_pay_config(merchant_session_data),
+      'apple_pay' => build_apple_pay_config,
       'merchant_name' => @payment_data['merchant_name'],
       'country_code' => @payment_data['country_code'],
       'currency_code' => @payment_data['currency_code']
@@ -198,6 +200,15 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     end
 
     request
+  end
+
+  def build_apple_pay_config
+    apple_pay_settings = (@channel.payment_settings || {})['apple_pay'] || {}
+    {
+      'merchant_identifier' => merchant_identifier_string,
+      'supported_networks' => apple_pay_settings['supported_networks'] || default_supported_networks,
+      'merchant_capabilities' => apple_pay_settings['merchant_capabilities'] || default_merchant_capabilities
+    }
   end
 
   # Build line items array
@@ -224,33 +235,10 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     }
   end
 
-  # Build applePay configuration
-  def build_apple_pay_config(_merchant_session_data = nil)
-    payment_settings = @channel.payment_settings || {}
-    apple_pay_settings = payment_settings['apple_pay'] || {}
-
-    # CRITICAL: In applePay config, use the STRING merchant ID (e.g., "com.apple.apple-pay-matthieu")
-    # NOT the hash from merchant session. The hash only goes in merchantSession object.
-    # This is different from what you might expect - applePay.merchantIdentifier is the string,
-    # merchantSession.merchantIdentifier is the hash.
-
-    # Use real merchant ID from settings (even in test mode)
-    # Test mode affects payment processing, not the merchant ID
-    merchant_id = merchant_identifier_string
-
-    Rails.logger.info "[AMB ApplePay] Merchant identifier (applePay config): #{merchant_id}"
-    Rails.logger.info "[AMB ApplePay] Test mode: #{test_mode_enabled? ? 'enabled' : 'disabled'}"
-
-    {
-      'merchant_identifier' => merchant_id,
-      'supported_networks' => apple_pay_settings['supported_networks'] || default_supported_networks,
-      'merchant_capabilities' => apple_pay_settings['merchant_capabilities'] || default_merchant_capabilities
-    }
-  end
-
-  # Get the string merchant identifier (used in applePay config)
+  # Get the string merchant identifier (used in paymentRequest)
   def merchant_identifier_string
     @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
+      @channel.payment_settings['merchantIdentifier'] ||
       ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
   end
 

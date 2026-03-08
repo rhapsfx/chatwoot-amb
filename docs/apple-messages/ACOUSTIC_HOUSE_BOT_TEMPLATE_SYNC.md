@@ -121,7 +121,7 @@ rails runner script/export_acoustic_house_bot_templates.rb 1 /tmp/bot_templates.
 }
 ```
 
-### 3. Deployment Integration (`script/deploy-backend-changes-safe.sh`)
+### 3. Deployment Integration (`script/deploy-production-docker.sh`)
 
 The deployment script automatically:
 1. Runs drift detection as pre-deployment check
@@ -260,5 +260,5 @@ Found: 6 templates
 - **Bot Service**: `app/services/apple_messages_for_business/acoustic_house_bot_service.rb`
 - **Drift Detection**: `script/detect_acoustic_house_bot_templates.rb`
 - **Export Script**: `script/export_acoustic_house_bot_templates.rb`
-- **Deployment**: `script/deploy-backend-changes-safe.sh` (Step 1.8)
+- **Deployment**: `script/deploy-production-docker.sh` (Step 1.8)
 - **Documentation**: `docs/apple-messages/ACOUSTIC_HOUSE_BOT_TEMPLATE_SYNC.md` (this file)

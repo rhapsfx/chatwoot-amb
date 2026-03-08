@@ -233,7 +233,7 @@ Check if build is using cache:
 
 ### Solution 1: Force Clean Build
 ```bash
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 This rebuilds all layers without using cache (slower but guaranteed fresh).
@@ -370,7 +370,7 @@ After any deployment, verify ALL of these:
 
 ### Rebuild with no cache
 ```bash
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 ### Check container logs
@@ -415,8 +415,8 @@ ssh root@msp.rhaps.net 'free -h && df -h'
 ## Related Documentation
 
 - [Main Deployment Guide](./DEPLOYMENT_GUIDE.md)
-- [Quick Rebuild Script](../script/quick_rebuild.sh)
-- [Backend Deployment Script](../script/deploy-backend-enhanced.sh)
+- [Quick Rebuild Script](../script/deploy-production-docker.sh)
+- [Backend Deployment Script](../script/deploy-production-docker.sh)
 - [Production Dockerfile](../Dockerfile.production)
 
 ---

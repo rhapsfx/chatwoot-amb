@@ -797,7 +797,7 @@ end
 ### Production Deployment Steps
 
 1. **Run migrations** (if any database changes)
-2. **Deploy backend**: `./script/deploy-backend-changes-safe.sh`
+2. **Deploy backend**: `./script/deploy-production-docker.sh`
 3. **Build frontend assets**: `bin/vite build`
 4. **Restart servers**
 5. **Verify in production**:

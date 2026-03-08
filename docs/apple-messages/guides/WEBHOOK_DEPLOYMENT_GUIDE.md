@@ -21,7 +21,7 @@ We've refactored the Apple Messages for Business webhook endpoint to use a **per
 
 ### 1. Deploy Backend Changes
 ```bash
-./deploy-backend-changes.sh
+./script/deploy-production-docker.sh
 ```
 
 This script:
@@ -108,7 +108,7 @@ If issues occur, you can rollback by:
 1. **Revert code changes:**
    ```bash
    git revert HEAD
-   ./deploy-backend-changes.sh
+   ./script/deploy-production-docker.sh
    ```
 
 2. **Update Apple Business Register** back to the old URL format with MSP ID

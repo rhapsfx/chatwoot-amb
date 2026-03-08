@@ -599,7 +599,7 @@ If using MessageTemplate model instead of inline:
 
 3. **Deploy to production**:
    ```bash
-   ./script/deploy-backend-changes-safe.sh
+   ./script/deploy-production-docker.sh
    ```
 
 4. **Monitor logs**:

@@ -160,7 +160,7 @@ Medium Priority:
 ### **5. Deploy to Production** (When Ready)
 ```bash
 # In YOUR terminal (NOT Claude Code - sandbox blocks SSH/rsync):
-./script/deploy-backend-changes-safe.sh
+./script/deploy-production-docker.sh
 
 # Monitor logs
 tail -f log/production.log | grep "\[Bot\]"

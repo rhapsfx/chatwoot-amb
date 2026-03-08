@@ -72,10 +72,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'big form' => :handle_large_form_demo,
     'ar' => :handle_ar_demo,
     'augmented reality' => :handle_ar_demo,
+    'imessage' => :handle_imessage_app,
     'imessage app' => :handle_imessage_app,
     'imessage extension' => :handle_imessage_app,
     'authentication' => :handle_authentication_menu,
     'auth' => :handle_authentication_menu,
+    'oauth' => :handle_authentication_menu,
     'shazam' => :handle_imessage_app,
     'appclip' => :handle_app_clip_demo
   }.freeze
@@ -878,8 +880,20 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     update_bot_state('AHC3')
 
     # NOTE: Removed blocking sleep(15.0) that was causing Rack timeouts
-    # AR question will be sent immediately - user may see question before AR file fully loads
-    # This is acceptable as the AR file will load in background
+    # Schedule AR question after a short delay so the attachment is visible first
+    log_info '[Bot] 🎨 Scheduling AR view question after AR attachment delivery'
+    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 8.0)
+
+    return if scheduled
+
+    # Fallback for Redis/Sidekiq outages: run inline after a short delay
+    log_warn '[Bot] ⚠️ AR view question scheduling failed; falling back to inline delay'
+    sleep 8.0
+    send_ar_view_question_and_state
+  end
+
+  def send_ar_view_question_and_state
+    log_info '[Bot] 🎨 Sending AR view question after AR attachment delivery'
     handle_ar_first_question
   end
 
@@ -918,9 +932,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                         identifier
                       end
 
-    send_text_message('Try tapping on the image to see the AR image of the guitar!') if selection_value == '222' # No - User didn't see AR view
+    if selection_value == '222'
+      # No - User didn't see AR view, prompt again and keep waiting
+      send_text_message('Try tapping on the image to see the AR preview, then answer the question below.')
+      update_bot_state('AHD1')
+      send_ar_view_question
+      return
+    end
 
-    # Send AR placement question immediately - brief delay not critical
+    # Yes - proceed to AR placement question
     update_bot_state('AHE1')
     send_ar_place_question
   end
@@ -951,11 +971,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # After AR section, proceed to Apple Pay
     update_bot_state('AHE2')
     handle_apple_pay_prompt
-    # Defensive catcher for text input when Quick Reply is expected (AHE1)
-    def handle_ar_place_catcher
-      log_info '[Bot] 🛡️ handle_ar_place_catcher called - user sent text instead of selecting Quick Reply'
-      send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you'd like to place the guitar in AR.")
-    end
+  end
+
+  # Defensive catcher for text input when Quick Reply is expected (AHE1)
+  def handle_ar_place_catcher
+    log_info '[Bot] 🛡️ handle_ar_place_catcher called - user sent text instead of selecting Quick Reply'
+    send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you'd like to place the guitar in AR.")
   end
 
   def handle_apple_pay_prompt
@@ -1619,10 +1640,18 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_ar_demo
-    # Demo mode: just show AR content, don't continue flow
+    # Demo mode: show AR content then ask the same Yes/No questions as the main flow
     send_text_message('Check out our AR experience:')
     send_ar_file
-    # State will be set to DEMO_MODE by handle_keyword_message
+    # State will be set to DEMO_MODE by handle_keyword_message, then
+    # send_ar_view_question_and_state transitions to AHD1 so the response is handled.
+    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 8.0)
+    return if scheduled
+
+    # Fallback for Redis/Sidekiq outages: run inline after a short delay
+    log_warn '[Bot] ⚠️ AR view question scheduling failed in demo; falling back to inline delay'
+    sleep 8.0
+    send_ar_view_question_and_state
   end
 
   def handle_large_form_demo
@@ -1662,7 +1691,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Idempotency guard: prevent processing the same menu selection twice
     # Use conversation ID + timestamp + selection data as the unique key
     # This prevents duplicate processing even if multiple message objects are created
-    selection_data = interactive_data['ldtext'] || interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
+    selected_menu_identifier = interactive_data.dig('data', 'reply', 'identifier') ||
+                               interactive_data.dig('data', 'listPicker', 'sections')&.find do |section|
+                                 section['title'] == 'You Selected'
+                               end&.dig('items', 0, 'identifier')
+    selected_menu_title = interactive_data.dig('data', 'reply', 'title') ||
+                          interactive_data.dig('data', 'listPicker', 'sections')&.find do |section|
+                            section['title'] == 'You Selected'
+                          end&.dig('items', 0, 'title')
+    selection_data = interactive_data['ldtext'] || selected_menu_identifier || selected_menu_title ||
+                     interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
     selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
     selection_key = "menu_selection:#{selection_hash}"
 
@@ -1747,23 +1785,23 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       # Find the identifier (should be a number string)
       selection_identifier = objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
     else
-      # Standard format - extract from listPicker sections
+      # Standard format - extract from listPicker selected section or data.reply
       data = interactive_data['data'] || {}
       list_picker = data['listPicker'] || {}
       sections = list_picker['sections'] || []
 
-      # Find the selected item across all sections
-      sections.each do |section|
-        items = section['items'] || []
-        selected_item = items.find { |item| item['identifier'].present? }
-        next unless selected_item
+      selected_section = sections.find { |section| section['title'] == 'You Selected' }
+      selected_item = selected_section&.dig('items', 0)
 
-        # Capture title for potential remapping
-        selected_item_title = selected_item['title']
-        # Extract the identifier (may be "option_2" or "176347360869701")
-        selection_identifier = selected_item['identifier'].to_s
+      # Fallback: in some payloads, selected item is explicitly flagged
+      selected_item ||= sections.flat_map { |section| section['items'] || [] }.find { |item| item['selected'] == true }
+
+      selected_item_title = selected_item&.dig('title') || data.dig('reply', 'title')
+      selection_identifier = selected_item&.dig('identifier') || data.dig('reply', 'identifier')
+
+      if selection_identifier.present?
+        selection_identifier = selection_identifier.to_s
         log_info "[Bot] 📋 Found selected item: #{utf8_encode(selected_item_title)} (identifier: #{selection_identifier})"
-        break
       end
     end
 
@@ -1786,10 +1824,31 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     unless /^\d{1,2}$/.match?(selection_identifier)  # Not a 1-2 digit number
       log_warn "[Bot] 📋 Got non-standard identifier: #{selection_identifier}, attempting title mapping..."
 
+      identifier_to_id = {
+        'act_introduction' => '1',
+        'act_list_picker' => '2',
+        'act_ar_image' => '3',
+        'act_apple_pay' => '4',
+        'act_time_picker' => '5',
+        'act_form' => '6',
+        'act_send_image' => '7',
+        'act_documents' => '8',
+        'act_authentication' => '9',
+        'act_imessage_app' => '10',
+        'act_rich_link' => '11',
+        'act_app_clip' => '12'
+      }
+
+      mapped_id = identifier_to_id[selection_identifier]
+      if mapped_id
+        log_info "[Bot] 📋 Remapped action identifier from #{selection_identifier} to #{mapped_id}"
+        selection_identifier = mapped_id
+      end
+
       # Get the title from ldtext or the captured title
       item_title = interactive_data['ldtext'] || selected_item_title
 
-      if item_title.present?
+      if item_title.present? && !/^\d{1,2}$/.match?(selection_identifier)
         log_info "[Bot] 📋 Found title for mapping: #{utf8_encode(item_title)}"
 
         # Map title to identifier
@@ -1974,6 +2033,21 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   # === Helper Methods ===
+
+  def schedule_delayed_action(method_name, delay:)
+    return false unless method_name.present?
+
+    log_info "[Bot] ⏳ Scheduling delayed action '#{method_name}' in #{delay}s for conversation #{@conversation.id}"
+    AppleMessagesForBusiness::BotDelayedActionJob.set(wait: delay.seconds).perform_later(
+      conversation_id: @conversation.id,
+      method_name: method_name.to_s
+    )
+    true
+  rescue StandardError => e
+    Rails.logger.error utf8_encode("[Bot] ❌ Failed to schedule delayed action #{method_name}: #{e.message}")
+    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
+    false
+  end
 
   def send_text_message(content)
     with_typing_indicator do
@@ -2604,9 +2678,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def send_ar_view_question
     # Send question with quick reply (message parameter handles text + buttons together)
     send_quick_reply(
-      title: 'Did you see the AR view?',
+      title: 'AR Preview',
       request_id: 'qr_view_ar',
-      message: 'Did you click on the image and see the 3D augmented reality view of the guitar?',
+      message: 'Did you experience the AR preview in your environment?',
       items: [
         { title: 'Yes', identifier: '111' },
         { title: 'No', identifier: '222' }

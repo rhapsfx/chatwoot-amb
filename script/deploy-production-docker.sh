@@ -167,6 +167,34 @@ docker_cmd compose -f "$COMPOSE_FILE" up -d postgres redis
 echo "=== Starting services ==="
 docker_cmd compose -f "$COMPOSE_FILE" up -d web worker
 
+# Hot-patch: copy any locally modified or new Ruby/config files into running containers.
+# This ensures uncommitted changes are live without a full image rebuild.
+hotpatch_ruby_files() {
+  local changed_files=()
+  while IFS= read -r line; do
+    local file="${line:3}"
+    if [[ "$file" == *.rb ]] && [[ "$file" == app/* || "$file" == config/* ]]; then
+      changed_files+=("$file")
+    fi
+  done < <(git status --porcelain)
+
+  if [ ${#changed_files[@]} -eq 0 ]; then
+    echo "=== No local Ruby changes to hot-patch ==="
+    return
+  fi
+
+  echo "=== Hot-patching ${#changed_files[@]} Ruby file(s) into containers ==="
+  for file in "${changed_files[@]}"; do
+    echo "  Patching: $file"
+    docker_cmd cp "$file" "chatwoot-web:/app/$file"
+    docker_cmd cp "$file" "chatwoot-worker:/app/$file"
+  done
+
+  echo "=== Restarting web and worker to load patched code (60s timeout for Sidekiq graceful shutdown) ==="
+  docker_cmd compose -f "$COMPOSE_FILE" restart --timeout 60 web worker
+}
+hotpatch_ruby_files
+
 echo "=== Skipping Apple Pay certificate deployment ==="
 
 echo "=== Current container status ==="

@@ -179,18 +179,26 @@ class AppleMessagesForBusiness::MerchantSessionService
   def merchant_certificate
     @channel.payment_settings.dig('apple_pay', 'merchant_identity_certificate') ||
       @channel.merchant_certificates ||
-      ENV.fetch('APPLE_PAY_MERCHANT_CERTIFICATE', nil)
+      ENV.fetch('APPLE_PAY_MERCHANT_CERTIFICATE', nil) ||
+      load_file_from_certs('apple_pay_cert.pem')
   end
 
   def merchant_private_key
     @channel.payment_settings.dig('apple_pay', 'merchant_identity_private_key') ||
       @channel.payment_settings.dig('apple_pay', 'private_key') ||
-      ENV.fetch('APPLE_PAY_MERCHANT_PRIVATE_KEY', nil)
+      ENV.fetch('APPLE_PAY_MERCHANT_PRIVATE_KEY', nil) ||
+      load_file_from_certs('apple_pay_private.key')
   end
 
   def merchant_identifier
     @channel.payment_settings.dig('apple_pay', 'merchant_identifier') ||
+      @channel.payment_settings['merchantIdentifier'] ||
       ENV.fetch('APPLE_PAY_MERCHANT_IDENTIFIER', nil)
+  end
+
+  def load_file_from_certs(filename)
+    path = Rails.root.join('certs', 'apple_pay', filename)
+    File.read(path) if File.exist?(path)
   end
 
   def merchant_domain

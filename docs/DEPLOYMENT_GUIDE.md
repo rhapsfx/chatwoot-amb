@@ -6,11 +6,11 @@ This guide explains the **simplified deployment workflow** for the Chatwoot prod
 
 We have **2 primary deployment scripts** for different scenarios:
 
-1. **`script/quick_rebuild.sh`** - Full Docker image rebuild (Dockerfile/dependencies/frontend changes)
-2. **`script/deploy-backend-enhanced.sh`** - Hot-patch backend code (Ruby-only changes)
+1. **`script/deploy-production-docker.sh`** - Full Docker image rebuild (Dockerfile/dependencies/frontend changes)
+2. **`script/deploy-production-docker.sh`** - Hot-patch backend code (Ruby-only changes)
 
 Plus **2 specialized utilities**:
-3. **`script/deploy-backend-changes-safe.sh`** - Comprehensive backend + Apple Pay + n8n + bots
+3. **`script/deploy-production-docker.sh`** - Comprehensive backend + Apple Pay + n8n + bots
 4. **`script/deploy-apple-pay-certs.sh`** - Apple Pay certificate deployment
 
 ---
@@ -20,22 +20,22 @@ Plus **2 specialized utilities**:
 ```
 Need to deploy changes?
 │
-├─ Changed Dockerfile.production? ────────────────────────→ quick_rebuild.sh
-├─ Changed Gemfile/package.json dependencies? ────────────→ quick_rebuild.sh
-├─ Changed Vue/JavaScript/CSS (frontend)? ────────────────→ quick_rebuild.sh
-├─ Changed Node.js or Ruby versions? ─────────────────────→ quick_rebuild.sh
+├─ Changed Dockerfile.production? ────────────────────────→ deploy-production-docker.sh
+├─ Changed Gemfile/package.json dependencies? ────────────→ deploy-production-docker.sh
+├─ Changed Vue/JavaScript/CSS (frontend)? ────────────────→ deploy-production-docker.sh
+├─ Changed Node.js or Ruby versions? ─────────────────────→ deploy-production-docker.sh
 │
-├─ Changed Ruby code ONLY (services/controllers/models)? ─→ deploy-backend-enhanced.sh
-├─ Changed routes or initializers? ───────────────────────→ deploy-backend-enhanced.sh
-├─ Need to run database migrations? ──────────────────────→ deploy-backend-enhanced.sh
+├─ Changed Ruby code ONLY (services/controllers/models)? ─→ deploy-production-docker.sh
+├─ Changed routes or initializers? ───────────────────────→ deploy-production-docker.sh
+├─ Need to run database migrations? ──────────────────────→ deploy-production-docker.sh
 │
-├─ Deploying Apple Pay/n8n/bot templates together? ───────→ deploy-backend-changes-safe.sh
+├─ Deploying Apple Pay/n8n/bot templates together? ───────→ deploy-production-docker.sh
 └─ Updating Apple Pay certificates? ──────────────────────→ deploy-apple-pay-certs.sh
 ```
 
 ---
 
-## 1. quick_rebuild.sh - Full Docker Rebuild
+## 1. deploy-production-docker.sh - Full Docker Rebuild
 
 ### When to Use
 
@@ -51,10 +51,10 @@ Use this when you've changed:
 
 ```bash
 # Standard rebuild (uses Docker layer cache)
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 
 # Clean rebuild (no cache - for infrastructure changes)
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 ### What It Does
@@ -95,7 +95,7 @@ SCRIPT
 
 ---
 
-## 2. deploy-backend-enhanced.sh - Hot-Patch Backend
+## 2. deploy-production-docker.sh - Hot-Patch Backend
 
 ### When to Use
 
@@ -111,7 +111,7 @@ Use this when you've changed **Ruby code ONLY**:
 ### Usage
 
 ```bash
-./script/deploy-backend-enhanced.sh
+./script/deploy-production-docker.sh
 ```
 
 ### What It Does
@@ -141,7 +141,7 @@ Use this when you've changed **Ruby code ONLY**:
 
 ---
 
-## 3. deploy-backend-changes-safe.sh - Comprehensive Deployment
+## 3. deploy-production-docker.sh - Comprehensive Deployment
 
 ### When to Use
 
@@ -155,12 +155,12 @@ Use this for **complex deployments** involving multiple subsystems:
 ### Usage
 
 ```bash
-./script/deploy-backend-changes-safe.sh
+./script/deploy-production-docker.sh
 ```
 
 ### What It Does
 
-Everything in `deploy-backend-enhanced.sh` PLUS:
+Everything in `deploy-production-docker.sh` PLUS:
 - Deploys Apple Pay certificates and configuration
 - Updates n8n custom AMB nodes
 - Syncs bot templates
@@ -198,7 +198,7 @@ Use this **only** when updating Apple Pay certificates:
 - Modified `MessageList.vue` (frontend Vue component)
 - Added 8 circle.png images to `public/apple-messages/`
 
-**Script**: `quick_rebuild.sh`
+**Script**: `deploy-production-docker.sh`
 
 **Why**: Frontend (Vue) changes require Vite build, which is baked into Docker image.
 
@@ -210,7 +210,7 @@ git add public/apple-messages/*.png
 git commit -m "feat: add circle.png images for Apple Messages modal"
 
 # Deploy
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 **Post-deployment**:
@@ -225,14 +225,14 @@ git commit -m "feat: add circle.png images for Apple Messages modal"
 **Changes**:
 - Modified `app/services/apple_messages_for_business/acoustic_house_bot_service.rb`
 
-**Script**: `deploy-backend-enhanced.sh`
+**Script**: `deploy-production-docker.sh`
 
 **Why**: Ruby service change only, no Docker or frontend changes.
 
 **Time**: 1-3 minutes
 
 ```bash
-./script/deploy-backend-enhanced.sh
+./script/deploy-production-docker.sh
 ```
 
 ---
@@ -244,14 +244,14 @@ git commit -m "feat: add circle.png images for Apple Messages modal"
 - Ran `bundle install` (updated `Gemfile.lock`)
 - Created new service using the gem
 
-**Script**: `quick_rebuild.sh`
+**Script**: `deploy-production-docker.sh`
 
 **Why**: Gemfile changes require rebuilding Docker image to install dependencies.
 
 **Time**: 5-10 minutes (with cache)
 
 ```bash
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 ```
 
 ---
@@ -261,14 +261,14 @@ git commit -m "feat: add circle.png images for Apple Messages modal"
 **Changes**:
 - Modified `Dockerfile.production` line 72: `NODE_OPTIONS="--max-old-space-size=4096"`
 
-**Script**: `quick_rebuild.sh --no-cache`
+**Script**: `deploy-production-docker.sh --no-cache`
 
 **Why**: Dockerfile infrastructure change requires clean rebuild.
 
 **Time**: 15-20 minutes
 
 ```bash
-./script/quick_rebuild.sh --no-cache
+./script/deploy-production-docker.sh --no-cache
 ```
 
 ---
@@ -279,21 +279,21 @@ git commit -m "feat: add circle.png images for Apple Messages modal"
 - Added `app/controllers/api/v1/new_feature_controller.rb`
 - Updated `config/routes.rb`
 
-**Script**: `deploy-backend-enhanced.sh`
+**Script**: `deploy-production-docker.sh`
 
 **Why**: Backend code and routes only, no Docker or dependency changes.
 
 **Time**: 1-3 minutes
 
 ```bash
-./script/deploy-backend-enhanced.sh
+./script/deploy-production-docker.sh
 ```
 
 ---
 
 ## Troubleshooting
 
-### Issue: Frontend Changes Don't Appear After `quick_rebuild.sh`
+### Issue: Frontend Changes Don't Appear After `deploy-production-docker.sh`
 
 **Cause**: Docker bind mount `/app/public/vite` is overriding image assets with old host files.
 
@@ -316,7 +316,7 @@ Then hard refresh browser: `Cmd+Shift+R`
 
 ---
 
-### Issue: "Container not running" with `deploy-backend-enhanced.sh`
+### Issue: "Container not running" with `deploy-production-docker.sh`
 
 **Cause**: Containers aren't running.
 
@@ -326,7 +326,7 @@ Then hard refresh browser: `Cmd+Shift+R`
 ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml up -d'
 
 # Or rebuild if image is missing
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 ```
 
 ---
@@ -344,7 +344,7 @@ ssh root@msp.rhaps.net 'free -h'
 ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.production.yml restart web worker'
 
 # Then rebuild
-./script/quick_rebuild.sh
+./script/deploy-production-docker.sh
 ```
 
 ---
@@ -416,8 +416,8 @@ ssh root@msp.rhaps.net 'cd /opt/chatwoot && docker compose -f docker-compose.pro
    ```
 
 4. **Use appropriate script for change type**
-   - Dockerfile/dependencies/frontend → `quick_rebuild.sh`
-   - Ruby code only → `deploy-backend-enhanced.sh`
+   - Dockerfile/dependencies/frontend → `deploy-production-docker.sh`
+   - Ruby code only → `deploy-production-docker.sh`
    - Don't use rebuild for simple code changes
 
 5. **Hard refresh browser after frontend deployments**
@@ -459,7 +459,7 @@ The production setup uses bind mounts:
 
 - **2024-12-14**: Complete rewrite after deployment workflow optimization
   - Removed 28 deprecated scripts (vessel/container experiments)
-  - Established `quick_rebuild.sh` + `deploy-backend-enhanced.sh` as core workflow
+  - Established `deploy-production-docker.sh` + `deploy-production-docker.sh` as core workflow
   - Documented bind mount asset extraction workaround
   - Added comprehensive troubleshooting section
   - Aligned with actual working deployment process

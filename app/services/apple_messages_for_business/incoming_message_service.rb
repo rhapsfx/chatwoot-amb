@@ -1294,11 +1294,20 @@ class AppleMessagesForBusiness::IncomingMessageService
       Rails.logger.info '[Bot] Form response detected - using process_message'
       bot_service.process_message
     elsif @idr_data.present? || @params['interactiveData'].present?
-      Rails.logger.info '[Bot] Interactive response detected - using process_interactive_response'
+      Rails.logger.info '[Bot] Interactive response detected - scheduling async bot processing'
       # CRITICAL: Prioritize direct interactiveData (contains form selections) over IDR (display only)
       interactive_data = @params['interactiveData'].presence || @idr_data
-      Rails.logger.info "[Bot] Using #{@params['interactiveData'].present? ? 'direct interactiveData' : 'IDR data'}"
-      bot_service.process_interactive_response(interactive_data)
+      # Persist the interactive data in the message now so the background job can read it.
+      # process_interactive_data hasn't run yet at this point so we store it under
+      # bot_interactive_data; the job prefers interactive_response if that's set first.
+      @message.update_columns(
+        content_attributes: @message.content_attributes.merge('bot_interactive_data' => interactive_data)
+      )
+      AppleMessagesForBusiness::BotInteractiveResponseJob.perform_later(
+        conversation_id: @conversation.id,
+        message_id: @message.id
+      )
+      Rails.logger.info "[Bot] BotInteractiveResponseJob scheduled for message #{@message.id}"
     else
       Rails.logger.info '[Bot] Regular message - using process_message'
       bot_service.process_message
