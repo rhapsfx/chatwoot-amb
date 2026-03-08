@@ -419,6 +419,51 @@ module AppleMessagesForBusiness
       log_error e.backtrace.join("\n")
     end
 
+    # Returns true on success, false when template is missing or an error occurs.
+    # Callers decide the fallback behaviour.
+    def send_guitar_info_form
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_guitar_info_form'
+      )
+
+      unless template
+        log_error "[Bot] Guitar Info Form template 'ah_guitar_info_form' not found"
+        return false
+      end
+
+      log_info "[Bot] Sending Guitar Info Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      renderer = Templates::BotRendererService.new(
+        template_id: template.id,
+        parameters: {},
+        channel_type: 'apple_messages_for_business'
+      )
+
+      rendered = renderer.render_for_bot
+      rendered[:content_attributes]['request_identifier'] = 'form_0343' if rendered[:content_attributes]['request_identifier'].blank?
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: rendered[:content],
+            content_type: rendered[:content_type],
+            content_attributes: rendered[:content_attributes]
+          )
+        ).perform
+      end
+
+      log_info '[Bot] Guitar Info Form sent successfully'
+      true
+    rescue StandardError => e
+      log_error "[Bot] Failed to send guitar info form: #{e.message}"
+      log_error e.backtrace.join("\n")
+      false
+    end
+
     def send_summary_list_picker
       template = MessageTemplate.find_by(
         account_id: @conversation.account_id,
@@ -818,9 +863,8 @@ module AppleMessagesForBusiness
       end
     end
 
-    private
-
     # === Typing indicators ===
+    # Public so the main service can wrap its own MessageBuilder calls.
 
     def with_typing_indicator
       return yield unless typing_indicators_enabled?
@@ -834,6 +878,8 @@ module AppleMessagesForBusiness
       send_typing_indicator(:end)
       raise e
     end
+
+    private
 
     def send_typing_indicator(action)
       return unless typing_indicators_enabled?

@@ -556,14 +556,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
     supports_forms = capabilities.include?('FORM')
 
-    if supports_forms
-      log_info '[Bot] Device supports FORM - sending Apple Messages Form'
-      send_guitar_info_form
+    if supports_forms && send_guitar_info_form
+      log_info '[Bot] Device supports FORM - Guitar Info Form sent'
       update_bot_state('AHB1') # Wait for form response
     else
-      log_info '[Bot] Device does not support FORM - asking for name via text'
+      log_info '[Bot] FORM not supported or template missing - asking for name via text'
       send_text_message("What's your name?")
-      # Skip form and ask for text name input
       update_bot_state('AHB1_2') # Wait for text name input
     end
   end
@@ -1631,8 +1629,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     supports_forms = capabilities.include?('FORM')
 
     if supports_forms
-      send_text_message('Here\'s our guitar information form:')
-      send_guitar_info_form
+      send_text_message("Here's our guitar information form:")
+      unless send_guitar_info_form
+        send_text_message("The guitar info form template ('ah_guitar_info_form') is not configured yet. Please create it in the Templates section.")
+      end
     else
       send_text_message('Your device does not support FORM, please switch to an iOS device')
     end
@@ -2157,57 +2157,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     @sender.with_typing_indicator(&)
   end
 
+  # Returns true if the form was sent successfully, false if template not found.
+  # Callers are responsible for fallback behaviour.
   def send_guitar_info_form
-    # Use the specific form template by name
-    template = MessageTemplate.find_by(
-      account_id: @conversation.account_id,
-      name: 'ah_guitar_info_form'
-    )
-
-    unless template
-      Rails.logger.error utf8_encode("[Bot] Guitar Info Form template 'ah_guitar_info_form' not found - falling back to guitar list")
-      # Fallback: skip to guitar list if form template doesn't exist
-      update_bot_state('AHB3')
-      handle_guitar_list_prompt
-      return
-    end
-
-    log_info "[Bot] Sending Guitar Info Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
-
-    # Use BotRendererService to properly render the template
-    renderer = Templates::BotRendererService.new(
-      template_id: template.id,
-      parameters: {},
-      channel_type: 'apple_messages_for_business'
-    )
-
-    rendered = renderer.render_for_bot
-
-    # Add request_identifier for proper routing
-    rendered[:content_attributes]['request_identifier'] = 'form_0343' if rendered[:content_attributes]['request_identifier'].blank?
-
-    # Create outgoing message with form content
-    with_typing_indicator do
-      Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        bot_message_params(
-          message_type: :outgoing,
-          content: rendered[:content],
-          content_type: rendered[:content_type],
-          content_attributes: rendered[:content_attributes]
-        )
-      ).perform
-    end
-
-    # Form will be automatically sent via SendReplyJob callback
-    log_info '[Bot] Guitar Info Form sent successfully'
-  rescue StandardError => e
-    Rails.logger.error utf8_encode("[Bot] Failed to send guitar info form: #{e.message}")
-    Rails.logger.error utf8_encode(e.backtrace.join("\n"))
-    # Fallback to guitar list on error
-    update_bot_state('AHB3')
-    handle_guitar_list_prompt
+    @sender.send_guitar_info_form
   end
 
   def handle_large_form_response(content_attributes)

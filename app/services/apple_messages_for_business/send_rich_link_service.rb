@@ -172,14 +172,17 @@ class AppleMessagesForBusiness::SendRichLinkService
       # Use save! instead of update_column to trigger callbacks and ActionCable broadcasts
       @message.content_attributes = content_attrs.merge(updates)
       Rails.logger.info '🔍 Rich Link - About to save message with scraped data'
-      Rails.logger.info "🔍 Rich Link - content_attributes before save: #{@message.content_attributes.inspect}"
+      sanitized_before_save = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.content_attributes)
+      Rails.logger.info "🔍 Rich Link - content_attributes before save: #{sanitized_before_save.inspect}"
       Rails.logger.info "🔍 Rich Link - Message changed?: #{@message.changed?}"
-      Rails.logger.info "🔍 Rich Link - Changed attributes: #{@message.changes.inspect}"
+      sanitized_changes = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.changes)
+      Rails.logger.info "🔍 Rich Link - Changed attributes: #{sanitized_changes.inspect}"
 
       begin
         @message.save!
         Rails.logger.info '✅ Rich Link - Message saved successfully with scraped data'
-        Rails.logger.info "🔍 Rich Link - Previous changes after save: #{@message.previous_changes.inspect}"
+        sanitized_previous_changes = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.previous_changes)
+        Rails.logger.info "🔍 Rich Link - Previous changes after save: #{sanitized_previous_changes.inspect}"
 
         # Manually dispatch update event if Rails didn't detect changes
         if @message.previous_changes.blank?
@@ -199,7 +202,8 @@ class AppleMessagesForBusiness::SendRichLinkService
 
       # Update local content_attrs for building payload
       content_attrs = @message.content_attributes
-      Rails.logger.info "🔍 Rich Link - content_attributes after save: #{content_attrs.inspect}"
+      sanitized_after_save = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(content_attrs)
+      Rails.logger.info "🔍 Rich Link - content_attributes after save: #{sanitized_after_save.inspect}"
     else
       Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
     end
