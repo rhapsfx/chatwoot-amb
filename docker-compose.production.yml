@@ -223,8 +223,8 @@ services:
       - ./tmp:/app/tmp
     command: bundle exec sidekiq -C config/sidekiq.yml
     healthcheck:
-      # Checks that the sidekiq process is alive and can reach Redis
-      test: ["CMD-SHELL", "ps aux | grep '[s]idekiq' || exit 1"]
+      # Use SidekiqAlive's built-in HTTP endpoint instead of relying on procps.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7433 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

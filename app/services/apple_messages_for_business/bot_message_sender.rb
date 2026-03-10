@@ -759,8 +759,8 @@ module AppleMessagesForBusiness
           'country_code' => 'US',
           'line_items' => [{ 'label' => guitar_name, 'amount' => '0.01', 'type' => 'final' }],
           'total' => { 'label' => 'Acoustic House', 'amount' => '0.01', 'type' => 'final' },
-          'received_title' => "Buy your new #{guitar_name}",
-          'received_subtitle' => 'test payment',
+          'received_title' => "Secure your #{guitar_name} today",
+          'received_subtitle' => 'Complete your purchase with Apple Pay',
           'received_style' => 'large',
           'received_image_identifier' => image_identifier,
           'reply_style' => 'large',
@@ -782,7 +782,7 @@ module AppleMessagesForBusiness
 
           message_params = bot_message_params(
             message_type: :outgoing,
-            content: "Buy your new #{guitar_name}",
+            content: "Secure your #{guitar_name} today",
             content_type: 'apple_pay',
             content_attributes: stored_payment_data,
             source_id: response[:message_id],

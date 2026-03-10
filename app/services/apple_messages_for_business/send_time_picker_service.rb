@@ -22,9 +22,11 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       replyMessage: build_reply_message
     }
 
-    # Fetch and include images
+    # Fetch and include images at the interactiveData level (not inside data)
+    # Apple MSP resolves imageIdentifier in receivedMessage/replyMessage by looking
+    # at interactiveData.images, not interactiveData.data.images
     images = build_images_array
-    base_data[:data][:images] = images if images.present?
+    base_data[:images] = images if images.present?
 
     Rails.logger.info "[AMB TimePicker] build_interactive_data - Images included: #{images&.length || 0}"
 
@@ -32,26 +34,6 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
   end
 
   private
-
-  def message_payload
-    {
-      sourceId: source_id,
-      destinationId: destination_id,
-      v: 1,
-      type: 'interactive',
-      interactiveData: {
-        bid: channel.imessage_extension_bid,
-        data: {
-          requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid,
-          mspVersion: '1.0',
-          event: build_event_data,
-          images: build_images_array
-        },
-        receivedMessage: build_received_message,
-        replyMessage: build_reply_message
-      }
-    }
-  end
 
   def save_images_to_storage
     images = content_attributes['images'] || []

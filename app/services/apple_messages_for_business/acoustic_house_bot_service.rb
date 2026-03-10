@@ -546,7 +546,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     update_conversation_attribute('region', selection)
 
-    send_text_message("Great! You selected #{selection}.")
+    send_text_message("Great to read you are visiting us from #{selection}.")
     update_bot_state('AHA3')
     handle_form_or_name_prompt
   end
@@ -556,9 +556,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
     supports_forms = capabilities.include?('FORM')
 
-    if supports_forms && send_guitar_info_form
-      log_info '[Bot] Device supports FORM - Guitar Info Form sent'
-      update_bot_state('AHB1') # Wait for form response
+    if supports_forms
+      send_text_message('We would love to know a bit more about you, can you please fill up the following form so we know how to address you?')
+      if send_guitar_info_form
+        log_info '[Bot] Device supports FORM - Guitar Info Form sent'
+        update_bot_state('AHB1') # Wait for form response
+      else
+        log_info '[Bot] FORM template missing - asking for name via text'
+        send_text_message("What's your name?")
+        update_bot_state('AHB1_2')
+      end
     else
       log_info '[Bot] FORM not supported or template missing - asking for name via text'
       send_text_message("What's your name?")
@@ -743,7 +750,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_guitar_list_prompt
     log_info '[Bot] 🎸 handle_guitar_list_prompt called'
-    send_text_message('Here are some amazing guitars:')
+    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one')
     send_guitar_list_picker
     update_bot_state('AHC1')
     log_info '[Bot] 🎸 Guitar list prompt completed, state updated to AHC1'
@@ -938,9 +945,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       return
     end
 
-    # Yes - proceed to AR placement question
-    update_bot_state('AHE1')
-    send_ar_place_question
+    # Yes - skip placement question and proceed directly to Apple Pay
+    update_bot_state('AHE2')
+    handle_apple_pay_prompt
   end
 
   def handle_ar_place_response(interactive_data)
@@ -1018,7 +1025,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       handle_lesson_introduction
     else
       # Still waiting for Apple Pay response
-      send_text_message('Waiting for Apple Pay response...')
+      send_text_message('Your guitar is waiting — complete the payment to lock in your order!')
     end
   end
 
@@ -1362,9 +1369,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       update_bot_state('AHJ4')
       handle_learn_more_prompt
     else
-      # Continue to photo question (skip rich link until after photo response)
-      update_bot_state('AHI3')
-      handle_photo_intro
+      # Continue directly to photo request
+      handle_photo_request
     end
   end
 
@@ -1383,13 +1389,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_photo_request
-    # AHI4: Request photo from user
     first_name = get_conversation_attribute('customer_name') || 'there'
 
     send_quick_reply(
-      title: 'Will you share a picture?',
+      title: 'Share a photo?',
       request_id: 'qr_photo',
-      message: "You can send us one too!!! #{first_name} will you share a picture of your favorite food or place to eat?",
+      message: "#{first_name}, we would love to see you with your new guitar! Would you like to share a photo?",
       items: [
         { title: 'Yes', value: 'Yes' },
         { title: 'No', value: 'No' }
@@ -1400,8 +1405,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   def handle_rich_links
-    # Deprecated - replaced by handle_rich_link_display
-    send_text_message('Or... just send a photo anytime')
+    # Deprecated - silently advance state to avoid duplicate messages
     update_bot_state('AHJ1')
   end
 
@@ -1427,7 +1431,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     if selection&.match?(/yes/i)
       # User said Yes - wait for them to send a photo
-      send_text_message('Awesome! We will hang tight while you send us your fav.')
+      send_text_message('Love it! Go ahead and send us the photo whenever you are ready.')
       # Stay in AHJ1 state - attachment handler will progress to AHJ2 when photo is received
     else
       # User said No - skip photo and ask if they want to learn more
@@ -1582,7 +1586,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_list_picker_demo
     # Demo mode: just show the list picker, don't continue flow
-    send_text_message('Here are some amazing guitars:')
+    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one')
     send_guitar_list_picker
     # State will be set to DEMO_MODE by handle_keyword_message
   end
