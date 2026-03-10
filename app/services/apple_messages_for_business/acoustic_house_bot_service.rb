@@ -392,6 +392,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       return true
     end
 
+    # Fuzzy match fallback — catches typos (e.g. "guittar", "tme picker")
+    matched_keyword, handler_method, keyword_type = fuzzy_match_keyword(keyword)
+    if matched_keyword
+      log_info "[Bot] 🔍 Fuzzy match: '#{keyword}' → '#{matched_keyword}'"
+      dispatch_keyword_handler(handler_method)
+      if keyword_type == :demo
+        handler_method == :handle_large_form_demo ? update_bot_state('DEMO_MODE_LARGE_FORM') : update_bot_state('DEMO_MODE')
+      end
+      return true
+    end
+
     false
   end
 
@@ -443,7 +454,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       when 'AHF1_skip'
         # Waiting for skip payment quick reply response
         # No action needed - response will route through interactive handler
-        send_text_message("Please select 'Skip Payment' or 'Try Again' from the options above.")
+        send_text_message("☝️ Please select 'Skip Payment' or 'Try Again' from the options above.")
       when 'AHF2'
         handle_lesson_introduction
       when 'AHF3'
@@ -453,7 +464,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       when 'AHG2'
         # Store selection state - waiting for list picker response
         # Interactive handler will process the selection
-        send_text_message('Please select a store from the list above.')
+        send_text_message('☝️ Please select a store from the list above.')
       when 'AHH1'
         handle_time_picker_catcher
       when 'AHH2'
@@ -473,7 +484,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       when 'AHK0'
         # Waiting for learn more quick reply response
         # Interactive handler will process the response
-        send_text_message('Please select Yes or No from the options above.')
+        send_text_message('☝️ Please select Yes or No from the options above.')
       when 'AHK1'
         handle_summary
       when 'AHK2'
@@ -557,7 +568,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     supports_forms = capabilities.include?('FORM')
 
     if supports_forms
-      send_text_message('We would love to know a bit more about you, can you please fill up the following form so we know how to address you?')
+      send_text_message('We would love to know a bit more about you, can you please fill up the following form so we know how to address you? 👇')
       if send_guitar_info_form
         log_info '[Bot] Device supports FORM - Guitar Info Form sent'
         update_bot_state('AHB1') # Wait for form response
@@ -745,12 +756,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Defensive catcher for text input when Quick Reply is expected (AHB2)
   def handle_name_preference_catcher
     log_info '[Bot] 🛡️ handle_name_preference_catcher called - user sent text instead of selecting Quick Reply'
-    send_text_message('Please select either your full name or stage name from the options above.')
+    send_text_message('☝️ Please select either your full name or stage name from the options above.')
   end
 
   def handle_guitar_list_prompt
     log_info '[Bot] 🎸 handle_guitar_list_prompt called'
-    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one')
+    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one 👇')
     send_guitar_list_picker
     update_bot_state('AHC1')
     log_info '[Bot] 🎸 Guitar list prompt completed, state updated to AHC1'
@@ -764,7 +775,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     case retry_count
     when 1
       # First message received after showing list - user might be typing
-      send_text_message('Please select a guitar from the list above.')
+      send_text_message('☝️ Please select a guitar from the list above.')
     when 2
       send_text_message("Looks like we're waiting for you to select a guitar from the list.")
     when 3
@@ -911,7 +922,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Defensive catcher for text input when Quick Reply is expected (AHD1)
   def handle_ar_view_catcher
     log_info '[Bot] 🛡️ handle_ar_view_catcher called - user sent text instead of selecting Quick Reply'
-    send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you saw the AR view.")
+    send_text_message("☝️ Please select 'Yes' or 'No' from the options above to let us know if you saw the AR view.")
   end
 
   def handle_ar_view_response(interactive_data)
@@ -981,7 +992,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Defensive catcher for text input when Quick Reply is expected (AHE1)
   def handle_ar_place_catcher
     log_info '[Bot] 🛡️ handle_ar_place_catcher called - user sent text instead of selecting Quick Reply'
-    send_text_message("Please select 'Yes' or 'No' from the options above to let us know if you'd like to place the guitar in AR.")
+    send_text_message("☝️ Please select 'Yes' or 'No' from the options above to let us know if you'd like to place the guitar in AR.")
   end
 
   def handle_apple_pay_prompt
@@ -1248,7 +1259,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     case retry_count
     when 1
-      send_text_message('Looks like we\'re waiting for you to select a time from the menu above.')
+      send_text_message('☝️ Looks like we\'re waiting for you to select a time from the menu above.')
     when 2
       send_text_message('You may set up a lesson at Apple Park')
       location = LOCATION_DATABASE['95014']
@@ -1330,7 +1341,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_continue_prompt
     # AHH2: Ask if user wants to continue
-    send_text_message('Thank you for your co-operation, you\'re all set to learn to shred. 🤘')
+    send_text_message('Thank you for your co-operation, you\'re all set to learn to shred. 🤘 👇')
 
     send_quick_reply(
       title: 'Shall we continue?',
@@ -1586,14 +1597,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_list_picker_demo
     # Demo mode: just show the list picker, don't continue flow
-    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one')
+    send_text_message('We understand you are interested in purchasing a guitar, here is a selection below. Tap on the bubble to choose one 👇')
     send_guitar_list_picker
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
   def handle_time_picker_demo
     # Demo mode: send time picker with default location (Apple Park)
-    send_text_message('Here\'s a time picker demo:')
+    send_text_message('Here\'s a time picker demo 👇')
 
     # Use Apple Park as default location for demo
     location = LOCATION_DATABASE['95014']
@@ -1604,7 +1615,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_apple_pay_demo
     # Demo mode: send Apple Pay request with demo item
-    send_text_message('Here\'s an Apple Pay payment request:')
+    send_text_message('Here\'s an Apple Pay payment request 👇')
 
     result = send_apple_pay_request('Demo Guitar - Fender Stratocaster')
 
@@ -1633,7 +1644,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     supports_forms = capabilities.include?('FORM')
 
     if supports_forms
-      send_text_message("Here's our guitar information form:")
+      send_text_message("Here's our guitar information form 👇")
       unless send_guitar_info_form
         send_text_message("The guitar info form template ('ah_guitar_info_form') is not configured yet. Please create it in the Templates section.")
       end
@@ -2768,5 +2779,44 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     send_oauth_authentication('facebook')
     update_bot_state('DEMO_MODE')
+  end
+
+  # === Fuzzy keyword matching ===
+
+  # Returns [matched_keyword, handler_method, :demo|:flow_control] or nil
+  def fuzzy_match_keyword(input)
+    best = nil
+    best_distance = Float::INFINITY
+
+    { demo: DEMO_KEYWORDS, flow_control: FLOW_CONTROL_KEYWORDS }.each do |type, keywords|
+      keywords.each do |keyword, handler|
+        next if keyword.length < 4 # skip very short keywords to avoid false positives
+
+        max_distance = keyword.length <= 6 ? 1 : 2
+        dist = levenshtein_distance(input, keyword)
+
+        if dist <= max_distance && dist < best_distance
+          best_distance = dist
+          best = [keyword, handler, type]
+        end
+      end
+    end
+
+    best
+  end
+
+  def levenshtein_distance(str1, str2)
+    m = str1.length
+    n = str2.length
+    d = Array.new(m + 1) { Array.new(n + 1, 0) }
+    (0..m).each { |i| d[i][0] = i }
+    (0..n).each { |j| d[0][j] = j }
+    (1..m).each do |i|
+      (1..n).each do |j|
+        cost = str1[i - 1] == str2[j - 1] ? 0 : 1
+        d[i][j] = [d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost].min
+      end
+    end
+    d[m][n]
   end
 end
