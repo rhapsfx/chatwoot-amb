@@ -41,7 +41,6 @@ const newTag = ref('');
 const newUseCase = ref('');
 
 // Hoisted early — used inside fetchTemplate
-const invitationParametersError = ref('');
 const customTemplateIdActive = ref(false);
 const TEMPLATE_ID_OPTIONS = [
   {
@@ -319,25 +318,10 @@ const LOCALE_OPTIONS = [
   { value: 'nb-NO', label: 'Norwegian Bokmål (Norway)' },
 ];
 
-const INVITATION_PARAMETERS_EXAMPLES = {
-  'binaryChoice.engage.noImage': { brandName: 'Your Brand' },
-  'binaryChoice.engage.withImage': {
-    brandName: 'Your Brand',
-    brandLogo: '<base64 PNG>',
-  },
-};
+// Toggle: visual UI vs raw JSON editor
+const invitationParamsVisualMode = ref(true);
 
-const applyDefaultParameters = () => {
-  if (!template.value.metadata) template.value.metadata = {};
-  const invitationTemplateId = template.value.metadata.invitation_template_id;
-  const example = INVITATION_PARAMETERS_EXAMPLES[invitationTemplateId] ?? {
-    brandName: 'Your Brand',
-  };
-  template.value.metadata.invitation_parameters = example;
-  invitationParametersError.value = '';
-};
-
-// Apple invitation parameters JSON editor
+// JSON editor — syncs with metadata.invitation_parameters
 const invitationParametersJson = computed({
   get() {
     const params = template.value.metadata?.invitation_parameters;
@@ -349,10 +333,9 @@ const invitationParametersJson = computed({
     }
   },
   set(val) {
-    invitationParametersError.value = '';
     if (!val.trim()) {
-      if (!template.value.metadata) template.value.metadata = {};
-      delete template.value.metadata.invitation_parameters;
+      if (template.value.metadata)
+        delete template.value.metadata.invitation_parameters;
       return;
     }
     try {
@@ -360,10 +343,12 @@ const invitationParametersJson = computed({
       if (!template.value.metadata) template.value.metadata = {};
       template.value.metadata.invitation_parameters = parsed;
     } catch {
-      // keep raw string until blur triggers parseInvitationParameters
+      // keep raw string until blur
     }
   },
 });
+
+const invitationParametersError = ref('');
 
 const parseInvitationParameters = event => {
   const val = event.target.value.trim();
@@ -374,9 +359,7 @@ const parseInvitationParameters = event => {
     return;
   }
   try {
-    const parsed = JSON.parse(val);
-    if (!template.value.metadata) template.value.metadata = {};
-    template.value.metadata.invitation_parameters = parsed;
+    JSON.parse(val);
     invitationParametersError.value = '';
   } catch {
     invitationParametersError.value = t(
@@ -385,8 +368,66 @@ const parseInvitationParameters = event => {
   }
 };
 
+// Visual invitation parameters editor
+const invitationBrandName = computed({
+  get() {
+    return template.value.metadata?.invitation_parameters?.brandName ?? '';
+  },
+  set(val) {
+    if (!template.value.metadata) template.value.metadata = {};
+    if (!template.value.metadata.invitation_parameters) {
+      template.value.metadata.invitation_parameters = {};
+    }
+    if (val) {
+      template.value.metadata.invitation_parameters.brandName = val;
+    } else {
+      delete template.value.metadata.invitation_parameters.brandName;
+    }
+  },
+});
+
+const invitationBrandLogo = computed({
+  get() {
+    return template.value.metadata?.invitation_parameters?.brandLogo ?? '';
+  },
+  set(val) {
+    if (!template.value.metadata) template.value.metadata = {};
+    if (!template.value.metadata.invitation_parameters) {
+      template.value.metadata.invitation_parameters = {};
+    }
+    if (val) {
+      template.value.metadata.invitation_parameters.brandLogo = val;
+    } else {
+      delete template.value.metadata.invitation_parameters.brandLogo;
+    }
+  },
+});
+
+const brandLogoDragging = ref(false);
+
+const handleBrandLogoFile = file => {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    invitationBrandLogo.value = e.target.result.split(',')[1];
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleBrandLogoDrop = e => {
+  brandLogoDragging.value = false;
+  handleBrandLogoFile(e.dataTransfer?.files?.[0]);
+};
+
+const handleBrandLogoInput = e => {
+  handleBrandLogoFile(e.target.files?.[0]);
+};
+
+const removeBrandLogo = () => {
+  invitationBrandLogo.value = '';
+};
+
 const formatLocaleOption = opt => `${opt.label} — ${opt.value}`;
-const invitationParametersPlaceholder = '{"key": "value"}';
 
 const resetTemplate = () => {
   template.value = {
@@ -820,34 +861,131 @@ onMounted(() => {
               </p>
             </div>
 
-            <!-- Default Parameters (JSON) -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
+            <!-- Default Parameters — visual editor -->
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
                 <label class="text-sm font-medium text-n-slate-12">
                   {{ t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.LABEL') }}
                 </label>
                 <button
                   type="button"
-                  class="text-xs text-n-blue-9 hover:underline"
-                  @click="applyDefaultParameters"
+                  class="flex items-center gap-1 text-xs text-n-blue-9 hover:underline"
+                  @click="
+                    invitationParamsVisualMode = !invitationParamsVisualMode
+                  "
                 >
-                  {{ t('TEMPLATES.BUILDER.INVITATION.USE_EXAMPLE') }}
+                  <i
+                    :class="
+                      invitationParamsVisualMode
+                        ? 'i-lucide-code'
+                        : 'i-lucide-layout-template'
+                    "
+                  />
+                  {{
+                    invitationParamsVisualMode
+                      ? t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.SWITCH_JSON')
+                      : t(
+                          'TEMPLATES.BUILDER.INVITATION.PARAMETERS.SWITCH_VISUAL'
+                        )
+                  }}
                 </button>
               </div>
-              <textarea
-                v-model="invitationParametersJson"
-                rows="5"
-                :placeholder="invitationParametersPlaceholder"
-                class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
-                @blur="parseInvitationParameters"
-              />
-              <p
-                v-if="invitationParametersError"
-                class="mt-1 text-xs text-n-red-11"
-              >
-                {{ invitationParametersError }}
-              </p>
-              <p v-else class="mt-1 text-xs text-n-slate-11">
+
+              <template v-if="invitationParamsVisualMode">
+                <!-- Brand Name -->
+                <div>
+                  <label class="block text-xs text-n-slate-11 mb-1">
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.INVITATION.PARAMETERS.BRAND_NAME.LABEL'
+                      )
+                    }}
+                  </label>
+                  <input
+                    v-model="invitationBrandName"
+                    type="text"
+                    :placeholder="
+                      t(
+                        'TEMPLATES.BUILDER.INVITATION.PARAMETERS.BRAND_NAME.PLACEHOLDER'
+                      )
+                    "
+                    class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 text-sm"
+                  />
+                </div>
+
+                <!-- Brand Logo -->
+                <div>
+                  <label class="block text-xs text-n-slate-11 mb-2">
+                    {{
+                      t(
+                        'TEMPLATES.BUILDER.INVITATION.PARAMETERS.BRAND_LOGO.LABEL'
+                      )
+                    }}
+                  </label>
+                  <div
+                    v-if="invitationBrandLogo"
+                    class="relative inline-block mb-2"
+                  >
+                    <img
+                      :src="`data:image/png;base64,${invitationBrandLogo}`"
+                      class="h-16 w-16 rounded-lg border border-n-slate-7 object-contain bg-n-slate-1"
+                      alt="Brand logo"
+                    />
+                    <button
+                      type="button"
+                      class="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center rounded-full bg-n-slate-12 text-white hover:bg-n-red-11"
+                      @click="removeBrandLogo"
+                    >
+                      <i class="i-lucide-x text-[10px]" />
+                    </button>
+                  </div>
+                  <label
+                    class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors"
+                    :class="
+                      brandLogoDragging
+                        ? 'border-n-blue-9 bg-n-blue-1'
+                        : 'border-n-slate-7 hover:border-n-blue-7 hover:bg-n-slate-2'
+                    "
+                    @dragover.prevent="brandLogoDragging = true"
+                    @dragleave="brandLogoDragging = false"
+                    @drop.prevent="handleBrandLogoDrop"
+                  >
+                    <i class="i-lucide-image text-xl text-n-slate-9 mb-1" />
+                    <span class="text-xs text-n-slate-11">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.INVITATION.PARAMETERS.BRAND_LOGO.DROP_HINT'
+                        )
+                      }}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png"
+                      class="hidden"
+                      @change="handleBrandLogoInput"
+                    />
+                  </label>
+                </div>
+              </template>
+
+              <!-- JSON editor -->
+              <template v-else>
+                <textarea
+                  v-model="invitationParametersJson"
+                  rows="5"
+                  placeholder='{"key": "value"}'
+                  class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
+                  @blur="parseInvitationParameters"
+                />
+                <p
+                  v-if="invitationParametersError"
+                  class="mt-1 text-xs text-n-red-11"
+                >
+                  {{ invitationParametersError }}
+                </p>
+              </template>
+
+              <p class="text-xs text-n-slate-11">
                 {{ t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.HINT') }}
               </p>
             </div>

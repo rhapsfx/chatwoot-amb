@@ -198,6 +198,23 @@ class MessageTemplate < ApplicationRecord
     end
   end
 
+  # Returns lightweight JSON for list views — no content, no attachments, no metadata
+  def summary_json
+    {
+      id: id,
+      name: name,
+      category: category,
+      description: description,
+      supportedChannels: supported_channels || [],
+      tags: tags || [],
+      useCases: use_cases || [],
+      status: status,
+      version: version,
+      createdAt: created_at,
+      updatedAt: updated_at
+    }
+  end
+
   # Returns detailed JSON representation for API responses
   def detailed_json(include_content_blocks: false)
     # Build content first to catch any errors early

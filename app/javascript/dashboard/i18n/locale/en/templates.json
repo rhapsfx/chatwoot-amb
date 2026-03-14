@@ -718,9 +718,19 @@
           "HINT": "BCP-47 locale tag (e.g. en-US, fr-FR). Defaults to en-US if left blank."
         },
         "PARAMETERS": {
-          "LABEL": "Default Parameters (JSON)",
-          "HINT": "Optional default key/value pairs sent with every invitation using this template.",
-          "INVALID_JSON": "Invalid JSON — please fix before saving."
+          "LABEL": "Default Parameters",
+          "HINT": "Optional default values sent with every invitation using this template.",
+          "SWITCH_JSON": "Edit as JSON",
+          "SWITCH_VISUAL": "Visual editor",
+          "INVALID_JSON": "Invalid JSON — please fix before saving.",
+          "BRAND_NAME": {
+            "LABEL": "Brand Name",
+            "PLACEHOLDER": "Your Brand"
+          },
+          "BRAND_LOGO": {
+            "LABEL": "Brand Logo (PNG)",
+            "DROP_HINT": "Drop a PNG here or click to select"
+          }
         }
       },
       "VALIDATION": {
