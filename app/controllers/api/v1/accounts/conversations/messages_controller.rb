@@ -248,7 +248,10 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                     # Custom Payload
                     :custom_payload,
                     :skip_validation,
-                    :apply_case_transform
+                    :apply_case_transform,
+                    # Apple Invitation
+                    :invitation_template_id, :reference_id, :locale,
+                    { :parameters => {} }
                   ])
   end
 

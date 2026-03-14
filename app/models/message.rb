@@ -107,7 +107,8 @@ class Message < ApplicationRecord
     apple_form: 19,
     apple_custom_app: 20,
     apple_form_response: 21,
-    apple_custom_payload: 22
+    apple_custom_payload: 22,
+    apple_invitation: 23
   }
   enum status: { sent: 0, delivered: 1, read: 2, failed: 3 }
   # [:submitted_email, :items, :submitted_values] : Used for bot message types

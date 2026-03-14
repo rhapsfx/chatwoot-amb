@@ -67,6 +67,17 @@ class Channel::AppleMessagesForBusiness < ApplicationRecord
     ).perform
   end
 
+  def send_invitation(inbox:, destination_id:, template_id:, reference_id:, parameters:, locale: nil)
+    AppleMessagesForBusiness::SendInvitationService.new(
+      inbox: inbox,
+      destination_id: destination_id,
+      template_id: template_id,
+      reference_id: reference_id,
+      parameters: parameters,
+      locale: locale
+    ).perform
+  end
+
   def generate_jwt_token
     AppleMessagesForBusiness::JwtService.generate_token(msp_id, secret)
   end

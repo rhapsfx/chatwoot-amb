@@ -69,6 +69,8 @@ module AppleMessagesForBusiness
       'maximum_character_count' => 'maximumCharacterCount',
 
       # Common message fields
+      'reference_id' => 'referenceId',
+      'template_id'  => 'templateId',
       'source_id' => 'sourceId',
       'destination_id' => 'destinationId',
       'request_identifier' => 'requestIdentifier',
@@ -82,6 +84,10 @@ module AppleMessagesForBusiness
       'rich_link_data_ref' => 'richLinkDataRef',
       'store_region' => 'storeRegion',
       'signature_base64' => 'signature-base64',  # Special case: underscore → hyphen
+
+      # Branding
+      'brand_logo'   => 'brandLogo',
+      'brand_name'   => 'brandName',
 
       # Custom app
       'app_id' => 'appId',

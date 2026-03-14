@@ -7,6 +7,7 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
     Channel::AppleMessagesForBusiness
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity
   def perform_reply
     Rails.logger.debug { "🔥 SendOnAMB - Processing #{message.content_type} message ID:#{message.id}" }
 
@@ -27,11 +28,14 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
       send_apple_pay_message
     when 'apple_custom_payload'
       send_custom_payload_message
+    when 'apple_invitation'
+      send_invitation_message
     else
       Rails.logger.debug '🔥 Unknown content type, using fallback'
       send_text_or_attachment_message # fallback
     end
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/CyclomaticComplexity
 
   def send_text_or_attachment_message
     service = AppleMessagesForBusiness::SendMessageService.new(
@@ -133,6 +137,21 @@ class AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService < Base::Se
       channel: channel,
       destination_id: message.conversation.contact_inbox.source_id,
       message: message
+    )
+
+    response = service.perform
+    update_message_status(response)
+  end
+
+  def send_invitation_message
+    attrs = message.content_attributes
+    service = AppleMessagesForBusiness::SendInvitationService.new(
+      inbox: channel.inbox,
+      destination_id: message.conversation.contact_inbox.source_id,
+      template_id: attrs['invitation_template_id'],
+      reference_id: attrs['reference_id'] || "msg-#{message.id}",
+      parameters: attrs['parameters'] || {},
+      locale: attrs['locale']
     )
 
     response = service.perform

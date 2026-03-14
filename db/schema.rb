@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_13_000001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -119,6 +119,30 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.integer "account_id"
+    t.integer "priority", default: 10, null: false
+    t.jsonb "config_overrides", default: {}, null: false
+    t.bigint "version_id"
+    t.text "notes"
+    t.index ["inbox_id", "priority"], name: "index_agent_bot_inboxes_on_inbox_and_priority_unique", unique: true, where: "(status = 0)"
+    t.index ["version_id"], name: "index_agent_bot_inboxes_on_version_id"
+  end
+
+  create_table "agent_bot_versions", force: :cascade do |t|
+    t.bigint "agent_bot_id", null: false
+    t.string "version_tag", limit: 50, null: false
+    t.text "description"
+    t.jsonb "config", default: {}, null: false
+    t.boolean "is_active", default: false, null: false
+    t.boolean "is_default", default: false, null: false
+    t.datetime "activated_at"
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "archived_at"
+    t.index ["agent_bot_id", "is_active"], name: "index_agent_bot_versions_on_bot_and_active"
+    t.index ["agent_bot_id", "version_tag"], name: "index_agent_bot_versions_on_bot_and_tag", unique: true
+    t.index ["agent_bot_id"], name: "index_agent_bot_versions_on_agent_bot_id"
+    t.index ["archived_at"], name: "index_agent_bot_versions_on_archived_at"
   end
 
   create_table "agent_bots", force: :cascade do |t|
@@ -128,7 +152,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.bigint "account_id"
-    t.integer "bot_type", default: 0
+    t.integer "bot_type", default: 0, comment: "Bot type: 0 = webhook, 1 = apple_messages_for_business (AMB)"
     t.jsonb "bot_config", default: {}
     t.index ["account_id"], name: "index_agent_bots_on_account_id"
   end
@@ -155,6 +179,21 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["bundle_id"], name: "index_apple_app_metadata_on_bundle_id", unique: true
+  end
+
+  create_table "apple_invitation_opt_outs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "contact_id", null: false
+    t.string "phone_number", null: false
+    t.bigint "inbox_id", null: false
+    t.datetime "opted_out_at", null: false
+    t.jsonb "reference_ids", default: []
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "phone_number", "inbox_id"], name: "idx_apple_inv_opt_outs_unique", unique: true
+    t.index ["account_id"], name: "index_apple_invitation_opt_outs_on_account_id"
+    t.index ["contact_id"], name: "index_apple_invitation_opt_outs_on_contact_id"
+    t.index ["inbox_id"], name: "index_apple_invitation_opt_outs_on_inbox_id"
   end
 
   create_table "apple_list_picker_images", force: :cascade do |t|
@@ -293,6 +332,40 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "updated_at", precision: nil, null: false
     t.boolean "active", default: true, null: false
     t.index ["account_id"], name: "index_automation_rules_on_account_id"
+  end
+
+  create_table "bot_action_templates", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "template_type", null: false
+    t.jsonb "parameters", default: {}, null: false
+    t.jsonb "metadata", default: {}
+    t.integer "execution_order", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "name"], name: "index_bot_action_templates_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_bot_action_templates_on_account_id"
+    t.index ["template_type"], name: "index_bot_action_templates_on_template_type"
+  end
+
+  create_table "bot_flows", force: :cascade do |t|
+    t.bigint "agent_bot_id", null: false
+    t.string "name"
+    t.text "description"
+    t.jsonb "flow_data", default: {}
+    t.jsonb "metadata", default: {}
+    t.boolean "is_active", default: true, null: false
+    t.integer "version", default: 1
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "version_tag"
+    t.bigint "parent_flow_id"
+    t.boolean "is_published", default: false
+    t.datetime "published_at"
+    t.text "changelog"
+    t.index ["agent_bot_id", "version_tag"], name: "index_bot_flows_on_agent_bot_id_and_version_tag", unique: true, where: "(version_tag IS NOT NULL)"
+    t.index ["agent_bot_id"], name: "index_bot_flows_on_agent_bot_id"
+    t.index ["parent_flow_id"], name: "index_bot_flows_on_parent_flow_id"
   end
 
   create_table "campaigns", force: :cascade do |t|
@@ -555,6 +628,18 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.index ["bot_token"], name: "index_channel_telegram_on_bot_token", unique: true
+  end
+
+  create_table "channel_tiktok", force: :cascade do |t|
+    t.integer "account_id", null: false
+    t.string "business_id", null: false
+    t.string "access_token", null: false
+    t.datetime "expires_at", null: false
+    t.string "refresh_token", null: false
+    t.datetime "refresh_token_expires_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["business_id"], name: "index_channel_tiktok_on_business_id", unique: true
   end
 
   create_table "channel_twilio_sms", force: :cascade do |t|
@@ -1147,7 +1232,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
     t.text "header_text"
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
-    t.jsonb "config", default: {"allowed_locales"=>["en"]}
+    t.jsonb "config", default: {"allowed_locales" => ["en"]}
     t.boolean "archived", default: false
     t.bigint "channel_web_widget_id"
     t.jsonb "ssl_settings", default: {}, null: false
@@ -1400,8 +1485,16 @@ ActiveRecord::Schema[7.1].define(version: 2025_11_26_120000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "agent_bot_inboxes", "agent_bot_versions", column: "version_id", on_delete: :nullify
+  add_foreign_key "agent_bot_versions", "agent_bots"
+  add_foreign_key "apple_invitation_opt_outs", "accounts"
+  add_foreign_key "apple_invitation_opt_outs", "contacts"
+  add_foreign_key "apple_invitation_opt_outs", "inboxes"
   add_foreign_key "apple_list_picker_images", "accounts"
   add_foreign_key "apple_list_picker_images", "inboxes"
+  add_foreign_key "bot_action_templates", "accounts"
+  add_foreign_key "bot_flows", "agent_bots"
+  add_foreign_key "bot_flows", "bot_flows", column: "parent_flow_id"
   add_foreign_key "inboxes", "portals"
   add_foreign_key "message_templates", "accounts", on_delete: :cascade
   add_foreign_key "shared_apple_images", "accounts"

@@ -2,13 +2,26 @@
 #
 # Table name: agent_bot_inboxes
 #
-#  id           :bigint           not null, primary key
-#  status       :integer          default("active")
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
-#  account_id   :integer
-#  agent_bot_id :integer
-#  inbox_id     :integer
+#  id               :bigint           not null, primary key
+#  config_overrides :jsonb            not null
+#  notes            :text
+#  priority         :integer          default(10), not null
+#  status           :integer          default("active")
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  account_id       :integer
+#  agent_bot_id     :integer
+#  inbox_id         :integer
+#  version_id       :bigint
+#
+# Indexes
+#
+#  index_agent_bot_inboxes_on_inbox_and_priority_unique  (inbox_id,priority) UNIQUE WHERE (status = 0)
+#  index_agent_bot_inboxes_on_version_id                 (version_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (version_id => agent_bot_versions.id) ON DELETE => nullify
 #
 
 class AgentBotInbox < ApplicationRecord

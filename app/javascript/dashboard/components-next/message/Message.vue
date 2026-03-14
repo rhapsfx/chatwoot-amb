@@ -44,6 +44,7 @@ import AppleFormBubble from './bubbles/AppleForm.vue';
 import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
 import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
 import AppleCustomAppBubble from './bubbles/AppleCustomApp.vue';
+import AppleInvitationBubble from './bubbles/AppleInvitation.vue';
 import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
 
 import MessageError from './MessageError.vue';
@@ -333,6 +334,10 @@ const componentToRender = computed(() => {
     return AppleCustomAppBubble;
   }
 
+  if (props.contentType === CONTENT_TYPES.APPLE_INVITATION) {
+    return AppleInvitationBubble;
+  }
+
   // Check for tapback reactions (Apple Messages)
   if (props.contentAttributes?.is_tapback_reaction) {
     return TapbackReactionBubble;
@@ -433,13 +438,16 @@ const shouldRenderMessage = computed(() => {
   const isUnsupported = props.contentAttributes?.isUnsupported;
   const isAnIntegrationMessage =
     props.contentType === CONTENT_TYPES.INTEGRATIONS;
+  const isAppleInvitation =
+    props.contentType === CONTENT_TYPES.APPLE_INVITATION;
 
   return (
     hasAttachments ||
     props.content ||
     isEmailContentType ||
     isUnsupported ||
-    isAnIntegrationMessage
+    isAnIntegrationMessage ||
+    isAppleInvitation
   );
 });
 

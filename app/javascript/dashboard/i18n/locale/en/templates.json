@@ -701,6 +701,29 @@
         "SAVE_FIRST": "Please save the template first before adding attachments. You can save now with just the basic information and add attachments after.",
         "INFO_HINT": "For Apple Messages for Business, you can create attachment-only templates. Just save the template with basic info, then add your files in the Attachments tab."
       },
+      "INVITATION": {
+        "HINT_TEXT": "To send Apple Invitation outbound messages, set Category to Notification, then configure the invitation settings in the Parameters tab.",
+        "HINT_LINK": "Parameters tab",
+        "CUSTOM_TEMPLATE_PLACEHOLDER": "e.g. myBrand.engage.promoOffer",
+        "USE_EXAMPLE": "Use example",
+        "TITLE": "Apple Invitation Settings",
+        "DESCRIPTION": "Required fields for sending proactive Apple Messages for Business invitations (Business Updates).",
+        "TEMPLATE_ID": {
+          "LABEL": "Apple Template ID",
+          "PLACEHOLDER": "e.g. order_confirmation_v2",
+          "HINT": "The template identifier registered with Apple for this invitation type."
+        },
+        "LOCALE": {
+          "LABEL": "Default Locale",
+          "HINT": "BCP-47 locale tag (e.g. en-US, fr-FR). Defaults to en-US if left blank."
+        },
+        "PARAMETERS": {
+          "LABEL": "Default Parameters (JSON)",
+          "PLACEHOLDER": "{\"key\": \"value\"}",
+          "HINT": "Optional default key/value pairs sent with every invitation using this template.",
+          "INVALID_JSON": "Invalid JSON — please fix before saving."
+        }
+      },
       "VALIDATION": {
         "NAME_REQUIRED": "Template name is required",
         "CATEGORY_REQUIRED": "Please select a category",

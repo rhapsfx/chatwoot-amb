@@ -497,6 +497,14 @@ class MessageTemplate < ApplicationRecord
     supported_channels&.include?('apple_messages_for_business')
   end
 
+  def apple_invitation_template?
+    apple_messages_template? && metadata['invitation_template_id'].present?
+  end
+
+  def invitation_template_id
+    metadata['invitation_template_id']
+  end
+
   # Attachment Management Methods
 
   # Returns summary of all attachments with metadata

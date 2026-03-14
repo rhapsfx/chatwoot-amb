@@ -2,15 +2,15 @@
 #
 # Table name: agent_bots
 #
-#  id           :bigint           not null, primary key
-#  bot_config   :jsonb
-#  bot_type     :integer          default("webhook")
-#  description  :string
-#  name         :string
-#  outgoing_url :string
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
-#  account_id   :bigint
+#  id                                                                     :bigint           not null, primary key
+#  bot_config                                                             :jsonb
+#  bot_type(Bot type: 0 = webhook, 1 = apple_messages_for_business (AMB)) :integer          default("webhook")
+#  description                                                            :string
+#  name                                                                   :string
+#  outgoing_url                                                           :string
+#  created_at                                                             :datetime         not null
+#  updated_at                                                             :datetime         not null
+#  account_id                                                             :bigint
 #
 # Indexes
 #

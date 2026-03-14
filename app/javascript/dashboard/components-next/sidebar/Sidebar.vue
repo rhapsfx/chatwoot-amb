@@ -421,6 +421,11 @@ const menuItems = computed(() => {
           label: t('SIDEBAR.WHATSAPP'),
           to: accountScopedRoute('campaigns_whatsapp_index'),
         },
+        {
+          name: 'Apple Messages',
+          label: 'Apple Messages',
+          to: accountScopedRoute('campaigns_apple_messages_index'),
+        },
       ],
     },
     {

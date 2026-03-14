@@ -32,13 +32,28 @@ const template = ref({
   contentBlocks: [],
   version: 1,
   attachments: [],
-  metadata: {}, // IMPORTANT: Include metadata field so it persists on save
+  metadata: { invitation_locale: 'en-US' }, // IMPORTANT: Include metadata field so it persists on save
 });
 
 const errors = ref({});
 const activeTab = ref('basic');
 const newTag = ref('');
 const newUseCase = ref('');
+
+// Hoisted early — used inside fetchTemplate
+const invitationParametersError = ref('');
+const customTemplateIdActive = ref(false);
+const TEMPLATE_ID_OPTIONS = [
+  {
+    value: 'binaryChoice.engage.noImage',
+    label: 'binaryChoice.engage.noImage',
+  },
+  {
+    value: 'binaryChoice.engage.withImage',
+    label: 'binaryChoice.engage.withImage',
+  },
+  { value: '__custom__', label: 'Custom value...' },
+];
 
 // Computed
 const availableChannels = [
@@ -108,6 +123,17 @@ const fetchTemplate = async () => {
   try {
     const response = await TemplatesAPI.show(templateId.value);
     template.value = response.data;
+    if (!template.value.metadata) template.value.metadata = {};
+    if (!template.value.metadata.invitation_locale) {
+      template.value.metadata.invitation_locale = 'en-US';
+    }
+    const existingTemplateId = template.value.metadata.invitation_template_id;
+    customTemplateIdActive.value = !!(
+      existingTemplateId &&
+      !TEMPLATE_ID_OPTIONS.slice(0, -1).some(
+        o => o.value === existingTemplateId
+      )
+    );
   } catch (error) {
     useAlert(t('TEMPLATES.API.FETCH_ERROR'));
     router.push({ name: 'template_list' });
@@ -131,18 +157,20 @@ const validateTemplate = () => {
     errors.value.channels = t('TEMPLATES.BUILDER.VALIDATION.CHANNEL_REQUIRED');
   }
 
-  // Content blocks are optional for Apple Messages if template will have attachments
-  // Or if it's a new template (user can add attachments after saving)
   const isAppleMessages = template.value.supportedChannels.includes(
     'apple_messages_for_business'
   );
   const hasAttachments = template.value.attachments?.length > 0;
   const isNewTemplate = !isEditMode.value;
+  const isNotificationCategory = template.value.category === 'notification';
 
-  // Allow saving without content blocks if:
-  // - It's Apple Messages AND (has attachments OR is a new template being created)
+  // Content blocks not required for:
+  // - Notification templates (Apple Invitation — no content blocks needed)
+  // - Apple Messages with attachments
+  // - New Apple Messages templates (attachments added after first save)
   const canSkipContentBlocks =
-    isAppleMessages && (hasAttachments || isNewTemplate);
+    isNotificationCategory ||
+    (isAppleMessages && (hasAttachments || isNewTemplate));
 
   if (template.value.contentBlocks.length === 0 && !canSkipContentBlocks) {
     errors.value.content = t('TEMPLATES.BUILDER.VALIDATION.CONTENT_REQUIRED');
@@ -233,6 +261,125 @@ const updateAttachments = attachments => {
   template.value.attachments = attachments;
 };
 
+const templateIdSelectValue = computed({
+  get() {
+    if (customTemplateIdActive.value) return '__custom__';
+    const val = template.value.metadata?.invitation_template_id;
+    if (!val) return '';
+    return TEMPLATE_ID_OPTIONS.slice(0, -1).some(o => o.value === val)
+      ? val
+      : '__custom__';
+  },
+  set(val) {
+    if (!template.value.metadata) template.value.metadata = {};
+    if (val === '__custom__') {
+      customTemplateIdActive.value = true;
+      // preserve existing value if it was already custom
+      if (
+        !template.value.metadata.invitation_template_id ||
+        TEMPLATE_ID_OPTIONS.slice(0, -1).some(
+          o => o.value === template.value.metadata.invitation_template_id
+        )
+      ) {
+        template.value.metadata.invitation_template_id = '';
+      }
+    } else {
+      customTemplateIdActive.value = false;
+      template.value.metadata.invitation_template_id = val;
+    }
+  },
+});
+
+const LOCALE_OPTIONS = [
+  { value: 'en-US', label: 'English (United States)' },
+  { value: 'en-GB', label: 'English (United Kingdom)' },
+  { value: 'en-CA', label: 'English (Canada)' },
+  { value: 'en-AU', label: 'English (Australia)' },
+  { value: 'fr-FR', label: 'French (France)' },
+  { value: 'fr-CA', label: 'French (Canada)' },
+  { value: 'de-DE', label: 'German (Germany)' },
+  { value: 'es-ES', label: 'Spanish (Spain)' },
+  { value: 'es-MX', label: 'Spanish (Mexico)' },
+  { value: 'it-IT', label: 'Italian (Italy)' },
+  { value: 'pt-BR', label: 'Portuguese (Brazil)' },
+  { value: 'pt-PT', label: 'Portuguese (Portugal)' },
+  { value: 'nl-NL', label: 'Dutch (Netherlands)' },
+  { value: 'ru-RU', label: 'Russian (Russia)' },
+  { value: 'ja-JP', label: 'Japanese (Japan)' },
+  { value: 'ko-KR', label: 'Korean (South Korea)' },
+  { value: 'zh-CN', label: 'Chinese Simplified (China)' },
+  { value: 'zh-TW', label: 'Chinese Traditional (Taiwan)' },
+  { value: 'ar-SA', label: 'Arabic (Saudi Arabia)' },
+  { value: 'he-IL', label: 'Hebrew (Israel)' },
+  { value: 'tr-TR', label: 'Turkish (Turkey)' },
+  { value: 'pl-PL', label: 'Polish (Poland)' },
+  { value: 'sv-SE', label: 'Swedish (Sweden)' },
+  { value: 'da-DK', label: 'Danish (Denmark)' },
+  { value: 'fi-FI', label: 'Finnish (Finland)' },
+  { value: 'nb-NO', label: 'Norwegian Bokmål (Norway)' },
+];
+
+const DEFAULT_INVITATION_PARAMETERS = `{
+  "customerName": "{{customer_name}}",
+  "orderId": "{{order_id}}"
+}`;
+
+const applyDefaultParameters = () => {
+  if (!template.value.metadata) template.value.metadata = {};
+  template.value.metadata.invitation_parameters = JSON.parse(
+    DEFAULT_INVITATION_PARAMETERS
+  );
+  invitationParametersError.value = '';
+};
+
+// Apple invitation parameters JSON editor
+const invitationParametersJson = computed({
+  get() {
+    const params = template.value.metadata?.invitation_parameters;
+    if (!params || Object.keys(params).length === 0) return '';
+    try {
+      return JSON.stringify(params, null, 2);
+    } catch {
+      return '';
+    }
+  },
+  set(val) {
+    invitationParametersError.value = '';
+    if (!val.trim()) {
+      if (!template.value.metadata) template.value.metadata = {};
+      delete template.value.metadata.invitation_parameters;
+      return;
+    }
+    try {
+      const parsed = JSON.parse(val);
+      if (!template.value.metadata) template.value.metadata = {};
+      template.value.metadata.invitation_parameters = parsed;
+    } catch {
+      // keep raw string until blur triggers parseInvitationParameters
+    }
+  },
+});
+
+const parseInvitationParameters = event => {
+  const val = event.target.value.trim();
+  if (!val) {
+    invitationParametersError.value = '';
+    if (template.value.metadata)
+      delete template.value.metadata.invitation_parameters;
+    return;
+  }
+  try {
+    const parsed = JSON.parse(val);
+    if (!template.value.metadata) template.value.metadata = {};
+    template.value.metadata.invitation_parameters = parsed;
+    invitationParametersError.value = '';
+  } catch {
+    invitationParametersError.value = t(
+      'TEMPLATES.BUILDER.INVITATION.PARAMETERS.INVALID_JSON'
+    );
+  }
+};
+
 const resetTemplate = () => {
   template.value = {
     name: '',
@@ -246,8 +393,9 @@ const resetTemplate = () => {
     contentBlocks: [],
     version: 1,
     attachments: [],
-    metadata: {}, // IMPORTANT: Include metadata field
+    metadata: { invitation_locale: 'en-US' }, // IMPORTANT: Include metadata field
   };
+  customTemplateIdActive.value = false;
   errors.value = {};
   activeTab.value = 'basic';
 };
@@ -466,23 +614,29 @@ onMounted(() => {
               {{ errors.channels }}
             </p>
 
-            <!-- Info box for Apple Messages attachment-only templates -->
+            <!-- Apple Messages invitation hint -->
             <div
               v-if="
                 template.supportedChannels.includes(
                   'apple_messages_for_business'
                 )
               "
-              class="mt-4 p-4 bg-n-blue-1 border border-n-blue-7 rounded-lg flex gap-3"
+              class="mt-4 flex items-start gap-3 p-4 bg-n-teal-1 border border-n-teal-7 rounded-lg"
             >
               <i
-                class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5"
+                class="i-lucide-bell-ring text-n-teal-9 text-lg flex-shrink-0 mt-0.5"
               />
-              <div class="text-sm text-n-blue-11">
-                <p class="font-medium mb-1">
-                  {{ t('TEMPLATES.BUILDER.ATTACHMENTS.TITLE') }}
+              <div class="flex-1 text-sm text-n-teal-11">
+                <p>
+                  {{ t('TEMPLATES.BUILDER.INVITATION.HINT_TEXT') }}
+                  <button
+                    type="button"
+                    class="font-semibold underline hover:text-n-teal-12"
+                    @click="activeTab = 'parameters'"
+                  >
+                    {{ t('TEMPLATES.BUILDER.INVITATION.HINT_LINK') }}
+                  </button>
                 </p>
-                <p>{{ t('TEMPLATES.BUILDER.ATTACHMENTS.INFO_HINT') }}</p>
               </div>
             </div>
           </div>
@@ -559,11 +713,127 @@ onMounted(() => {
         </div>
 
         <!-- Parameters Tab -->
-        <div v-show="activeTab === 'parameters'" class="max-w-4xl mx-auto">
+        <div
+          v-show="activeTab === 'parameters'"
+          class="max-w-4xl mx-auto space-y-8"
+        >
           <ParameterEditor
             :parameters="template.parameters"
             @update:parameters="updateParameters"
           />
+
+          <!-- Apple Invitation Settings (shown when Apple Messages + Notification) -->
+          <div
+            v-if="
+              template.supportedChannels.includes(
+                'apple_messages_for_business'
+              ) && template.category === 'notification'
+            "
+            class="p-5 border border-n-slate-7 rounded-lg space-y-5"
+          >
+            <div class="flex items-center gap-2">
+              <i class="i-lucide-bell text-n-blue-9" />
+              <h3 class="text-sm font-semibold text-n-slate-12">
+                {{ t('TEMPLATES.BUILDER.INVITATION.TITLE') }}
+              </h3>
+            </div>
+            <p class="text-xs text-n-slate-11 -mt-3">
+              {{ t('TEMPLATES.BUILDER.INVITATION.DESCRIPTION') }}
+            </p>
+
+            <!-- Apple Template ID — dropdown + custom input -->
+            <div>
+              <label class="block text-sm font-medium text-n-slate-12 mb-1">
+                {{ t('TEMPLATES.BUILDER.INVITATION.TEMPLATE_ID.LABEL') }}
+                <span class="text-n-red-11">*</span>
+              </label>
+              <select
+                v-model="templateIdSelectValue"
+                class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 text-sm"
+              >
+                <option value="" disabled>
+                  {{
+                    t('TEMPLATES.BUILDER.INVITATION.TEMPLATE_ID.PLACEHOLDER')
+                  }}
+                </option>
+                <option
+                  v-for="opt in TEMPLATE_ID_OPTIONS"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+              <input
+                v-if="templateIdSelectValue === '__custom__'"
+                v-model="template.metadata.invitation_template_id"
+                type="text"
+                :placeholder="
+                  t('TEMPLATES.BUILDER.INVITATION.CUSTOM_TEMPLATE_PLACEHOLDER')
+                "
+                class="w-full mt-2 px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
+              />
+              <p class="mt-1 text-xs text-n-slate-11">
+                {{ t('TEMPLATES.BUILDER.INVITATION.TEMPLATE_ID.HINT') }}
+              </p>
+            </div>
+
+            <!-- Default Locale — full dropdown -->
+            <div>
+              <label class="block text-sm font-medium text-n-slate-12 mb-1">
+                {{ t('TEMPLATES.BUILDER.INVITATION.LOCALE.LABEL') }}
+              </label>
+              <select
+                v-model="template.metadata.invitation_locale"
+                class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 text-sm"
+              >
+                <option
+                  v-for="opt in LOCALE_OPTIONS"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }} — {{ opt.value }}
+                </option>
+              </select>
+              <p class="mt-1 text-xs text-n-slate-11">
+                {{ t('TEMPLATES.BUILDER.INVITATION.LOCALE.HINT') }}
+              </p>
+            </div>
+
+            <!-- Default Parameters (JSON) -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-sm font-medium text-n-slate-12">
+                  {{ t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.LABEL') }}
+                </label>
+                <button
+                  type="button"
+                  class="text-xs text-n-blue-9 hover:underline"
+                  @click="applyDefaultParameters"
+                >
+                  {{ t('TEMPLATES.BUILDER.INVITATION.USE_EXAMPLE') }}
+                </button>
+              </div>
+              <textarea
+                v-model="invitationParametersJson"
+                rows="5"
+                :placeholder="
+                  t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.PLACEHOLDER')
+                "
+                class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
+                @blur="parseInvitationParameters"
+              />
+              <p
+                v-if="invitationParametersError"
+                class="mt-1 text-xs text-n-red-11"
+              >
+                {{ invitationParametersError }}
+              </p>
+              <p v-else class="mt-1 text-xs text-n-slate-11">
+                {{ t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.HINT') }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- Content Blocks Tab -->

@@ -443,6 +443,9 @@ en:
     ssl_status:
       custom_domain_not_configured: 'Custom domain is not configured'
   apple_messages:
+    invitation:
+      user_left_conversation: "User left the conversation and opted out of invitation messages."
+      opt_out_recorded: "Opt-out recorded for this contact."
     shared_images:
       tabs:
         system: 'System'

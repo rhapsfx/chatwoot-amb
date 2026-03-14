@@ -96,6 +96,25 @@ const sendError = ref(null);
 const isSending = ref(false);
 const showErrorDetails = ref(false);
 
+// Invitation Tab State
+const invitationData = ref({
+  selectedTemplateId: '',
+  referenceId: '',
+});
+const invitationTemplates = computed(() => {
+  const all = store.getters['messageTemplates/getTemplates'] || [];
+  return all.filter(
+    t =>
+      t.supportedChannels?.includes('apple_messages_for_business') &&
+      t.category === 'notification'
+  );
+});
+const selectedInvitationTemplate = computed(() =>
+  invitationTemplates.value.find(
+    t => String(t.id) === String(invitationData.value.selectedTemplateId)
+  )
+);
+
 // Auto-select first app when switching to iMessage Apps tab
 watch(activeTab, newTab => {
   if (newTab === 'imessage_apps' && availableApps.value.length === 1) {
@@ -1251,6 +1270,24 @@ const sendAppleMessage = () => {
       content = timePickerData.value.event?.title || 'Time Picker Message';
       break;
     }
+    case 'invitation': {
+      if (!selectedInvitationTemplate.value || !invitationData.value.referenceId.trim()) {
+        return;
+      }
+      content_type = 'apple_invitation';
+      content_attributes = {
+        invitation_template_id:
+          selectedInvitationTemplate.value.metadata?.invitation_template_id ||
+          selectedInvitationTemplate.value.name,
+        reference_id: invitationData.value.referenceId.trim(),
+        parameters:
+          selectedInvitationTemplate.value.metadata?.invitation_parameters || {},
+        locale:
+          selectedInvitationTemplate.value.metadata?.invitation_locale || 'en-us',
+      };
+      content = `Apple Invitation: ${content_attributes.invitation_template_id}`;
+      break;
+    }
     case 'forms':
       // Forms are created through the modal, this shouldn't be reached
       return;
@@ -2091,6 +2128,12 @@ watch(
               icon: '/apple-messages/light/debug-circle.png',
               iconDark: '/apple-messages/debug-circle.png',
               label: 'Custom Payload',
+            },
+            {
+              id: 'invitation',
+              icon: '/apple-messages/light/bell-circle.png',
+              iconDark: '/apple-messages/bell-circle.png',
+              label: t('APPLE_MESSAGES.INVITATION.TAB_LABEL'),
             },
           ]"
           :key="tab.id"
@@ -3672,6 +3715,58 @@ watch(
       </div>
     </div>
 
+    <!-- Invitation Tab -->
+    <div v-if="activeTab === 'invitation'" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold text-n-slate-12 mb-1">
+          {{ t('APPLE_MESSAGES.INVITATION.TEMPLATE_LABEL') }}
+        </label>
+        <select
+          v-model="invitationData.selectedTemplateId"
+          class="w-full p-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 text-sm"
+        >
+          <option value="" disabled>
+            {{ t('APPLE_MESSAGES.INVITATION.TEMPLATE_LABEL') }}
+          </option>
+          <option
+            v-for="tmpl in invitationTemplates"
+            :key="tmpl.id"
+            :value="tmpl.id"
+          >
+            {{ tmpl.name }}
+          </option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-n-slate-12 mb-1">
+          {{ t('APPLE_MESSAGES.INVITATION.REFERENCE_ID_LABEL') }}
+        </label>
+        <input
+          v-model="invitationData.referenceId"
+          type="text"
+          class="w-full p-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 text-sm"
+          :placeholder="t('APPLE_MESSAGES.INVITATION.REFERENCE_ID_PLACEHOLDER')"
+        />
+      </div>
+      <div class="flex justify-end pt-2 border-t border-n-weak">
+        <button
+          class="px-4 py-2 text-n-slate-11 hover:text-n-slate-12 transition-colors"
+          @click="cancelComposer"
+        >
+          Cancel
+        </button>
+        <button
+          class="ml-3 px-4 py-2 bg-n-blue-9 text-white rounded-lg hover:bg-n-blue-10 transition-colors disabled:opacity-50"
+          :disabled="
+            !selectedInvitationTemplate || !invitationData.referenceId.trim()
+          "
+          @click="sendAppleMessage"
+        >
+          {{ t('APPLE_MESSAGES.INVITATION.SEND_BUTTON') }}
+        </button>
+      </div>
+    </div>
+
     <!-- Custom Payload Tab -->
     <div v-if="activeTab === 'custom_payload'" class="space-y-6 max-w-none">
       <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -3998,7 +4093,11 @@ watch(
 
     <!-- Actions - Positioned at the bottom for all tabs except Forms and Custom Payload -->
     <div
-      v-if="activeTab !== 'forms' && activeTab !== 'custom_payload'"
+      v-if="
+        activeTab !== 'forms' &&
+        activeTab !== 'custom_payload' &&
+        activeTab !== 'invitation'
+      "
       class="flex justify-end space-x-3 mt-6 pt-4 border-t border-n-weak dark:border-n-slate-6"
     >
       <button

@@ -180,6 +180,30 @@
         "MESSAGE": "Custom payload sent successfully"
       }
     },
+    "CAMPAIGN": {
+      "CREATE_TITLE": "Create Apple Messages campaign",
+      "HEADER_TITLE": "Apple Messages campaigns",
+      "BUTTON_LABEL": "Create campaign",
+      "EMPTY_STATE_TITLE": "No Apple Messages campaigns are available",
+      "EMPTY_STATE_SUBTITLE": "Launch an Apple Messages campaign to reach your customers via invitation. Click 'Create campaign' to get started.",
+      "FORM": {
+        "SELECT_INBOX": "Select Inbox",
+        "INVITATION_TEMPLATE": "Invitation Template",
+        "AUDIENCE": "Audience",
+        "LABELS": "Labels",
+        "PHONES": "Phones"
+      }
+    },
+    "INVITATION": {
+      "TAB_LABEL": "Invitation",
+      "CAMPAIGN_TITLE": "Apple Messages Invitation",
+      "TEMPLATE_LABEL": "Invitation Template",
+      "REFERENCE_ID_LABEL": "Reference ID",
+      "REFERENCE_ID_PLACEHOLDER": "e.g. order-1234",
+      "SEND_BUTTON": "Send Invitation",
+      "OPTED_OUT_BADGE": "Opted Out",
+      "USER_LEFT": "User left the conversation and opted out of invitation messages."
+    },
     "RICH_LINK": {
       "MODAL_TITLE": "Rich Link",
       "MODAL_DESCRIPTION": "Create rich links with images, titles, and descriptions - or generate App Clips",
