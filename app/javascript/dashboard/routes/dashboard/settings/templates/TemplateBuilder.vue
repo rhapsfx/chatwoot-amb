@@ -327,7 +327,13 @@ const invitationParametersJson = computed({
     const params = template.value.metadata?.invitation_parameters;
     if (!params || Object.keys(params).length === 0) return '';
     try {
-      return JSON.stringify(params, null, 2);
+      // Always display brand_name before brand_logo
+      const { brand_name, brand_logo, ...rest } = params;
+      const ordered = {};
+      if (brand_name !== undefined) ordered.brand_name = brand_name;
+      if (brand_logo !== undefined) ordered.brand_logo = brand_logo;
+      Object.assign(ordered, rest);
+      return JSON.stringify(ordered, null, 2);
     } catch {
       return '';
     }
@@ -371,7 +377,7 @@ const parseInvitationParameters = event => {
 // Visual invitation parameters editor
 const invitationBrandName = computed({
   get() {
-    return template.value.metadata?.invitation_parameters?.brandName ?? '';
+    return template.value.metadata?.invitation_parameters?.brand_name ?? '';
   },
   set(val) {
     if (!template.value.metadata) template.value.metadata = {};
@@ -379,27 +385,30 @@ const invitationBrandName = computed({
       template.value.metadata.invitation_parameters = {};
     }
     if (val) {
-      template.value.metadata.invitation_parameters.brandName = val;
+      template.value.metadata.invitation_parameters.brand_name = val;
     } else {
-      delete template.value.metadata.invitation_parameters.brandName;
+      delete template.value.metadata.invitation_parameters.brand_name;
     }
   },
 });
 
 const invitationBrandLogo = computed({
   get() {
-    return template.value.metadata?.invitation_parameters?.brandLogo ?? '';
+    return template.value.metadata?.invitation_parameters?.brand_logo ?? '';
   },
   set(val) {
     if (!template.value.metadata) template.value.metadata = {};
     if (!template.value.metadata.invitation_parameters) {
       template.value.metadata.invitation_parameters = {};
     }
-    if (val) {
-      template.value.metadata.invitation_parameters.brandLogo = val;
-    } else {
-      delete template.value.metadata.invitation_parameters.brandLogo;
-    }
+    // Rebuild with brand_name first to keep consistent key order
+    const { brand_name, ...rest } =
+      template.value.metadata.invitation_parameters;
+    template.value.metadata.invitation_parameters = {};
+    if (brand_name !== undefined)
+      template.value.metadata.invitation_parameters.brand_name = brand_name;
+    if (val) template.value.metadata.invitation_parameters.brand_logo = val;
+    Object.assign(template.value.metadata.invitation_parameters, rest);
   },
 });
 
@@ -426,6 +435,12 @@ const handleBrandLogoInput = e => {
 const removeBrandLogo = () => {
   invitationBrandLogo.value = '';
 };
+
+const isAppleInvitation = computed(
+  () =>
+    template.value.supportedChannels?.includes('apple_messages_for_business') &&
+    template.value.category === 'notification'
+);
 
 const formatLocaleOption = opt => `${opt.label} — ${opt.value}`;
 
@@ -776,6 +791,7 @@ onMounted(() => {
           class="max-w-4xl mx-auto space-y-8"
         >
           <ParameterEditor
+            v-if="!isAppleInvitation"
             :parameters="template.parameters"
             @update:parameters="updateParameters"
           />

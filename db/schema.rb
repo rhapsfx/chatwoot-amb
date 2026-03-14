@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_13_000001) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_14_000001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1105,6 +1105,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_13_000001) do
     t.jsonb "metadata", default: {}
     t.jsonb "attachment_metadata", default: {}
     t.index ["account_id", "category"], name: "index_message_templates_on_account_id_and_category"
+    t.index ["account_id", "created_at"], name: "index_message_templates_on_account_id_and_created_at", order: { created_at: :desc }
     t.index ["account_id", "status"], name: "index_message_templates_on_account_id_and_status"
     t.index ["account_id"], name: "index_message_templates_on_account_id"
     t.index ["attachment_metadata"], name: "index_message_templates_on_attachment_metadata", using: :gin

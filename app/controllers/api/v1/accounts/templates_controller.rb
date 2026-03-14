@@ -9,7 +9,10 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   # GET /api/v1/accounts/:account_id/templates
   # List all templates for the account with optional filtering
   def index
-    templates = Current.account.message_templates.order(created_at: :desc)
+    templates = Current.account.message_templates
+                       .select(:id, :name, :category, :description, :supported_channels,
+                               :tags, :use_cases, :status, :version, :created_at, :updated_at)
+                       .order(created_at: :desc)
 
     # Apply filters
     templates = templates.where(category: params[:category]) if params[:category].present?
@@ -41,7 +44,7 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
 
     render json: {
       templates: paginated_templates.map(&:summary_json),
-      total: templates.count,
+      total: templates.except(:select).count,
       page: page,
       perPage: per_page
     }
