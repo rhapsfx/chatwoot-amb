@@ -319,16 +319,21 @@ const LOCALE_OPTIONS = [
   { value: 'nb-NO', label: 'Norwegian Bokmål (Norway)' },
 ];
 
-const DEFAULT_INVITATION_PARAMETERS = `{
-  "customerName": "{{customer_name}}",
-  "orderId": "{{order_id}}"
-}`;
+const INVITATION_PARAMETERS_EXAMPLES = {
+  'binaryChoice.engage.noImage': { brandName: 'Your Brand' },
+  'binaryChoice.engage.withImage': {
+    brandName: 'Your Brand',
+    brandLogo: '<base64 PNG>',
+  },
+};
 
 const applyDefaultParameters = () => {
   if (!template.value.metadata) template.value.metadata = {};
-  template.value.metadata.invitation_parameters = JSON.parse(
-    DEFAULT_INVITATION_PARAMETERS
-  );
+  const invitationTemplateId = template.value.metadata.invitation_template_id;
+  const example = INVITATION_PARAMETERS_EXAMPLES[invitationTemplateId] ?? {
+    brandName: 'Your Brand',
+  };
+  template.value.metadata.invitation_parameters = example;
   invitationParametersError.value = '';
 };
 
@@ -379,6 +384,9 @@ const parseInvitationParameters = event => {
     );
   }
 };
+
+const formatLocaleOption = opt => `${opt.label} — ${opt.value}`;
+const invitationParametersPlaceholder = '{"key": "value"}';
 
 const resetTemplate = () => {
   template.value = {
@@ -491,7 +499,10 @@ onMounted(() => {
           <div>
             <label class="block text-sm font-medium text-n-slate-12 mb-2">
               {{ t('TEMPLATES.BUILDER.NAME.LABEL') }}
-              <span class="text-n-red-11">*</span>
+              <span
+                class="text-n-red-11 required-indicator"
+                aria-hidden="true"
+              />
             </label>
             <input
               v-model="template.name"
@@ -527,7 +538,10 @@ onMounted(() => {
             <div>
               <label class="block text-sm font-medium text-n-slate-12 mb-2">
                 {{ t('TEMPLATES.BUILDER.CATEGORY.LABEL') }}
-                <span class="text-n-red-11">*</span>
+                <span
+                  class="text-n-red-11 required-indicator"
+                  aria-hidden="true"
+                />
               </label>
               <select
                 v-model="template.category"
@@ -577,7 +591,10 @@ onMounted(() => {
           <div>
             <label class="block text-sm font-medium text-n-slate-12 mb-2">
               {{ t('TEMPLATES.BUILDER.CHANNELS.LABEL') }}
-              <span class="text-n-red-11">*</span>
+              <span
+                class="text-n-red-11 required-indicator"
+                aria-hidden="true"
+              />
             </label>
             <p class="text-sm text-n-slate-11 mb-3">
               {{ t('TEMPLATES.BUILDER.CHANNELS.DESCRIPTION') }}
@@ -745,7 +762,10 @@ onMounted(() => {
             <div>
               <label class="block text-sm font-medium text-n-slate-12 mb-1">
                 {{ t('TEMPLATES.BUILDER.INVITATION.TEMPLATE_ID.LABEL') }}
-                <span class="text-n-red-11">*</span>
+                <span
+                  class="text-n-red-11 required-indicator"
+                  aria-hidden="true"
+                />
               </label>
               <select
                 v-model="templateIdSelectValue"
@@ -792,7 +812,7 @@ onMounted(() => {
                   :key="opt.value"
                   :value="opt.value"
                 >
-                  {{ opt.label }} — {{ opt.value }}
+                  {{ formatLocaleOption(opt) }}
                 </option>
               </select>
               <p class="mt-1 text-xs text-n-slate-11">
@@ -817,7 +837,7 @@ onMounted(() => {
               <textarea
                 v-model="invitationParametersJson"
                 rows="5"
-                placeholder='{"key": "value"}'
+                :placeholder="invitationParametersPlaceholder"
                 class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
                 @blur="parseInvitationParameters"
               />
@@ -871,3 +891,9 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.required-indicator::after {
+  content: '*';
+}
+</style>
