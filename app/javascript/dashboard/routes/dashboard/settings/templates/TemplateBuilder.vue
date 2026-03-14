@@ -817,9 +817,7 @@ onMounted(() => {
               <textarea
                 v-model="invitationParametersJson"
                 rows="5"
-                :placeholder="
-                  t('TEMPLATES.BUILDER.INVITATION.PARAMETERS.PLACEHOLDER')
-                "
+                placeholder='{"key": "value"}'
                 class="w-full px-4 py-2 border border-n-slate-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white text-n-slate-12 font-mono text-sm"
                 @blur="parseInvitationParameters"
               />

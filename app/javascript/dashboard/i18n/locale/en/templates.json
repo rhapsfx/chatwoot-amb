@@ -719,7 +719,6 @@
         },
         "PARAMETERS": {
           "LABEL": "Default Parameters (JSON)",
-          "PLACEHOLDER": "{\"key\": \"value\"}",
           "HINT": "Optional default key/value pairs sent with every invitation using this template.",
           "INVALID_JSON": "Invalid JSON — please fix before saving."
         }
