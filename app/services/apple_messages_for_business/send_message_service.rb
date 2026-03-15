@@ -525,8 +525,8 @@ class AppleMessagesForBusiness::SendMessageService
     subtitle = received_msg['subtitle'] || content_attributes['received_subtitle']
     msg[:subtitle] = subtitle if subtitle.present?
 
-    # Add imageIdentifier if present (check both camelCase and snake_case)
-    image_id = received_msg['image_identifier'] || received_msg['imageIdentifier'] || content_attributes['received_image_identifier']
+    # Add imageIdentifier if present
+    image_id = received_msg['image_identifier'] || content_attributes['received_image_identifier']
     msg[:imageIdentifier] = image_id if image_id.present?
 
     msg
@@ -562,8 +562,8 @@ class AppleMessagesForBusiness::SendMessageService
 
     msg[:tertiarySubtitle] = content_attributes['reply_tertiary_subtitle'] if content_attributes['reply_tertiary_subtitle'].present?
 
-    # Add imageIdentifier if present (check both camelCase and snake_case)
-    image_id = reply_msg['image_identifier'] || reply_msg['imageIdentifier'] || content_attributes['reply_image_identifier']
+    # Add imageIdentifier if present
+    image_id = reply_msg['image_identifier'] || content_attributes['reply_image_identifier']
     msg[:imageIdentifier] = image_id if image_id.present?
 
     msg
@@ -645,8 +645,7 @@ class AppleMessagesForBusiness::SendMessageService
         Rails.logger.info "[collect_form_image_identifiers] Options count: #{options.length}"
 
         options.each do |option|
-          # Support both camelCase and snake_case (API normalizes to snake_case)
-          image_id = option['imageIdentifier'] || option['image_identifier']
+          image_id = option['image_identifier']
           Rails.logger.info "[collect_form_image_identifiers] Option image_id: #{image_id.inspect}"
           identifiers << image_id if image_id.present?
         end
@@ -1302,5 +1301,23 @@ class AppleMessagesForBusiness::SendMessageService
     end
 
     false
+  end
+
+  def determine_content_type(data, filename)
+    # Try to detect from data
+    return 'image/png' if data[0..3] == "\x89PNG"
+    return 'image/jpeg' if data[0..1] == "\xFF\xD8"
+    return 'image/gif' if data[0..2] == 'GIF'
+    return 'image/webp' if data[8..11] == 'WEBP'
+
+    # Fallback to filename extension
+    ext = File.extname(filename).downcase
+    case ext
+    when '.png' then 'image/png'
+    when '.jpg', '.jpeg' then 'image/jpeg'
+    when '.gif' then 'image/gif'
+    when '.webp' then 'image/webp'
+    else 'image/jpeg' # default
+    end
   end
 end

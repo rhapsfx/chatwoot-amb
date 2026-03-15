@@ -70,7 +70,7 @@ module AppleMessagesForBusiness
 
       # Common message fields
       'reference_id' => 'referenceId',
-      'template_id'  => 'templateId',
+      'template_id' => 'templateId',
       'source_id' => 'sourceId',
       'destination_id' => 'destinationId',
       'request_identifier' => 'requestIdentifier',
@@ -86,8 +86,8 @@ module AppleMessagesForBusiness
       'signature_base64' => 'signature-base64',  # Special case: underscore → hyphen
 
       # Branding
-      'brand_logo'   => 'brandLogo',
-      'brand_name'   => 'brandName',
+      'brand_logo' => 'brandLogo',
+      'brand_name' => 'brandName',
 
       # Custom app
       'app_id' => 'appId',
@@ -225,7 +225,7 @@ module AppleMessagesForBusiness
       #   CaseTransformer.from_apple_format(input)
       #   # => { 'image_identifier' => 'img_123', 'multiple_selection' => true }
       #
-      def from_apple_format(hash)
+      def from_apple_format(hash, context: nil)
         return hash unless hash.is_a?(Hash)
 
         # Build reverse mapping on first use
@@ -251,20 +251,32 @@ module AppleMessagesForBusiness
           if PRESERVE_KEYS.include?(string_key)
             # Preserve the key name but transform nested values
             # This is consistent with to_apple_format behavior
-            transformed[string_key] = transform_value_from_apple(value)
+            transformed[string_key] = transform_value_from_apple(value, context)
+            next
+          end
+
+          # Context-specific imageIdentifier mapping (takes priority over reverse mapping)
+          snake_key = if string_key == 'imageIdentifier' && context == :received_message
+                        'received_image_identifier'
+                      elsif string_key == 'imageIdentifier' && context == :reply_message
+                        'reply_image_identifier'
+                      end
+
+          if snake_key
+            transformed[snake_key] = transform_value_from_apple(value, context)
             next
           end
 
           # Apply reverse mapping
           if @reverse_mapping.key?(string_key)
             snake_key = @reverse_mapping[string_key]
-            transformed[snake_key] = transform_value_from_apple(value)
+            transformed[snake_key] = transform_value_from_apple(value, context)
             next
           end
 
           # Default: use ActiveSupport's underscore for unmapped fields
           snake_key = string_key.underscore
-          transformed[snake_key] = transform_value_from_apple(value)
+          transformed[snake_key] = transform_value_from_apple(value, context)
         end
 
         transformed
@@ -329,12 +341,12 @@ module AppleMessagesForBusiness
       end
 
       # Transform a value recursively (from Apple format)
-      def transform_value_from_apple(value)
+      def transform_value_from_apple(value, context = nil)
         case value
         when Hash
-          from_apple_format(value)
+          from_apple_format(value, context: context)
         when Array
-          value.map { |item| transform_value_from_apple(item) }
+          value.map { |item| transform_value_from_apple(item, context) }
         else
           value
         end

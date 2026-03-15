@@ -10,7 +10,7 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   def perform
     # Handle CloseSession (user opted out of invitation messages)
-    if params['type'] == 'close'
+    if @params['type'] == 'close'
       AppleMessagesForBusiness::CloseSessionHandlerService.new(inbox: @inbox, params: @params).perform
       return
     end

@@ -186,8 +186,9 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
                   :content_attributes => [
                     # Common type field for all Apple Messages
                     :type,
-                    # Apple Quick Reply
-                    :summary_text, { :items => [:title, :identifier, :description] },
+                    # Apple Quick Reply / Bot cards
+                    :summary_text, { :items => [:title, :identifier, :description, :value, :media_url,
+                                                { :actions => [:text, :type, :payload, :uri] }] },
                     { :replies => [:title, :identifier, :description, :imageIdentifier, :image_identifier] },
                     # Apple List Picker
                     { :sections => [:title, :multiple_selection, { :items => [:title, :subtitle, :identifier, :imageIdentifier, :image_identifier] }] },

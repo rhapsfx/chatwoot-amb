@@ -2114,6 +2114,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     @sender.send_apple_messages_rich_link
   end
 
+  def send_imessage_app
+    @sender.send_imessage_app
+  end
+
   def send_delivery_confirmation(address_data, customer_name = nil)
     @sender.send_delivery_confirmation(address_data, customer_name)
   end
@@ -2175,7 +2179,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Returns true if the form was sent successfully, false if template not found.
   # Callers are responsible for fallback behaviour.
   def send_guitar_info_form
-    @sender.send_guitar_info_form
+    return if @sender.send_guitar_info_form
+
+    handle_guitar_list_prompt
   end
 
   def handle_large_form_response(content_attributes)
@@ -2639,36 +2645,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_imessage_app(_interactive_data = nil)
     log_info '[Bot] 🎵 handle_imessage_app called - Sending Shazam extension'
-
-    # Create message record - SendReplyJob will handle sending to Apple MSP
-    begin
-      log_info '[Bot] 🎵 Creating Shazam message record'
-
-      message = Messages::MessageBuilder.new(
-        message_sender,
-        @conversation,
-        {
-          message_type: :outgoing,
-          content_type: 'apple_custom_app',
-          content: 'Shazam',
-          content_attributes: {
-            app_id: '284993459',
-            app_name: 'Shazam',
-            bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:4GWDBCF5A4:com.shazam.Shazam.imessageextension',
-            use_live_layout: true
-          },
-          private: false
-        }
-      ).perform
-
-      log_info "[Bot] 🎵 Message created successfully: ID=#{message&.id}, content_type=#{message&.content_type}"
-
-      send_text_message('🎵 Tap the Shazam bubble above to identify songs!')
-    rescue StandardError => e
-      log_warn "[Bot] ❌ Error creating Shazam message: #{e.message}"
-      log_warn e.backtrace.join("\n")
-      send_text_message('Sorry, there was an error sending the Shazam extension. Please try again.')
-    end
+    @sender.send_imessage_app
   end
 
   # === OAuth Authentication Handlers ===

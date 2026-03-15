@@ -97,24 +97,6 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
     end
   end
 
-  def determine_content_type(data, filename)
-    # Try to detect from data
-    return 'image/png' if data[0..3] == "\x89PNG"
-    return 'image/jpeg' if data[0..1] == "\xFF\xD8"
-    return 'image/gif' if data[0..2] == 'GIF'
-    return 'image/webp' if data[8..11] == 'WEBP'
-
-    # Fallback to filename extension
-    ext = File.extname(filename).downcase
-    case ext
-    when '.png' then 'image/png'
-    when '.jpg', '.jpeg' then 'image/jpeg'
-    when '.gif' then 'image/gif'
-    when '.webp' then 'image/webp'
-    else 'image/jpeg' # default
-    end
-  end
-
   def build_time_picker_data
     event_data = content_attributes['event'] || {}
 

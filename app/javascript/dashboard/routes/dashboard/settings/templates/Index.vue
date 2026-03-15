@@ -23,6 +23,32 @@ const selectedSortBy = ref('name'); // Default sort by name
 const showDeleteConfirmation = ref(false);
 const templateToDelete = ref(null);
 
+const BOT_API_BADGE_LABEL = '🤖 Bot API';
+const BOT_API_ONLY_TITLE = 'Available via Bot API only';
+const botApiBanner = {
+  title: 'Bot Templates API',
+  descriptionPrefix: 'Templates marked with',
+  descriptionSuffix:
+    'are designed for programmatic use via webhooks, Dialogflow, Rasa, or custom bots.',
+  curlCommand: [
+    { prefix: 'curl', text: ' -X POST' },
+    {
+      text: ' https://your-chatwoot-domain.com/api/v1/accounts/1/bot_templates/send_message \\',
+    },
+    { prefix: '-H', text: ' "X-Api-Access-Token: YOUR_API_TOKEN" \\' },
+    { prefix: '-H', text: ' "Content-Type: application/json" \\' },
+    {
+      prefix: '-d',
+      text: ` '{"conversation_id": 15, "template_id": 4, "parameters": {}}'`,
+    },
+  ],
+  tokenLabel: 'Get your API token:',
+  tokenPath: 'Profile → Settings → Access Token',
+  docsLabel: 'Full documentation:',
+  docsPath: 'docs/api/BOT_TEMPLATES_API.md',
+  docsSuffix: 'in the project root',
+};
+
 // Helper function for sorting templates
 const sortTemplatesList = templatesList => {
   const sorted = [...templatesList];
@@ -221,6 +247,14 @@ const duplicateTemplate = async template => {
   }
 };
 
+const getUseCaseLabel = useCase => {
+  return useCase === 'bot_api_only' ? BOT_API_BADGE_LABEL : useCase;
+};
+
+const getUseCaseTitle = useCase => {
+  return useCase === 'bot_api_only' ? BOT_API_ONLY_TITLE : useCase;
+};
+
 const getCategoryLabel = category => {
   if (!category) return t('TEMPLATES.CATEGORIES.UNCATEGORIZED');
 
@@ -232,8 +266,10 @@ const getCategoryLabel = category => {
   if (lowerCategory === 'sales') return t('TEMPLATES.CATEGORIES.SALES');
   if (lowerCategory === 'onboarding')
     return t('TEMPLATES.CATEGORIES.ONBOARDING');
+  if (lowerCategory === 'notification')
+    return t('TEMPLATES.CATEGORIES.NOTIFICATION');
 
-  return category;
+  return category.charAt(0).toUpperCase() + category.slice(1);
 };
 
 const getChannelIcon = channel => {
@@ -329,43 +365,50 @@ watch(
         <i class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5" />
         <div class="flex-1">
           <h4 class="text-sm font-semibold text-n-slate-12 mb-2">
-            Bot Templates API
+            {{ botApiBanner.title }}
           </h4>
           <p class="text-sm text-n-slate-11 mb-3">
-            Templates marked with
+            {{ botApiBanner.descriptionPrefix }}
             <span
               class="px-2 py-0.5 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
-              >🤖 Bot API</span>
-            are designed for programmatic use via webhooks, Dialogflow, Rasa, or
-            custom bots.
+            >
+              {{ BOT_API_BADGE_LABEL }}
+            </span>
+            {{ botApiBanner.descriptionSuffix }}
           </p>
           <div
             class="bg-white dark:bg-n-slate-1 p-3 rounded border border-n-slate-6 text-xs font-mono overflow-x-auto"
           >
             <div class="text-n-slate-11 whitespace-pre-wrap break-all">
-              <span class="text-n-slate-10">curl</span> -X POST
-              https://your-chatwoot-domain.com/api/v1/accounts/1/bot_templates/send_message
-              \<br />
-              <span class="text-n-slate-10">-H</span>
-              "X-Api-Access-Token: YOUR_API_TOKEN" \<br />
-              <span class="text-n-slate-10">-H</span> "Content-Type:
-              application/json" \<br />
-              <span class="text-n-slate-10">-d</span> '{"conversation_id": 15,
-              "template_id": 4, "parameters": {}}'
+              <template
+                v-for="(line, index) in botApiBanner.curlCommand"
+                :key="`${line.prefix || 'text'}-${index}`"
+              >
+                <span v-if="line.prefix" class="text-n-slate-10">
+                  {{ line.prefix }}
+                </span>
+                {{ line.text }}
+                <br v-if="index < botApiBanner.curlCommand.length - 1" />
+              </template>
             </div>
           </div>
           <div class="mt-3 text-xs text-n-slate-11">
             <div class="mb-1">
-              <strong class="text-n-slate-12">Get your API token:</strong>
-              Profile → Settings → Access Token
+              <strong class="text-n-slate-12">
+                {{ botApiBanner.tokenLabel }}
+              </strong>
+              {{ botApiBanner.tokenPath }}
             </div>
             <div>
-              <strong class="text-n-slate-12">Full documentation:</strong> See
+              <strong class="text-n-slate-12">
+                {{ botApiBanner.docsLabel }}
+              </strong>
               <code
                 class="px-1 py-0.5 bg-n-slate-2 text-n-slate-12 rounded font-mono"
-                >docs/api/BOT_TEMPLATES_API.md</code
               >
-              in the project root
+                {{ botApiBanner.docsPath }}
+              </code>
+              {{ botApiBanner.docsSuffix }}
             </div>
           </div>
         </div>
@@ -604,13 +647,9 @@ watch(
                 v-for="useCase in template.useCases || []"
                 :key="useCase"
                 class="px-2 py-1 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
-                :title="
-                  useCase === 'bot_api_only'
-                    ? 'Available via Bot API only'
-                    : useCase
-                "
+                :title="getUseCaseTitle(useCase)"
               >
-                {{ useCase === 'bot_api_only' ? '🤖 Bot API' : useCase }}
+                {{ getUseCaseLabel(useCase) }}
               </span>
               <span
                 v-if="template.tags && template.tags.length > 3"

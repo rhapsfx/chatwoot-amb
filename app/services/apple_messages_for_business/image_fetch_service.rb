@@ -121,7 +121,7 @@ class AppleMessagesForBusiness::ImageFetchService
       source: "shared_#{shared_image.image_type}"
     }
   rescue StandardError => e
-    log_error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
+    Rails.logger.error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
     nil
   end
 
@@ -135,7 +135,7 @@ class AppleMessagesForBusiness::ImageFetchService
     embedded_data = embedded&.dig('data') || embedded&.dig(:data)
     return nil if embedded.blank? || embedded_data.blank?
 
-    log_info "[ImageFetch] ✅ Found in embedded: #{identifier}"
+    Rails.logger.info "[ImageFetch] ✅ Found in embedded: #{identifier}"
 
     {
       identifier: identifier,

@@ -274,14 +274,7 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
-            # OLD routes (kept for backward compatibility - Phase 1 of rename)
-            resources :apple_list_picker_images, only: [:index, :create, :destroy], module: :inboxes do
-              collection do
-                post :copy_from
-                post :bulk_upload
-              end
-            end
-            # NEW routes (Phase 1 - Non-Breaking rename to apple_amb_images)
+            # Apple AMB image management
             resources :apple_amb_images, only: [:index, :create, :destroy], module: :inboxes do
               collection do
                 post :copy_from

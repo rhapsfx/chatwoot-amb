@@ -54,6 +54,9 @@ class Messages::MessageBuilder
     # Check both separate images parameter AND images nested in content_attributes
     parsed_content_attributes[:images] = params[:images] if @params[:content_type]&.start_with?('apple_') && params.key?(:images)
 
+    # Store external_created_at directly in content_attributes hash
+    parsed_content_attributes[:external_created_at] = @params[:external_created_at] if @params[:external_created_at].present?
+
     parsed_content_attributes
   end
 

@@ -44,22 +44,15 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
     end
 
     # Update the message with the new content_attributes
-    # Temporarily disable SQL logging to avoid base64 spam in logs
-    old_log_level = ActiveRecord::Base.logger&.level
-    ActiveRecord::Base.logger&.level = Logger::WARN if old_log_level
-
-    @message.update(content_attributes: updated_attrs)
-
-    # Restore log level
-    ActiveRecord::Base.logger&.level = old_log_level if old_log_level
+    # Silence SQL logging to avoid base64 spam in logs
+    ActiveRecord::Base.logger.silence do
+      @message.update(content_attributes: updated_attrs)
+    end
 
     Rails.logger.info '[AMB ListPicker] Updated content_attributes with images for frontend display'
   rescue StandardError => e
     Rails.logger.error "[AMB ListPicker] Failed to update content_attributes with images: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
-  ensure
-    # Ensure log level is restored even if there's an error
-    ActiveRecord::Base.logger&.level = old_log_level if old_log_level
   end
 
   # Override parent to use transformed images
@@ -216,24 +209,6 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
     Rails.logger.info "[AMB ListPicker] Image processing complete: #{successful_count} successful, #{skipped_count} skipped, #{failed_count} failed out of #{images.length} total"
   end
 
-  def determine_content_type(data, filename)
-    # Try to detect from data
-    return 'image/png' if data[0..3] == "\x89PNG"
-    return 'image/jpeg' if data[0..1] == "\xFF\xD8"
-    return 'image/gif' if data[0..2] == 'GIF'
-    return 'image/webp' if data[8..11] == 'WEBP'
-
-    # Fallback to filename extension
-    ext = File.extname(filename).downcase
-    case ext
-    when '.png' then 'image/png'
-    when '.jpg', '.jpeg' then 'image/jpeg'
-    when '.gif' then 'image/gif'
-    when '.webp' then 'image/webp'
-    else 'image/jpeg' # default
-    end
-  end
-
   # Override parent to properly transform section/item keys
   def build_list_picker_data
     sections = content_attributes['sections'] || []
@@ -294,8 +269,7 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
         next unless items.is_a?(Array)
 
         items.each do |item|
-          # Handle both camelCase and snake_case
-          image_id = item['imageIdentifier'] || item['image_identifier']
+          image_id = item['image_identifier']
           identifiers << image_id if image_id.present?
         end
       end

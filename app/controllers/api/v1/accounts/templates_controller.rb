@@ -44,7 +44,7 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
 
     render json: {
       templates: paginated_templates.map(&:summary_json),
-      total: templates.except(:select).count,
+      total: templates.except(:select, :order).count,
       page: page,
       perPage: per_page
     }

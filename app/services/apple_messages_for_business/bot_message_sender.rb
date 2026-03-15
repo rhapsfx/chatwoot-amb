@@ -270,11 +270,11 @@ module AppleMessagesForBusiness
           @conversation,
           bot_message_params(
             message_type: :outgoing,
-            content: 'https://register.apple.com/resources/messages/messaging-documentation/',
+            content: 'https://www.apple.com/macbook-neo/',
             content_type: 'apple_rich_link',
             content_attributes: {
-              'url' => 'https://register.apple.com/resources/messages/messaging-documentation/',
-              'title' => 'Apple Messages for Business',
+              'url' => 'https://www.apple.com/macbook-neo/',
+              'title' => 'MacBook Neo',
               'image_data' => image_data,
               'image_mime_type' => 'image/png'
             }.compact
@@ -284,6 +284,34 @@ module AppleMessagesForBusiness
     rescue StandardError => e
       log_error "[Bot] Failed to send rich link: #{e.message}"
       log_error e.backtrace.join("\n")
+    end
+
+    def send_imessage_app
+      log_info '[Bot] 🎵 Sending Shazam iMessage extension'
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: 'Shazam',
+            content_type: 'apple_custom_app',
+            content_attributes: {
+              'app_id' => '284993459',
+              'app_name' => 'Shazam',
+              'bid' => 'com.apple.messages.MSMessageExtensionBalloonPlugin:4GWDBCF5A4:com.shazam.Shazam.imessageextension',
+              'use_live_layout' => true
+            }
+          )
+        ).perform
+      end
+
+      send_text_message('🎵 Tap the Shazam bubble above to identify songs!')
+    rescue StandardError => e
+      log_error "[Bot] Failed to send iMessage app: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message('Sorry, there was an error sending the Shazam extension. Please try again.')
     end
 
     def send_delivery_confirmation(address_data, customer_name = nil)

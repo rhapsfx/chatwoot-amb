@@ -243,8 +243,8 @@ class AppleMessagesForBusiness::FormService
         description: option['description']
       }
 
-      # Include image_identifier if present (handle both camelCase and snake_case)
-      image_id = option['imageIdentifier'] || option['image_identifier']
+      # Include image_identifier if present
+      image_id = option['image_identifier']
       option_data[:imageIdentifier] = image_id if image_id.present?
 
       option_data.compact
@@ -358,8 +358,7 @@ class AppleMessagesForBusiness::FormService
 
           options = item['options'] || []
           options.each do |option|
-            # Handle both camelCase and snake_case
-            image_id = option['imageIdentifier'] || option['image_identifier']
+            image_id = option['image_identifier']
             identifiers << image_id if image_id.present?
           end
         end
@@ -408,12 +407,21 @@ class AppleMessagesForBusiness::FormService
       'Destination-Id' => @destination_id
     }
 
-    HTTParty.post(
-      "#{AppleMessagesForBusiness::SendMessageService::AMB_SERVER}/message",
-      body: payload.to_json,
-      headers: headers,
-      timeout: 30
-    )
+    attempts = 0
+    begin
+      attempts += 1
+      HTTParty.post(
+        "#{AppleMessagesForBusiness::SendMessageService::AMB_SERVER}/message",
+        body: payload.to_json,
+        headers: headers,
+        timeout: 30
+      )
+    rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, SocketError => e
+      raise if attempts >= 3
+
+      Rails.logger.warn "[AMB Form] Network error (attempt #{attempts}/3): #{e.message}, retrying..."
+      retry
+    end
   end
 
   def self.find_conversation_by_source_id(channel, source_id)
