@@ -121,6 +121,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'qr_photo' => :handle_photo_response,
     'qr_learn_more' => :handle_learn_more_response,
     'lp_menu_0319' => :handle_menu_selection,
+    'lp_summary_0319' => :handle_summary_selection,
     'form_large_content' => :handle_large_form_response,
     'act_imessage_app' => :handle_imessage_app,
     'qr_oauth_provider' => :handle_oauth_provider_selection
@@ -194,6 +195,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Sanitize interactive data to remove base64 image content from logs
     sanitized_data = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(interactive_data, max_length: 20)
     log_info "[Bot] 🎯 Interactive data: #{utf8_encode(sanitized_data).inspect}"
+
+    # Handle iMessage extension balloon responses (bid format) that have no requestIdentifier.
+    # Apple sends { "bid": "...", "data": { "replyMessage": {...} }, "sessionIdentifier": "..." }
+    # when the user taps a Shazam/custom-app bubble directly (no routing info available).
+    # List pickers that include bid (e.g. summary LP) still carry data['requestIdentifier']
+    # and must fall through to the normal routing path below.
+    if interactive_data['bid'].present? && (interactive_data['data'] || {})['requestIdentifier'].blank?
+      log_info '[Bot] 🎵 iMessage extension response detected (bid present, no requestIdentifier)'
+      send_text_message("Type 'menu' to explore more features or 'startover' to restart.")
+      return
+    end
 
     # For quick replies, Apple uses 'selectedIdentifier' (our custom identifier)
     # For other types (list picker, time picker), use 'requestIdentifier'
@@ -1992,6 +2004,56 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     end
   end
 
+  def handle_summary_selection(interactive_data)
+    log_info '[Bot] 📋 handle_summary_selection called'
+
+    # Extract selected item identifier from list picker response
+    identifier = extract_summary_identifier(interactive_data)
+    log_info "[Bot] 📋 Summary selection identifier: #{identifier.inspect}"
+
+    case identifier
+    when '1' # Apple Pay
+      send_text_message('Here\'s our Apple Pay demo:')
+      handle_apple_pay_demo
+    when '2' # Apple Wallet
+      send_text_message('🍎 Apple Wallet lets customers save passes, boarding passes, tickets, and loyalty cards directly in the Messages conversation.')
+      update_bot_state('DEMO_MODE')
+    when '3' # AR Experience
+      send_text_message('Here\'s our AR experience demo:')
+      handle_ar_demo
+    when '4' # Authentication
+      handle_authentication_menu
+    when '5' # File Sharing
+      send_text_message('Document sharing demo:')
+      handle_documents_intro
+    when '6' # iMessage Apps
+      send_text_message('📱 iMessage App Demo')
+      handle_imessage_app
+      update_bot_state('DEMO_MODE')
+    when '7' # List Picker
+      handle_list_picker_demo
+    when '8' # Media Sharing
+      send_text_message('📸 Media Sharing lets customers send photos and videos directly in the conversation. Try sending us a photo!')
+      update_bot_state('DEMO_MODE')
+    when '9' # QR Code
+      send_text_message('📷 QR Code scanning lets customers quickly capture and share QR codes within the Messages conversation.')
+      update_bot_state('DEMO_MODE')
+    when '10' # Quick Type
+      send_text_message('⌨️ Quick Type provides intelligent reply suggestions based on conversation context, helping customers respond faster.')
+      update_bot_state('DEMO_MODE')
+    when '11', '12' # Rich Link Locator / Rich Links
+      send_text_message('Here\'s a rich link demo:')
+      send_apple_messages_rich_link
+      update_bot_state('DEMO_MODE')
+    when '13' # Time Picker
+      handle_time_picker_demo
+    else
+      log_warn "[Bot] ❌ Unknown summary selection identifier: #{identifier.inspect}"
+      send_text_message("Type 'menu' to explore all features or 'startover' to restart.")
+      update_bot_state('DEMO_MODE')
+    end
+  end
+
   def handle_learn_more_response(interactive_data)
     log_info '[Bot] 📚 handle_learn_more_response called'
 
@@ -2759,6 +2821,34 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   end
 
   # === Fuzzy keyword matching ===
+
+  # Extracts the selected item identifier from a summary list picker response.
+  # Handles standard listPicker format, ldtext (IDR), and NSKeyedArchiver.
+  def extract_summary_identifier(interactive_data)
+    # IDR/ldtext resolved format
+    return interactive_data['ldtext'].strip if interactive_data['ldtext'].present?
+
+    data = interactive_data['data'] || {}
+    list_picker = data['listPicker'] || {}
+    sections = list_picker['sections'] || []
+
+    # Standard format: look for the 'You Selected' echo section first
+    selected_section = sections.find { |s| s['title'] == 'You Selected' }
+    selected_item = selected_section&.dig('items', 0)
+    # Fallback: find the item explicitly flagged as selected
+    selected_item ||= sections.flat_map { |s| s['items'] || [] }.find { |item| item['selected'] == true }
+
+    identifier = selected_item&.dig('identifier')
+    return identifier.to_s if identifier.present?
+
+    # NSKeyedArchiver format: find a short numeric string in $objects
+    if interactive_data['$archiver'] == 'NSKeyedArchiver'
+      objects = interactive_data['$objects'] || []
+      return objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d{1,2}$/) }
+    end
+
+    nil
+  end
 
   # Returns [matched_keyword, handler_method, :demo|:flow_control] or nil
   def fuzzy_match_keyword(input)

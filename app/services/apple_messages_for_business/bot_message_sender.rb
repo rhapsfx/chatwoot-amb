@@ -259,10 +259,9 @@ module AppleMessagesForBusiness
     end
 
     def send_apple_messages_rich_link
-      # Use pre-encoded image_data so OG scraping in SendRichLinkService cannot
-      # clobber our image with an inaccessible Apple-CDN URL.
-      image_data = encode_demo_image('heroImage.png')
-      log_info "[Bot] 🔗 Rich link image_data present: #{image_data.present?} (#{image_data&.length || 0} chars)"
+      # No image_data provided — SendRichLinkService will scrape the OG image
+      # from the URL and download/encode it automatically.
+      log_info '[Bot] 🔗 Sending MacBook Neo rich link (OG image will be fetched by SendRichLinkService)'
 
       with_typing_indicator do
         Messages::MessageBuilder.new(
@@ -274,10 +273,8 @@ module AppleMessagesForBusiness
             content_type: 'apple_rich_link',
             content_attributes: {
               'url' => 'https://www.apple.com/macbook-neo/',
-              'title' => 'MacBook Neo',
-              'image_data' => image_data,
-              'image_mime_type' => 'image/png'
-            }.compact
+              'title' => 'MacBook Neo'
+            }
           )
         ).perform
       end
