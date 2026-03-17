@@ -109,7 +109,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
     # Build event with snake_case, then transform to Apple format
     event = {
       'identifier' => event_data['identifier'].presence || SecureRandom.uuid,
-      'title' => event_data['title'] || 'Select a time',
+      'title' => event_data['title'].presence || 'Select a time',
       'image_identifier' => event_data['image_identifier'],
       'location' => build_location_data(event_data['location']),
       'timeslots' => build_timeslots(event_data['timeslots'] || default_timeslots),

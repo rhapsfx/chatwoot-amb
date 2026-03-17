@@ -794,14 +794,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     case retry_count
     when 1
-      # First message received after showing list - user might be typing
-      send_text_message('☝️ Please select a guitar from the list above.')
-    when 2
       send_text_message("Looks like we're waiting for you to select a guitar from the list.")
-    when 3
+    when 2
       send_text_message('You may also use this menu as well.')
       send_guitar_list_picker
-    when 4
+    when 3
       send_text_message("If you find yourself stuck, you may have an overview with the keyword 'Menu'.")
     else
       # After 5+ retries, auto-select every 3rd attempt
@@ -2251,6 +2248,17 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_lesson_time_picker(location)
     @sender.send_lesson_time_picker(location)
+    # Schedule a proactive 10-second reminder if this is a fresh send (not a retry already in AHH1)
+    schedule_delayed_action(:send_time_picker_waiting_reminder, delay: 10.0) unless @bot_state == 'AHH1'
+  end
+
+  def send_time_picker_waiting_reminder
+    # Only fire if the user hasn't already triggered the catcher (retry_count == 0)
+    return unless @bot_state == 'AHH1'
+    return if (get_conversation_attribute('retry_count') || 0) > 0
+
+    send_text_message("☝️ Looks like we're waiting for you to select a time from the menu above.")
+    increment_retry_count # Prevent catcher's `when 1` from sending the same message again
   end
 
   def send_store_quick_reply(stores, user_coordinates)

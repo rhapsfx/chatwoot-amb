@@ -657,7 +657,7 @@ module AppleMessagesForBusiness
     # === Location / store / lesson senders ===
 
     def send_lesson_time_picker(location)
-      guitar = @conversation.custom_attributes&.dig('selected_guitar') || 'guitar'
+      guitar = @conversation.custom_attributes&.dig('selected_guitar').presence || 'guitar'
 
       day1 = 7.days.from_now.to_date
       day2 = 8.days.from_now.to_date

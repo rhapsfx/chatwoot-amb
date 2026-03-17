@@ -96,6 +96,7 @@ class AppleMessagesForBusiness::ImageFetchService
     {
       identifier: identifier,
       data: Base64.strict_encode64(picker_image.image.download),
+      mimeType: picker_image.image.content_type,
       description: picker_image.description || identifier,
       source: 'inbox'
     }
@@ -117,6 +118,7 @@ class AppleMessagesForBusiness::ImageFetchService
     {
       identifier: identifier,
       data: Base64.strict_encode64(shared_image.image.download),
+      mimeType: shared_image.image.content_type,
       description: shared_image.description || identifier,
       source: "shared_#{shared_image.image_type}"
     }
@@ -140,6 +142,7 @@ class AppleMessagesForBusiness::ImageFetchService
     {
       identifier: identifier,
       data: embedded_data, # Already base64
+      mimeType: embedded['mimeType'] || embedded[:mimeType] || embedded['mime_type'] || embedded[:mime_type] || 'image/png',
       description: embedded['description'] || embedded[:description] || identifier,
       source: 'embedded'
     }
