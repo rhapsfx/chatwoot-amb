@@ -389,13 +389,15 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Check if it's a demo keyword (isolated template execution)
     if DEMO_KEYWORDS.key?(keyword)
       handler_method = DEMO_KEYWORDS[keyword]
+      state_before = @bot_state
       dispatch_keyword_handler(handler_method)
 
-      # Set special state for large form to handle its response differently
+      # Set special state for large form to handle its response differently.
+      # If the handler already changed state (e.g., AHW1 waiting for user input),
+      # respect it — don't override with DEMO_MODE.
       if handler_method == :handle_large_form_demo
         update_bot_state('DEMO_MODE_LARGE_FORM')
-      else
-        # Set demo mode state to prevent flow continuation
+      elsif @bot_state == state_before
         update_bot_state('DEMO_MODE')
       end
       return true
