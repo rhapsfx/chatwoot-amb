@@ -686,8 +686,10 @@ module AppleMessagesForBusiness
               'received_title' => "Schedule a lesson with your #{guitar}",
               'received_subtitle' => location[:name],
               'received_image_identifier' => time_picker_image_id,
+              'received_style' => 'large',
               'reply_title' => 'Thank you!',
               'reply_image_identifier' => time_picker_image_id,
+              'reply_style' => 'icon',
               'event' => {
                 'identifier' => SecureRandom.uuid,
                 'title' => "Guitar Lesson - #{guitar}",

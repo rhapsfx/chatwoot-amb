@@ -33,11 +33,11 @@ class AppleMessagesForBusiness::WalletPassService
   def generate
     validate_env!
 
-    Passbook.setup do |config|
-      config.p12_certificate = ENV.fetch('WALLET_CERT_PEM')
-      config.p12_key         = ENV.fetch('WALLET_KEY_PEM')
-      config.p12_password    = ENV.fetch('WALLET_KEY_PASSWORD', '')
-      config.p12_intermediate_certificate = ENV.fetch('WALLET_WWDR_PEM')
+    Passbook.configure do |config|
+      config.certificate            = pem_env('WALLET_CERT_PEM')
+      config.rsa_private_key        = pem_env('WALLET_KEY_PEM')
+      config.password               = ENV.fetch('WALLET_KEY_PASSWORD', '')
+      config.apple_intermediate_cert = pem_env('WALLET_WWDR_PEM')
     end
 
     pkpass = Passbook::PKPass.new(build_pass_json)
@@ -141,8 +141,14 @@ class AppleMessagesForBusiness::WalletPassService
       file_path = ASSETS_DIR.join(asset_filename)
       next unless File.exist?(file_path)
 
-      pkpass.addFile pass_filename, data: File.binread(file_path)
+      pkpass.add_file({ name: pass_filename, content: File.binread(file_path) })
     end
+  end
+
+  # ENV vars store PEM content with literal \n escape sequences.
+  # Convert them to real newlines so OpenSSL can parse the PEM.
+  def pem_env(key)
+    ENV.fetch(key).gsub('\n', "\n")
   end
 
   def validate_env!
