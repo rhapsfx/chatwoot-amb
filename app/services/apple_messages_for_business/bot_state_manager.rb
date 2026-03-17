@@ -28,6 +28,7 @@ module AppleMessagesForBusiness
       AHI1 AHI3 AHI4
       AHJ1 AHJ2 AHJ3 AHJ4
       AHK0 AHK1 AHK2 AHK3
+      AHW1
       AH-restart
       DEMO_MODE DEMO_MODE_LARGE_FORM DEMO_MODE_AUTH_PROVIDER
       STOPPED

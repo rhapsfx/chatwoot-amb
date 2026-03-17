@@ -403,6 +403,7 @@ GEM
       multi_json (~> 1.11)
       os (>= 0.9, < 2.0)
       signet (>= 0.16, < 2.a)
+    grocer (0.7.1)
     groupdate (6.2.1)
       activesupport (>= 5.2)
     grpc (1.72.0)
@@ -653,6 +654,10 @@ GEM
     parser (3.3.8.0)
       ast (~> 2.4.1)
       racc
+    passbook2 (1.0.0)
+      activesupport
+      grocer
+      rubyzip (>= 1.0.0)
     pg (1.5.3)
     pg_search (2.3.6)
       activerecord (>= 5.2)
@@ -833,6 +838,7 @@ GEM
     ruby_llm-schema (0.1.0)
     ruby_parser (3.20.0)
       sexp_processor (~> 4.16)
+    rubyzip (3.2.2)
     sass (3.7.4)
       sass-listen (~> 4.0.0)
     sass-listen (4.0.0)
@@ -1097,6 +1103,7 @@ DEPENDENCIES
   opentelemetry-exporter-otlp
   opentelemetry-sdk
   parallel_tests
+  passbook2
   pg
   pg_search
   pgvector

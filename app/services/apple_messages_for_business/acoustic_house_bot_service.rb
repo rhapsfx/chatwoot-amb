@@ -80,7 +80,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     'oauth' => :handle_authentication_menu,
     'shazam' => :handle_imessage_app,
     'appclip' => :handle_app_clip_demo,
-    'app clip' => :handle_app_clip_demo
+    'app clip' => :handle_app_clip_demo,
+    'wallet' => :handle_wallet_demo,
+    'walletpass' => :handle_wallet_demo,
+    'wallet pass' => :handle_wallet_demo,
+    'apple wallet' => :handle_wallet_demo
   }.freeze
 
   # Keywords that control flow (reset, navigation, etc.)
@@ -503,6 +507,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         handle_final_message
       when 'AHK3'
         handle_register_rich_link
+      when 'AHW1'
+        handle_wallet_name_input
       when 'AH-restart'
         # Flow restart - go back to welcome
         handle_welcome
@@ -1341,7 +1347,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         return
       end
 
-      # Normal flow: continue to continue prompt
+      # Normal flow: send wallet pass then continue
+      send_wallet_pass
       update_bot_state('AHH2')
       handle_continue_prompt
     else
@@ -1696,6 +1703,32 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # State will be set to DEMO_MODE by handle_keyword_message
   end
 
+  def handle_wallet_demo
+    # Demo mode: generate a personalized Apple Wallet pass for the customer.
+    # If the customer name is not yet captured, ask for it first (state AHW1).
+    if @conversation.custom_attributes&.dig('customer_name').present?
+      send_wallet_pass
+      # State is set to DEMO_MODE by handle_keyword_message (keyword path)
+      # or explicitly below (summary LP path)
+    else
+      send_text_message("To generate your Guitar Lesson Pickup Pass, what's your name?")
+      update_bot_state('AHW1')
+    end
+  end
+
+  def handle_wallet_name_input
+    # AHW1: User replied with their name — store it and generate the pass.
+    name = @message.content.strip
+    if name.blank?
+      send_text_message('Please enter your name to continue.')
+      return
+    end
+
+    update_conversation_attribute('customer_name', name)
+    send_wallet_pass
+    update_bot_state('DEMO_MODE')
+  end
+
   def handle_app_clip_demo
     # Demo mode: send App Clip using richLinkDataRef
     send_text_message('📱 App Clip Demo')
@@ -2016,8 +2049,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       send_text_message('Here\'s our Apple Pay demo:')
       handle_apple_pay_demo
     when '2' # Apple Wallet
-      send_text_message('🍎 Apple Wallet lets customers save passes, boarding passes, tickets, and loyalty cards directly in the Messages conversation.')
-      update_bot_state('DEMO_MODE')
+      send_text_message('🍎 Here\'s your Apple Wallet Guitar Lesson Pickup Pass:')
+      handle_wallet_demo
     when '3' # AR Experience
       send_text_message('Here\'s our AR experience demo:')
       handle_ar_demo
@@ -2178,6 +2211,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_imessage_app
     @sender.send_imessage_app
+  end
+
+  def send_wallet_pass
+    @sender.send_wallet_pass
   end
 
   def send_delivery_confirmation(address_data, customer_name = nil)

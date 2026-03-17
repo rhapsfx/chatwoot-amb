@@ -46,6 +46,8 @@ gem 'gmail_xoauth'
 gem 'net-smtp',  '~> 0.3.4'
 # Prevent CSV injection
 gem 'csv-safe'
+# Apple Wallet pass generation (.pkpass files)
+gem 'passbook2'
 
 ##-- for active storage --##
 gem 'aws-sdk-s3', require: false

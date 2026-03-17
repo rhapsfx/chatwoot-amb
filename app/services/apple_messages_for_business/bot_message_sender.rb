@@ -311,6 +311,34 @@ module AppleMessagesForBusiness
       send_text_message('Sorry, there was an error sending the Shazam extension. Please try again.')
     end
 
+    def send_wallet_pass
+      log_info '[Bot] 🎫 Generating Apple Wallet pass'
+      with_typing_indicator do
+        service = AppleMessagesForBusiness::WalletPassService.new(@conversation)
+        pkpass_data = service.generate
+
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: StringIO.new(pkpass_data),
+          filename: 'acoustic-house-pass.pkpass',
+          content_type: 'application/vnd.apple.pkpass'
+        )
+
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: '🎫 Your Guitar Lesson Pickup Pass — tap to add to Apple Wallet!',
+            attachments: [blob.signed_id]
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to generate wallet pass: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message("Sorry, we couldn't generate your Wallet pass. Please try again.")
+    end
+
     def send_delivery_confirmation(address_data, customer_name = nil)
       return unless address_data.present?
 
