@@ -2,8 +2,10 @@
 
 class AppleMessagesForBusiness::AppleMapsService
   MAPS_API_BASE_URL = 'https://maps-api.apple.com/v1'
+  SNAPSHOT_API_BASE_URL = 'https://snapshot.maps.apple.com/api/v1'
   TOKEN_EXPIRATION = 30.minutes
   CACHE_TTL = 1.hour
+  SNAPSHOT_CACHE_TTL = 7.days # Store locations don't change often
   DEFAULT_SEARCH_RADIUS = 50_000 # 50 km in meters
   MAX_RESULTS = 10
 
@@ -77,6 +79,22 @@ class AppleMessagesForBusiness::AppleMapsService
     c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
     earth_radius_km * c
+  end
+
+  # Fetch a static map snapshot image for the given coordinates.
+  # Returns raw PNG bytes, or nil on failure.
+  # size: pixel dimensions requested (scale=2 gives @2x quality at those pixels)
+  # zoom: 14-16 is good for street-level
+  def snapshot(lat, lon, width: 180, height: 180, scale: 1, zoom: 15)
+    validate_coordinates!(lat, lon)
+
+    cache_key = "apple_maps:snapshot:#{lat.round(5)}:#{lon.round(5)}:#{width}x#{height}:s#{scale}z#{zoom}"
+    Rails.cache.fetch(cache_key, expires_in: SNAPSHOT_CACHE_TTL) do
+      perform_snapshot(lat, lon, width: width, height: height, scale: scale, zoom: zoom)
+    end
+  rescue StandardError => e
+    Rails.logger.error("AppleMapsService snapshot error: #{e.message}")
+    nil
   end
 
   # Extract coordinates from Apple Maps URL
@@ -283,5 +301,31 @@ class AppleMessagesForBusiness::AppleMapsService
     else
       raise AppleMapsError, "Apple Maps API error: #{response.code} - #{response.message}"
     end
+  end
+
+  def perform_snapshot(lat, lon, width:, height:, scale:, zoom:)
+    jwt_token = generate_token
+
+    # Place a red balloon pin at the exact store coordinates
+    annotations = [{ point: "#{lat},#{lon}", color: 'FF3B30' }].to_json
+
+    response = HTTParty.get(
+      "#{SNAPSHOT_API_BASE_URL}/snapshot",
+      headers: { 'Authorization' => "Bearer #{jwt_token}" },
+      query: {
+        center: "#{lat},#{lon}",
+        z: zoom,
+        t: 'standard',
+        scale: scale,
+        size: "#{width}x#{height}",
+        colorScheme: 'light',
+        annotations: annotations
+      },
+      timeout: 15
+    )
+
+    raise AppleMapsError, "Snapshot API returned #{response.code}" unless response.code == 200
+
+    response.body
   end
 end

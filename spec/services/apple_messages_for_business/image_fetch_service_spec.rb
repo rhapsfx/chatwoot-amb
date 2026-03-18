@@ -8,6 +8,21 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
   let(:service) { described_class.new(account_id: account.id, inbox_id: inbox.id, embedded_images: embedded_images) }
   let(:embedded_images) { [] }
 
+  # Stub encode_for_apple in all tier/hierarchy/logging tests so they don't depend on ImageMagick.
+  # encode_for_apple's own behavior (DPI, JPEG format) is tested in a dedicated describe block below.
+  let(:fake_jpeg_base64) { 'fakejpegbase64==' }
+  let(:fake_mime) { 'image/jpeg' }
+
+  shared_context 'with encode_for_apple stubbed' do
+    before do
+      allow(service).to receive(:encode_for_apple).and_return([fake_jpeg_base64, fake_mime])
+    end
+  end
+
+  def imagemagick_available?
+    system('which convert > /dev/null 2>&1') || system('which magick > /dev/null 2>&1')
+  end
+
   describe 'initialization' do
     it 'initializes with required parameters' do
       expect(service.instance_variable_get(:@account_id)).to eq(account.id)
@@ -45,6 +60,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with image from Tier 1: Inbox images' do
+      include_context 'with encode_for_apple stubbed'
+
       it 'fetches and encodes image from inbox-specific storage' do
         create(:apple_list_picker_image, inbox: inbox, identifier: 'inbox_img_1')
 
@@ -52,10 +69,9 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('inbox_img_1')
-        expect(result[0][:source]).to eq('inbox')
-        expect(result[0][:data]).to be_a(String)
-        # Base64 encoded data should be decodable
-        expect { Base64.strict_decode64(result[0][:data]) }.not_to raise_error
+        expect(result[0][:data]).to eq(fake_jpeg_base64)
+        # Apple spec only allows: identifier, data, description — no mimeType or source
+        expect(result[0].keys).to match_array(%i[identifier data description])
       end
 
       it 'includes description from picker image' do
@@ -76,6 +92,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with image from Tier 2: Shared account-wide images' do
+      include_context 'with encode_for_apple stubbed'
+
       it 'fetches and encodes image from shared storage' do
         create(:shared_apple_image, account: account, identifier: 'shared_img_1')
 
@@ -83,25 +101,9 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('shared_img_1')
-        expect(result[0][:source]).to eq('shared_system')
-        expect(result[0][:data]).to be_a(String)
-        expect { Base64.strict_decode64(result[0][:data]) }.not_to raise_error
-      end
-
-      it 'includes source type for branding images' do
-        create(:shared_apple_image, :branding, account: account, identifier: 'branding_img_1')
-
-        result = service.fetch_and_encode(['branding_img_1'])
-
-        expect(result[0][:source]).to eq('shared_branding')
-      end
-
-      it 'includes source type for template images' do
-        create(:shared_apple_image, :template, account: account, identifier: 'template_img_1')
-
-        result = service.fetch_and_encode(['template_img_1'])
-
-        expect(result[0][:source]).to eq('shared_template')
+        expect(result[0][:data]).to eq(fake_jpeg_base64)
+        # Apple spec only allows: identifier, data, description
+        expect(result[0].keys).to match_array(%i[identifier data description])
       end
 
       it 'includes description from shared image' do
@@ -134,7 +136,8 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         expect(result.length).to eq(1)
         expect(result[0][:identifier]).to eq('embedded_img_1')
         expect(result[0][:data]).to eq('base64encodeddata==')
-        expect(result[0][:source]).to eq('embedded')
+        # Apple spec only allows: identifier, data, description
+        expect(result[0].keys).to match_array(%i[identifier data description])
       end
 
       it 'includes description from embedded image' do
@@ -156,6 +159,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with image hierarchy: Tier 1 takes precedence' do
+      include_context 'with encode_for_apple stubbed'
       it 'uses inbox image over shared image when both exist' do
         # Create shared image
         create(:shared_apple_image, account: account, identifier: 'priority_img', description: 'Shared')
@@ -165,8 +169,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         result = service.fetch_and_encode(['priority_img'])
 
         expect(result.length).to eq(1)
-        expect(result[0][:source]).to eq('inbox')
-        expect(result[0][:description]).to eq('Inbox')
+        expect(result[0][:description]).to eq('Inbox') # inbox image chosen over shared
       end
 
       it 'uses shared image when inbox image does not exist' do
@@ -178,8 +181,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service_local.fetch_and_encode(['shared_only'])
 
-        expect(result[0][:source]).to eq('shared_system')
-        expect(result[0][:description]).to eq('Shared')
+        expect(result[0][:description]).to eq('Shared') # shared image chosen over embedded
       end
 
       it 'uses embedded image when inbox and shared images do not exist' do
@@ -190,12 +192,12 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
 
         result = service_local.fetch_and_encode(['embedded_only'])
 
-        expect(result[0][:source]).to eq('embedded')
         expect(result[0][:description]).to eq('Embedded')
       end
     end
 
     context 'with multiple images' do
+      include_context 'with encode_for_apple stubbed'
       it 'fetches multiple images with mixed sources' do
         # Tier 1: Inbox image
         create(:apple_list_picker_image, inbox: inbox, identifier: 'inbox_img', description: 'From inbox')
@@ -212,13 +214,13 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         expect(result.length).to eq(3)
 
         inbox_result = result.find { |r| r[:identifier] == 'inbox_img' }
-        expect(inbox_result[:source]).to eq('inbox')
+        expect(inbox_result[:description]).to eq('From inbox')
 
         shared_result = result.find { |r| r[:identifier] == 'shared_img' }
-        expect(shared_result[:source]).to eq('shared_system')
+        expect(shared_result[:description]).to eq('From shared')
 
         embedded_result = result.find { |r| r[:identifier] == 'embedded_img' }
-        expect(embedded_result[:source]).to eq('embedded')
+        expect(embedded_result[:description]).to eq('From embedded')
       end
 
       it 'returns only found images, skipping missing ones' do
@@ -242,6 +244,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with image not found anywhere' do
+      include_context 'with encode_for_apple stubbed'
       it 'skips image that does not exist in any tier' do
         result = service.fetch_and_encode(['nonexistent_img'])
 
@@ -259,6 +262,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with attachment edge cases' do
+      include_context 'with encode_for_apple stubbed'
       it 'skips inbox image without attachment' do
         picker_image = create(:apple_list_picker_image, inbox: inbox, identifier: 'no_attachment')
         picker_image.image.purge
@@ -301,6 +305,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with error handling' do
+      include_context 'with encode_for_apple stubbed'
       it 'continues when inbox image fetch fails' do
         # Create picker image but don't attach it
         picker_image = create(:apple_list_picker_image, inbox: inbox, identifier: 'error_img')
@@ -347,6 +352,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with logging' do
+      include_context 'with encode_for_apple stubbed'
       it 'logs image fetch initiation' do
         allow(Rails.logger).to receive(:info).and_call_original
         expect(Rails.logger).to receive(:info).with(/\[ImageFetch\] Looking for/).at_least(:once).and_call_original
@@ -403,6 +409,7 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
     end
 
     context 'with different accounts' do
+      include_context 'with encode_for_apple stubbed'
       it 'does not fetch shared images from different accounts' do
         other_account = create(:account)
         create(:shared_apple_image, account: other_account, identifier: 'other_account_img')
@@ -433,28 +440,27 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         result = service.fetch_and_encode(['img'])
 
         expect(result.length).to eq(1)
-        expect(result[0][:source]).to eq('inbox')
+        expect(result[0][:identifier]).to eq('img')
       end
     end
 
     context 'with base64 encoding' do
-      it 'returns valid base64 data for inbox images' do
+      include_context 'with encode_for_apple stubbed'
+
+      it 'returns the encoded data from encode_for_apple for inbox images' do
         create(:apple_list_picker_image, inbox: inbox, identifier: 'img')
 
         result = service.fetch_and_encode(['img'])
 
-        # Should not raise error when decoding
-        decoded = Base64.strict_decode64(result[0][:data])
-        expect(decoded).not_to be_empty
+        expect(result[0][:data]).to eq(fake_jpeg_base64)
       end
 
-      it 'returns valid base64 data for shared images' do
+      it 'returns the encoded data from encode_for_apple for shared images' do
         create(:shared_apple_image, account: account, identifier: 'img')
 
         result = service.fetch_and_encode(['img'])
 
-        decoded = Base64.strict_decode64(result[0][:data])
-        expect(decoded).not_to be_empty
+        expect(result[0][:data]).to eq(fake_jpeg_base64)
       end
 
       it 'preserves embedded base64 data without re-encoding' do
@@ -466,6 +472,82 @@ RSpec.describe AppleMessagesForBusiness::ImageFetchService, type: :service do
         result = service_local.fetch_and_encode(['img'])
 
         expect(result[0][:data]).to eq('dGVzdCBkYXRh')
+      end
+    end
+
+    context 'with Apple MSP image encoding requirements' do
+      # Apple's iOS Messages app requires JPEG at 72 DPI to render interactive message images.
+      # Requires ImageMagick — install with: brew install imagemagick
+      # The JFIF header stores resolution: byte 11=units (1=DPI), bytes 12-13=X density, 14-15=Y density.
+      before { skip 'ImageMagick not installed' unless imagemagick_available? }
+
+      it 'outputs JPEG format (magic bytes FF D8) for inbox images' do
+        create(:apple_list_picker_image, inbox: inbox, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        image_data = Base64.strict_decode64(result[0][:data])
+        expect(image_data.bytes[0]).to eq(0xFF)
+        expect(image_data.bytes[1]).to eq(0xD8)
+      end
+
+      it 'outputs JPEG format (magic bytes FF D8) for shared images' do
+        create(:shared_apple_image, account: account, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        image_data = Base64.strict_decode64(result[0][:data])
+        expect(image_data.bytes[0]).to eq(0xFF)
+        expect(image_data.bytes[1]).to eq(0xD8)
+      end
+
+      it 'returns only Apple-spec fields (identifier, data, description) for inbox images' do
+        create(:apple_list_picker_image, inbox: inbox, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        expect(result[0].keys).to match_array(%i[identifier data description])
+      end
+
+      it 'sets DPI to 72 in JFIF header for inbox images' do
+        create(:apple_list_picker_image, inbox: inbox, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        image_data = Base64.strict_decode64(result[0][:data])
+        # Only check JFIF segment (bytes 2-3: FF E0)
+        next unless image_data.bytes[2] == 0xFF && image_data.bytes[3] == 0xE0
+
+        jfif_units = image_data.bytes[11]   # 1 = dots per inch
+        x_density = (image_data.bytes[12] << 8) | image_data.bytes[13]
+        y_density = (image_data.bytes[14] << 8) | image_data.bytes[15]
+
+        expect(jfif_units).to eq(1)
+        expect(x_density).to eq(72)
+        expect(y_density).to eq(72)
+      end
+
+      it 'sets DPI to 72 in JFIF header for shared images' do
+        create(:shared_apple_image, account: account, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        image_data = Base64.strict_decode64(result[0][:data])
+        next unless image_data.bytes[2] == 0xFF && image_data.bytes[3] == 0xE0
+
+        jfif_units = image_data.bytes[11]
+        x_density = (image_data.bytes[12] << 8) | image_data.bytes[13]
+        y_density = (image_data.bytes[14] << 8) | image_data.bytes[15]
+
+        expect(jfif_units).to eq(1)
+        expect(x_density).to eq(72)
+        expect(y_density).to eq(72)
+      end
+
+      it 'does not upscale images smaller than 300x300' do
+        create(:apple_list_picker_image, inbox: inbox, identifier: 'img')
+        result = service.fetch_and_encode(['img'])
+
+        image_data = Base64.strict_decode64(result[0][:data])
+        require 'mini_magick'
+        image = MiniMagick::Image.read(image_data)
+        expect(image.width).to be <= 300
+        expect(image.height).to be <= 300
       end
     end
   end

@@ -94,13 +94,11 @@ class AppleMessagesForBusiness::ImageFetchService
     Rails.logger.info "[ImageFetch] ✅ Found in inbox #{@inbox_id}: #{identifier}"
 
     raw = picker_image.image.download
-    encoded, mime = encode_for_apple(raw, picker_image.image.content_type)
+    encoded, = encode_for_apple(raw, picker_image.image.content_type)
     {
       identifier: identifier,
       data: encoded,
-      mimeType: mime,
-      description: picker_image.description || identifier,
-      source: 'inbox'
+      description: picker_image.description.presence || identifier
     }
   rescue StandardError => e
     Rails.logger.error "[ImageFetch] Error fetching inbox image #{identifier}: #{e.message}"
@@ -118,47 +116,44 @@ class AppleMessagesForBusiness::ImageFetchService
     Rails.logger.info "[ImageFetch] ✅ Found in shared (#{shared_image.image_type}): #{identifier}"
 
     raw = shared_image.image.download
-    encoded, mime = encode_for_apple(raw, shared_image.image.content_type)
+    encoded, = encode_for_apple(raw, shared_image.image.content_type)
     {
       identifier: identifier,
       data: encoded,
-      mimeType: mime,
-      description: shared_image.description || identifier,
-      source: "shared_#{shared_image.image_type}"
+      description: shared_image.description.presence || identifier
     }
   rescue StandardError => e
     Rails.logger.error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
     nil
   end
 
-  # Resize large images before base64 encoding to stay within Apple MSP payload limits.
-  # Apple interactive message images should be under ~100KB; anything larger is resized
-  # to max 300×300 JPEG to ensure payload fits within Apple's size constraints.
+  # Encode image for Apple MSP: resize to max 300×300, convert to JPEG at 72 DPI.
+  # Apple's iOS Messages app requires DPI=72 to display interactive message images.
+  # resize_to_limit only downsizes — small images are not upscaled.
   def encode_for_apple(raw_bytes, content_type)
-    return [Base64.strict_encode64(raw_bytes), content_type] if raw_bytes.bytesize <= 102_400 # 100KB
-
-    Rails.logger.info "[ImageFetch] Resizing large image (#{raw_bytes.bytesize} bytes) for Apple MSP"
-
-    require 'tempfile'
     ext = content_type == 'image/jpeg' ? '.jpg' : '.png'
-    Tempfile.create(['amb_img', ext], binmode: true) do |tmp|
-      tmp.write(raw_bytes)
-      tmp.flush
+    source_tmp = Tempfile.new(['amb_src', ext])
+    source_tmp.binmode
+    source_tmp.write(raw_bytes)
+    source_tmp.flush
+    source_tmp.close
 
-      processed = ImageProcessing::MiniMagick
-                  .source(tmp.path)
-                  .resize_to_limit(300, 300)
-                  .convert('jpeg')
-                  .saver(quality: 85)
-                  .call
+    processed = ImageProcessing::MiniMagick
+                .source(source_tmp.path)
+                .resize_to_limit(300, 300)
+                .convert('jpeg')
+                .saver(quality: 85)
+                .custom { |img| img.combine_options { |c| c.units('PixelsPerInch').density('72x72') } }
+                .call
 
-      resized = File.binread(processed.path)
-      Rails.logger.info "[ImageFetch] Resized to #{resized.bytesize} bytes (JPEG)"
-      [Base64.strict_encode64(resized), 'image/jpeg']
-    end
+    result = File.binread(processed.path)
+    Rails.logger.info "[ImageFetch] Encoded: #{raw_bytes.bytesize} → #{result.bytesize} bytes (JPEG 72dpi)"
+    [Base64.strict_encode64(result), 'image/jpeg']
   rescue StandardError => e
-    Rails.logger.error "[ImageFetch] Resize failed, using original: #{e.message}"
+    Rails.logger.error "[ImageFetch] Image processing failed, using original: #{e.message}"
     [Base64.strict_encode64(raw_bytes), content_type]
+  ensure
+    source_tmp&.unlink
   end
 
   def fetch_from_embedded(identifier)
@@ -176,9 +171,7 @@ class AppleMessagesForBusiness::ImageFetchService
     {
       identifier: identifier,
       data: embedded_data, # Already base64
-      mimeType: embedded['mimeType'] || embedded[:mimeType] || embedded['mime_type'] || embedded[:mime_type] || 'image/png',
-      description: embedded['description'] || embedded[:description] || identifier,
-      source: 'embedded'
+      description: (embedded['description'] || embedded[:description]).presence || identifier
     }
   rescue StandardError => e
     Rails.logger.error "[ImageFetch] Error fetching embedded image #{identifier}: #{e.message}"

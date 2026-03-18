@@ -686,7 +686,7 @@ module AppleMessagesForBusiness
               'received_title' => "Schedule a lesson with your #{guitar}",
               'received_subtitle' => location[:name],
               'received_image_identifier' => time_picker_image_id,
-              'received_style' => 'large',
+              'received_style' => 'icon',
               'reply_title' => 'Thank you!',
               'reply_image_identifier' => time_picker_image_id,
               'reply_style' => 'icon',
@@ -742,20 +742,6 @@ module AppleMessagesForBusiness
     def send_store_selection_list_picker(stores, user_coordinates)
       return if stores.blank?
 
-      apple_store_image_id = 'apple_store_logo'
-
-      items = stores.map.with_index do |store, index|
-        {
-          'identifier' => index.to_s,
-          'title' => store[:name],
-          'subtitle' => "#{store[:distance_km]} km away • #{store[:formatted_address]}",
-          'style' => 'large',
-          'image_identifier' => apple_store_image_id
-        }
-      end
-
-      sections = [{ 'title' => 'Nearby Apple Stores', 'multiple_selection' => false, 'items' => items }]
-
       set_conv_attr('store_search_lat', user_coordinates[:latitude])
       set_conv_attr('store_search_lon', user_coordinates[:longitude])
 
@@ -770,8 +756,31 @@ module AppleMessagesForBusiness
       end
       set_conv_attr('available_stores', minimal_stores.to_json)
 
-      images = fetch_and_encode_images([apple_store_image_id])
-      log_info "[Bot] 🏪 Encoded #{images.length} images for store selection list picker"
+      # Build per-store map snapshots (180×180 — ideal list picker item size @3x)
+      store_map_images = fetch_store_map_snapshots(stores)
+
+      # Load pin-circle for the received/reply bubble (icon style = 120×120)
+      pin_circle = load_pin_circle_image
+
+      images = []
+      images << pin_circle if pin_circle
+      images.concat(store_map_images)
+
+      # Items reference their own map image; fall back gracefully if snapshot failed
+      items = stores.map.with_index do |store, index|
+        item = {
+          'identifier' => index.to_s,
+          'title' => store[:name],
+          'subtitle' => "#{store[:distance_km]} km away • #{store[:formatted_address]}"
+        }
+        item['image_identifier'] = "store_map_#{index}" if store_map_images.any? { |img| img['identifier'] == "store_map_#{index}" }
+        item
+      end
+
+      sections = [{ 'title' => 'Nearby Apple Stores', 'multiple_selection' => false, 'items' => items }]
+      bubble_image_id = pin_circle ? 'pin_circle' : nil
+
+      log_info "[Bot] 🏪 Store list picker: #{store_map_images.length}/#{stores.length} map snapshots, pin_circle=#{pin_circle.present?}"
 
       with_typing_indicator do
         Messages::MessageBuilder.new(
@@ -787,11 +796,13 @@ module AppleMessagesForBusiness
               'images' => images,
               'received_title' => 'Select a Store',
               'received_subtitle' => "Found #{stores.length} stores nearby",
-              'received_image_identifier' => apple_store_image_id,
+              'received_image_identifier' => bubble_image_id,
+              'received_style' => 'icon',
               'reply_title' => 'Great choice!',
               'reply_subtitle' => "Let's schedule your lesson",
-              'reply_image_identifier' => apple_store_image_id
-            }
+              'reply_image_identifier' => bubble_image_id,
+              'reply_style' => 'icon'
+            }.compact
           )
         ).perform
       end
@@ -916,6 +927,66 @@ module AppleMessagesForBusiness
       images.map do |image|
         { 'identifier' => image[:identifier], 'data' => image[:data], 'description' => image[:description] || '' }
       end
+    end
+
+    # Fetch a map snapshot for each store via Apple Maps Snapshot API.
+    # Returns array of image hashes with identifier, data (base64), description.
+    # List picker item images: 60×60 points @3x = 180×180 pixels — optimal for 'small' items.
+    def fetch_store_map_snapshots(stores)
+      maps_service = AppleMessagesForBusiness::AppleMapsService.new
+
+      stores.map.with_index do |store, index|
+        raw = maps_service.snapshot(
+          store[:latitude], store[:longitude],
+          width: 180, height: 180, scale: 1, zoom: 15
+        )
+        next nil if raw.nil?
+
+        encoded = encode_image_for_amb(raw.b, width: 180, height: 180)
+        { 'identifier' => "store_map_#{index}", 'data' => encoded, 'description' => store[:name] }
+      end.compact
+    rescue StandardError => e
+      log_error "[Bot] Failed to fetch store map snapshots: #{e.message}"
+      []
+    end
+
+    # Load pin-circle.png from public/apple-messages/light/ and encode for icon style (120×120).
+    def load_pin_circle_image
+      path = Rails.public_path.join('apple-messages/light/pin-circle.png')
+      return nil unless File.exist?(path)
+
+      raw = File.binread(path)
+      encoded = encode_image_for_amb(raw, width: 120, height: 120)
+      { 'identifier' => 'pin_circle', 'data' => encoded, 'description' => 'Location pin' }
+    rescue StandardError => e
+      log_error "[Bot] Failed to load pin-circle image: #{e.message}"
+      nil
+    end
+
+    # Resize image to exact dimensions, convert to JPEG at 72 DPI (Apple MSP requirement).
+    # Uses resize_to_fill so the output is always exactly width×height.
+    # Falls back to raw base64 if ImageMagick is unavailable.
+    def encode_image_for_amb(raw_bytes, width:, height:)
+      source_tmp = Tempfile.new(['amb_img', '.png'])
+      source_tmp.binmode
+      source_tmp.write(raw_bytes)
+      source_tmp.flush
+      source_tmp.close
+
+      processed = ImageProcessing::MiniMagick
+                  .source(source_tmp.path)
+                  .resize_to_fill(width, height)
+                  .convert('jpeg')
+                  .saver(quality: 85)
+                  .custom { |img| img.combine_options { |c| c.units('PixelsPerInch').density('72x72') } }
+                  .call
+
+      Base64.strict_encode64(File.binread(processed.path))
+    rescue StandardError => e
+      log_error "[Bot] Image encoding failed (#{width}×#{height}): #{e.message}"
+      Base64.strict_encode64(raw_bytes)
+    ensure
+      source_tmp&.unlink
     end
 
     # === Typing indicators ===

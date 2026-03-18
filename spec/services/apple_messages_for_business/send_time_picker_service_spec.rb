@@ -67,9 +67,18 @@ RSpec.describe AppleMessagesForBusiness::SendTimePickerService do
     # CaseTransformer.to_apple_format returns symbol keys throughout
     subject(:interactive_data) { service.send(:build_interactive_data) }
 
-    it 'includes bid and useLiveLayout' do
+    it 'includes bid' do
       expect(interactive_data[:bid]).to include('com.apple.messages')
-      expect(interactive_data[:useLiveLayout]).to be true
+    end
+
+    it 'does not include useLiveLayout (not in Apple MSP time picker spec)' do
+      expect(interactive_data).not_to have_key(:useLiveLayout)
+    end
+
+    it 'uses mspVersion (not version) inside data per Apple MSP reference' do
+      expect(interactive_data[:data]).to have_key(:mspVersion)
+      expect(interactive_data[:data][:mspVersion]).to eq('1.0')
+      expect(interactive_data[:data]).not_to have_key(:version)
     end
 
     it 'includes requestIdentifier inside data' do
@@ -89,7 +98,7 @@ RSpec.describe AppleMessagesForBusiness::SendTimePickerService do
       expect(timeslots.first).not_to have_key(:start_time)
     end
 
-    it 'includes receivedMessage with camelCase imageIdentifier' do
+    it 'includes receivedMessage with camelCase imageIdentifier and icon style' do
       received = interactive_data[:receivedMessage]
       expect(received[:title]).to eq('Schedule a lesson')
       expect(received[:imageIdentifier]).to eq('time_picker_lesson')
@@ -102,6 +111,21 @@ RSpec.describe AppleMessagesForBusiness::SendTimePickerService do
       expect(reply[:imageIdentifier]).to eq('time_picker_lesson')
     end
 
+    context 'default styles when none specified' do
+      before do
+        allow(service).to receive(:content_attributes)
+          .and_return(base_content_attributes.except('received_style', 'reply_style'))
+      end
+
+      it 'defaults received_style to icon (matches Apple MSP reference implementation)' do
+        expect(interactive_data[:receivedMessage][:style]).to eq('icon')
+      end
+
+      it 'defaults reply_style to icon' do
+        expect(interactive_data[:replyMessage][:style]).to eq('icon')
+      end
+    end
+
     context 'images placement' do
       let(:encoded_image) do
         { identifier: 'time_picker_lesson', data: 'base64encodeddata==', description: 'Lesson icon' }
@@ -112,20 +136,25 @@ RSpec.describe AppleMessagesForBusiness::SendTimePickerService do
           .to receive(:fetch_and_encode).and_return([encoded_image])
       end
 
-      it 'places images at the interactiveData top level, not inside data' do
-        expect(interactive_data[:images]).to be_present
-        expect(interactive_data[:data]).not_to have_key(:images)
+      it 'places images inside data (interactiveData.data.images) per Apple MSP spec' do
+        expect(interactive_data[:data][:images]).to be_present
+        expect(interactive_data).not_to have_key(:images)
       end
 
       it 'includes the correct image identifier in the images array' do
-        image = interactive_data[:images].find { |img| img[:identifier] == 'time_picker_lesson' }
+        image = interactive_data[:data][:images].find { |img| img[:identifier] == 'time_picker_lesson' }
         expect(image).to be_present
         expect(image[:data]).to eq('base64encodeddata==')
+      end
+
+      it 'returns only Apple-spec fields for each image (identifier, data, description)' do
+        image = interactive_data[:data][:images].first
+        expect(image.keys).to match_array(%i[identifier data description])
       end
     end
 
     context 'when no images are found' do
-      it 'omits the images key entirely from interactiveData and data' do
+      it 'omits the images key from both interactiveData and data' do
         expect(interactive_data).not_to have_key(:images)
         expect(interactive_data[:data]).not_to have_key(:images)
       end
