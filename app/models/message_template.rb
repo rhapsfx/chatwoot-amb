@@ -198,7 +198,7 @@ class MessageTemplate < ApplicationRecord
     end
   end
 
-  # Returns lightweight JSON for list views — no content, no attachments, no metadata
+  # Returns lightweight JSON for list views — no content, no attachments
   def summary_json
     {
       id: id,
@@ -210,6 +210,7 @@ class MessageTemplate < ApplicationRecord
       useCases: use_cases || [],
       status: status,
       version: version,
+      metadata: metadata || {},
       createdAt: created_at,
       updatedAt: updated_at
     }

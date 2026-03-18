@@ -289,6 +289,11 @@ const templateIdSelectValue = computed({
   },
 });
 
+const isNoImageTemplate = computed(() => {
+  const id = template.value.metadata?.invitation_template_id ?? '';
+  return id.toLowerCase().includes('noimage');
+});
+
 const LOCALE_OPTIONS = [
   { value: 'en-US', label: 'English (United States)' },
   { value: 'en-GB', label: 'English (United Kingdom)' },
@@ -938,6 +943,21 @@ onMounted(() => {
                       )
                     }}
                   </label>
+                  <div
+                    v-if="isNoImageTemplate"
+                    class="flex items-start gap-2 rounded-lg border border-n-amber-7 bg-n-amber-2 px-3 py-2 mb-2"
+                  >
+                    <i
+                      class="i-lucide-alert-triangle text-n-amber-9 text-sm mt-0.5 shrink-0"
+                    />
+                    <span class="text-xs text-n-amber-11">
+                      {{
+                        t(
+                          'TEMPLATES.BUILDER.INVITATION.PARAMETERS.BRAND_LOGO.NO_IMAGE_TEMPLATE_WARNING'
+                        )
+                      }}
+                    </span>
+                  </div>
                   <div
                     v-if="invitationBrandLogo"
                     class="relative inline-block mb-2"

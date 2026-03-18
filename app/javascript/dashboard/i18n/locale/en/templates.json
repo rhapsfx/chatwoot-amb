@@ -729,7 +729,8 @@
           },
           "BRAND_LOGO": {
             "LABEL": "Brand Logo (PNG)",
-            "DROP_HINT": "Drop a PNG here or click to select"
+            "DROP_HINT": "Drop a PNG here or click to select",
+            "NO_IMAGE_TEMPLATE_WARNING": "This template type does not support images. The logo will not be sent."
           }
         }
       },

@@ -11,7 +11,7 @@ class Api::V1::Accounts::TemplatesController < Api::V1::Accounts::BaseController
   def index
     templates = Current.account.message_templates
                        .select(:id, :name, :category, :description, :supported_channels,
-                               :tags, :use_cases, :status, :version, :created_at, :updated_at)
+                               :tags, :use_cases, :status, :version, :metadata, :created_at, :updated_at)
                        .order(created_at: :desc)
 
     # Apply filters

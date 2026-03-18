@@ -44,7 +44,7 @@ class AppleMessagesForBusiness::SendInvitationService
                                                                                         'template_id' => template_id,
                                                                                         'locale' => locale || 'en-us',
                                                                                         'reference_id' => reference_id,
-                                                                                        'parameters' => parameters
+                                                                                        'parameters' => filtered_parameters
                                                                                       })
         },
         'useLiveLayout' => true
@@ -53,6 +53,12 @@ class AppleMessagesForBusiness::SendInvitationService
     }
   end
   # rubocop:enable Metrics/MethodLength
+
+  def filtered_parameters
+    return parameters unless template_id.to_s.downcase.include?('noimage')
+
+    parameters.except('brand_logo', :brand_logo)
+  end
 
   def send_to_apple(payload, message_id)
     headers = {
