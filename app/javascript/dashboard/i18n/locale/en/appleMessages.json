@@ -198,6 +198,7 @@
       "TAB_LABEL": "Invitation",
       "CAMPAIGN_TITLE": "Apple Messages Invitation",
       "TEMPLATE_LABEL": "Invitation Template",
+      "TEMPLATE_PLACEHOLDER": "Click to select a template",
       "REFERENCE_ID_LABEL": "Reference ID",
       "REFERENCE_ID_PLACEHOLDER": "e.g. order-1234",
       "SEND_BUTTON": "Send Invitation",

@@ -3726,7 +3726,7 @@ watch(
           class="w-full p-2 border border-n-weak rounded-lg bg-n-solid-1 text-n-slate-12 text-sm"
         >
           <option value="" disabled>
-            {{ t('APPLE_MESSAGES.INVITATION.TEMPLATE_LABEL') }}
+            {{ t('APPLE_MESSAGES.INVITATION.TEMPLATE_PLACEHOLDER') }}
           </option>
           <option
             v-for="tmpl in invitationTemplates"
