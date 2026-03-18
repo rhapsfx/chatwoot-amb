@@ -93,10 +93,12 @@ class AppleMessagesForBusiness::ImageFetchService
 
     Rails.logger.info "[ImageFetch] ✅ Found in inbox #{@inbox_id}: #{identifier}"
 
+    raw = picker_image.image.download
+    encoded, mime = encode_for_apple(raw, picker_image.image.content_type)
     {
       identifier: identifier,
-      data: Base64.strict_encode64(picker_image.image.download),
-      mimeType: picker_image.image.content_type,
+      data: encoded,
+      mimeType: mime,
       description: picker_image.description || identifier,
       source: 'inbox'
     }
@@ -115,16 +117,48 @@ class AppleMessagesForBusiness::ImageFetchService
 
     Rails.logger.info "[ImageFetch] ✅ Found in shared (#{shared_image.image_type}): #{identifier}"
 
+    raw = shared_image.image.download
+    encoded, mime = encode_for_apple(raw, shared_image.image.content_type)
     {
       identifier: identifier,
-      data: Base64.strict_encode64(shared_image.image.download),
-      mimeType: shared_image.image.content_type,
+      data: encoded,
+      mimeType: mime,
       description: shared_image.description || identifier,
       source: "shared_#{shared_image.image_type}"
     }
   rescue StandardError => e
     Rails.logger.error "[ImageFetch] Error fetching shared image #{identifier}: #{e.message}"
     nil
+  end
+
+  # Resize large images before base64 encoding to stay within Apple MSP payload limits.
+  # Apple interactive message images should be under ~100KB; anything larger is resized
+  # to max 300×300 JPEG to ensure payload fits within Apple's size constraints.
+  def encode_for_apple(raw_bytes, content_type)
+    return [Base64.strict_encode64(raw_bytes), content_type] if raw_bytes.bytesize <= 102_400 # 100KB
+
+    Rails.logger.info "[ImageFetch] Resizing large image (#{raw_bytes.bytesize} bytes) for Apple MSP"
+
+    require 'tempfile'
+    ext = content_type == 'image/jpeg' ? '.jpg' : '.png'
+    Tempfile.create(['amb_img', ext], binmode: true) do |tmp|
+      tmp.write(raw_bytes)
+      tmp.flush
+
+      processed = ImageProcessing::MiniMagick
+                  .source(tmp.path)
+                  .resize_to_limit(300, 300)
+                  .convert('jpeg')
+                  .saver(quality: 85)
+                  .call
+
+      resized = File.binread(processed.path)
+      Rails.logger.info "[ImageFetch] Resized to #{resized.bytesize} bytes (JPEG)"
+      [Base64.strict_encode64(resized), 'image/jpeg']
+    end
+  rescue StandardError => e
+    Rails.logger.error "[ImageFetch] Resize failed, using original: #{e.message}"
+    [Base64.strict_encode64(raw_bytes), content_type]
   end
 
   def fetch_from_embedded(identifier)
