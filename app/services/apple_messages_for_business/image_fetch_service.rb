@@ -143,7 +143,7 @@ class AppleMessagesForBusiness::ImageFetchService
                 .resize_to_limit(300, 300)
                 .convert('jpeg')
                 .saver(quality: 85)
-                .custom { |img| img.combine_options { |c| c.units('PixelsPerInch').density('72x72') } }
+                .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
                 .call
 
     result = File.binread(processed.path)

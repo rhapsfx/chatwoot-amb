@@ -2,7 +2,7 @@
 
 class AppleMessagesForBusiness::AppleMapsService
   MAPS_API_BASE_URL = 'https://maps-api.apple.com/v1'
-  SNAPSHOT_API_BASE_URL = 'https://snapshot.maps.apple.com/api/v1'
+  SNAPSHOT_API_BASE_URL = 'https://snapshot.apple-mapkit.com/api/v1'
   TOKEN_EXPIRATION = 30.minutes
   CACHE_TTL = 1.hour
   SNAPSHOT_CACHE_TTL = 7.days # Store locations don't change often
@@ -309,9 +309,9 @@ class AppleMessagesForBusiness::AppleMapsService
     # Place a red balloon pin at the exact store coordinates
     annotations = [{ point: "#{lat},#{lon}", color: 'FF3B30' }].to_json
 
+    # Snapshot API authenticates via `token` query param, not Bearer header
     response = HTTParty.get(
       "#{SNAPSHOT_API_BASE_URL}/snapshot",
-      headers: { 'Authorization' => "Bearer #{jwt_token}" },
       query: {
         center: "#{lat},#{lon}",
         z: zoom,
@@ -319,12 +319,13 @@ class AppleMessagesForBusiness::AppleMapsService
         scale: scale,
         size: "#{width}x#{height}",
         colorScheme: 'light',
-        annotations: annotations
+        annotations: annotations,
+        token: jwt_token
       },
       timeout: 15
     )
 
-    raise AppleMapsError, "Snapshot API returned #{response.code}" unless response.code == 200
+    raise AppleMapsError, "Snapshot API returned #{response.code}: #{response.body[0..200]}" unless response.code == 200
 
     response.body
   end

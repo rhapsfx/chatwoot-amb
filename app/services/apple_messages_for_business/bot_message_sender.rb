@@ -929,17 +929,14 @@ module AppleMessagesForBusiness
       end
     end
 
-    # Fetch a map snapshot for each store via Apple Maps Snapshot API.
-    # Returns array of image hashes with identifier, data (base64), description.
-    # List picker item images: 60×60 points @3x = 180×180 pixels — optimal for 'small' items.
+    # Fetch a MapKit map snapshot for each store via Apple Maps Snapshot API.
+    # List picker item images: 180×180 px — ideal for 60×60pt @3x items.
+    # Degrades gracefully: stores without a snapshot simply have no image_identifier.
     def fetch_store_map_snapshots(stores)
       maps_service = AppleMessagesForBusiness::AppleMapsService.new
 
       stores.map.with_index do |store, index|
-        raw = maps_service.snapshot(
-          store[:latitude], store[:longitude],
-          width: 180, height: 180, scale: 1, zoom: 15
-        )
+        raw = maps_service.snapshot(store[:latitude], store[:longitude], width: 180, height: 180, scale: 1, zoom: 15)
         next nil if raw.nil?
 
         encoded = encode_image_for_amb(raw.b, width: 180, height: 180)
@@ -978,7 +975,7 @@ module AppleMessagesForBusiness
                   .resize_to_fill(width, height)
                   .convert('jpeg')
                   .saver(quality: 85)
-                  .custom { |img| img.combine_options { |c| c.units('PixelsPerInch').density('72x72') } }
+                  .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
                   .call
 
       Base64.strict_encode64(File.binread(processed.path))
