@@ -16,12 +16,31 @@ const referenceId = computed(() => contentAttributes.value?.reference_id || '');
 
 const locale = computed(() => contentAttributes.value?.locale || 'en-US');
 
+const brandName = computed(
+  () => contentAttributes.value?.parameters?.brand_name || ''
+);
+
 const isOptedOut = computed(() => !!contentAttributes.value?.opted_out);
+
+const friendlyTemplateName = computed(() => {
+  const id = invitationTemplateId.value;
+  if (!id) return '';
+  // Convert camelCase segments to words: "binaryChoice.engage.withImage" → "Binary Choice · With Image"
+  return id
+    .split('.')
+    .map(segment =>
+      segment
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, c => c.toUpperCase())
+        .trim()
+    )
+    .join(' · ');
+});
 </script>
 
 <template>
   <BaseBubble>
-    <div class="min-w-[200px] max-w-xs">
+    <div class="min-w-[220px] max-w-xs">
       <!-- Header row -->
       <div class="flex items-center gap-2 mb-2">
         <span
@@ -42,14 +61,22 @@ const isOptedOut = computed(() => !!contentAttributes.value?.opted_out);
         </span>
       </div>
 
-      <!-- Template ID -->
+      <!-- Brand name (primary) -->
       <p
-        v-if="invitationTemplateId"
-        class="text-sm font-medium text-n-slate-12 font-mono break-all leading-snug"
+        v-if="brandName"
+        class="text-sm font-semibold text-n-slate-12 leading-snug"
       >
-        {{ invitationTemplateId }}
+        {{ brandName }}
       </p>
-      <p v-else class="text-sm text-n-slate-9 italic">
+
+      <!-- Friendly template name (secondary) -->
+      <p
+        v-if="friendlyTemplateName"
+        class="text-xs text-n-slate-10 mt-0.5 leading-snug"
+      >
+        {{ friendlyTemplateName }}
+      </p>
+      <p v-else-if="!brandName" class="text-sm text-n-slate-9 italic">
         {{ t('APPLE_MESSAGES.INVITATION.TEMPLATE_LABEL') }}
       </p>
 

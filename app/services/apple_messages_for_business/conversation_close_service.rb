@@ -19,13 +19,6 @@ class AppleMessagesForBusiness::ConversationCloseService
     block_future_messages
     create_activity_message
 
-    # Force UI refresh with updated can_reply status after contact is blocked
-    # This ensures the UI reflects that the conversation is no longer respondable
-    @conversation.reload
-    can_reply_status = @conversation.can_reply?
-    Rails.logger.info "[AMB ConversationClose] Final can_reply status: #{can_reply_status} (should be false)"
-    @conversation.dispatch_conversation_updated_event
-
     Rails.logger.info '[AMB ConversationClose] Conversation close processing completed successfully'
   end
 
@@ -142,7 +135,7 @@ class AppleMessagesForBusiness::ConversationCloseService
     Rails.logger.info '[AMB ConversationClose] Creating activity message for conversation close'
 
     @conversation.messages.create!(
-      content: 'Customer opted out of receiving messages via Apple Messages. No further messages can be sent to this user.',
+      content: 'Customer opted out of receiving messages via Apple Messages. They must send a new message to resume the conversation or you shall offer to send an Apple Invitation.',
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       message_type: :activity,
@@ -159,9 +152,6 @@ class AppleMessagesForBusiness::ConversationCloseService
     )
 
     Rails.logger.info '[AMB ConversationClose] Activity message created successfully'
-
-    # Force UI refresh by broadcasting conversation update
-    @conversation.dispatch_conversation_updated_event
   end
 
   def source_id

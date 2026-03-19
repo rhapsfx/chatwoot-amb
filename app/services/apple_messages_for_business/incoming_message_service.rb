@@ -423,6 +423,16 @@ class AppleMessagesForBusiness::IncomingMessageService
         return selected_item['title'] if selected_item && selected_item['title'].present?
       end
       return 'Quick Reply Response'
+    elsif data_keys.include?('notification')
+      # Apple Invitation acceptance response
+      notification = interactive_data['data']['notification']
+      determinate = notification&.dig('displayContent', 'determinateResponse')
+      if determinate
+        title = determinate['title'].presence
+        subtitle = determinate['subtitle'].presence
+        return [title, subtitle].compact.join(' — ') if title || subtitle
+      end
+      return 'Invitation Response'
     else
       return 'Interactive Message Response'
     end

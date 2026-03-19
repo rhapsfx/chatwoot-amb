@@ -12,7 +12,8 @@ class AppleMessagesForBusiness::MessageProcessorService
     return send_regular_message unless apple_messages_conversation?
 
     # Check if the customer has opted out (blocked)
-    if customer_opted_out?
+    # Apple Invitations are allowed even after opt-out (they re-initiate the conversation)
+    if customer_opted_out? && @message_params[:content_type] != 'apple_invitation'
       Rails.logger.warn '[AMB MessageProcessor] Cannot send message - customer has opted out'
       raise StandardError, 'Cannot send message: Customer has opted out of receiving messages via Apple Messages'
     end
@@ -63,6 +64,7 @@ class AppleMessagesForBusiness::MessageProcessorService
       apple_authentication
       apple_custom_payload
       apple_rich_link
+      apple_invitation
     ].include?(content_type)
   end
 
