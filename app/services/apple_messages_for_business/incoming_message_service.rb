@@ -9,12 +9,6 @@ class AppleMessagesForBusiness::IncomingMessageService
   end
 
   def perform
-    # Handle CloseSession (user opted out of invitation messages)
-    if @params['type'] == 'close'
-      AppleMessagesForBusiness::CloseSessionHandlerService.new(inbox: @inbox, params: @params).perform
-      return
-    end
-
     Rails.logger.info '[AMB IncomingMessage] Starting message processing'
 
     unless valid_message?

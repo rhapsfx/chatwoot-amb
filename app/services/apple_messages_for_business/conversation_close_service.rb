@@ -46,11 +46,16 @@ class AppleMessagesForBusiness::ConversationCloseService
   def find_conversation
     Rails.logger.info "[AMB ConversationClose] Looking for conversation with source_id: #{source_id}"
 
-    # Find the contact first using JSONB query syntax
+    # Find the contact first by ContactInbox source_id (reliable - always set for AMB)
+    # Fallback to JSONB query on contact additional_attributes for backwards compatibility
     contact_inbox = ContactInbox.joins(:contact)
                                 .where(inbox: @inbox)
-                                .where("contacts.additional_attributes->>'apple_messages_source_id' = ?", source_id)
+                                .where(source_id: source_id)
                                 .first
+    contact_inbox ||= ContactInbox.joins(:contact)
+                                  .where(inbox: @inbox)
+                                  .where("contacts.additional_attributes->>'apple_messages_source_id' = ?", source_id)
+                                  .first
 
     unless contact_inbox
       Rails.logger.warn "[AMB ConversationClose] No contact found for source_id: #{source_id}"

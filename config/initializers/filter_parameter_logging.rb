@@ -17,21 +17,21 @@ module ParameterFilterHelper
   HEAVY_DATA_KEYS = /\b(data|image|content|file|attachment|base64)\b/i
   MIN_SIZE = 1024 # Only filter data > 1KB
 
+  BASE64_PATTERN = %r{\A[A-Za-z0-9+/\n]+=*\z}
+
   def self.should_truncate?(key, value)
-    value.is_a?(String) &&
-      key.to_s.match?(HEAVY_DATA_KEYS) &&
-      value.length > MIN_SIZE
+    return false unless value.is_a?(String) && value.length > MIN_SIZE
+
+    key.to_s.match?(HEAVY_DATA_KEYS) || value.match?(BASE64_PATTERN)
   end
 
   def self.truncate(_key, value)
     size_kb = (value.length / 1024.0).round(2)
-    # Reduced preview length from 100 to 20 to minimize log spam
-    preview_length = 20
 
-    if value.match?(%r{\A[A-Za-z0-9+/]+=*\z})
+    if value.match?(BASE64_PATTERN)
       "[BASE64 DATA FILTERED - #{size_kb} KB]"
     else
-      "[LARGE DATA FILTERED - #{size_kb} KB - preview: #{value[0...preview_length]}...]"
+      "[LARGE DATA FILTERED - #{size_kb} KB - preview: #{value[0...20]}...]"
     end
   end
 

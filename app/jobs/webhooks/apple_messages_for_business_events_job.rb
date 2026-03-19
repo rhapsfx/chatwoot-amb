@@ -50,8 +50,13 @@ class Webhooks::AppleMessagesForBusinessEventsJob < ApplicationJob
       Rails.logger.info '[AMB Job] Processing typing end indicator'
       process_typing_indicator(channel, payload, headers, :end)
     when 'close'
-      Rails.logger.info '[AMB Job] Processing conversation close'
-      process_conversation_close(channel, payload, headers)
+      if payload['referenceIds'].present?
+        Rails.logger.info '[AMB Job] Processing invitation opt-out (close with referenceIds)'
+        process_invitation_opt_out(channel, payload)
+      else
+        Rails.logger.info '[AMB Job] Processing conversation close'
+        process_conversation_close(channel, payload, headers)
+      end
     else
       Rails.logger.error "[AMB Job] Unknown message type: #{message_type}"
     end
@@ -73,6 +78,14 @@ class Webhooks::AppleMessagesForBusinessEventsJob < ApplicationJob
       inbox: channel.inbox,
       params: payload,
       headers: headers
+    ).perform
+  end
+
+  def process_invitation_opt_out(channel, payload)
+    # Handle invitation opt-out close events (contain referenceIds)
+    AppleMessagesForBusiness::CloseSessionHandlerService.new(
+      inbox: channel.inbox,
+      params: payload
     ).perform
   end
 end

@@ -7,11 +7,16 @@ class AppleMessagesForBusiness::ConversationReopenService
   def perform
     Rails.logger.info "[AMB ConversationReopen] Re-enabling messages for source_id: #{@source_id}"
 
-    # Find the contact and contact_inbox using proper JSONB syntax
+    # Find the contact by ContactInbox source_id (reliable - always set for AMB)
+    # Fallback to JSONB query on contact additional_attributes for backwards compatibility
     contact_inbox = ContactInbox.joins(:contact)
                                 .where(inbox: @inbox)
-                                .where("contacts.additional_attributes->>'apple_messages_source_id' = ?", @source_id)
+                                .where(source_id: @source_id)
                                 .first
+    contact_inbox ||= ContactInbox.joins(:contact)
+                                  .where(inbox: @inbox)
+                                  .where("contacts.additional_attributes->>'apple_messages_source_id' = ?", @source_id)
+                                  .first
 
     return unless contact_inbox
 
