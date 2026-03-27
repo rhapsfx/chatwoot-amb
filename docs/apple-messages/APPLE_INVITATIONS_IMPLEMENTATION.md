@@ -375,6 +375,98 @@ The response is stored as a regular incoming `text` message in the conversation.
 
 ---
 
+## Campaign System
+
+Apple Invitations can be sent as **bulk scheduled campaigns** via the Campaigns UI (`/accounts/:id/campaigns/apple_messages`).
+
+### Components
+
+| File | Purpose |
+|---|---|
+| `app/models/campaign.rb` | Campaign model — validation, type routing, trigger |
+| `app/services/apple_messages/oneoff_invitation_campaign_service.rb` | Campaign execution — audience loop, per-phone send |
+| `app/jobs/campaigns/trigger_oneoff_campaign_job.rb` | Sidekiq job that calls `campaign.trigger!` |
+| `app/jobs/trigger_scheduled_items_job.rb` | Cron job that enqueues campaigns due within 3 days |
+| `app/controllers/api/v1/accounts/campaigns_controller.rb` | REST CRUD + strong params |
+| `app/javascript/dashboard/components-next/Campaigns/Pages/CampaignPage/AppleMessagesCampaign/AppleMessagesCampaignForm.vue` | Campaign creation form |
+| `app/javascript/dashboard/components-next/Campaigns/Pages/CampaignPage/AppleMessagesCampaign/InvitationTemplatePicker.vue` | Template selector (filters `category: notification, channel: apple_messages_for_business`) |
+
+### Campaign Flow
+
+```
+1. Agent creates campaign via UI
+   POST /api/v1/accounts/:id/campaigns
+   { inbox_id, title, message (template name), scheduled_at, audience, template_params }
+
+2. Campaign saved (campaign_type: one_off, campaign_status: active)
+
+3. TriggerScheduledItemsJob runs every minute (cron)
+   Picks up active one_off campaigns with scheduled_at in 3-day window
+   → Campaigns::TriggerOneoffCampaignJob.perform_later(campaign)
+
+4. TriggerOneoffCampaignJob calls campaign.trigger!
+   → AppleMessages::OneoffInvitationCampaignService.new(campaign:).perform
+
+5. OneoffInvitationCampaignService:
+   a. validate_campaign! — checks one_off, not completed, template_params present
+   b. contacts_from_labels — finds contacts tagged with label audience entries
+   c. direct_phones — extracts phone entries from audience
+   d. For each phone: SendInvitationService (same as manual send)
+   e. campaign.completed!
+
+6. SendInvitationService handles opt-out check + Apple MSP POST (same as manual flow)
+```
+
+### Audience Format
+
+Audience is stored as a JSONB array on the campaign. Two entry types:
+
+```json
+[
+  { "type": "Label", "id": 42 },
+  { "type": "Phone", "phone": "+33768995916" }
+]
+```
+
+- **Label entries**: resolved to contacts via `account.contacts.tagged_with(label_titles)`; the contact's `phone_number` field is used as destination
+- **Phone entries**: used directly as destination; prepended with `tel:` if not already present
+
+### `template_params` Structure
+
+```json
+{
+  "template_id": "binaryChoice.engage.withImage",
+  "locale": "en-US",
+  "parameters": {
+    "brand_name": "Acoustic House",
+    "brand_logo": "<base64>"
+  }
+}
+```
+
+`template_id` comes from `message_template.metadata['invitation_template_id']`. `parameters` comes from `message_template.metadata['invitation_parameters']`, which stores the full parameter set including the base64-encoded logo.
+
+### Reference ID Pattern
+
+```
+campaign-{campaign.id}-contact-{contact.id}   # label-based audience
+campaign-{campaign.id}-{random hex}           # direct phone audience
+```
+
+### Known Bugs Fixed (March 2026)
+
+**1. `inbox_type` string mismatch** — `Campaign#execute_campaign`, `Campaign#validate_campaign_inbox`, `Campaign#ensure_correct_campaign_attributes`, and `OneoffInvitationCampaignService#amb_campaign?` all used the string `'AppleMessagesForBusiness'`. The actual value returned by `inbox.inbox_type` (which calls `channel.name`) is `'Apple Messages for Business'` (with spaces). This caused:
+- Campaign creation validation to fail ("Unsupported Inbox type")
+- Campaigns that did save to raise "Invalid campaign N" in the Sidekiq job and never execute
+
+Fixed in: `app/models/campaign.rb` (3 locations) and `app/services/apple_messages/oneoff_invitation_campaign_service.rb`.
+
+**2. `phone` stripped from audience by strong params** — `campaigns_controller.rb` only permitted `[:type, :id]` in the audience array. The `phone` key was silently dropped, so Phone-type audience entries were stored as `{ "type": "Phone" }` with no phone number. All direct-phone sends were skipped with "no phone number" log messages.
+
+Fixed in: `app/controllers/api/v1/accounts/campaigns_controller.rb` — added `:phone` to audience permitted params.
+
+---
+
 ## File Reference
 
 | File | Purpose |

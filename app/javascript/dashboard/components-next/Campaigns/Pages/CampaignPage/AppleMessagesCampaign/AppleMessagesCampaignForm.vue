@@ -50,10 +50,21 @@ const v$ = useVuelidate(rules, state);
 
 const isCreating = computed(() => formState.uiFlags.value.isCreating);
 
-const currentDateTime = computed(() => {
-  const now = new Date();
-  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return localTime.toISOString().slice(0, 16);
+const scheduledDate = computed({
+  get: () => state.scheduledAt?.slice(0, 10) ?? '',
+  set: value => {
+    const time = state.scheduledAt?.slice(11, 16) ?? '00:00';
+    state.scheduledAt = value ? `${value}T${time}` : null;
+  },
+});
+
+const scheduledTime = computed({
+  get: () => state.scheduledAt?.slice(11, 16) ?? '',
+  set: value => {
+    const date =
+      state.scheduledAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+    state.scheduledAt = value ? `${date}T${value}` : null;
+  },
 });
 
 const mapToOptions = (items, valueKey, labelKey) =>
@@ -238,15 +249,18 @@ const handleSubmit = async () => {
       />
     </div>
 
-    <Input
-      v-model="state.scheduledAt"
-      label="Scheduled time"
-      type="datetime-local"
-      :min="currentDateTime"
-      placeholder="Select scheduled time"
-      :message="formErrors.scheduledAt"
-      :message-type="formErrors.scheduledAt ? 'error' : 'info'"
-    />
+    <div class="flex flex-col gap-1">
+      <label class="mb-0.5 text-sm font-medium text-n-slate-12">
+        {{ t('APPLE_MESSAGES.CAMPAIGN.FORM.SCHEDULED_TIME') }}
+      </label>
+      <div class="flex gap-2">
+        <Input v-model="scheduledDate" type="date" class="flex-1" />
+        <Input v-model="scheduledTime" type="time" class="flex-1" />
+      </div>
+      <p v-if="formErrors.scheduledAt" class="text-xs text-n-ruby-10">
+        {{ formErrors.scheduledAt }}
+      </p>
+    </div>
 
     <div class="flex gap-3 justify-between items-center w-full">
       <Button

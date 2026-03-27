@@ -191,7 +191,8 @@
         "INVITATION_TEMPLATE": "Invitation Template",
         "AUDIENCE": "Audience",
         "LABELS": "Labels",
-        "PHONES": "Phones"
+        "PHONES": "Phones",
+        "SCHEDULED_TIME": "Scheduled time"
       }
     },
     "INVITATION": {

@@ -18,7 +18,7 @@ class AppleMessages::OneoffInvitationCampaignService
   end
 
   def amb_campaign?
-    campaign.inbox.inbox_type == 'AppleMessagesForBusiness'
+    campaign.inbox.inbox_type == 'Apple Messages for Business'
   end
 
   def process_audience
