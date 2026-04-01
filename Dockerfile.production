@@ -6,7 +6,7 @@
 # ============================================
 FROM ruby:3.4.4-slim AS base
 
-# Install essential system packages including Node.js for ExecJS runtime
+# Install essential system packages
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
     build-essential \
@@ -20,9 +20,12 @@ RUN apt-get update -qq && \
     ca-certificates \
     tzdata \
     shared-mime-info \
-    git \
-    nodejs \
-    npm && \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 (required by package.json engines field)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Set production environment

@@ -406,8 +406,8 @@ const invitationBrandLogo = computed({
     if (!template.value.metadata.invitation_parameters) {
       template.value.metadata.invitation_parameters = {};
     }
-    // Rebuild with brand_name first to keep consistent key order
-    const { brand_name, ...rest } =
+    // Rebuild with brand_name first; exclude brand_logo from rest so Object.assign below doesn't restore the old value
+    const { brand_name, brand_logo, ...rest } =
       template.value.metadata.invitation_parameters;
     template.value.metadata.invitation_parameters = {};
     if (brand_name !== undefined)
