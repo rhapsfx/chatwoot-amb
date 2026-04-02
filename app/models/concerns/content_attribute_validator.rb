@@ -399,6 +399,10 @@ class ContentAttributeValidator < ActiveModel::Validator
   def validate_apple_pay!(record)
     content_attrs = record.content_attributes || {}
 
+    # Skip validation for incoming interactive messages (they contain interactive_data)
+    # These are validated by Apple and we just store the payment response
+    return if content_attrs['interactive_data'].present?
+
     # Validate top-level keys
     invalid_keys = content_attrs.keys.map(&:to_sym) - ALLOWED_APPLE_PAY_KEYS
     record.errors.add(:content_attributes, "contains invalid keys for apple_pay: #{invalid_keys}") if invalid_keys.present?
