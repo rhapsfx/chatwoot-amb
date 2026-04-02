@@ -386,6 +386,28 @@ RSpec.describe ContentAttributeValidator do
       end
     end
 
+    context 'with incoming interactive response' do
+      before do
+        message.content_attributes = {
+          'interactive_data' => {
+            'bid' => 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
+            'sessionIdentifier' => 'session_123',
+            'data' => {
+              'payment' => { 'token' => { 'paymentData' => 'encrypted' } },
+              'version' => '1.0',
+              'requestIdentifier' => 'pay_request_123',
+              'receivedMessage' => { 'title' => 'Payment sent' },
+              'replyMessage' => { 'title' => 'Payment received' }
+            }
+          }
+        }
+      end
+
+      it 'skips validation for interactive_data' do
+        expect(message).to be_valid
+      end
+    end
+
     context 'with invalid content_attributes' do
       it 'fails without required flat fields' do
         message.content_attributes = { 'merchant_name' => 'Test' }
