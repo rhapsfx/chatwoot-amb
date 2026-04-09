@@ -2,3 +2,4 @@ backend: PATH="/opt/homebrew/opt/ruby@3.3/bin:/opt/homebrew/opt/postgresql@15/bi
 # https://github.com/mperham/sidekiq/issues/3090#issuecomment-389748695
 worker: PATH="/opt/homebrew/opt/ruby@3.3/bin:/opt/homebrew/opt/postgresql@15/bin:$PATH" bundle exec sidekiq -C config/sidekiq.yml
 vite: bin/vite dev
+scraper: cd services/playwright-scraper && node server.js

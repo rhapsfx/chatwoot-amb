@@ -143,79 +143,80 @@ class AppleMessagesForBusiness::SendRichLinkService
 
   def build_rich_link_data
     content_attrs = @message.content_attributes
-
-    # Always scrape Open Graph data for rich links to get accurate title/description/image/video
-    # This ensures we use proper OpenGraph metadata instead of frontend fallback values
     url = content_attrs['url'] || @message.content
-    Rails.logger.info "🔍 Rich Link - Attempting Open Graph scraping for: #{url}"
-    og_data = scrape_open_graph_data(url)
 
-    if og_data[:success]
-      Rails.logger.info '✅ Rich Link - Open Graph scraping successful'
-      Rails.logger.info "🔍 Rich Link - Scraped title: #{og_data[:title]}"
-      Rails.logger.info "🔍 Rich Link - Scraped image: #{og_data[:image_url]}"
-      Rails.logger.info "🔍 Rich Link - Scraped video: #{og_data[:video_url]}"
-      Rails.logger.info "🔍 Rich Link - Scraped description: #{og_data[:description]}"
+    # Only re-scrape if the frontend didn't already send usable OG data.
+    # Sites with bot-protection (Akamai, Cloudflare) may return a tracking pixel or
+    # a generic page on the second request, overwriting good data from the first scrape.
+    og_data = { success: false }
 
-      # Update content_attributes with scraped data
-      # ALWAYS prefer scraped data over frontend-provided fallbacks
-      # Frontend may send URL as title/description, but we want actual OpenGraph data
-      updates = {
-        'title' => og_data[:title] || content_attrs['title'],
-        'image_url' => og_data[:image_url] || content_attrs['image_url'],
-        'video_url' => og_data[:video_url] || content_attrs['video_url'],
-        'video_mime_type' => og_data[:video_mime_type] || content_attrs['video_mime_type'],
-        'description' => og_data[:description] || content_attrs['description']
-      }.compact
+    if frontend_og_data_usable?(content_attrs, url)
+      Rails.logger.info '✅ Rich Link - Frontend already has good OG data, skipping re-scrape'
+    else
+      Rails.logger.info "🔍 Rich Link - Attempting Open Graph scraping for: #{url}"
+      og_data = scrape_open_graph_data(url)
 
-      # Save updates to database for frontend display
-      # Use save! instead of update_column to trigger callbacks and ActionCable broadcasts
-      @message.content_attributes = content_attrs.merge(updates)
-      Rails.logger.info '🔍 Rich Link - About to save message with scraped data'
-      sanitized_before_save = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.content_attributes)
-      Rails.logger.info "🔍 Rich Link - content_attributes before save: #{sanitized_before_save.inspect}"
-      Rails.logger.info "🔍 Rich Link - Message changed?: #{@message.changed?}"
-      sanitized_changes = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.changes)
-      Rails.logger.info "🔍 Rich Link - Changed attributes: #{sanitized_changes.inspect}"
-
-      begin
-        @message.save!
-        Rails.logger.info '✅ Rich Link - Message saved successfully with scraped data'
-        sanitized_previous_changes = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(@message.previous_changes)
-        Rails.logger.info "🔍 Rich Link - Previous changes after save: #{sanitized_previous_changes.inspect}"
-
-        # Manually dispatch update event if Rails didn't detect changes
-        if @message.previous_changes.blank?
-          Rails.logger.warn '⚠️ Rich Link - No previous_changes detected, manually dispatching MESSAGE_UPDATED event'
-          Rails.configuration.dispatcher.dispatch(
-            'MESSAGE_UPDATED',
-            Time.zone.now,
-            message: @message.reload,
-            performed_by: nil
-          )
-          Rails.logger.info '✅ Rich Link - Manually dispatched MESSAGE_UPDATED event'
-        end
-      rescue StandardError => e
-        Rails.logger.error "❌ Rich Link - Failed to save message: #{e.message}"
-        Rails.logger.error e.backtrace.join("\n")
+      # Treat error pages as scrape failures
+      if og_data[:success] && error_page_title?(og_data[:title])
+        Rails.logger.warn "⚠️ Rich Link - Scrape returned error page: '#{og_data[:title]}', treating as failure"
+        og_data = { success: false }
       end
 
-      # Update local content_attrs for building payload
-      content_attrs = @message.content_attributes
-      sanitized_after_save = AppleMessagesForBusiness::LogSanitizer.sanitize_for_log(content_attrs)
-      Rails.logger.info "🔍 Rich Link - content_attributes after save: #{sanitized_after_save.inspect}"
-    else
-      Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
+      if og_data[:success]
+        Rails.logger.info "✅ Rich Link - Scraped title: #{og_data[:title]}, image: #{og_data[:image_url]}"
+
+        # Don't overwrite with tracking pixels — keep frontend value if scraped one is junk
+        scraped_image = og_data[:image_url]
+        scraped_image = nil if scraped_image&.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking})
+
+        # Prefer the higher-quality favicon: keep frontend PNG over scraped .ico
+        existing_favicon = content_attrs['favicon_url'].to_s
+        scraped_favicon_url = og_data[:favicon_url].to_s
+        scraped_favicon = if existing_favicon.match?(/\.(png|jpg|jpeg|webp|svg)/i) && scraped_favicon_url.match?(/\.ico$/i)
+                            existing_favicon
+                          else
+                            scraped_favicon_url.presence || existing_favicon
+                          end
+
+        updates = {
+          'title' => og_data[:title] || content_attrs['title'],
+          'image_url' => scraped_image || content_attrs['image_url'],
+          'favicon_url' => scraped_favicon,
+          'video_url' => og_data[:video_url] || content_attrs['video_url'],
+          'video_mime_type' => og_data[:video_mime_type] || content_attrs['video_mime_type'],
+          'description' => og_data[:description] || content_attrs['description']
+        }.compact
+
+        @message.content_attributes = content_attrs.merge(updates)
+
+        begin
+          @message.save!
+
+          if @message.previous_changes.blank?
+            Rails.configuration.dispatcher.dispatch(
+              'MESSAGE_UPDATED',
+              Time.zone.now,
+              message: @message.reload,
+              performed_by: nil
+            )
+          end
+        rescue StandardError => e
+          Rails.logger.error "❌ Rich Link - Failed to save scraped data: #{e.message}"
+        end
+
+        content_attrs = @message.content_attributes
+      else
+        Rails.logger.warn "⚠️ Rich Link - Open Graph scraping failed: #{og_data[:error]}"
+      end
     end
 
-    # PRIORITY 1: Check if richLinkDataRef exists (App Clips mode)
-    # This takes precedence over manual rich link building
-    if content_attrs['rich_link_data_ref'].present?
-      log_info '🔍 Rich Link - Using richLinkDataRef (App Clips mode)'
+    # Use richLinkDataRef (App Clips) only when we have no usable OG data at all
+    if content_attrs['rich_link_data_ref'].present? && !frontend_og_data_usable?(content_attrs, url) && !og_data[:success]
+      log_info '🔍 Rich Link - Using richLinkDataRef (App Clips mode, no usable OG data)'
       return build_from_rich_link_data_ref(content_attrs)
     end
 
-    # PRIORITY 2: Build manual richLinkData with assets
+    # Build embedded richLinkData with assets (title/description/image inline)
     log_info '🔍 Rich Link - Building manual richLinkData with assets'
     url = content_attrs['url'] || @message.content
 
@@ -226,9 +227,18 @@ class AppleMessagesForBusiness::SendRichLinkService
       content_attrs['video_url'] = url unless content_attrs['video_url'].present?
     end
 
+    # When title is just the domain, an error page title, or blank — derive from URL slug + brand
+    title = content_attrs['title'].to_s.strip
+    begin
+      host = URI.parse(url).host.to_s.downcase.delete_prefix('www.')
+      title = extract_title_from_url(url, content_attrs['site_name']) if title.blank? || title.downcase == host || error_page_title?(title)
+    rescue URI::InvalidURIError
+      title = extract_title_from_url(url, content_attrs['site_name']) if title.blank? || error_page_title?(title)
+    end
+
     {
       url: url,
-      title: content_attrs['title'] || extract_title_from_url(url),
+      title: title,
       assets: build_assets(content_attrs)
     }
   end
@@ -255,48 +265,61 @@ class AppleMessagesForBusiness::SendRichLinkService
   def build_assets(content_attrs)
     assets = {}
 
-    # Get image from either 'image_data' (base64), 'image_url' (URL), or 'favicon_url' (fallback)
-    image_source = content_attrs['image_data'] || content_attrs['image_url'] || content_attrs['favicon_url']
+    Rails.logger.info "🔍 Rich Link - build_assets image_data=#{content_attrs['image_data']&.truncate(80)} image_url=#{content_attrs['image_url']&.truncate(80)} favicon_url=#{content_attrs['favicon_url']&.truncate(80)}"
 
-    Rails.logger.info "🔍 Rich Link - Image source: #{image_source&.truncate(100)}"
-    Rails.logger.info "🔍 Rich Link - Content attrs keys: #{content_attrs.keys}"
+    # Build prioritized candidate list. Google favicon is always last resort.
+    begin
+      domain = URI.parse(content_attrs['url'] || '').host.to_s.delete_prefix('www.')
+      google_favicon = domain.present? ? "https://www.google.com/s2/favicons?domain=#{domain}&sz=128" : nil
+    rescue URI::InvalidURIError
+      google_favicon = nil
+    end
 
-    # Add image asset if provided
-    if image_source.present?
-      if image_source.start_with?('http')
-        # Download and encode image from URL (including favicon URLs)
-        Rails.logger.info "🔍 Rich Link - Downloading image from URL: #{image_source}"
-        encoded_image = download_and_encode_image(image_source)
-        if encoded_image
-          Rails.logger.info "✅ Rich Link - Successfully encoded image (#{encoded_image.length} chars)"
-          assets[:image] = {
-            data: encoded_image,
-            mimeType: detect_image_mime_type(image_source, content_attrs)
-          }
-        else
-          Rails.logger.error "❌ Rich Link - Failed to download/encode image from URL: #{image_source}"
-        end
-      elsif image_source.start_with?('data:image')
-        # Handle data URLs (base64 embedded)
-        base64_data = image_source.split(',')[1]
-        mime_type = begin
-          image_source.match(/data:([^;]+)/)[1]
+    # Upgrade favicon to highest-res available (apple-touch-icon → Google 128px).
+    # favicon.ico is 16–32px and looks pixelated when used as the rich link image.
+    raw_favicon = content_attrs['favicon_url']
+    best_favicon = raw_favicon.present? ? fetch_best_domain_icon(raw_favicon) : google_favicon
+
+    candidate_sources = [
+      content_attrs['image_data'],
+      content_attrs['image_url'],
+      best_favicon,
+      google_favicon
+    ].compact.uniq.reject { |s| s.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking}) }
+
+    # Try candidates in order; stop at first success.
+    # This ensures CDN-protected images (e.g. booking.com) fall through to favicon/google icon.
+    candidate_sources.each_with_index do |source, idx|
+      Rails.logger.info "🔍 Rich Link - Trying candidate #{idx + 1}/#{candidate_sources.size}: #{source.truncate(100)}"
+
+      encoded_image = nil
+      actual_mime_type = nil
+
+      if source.start_with?('http')
+        result = download_and_encode_image(source)
+        next unless result
+
+        encoded_image, actual_mime_type = result
+      elsif source.start_with?('data:image')
+        encoded_image = source.split(',')[1]
+        actual_mime_type = begin
+          source.match(/data:([^;]+)/)[1]
         rescue StandardError
           'image/jpeg'
         end
-
-        assets[:image] = {
-          data: base64_data,
-          mimeType: mime_type
-        }
       else
-        # Assume it's already base64 encoded
-        assets[:image] = {
-          data: image_source,
-          mimeType: content_attrs['image_mime_type'] || 'image/jpeg'
-        }
+        encoded_image = source
+        actual_mime_type = content_attrs['image_mime_type'] || 'image/jpeg'
       end
+
+      next if encoded_image.blank?
+
+      assets[:image] = { data: encoded_image, mimeType: actual_mime_type }
+      Rails.logger.info "✅ Rich Link - Image asset set from candidate #{idx + 1}"
+      break
     end
+
+    Rails.logger.warn '⚠️ Rich Link - No image asset could be built' if assets.empty?
 
     # Add video asset if provided
     if content_attrs['video_url'].present?
@@ -375,23 +398,27 @@ class AppleMessagesForBusiness::SendRichLinkService
     end
   end
 
+  # Apple MSP only supports image/jpeg and image/png for richLinkData assets.
+  APPLE_SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png].freeze
+  # Apple spec: image binary size must be 200KB or smaller
+  APPLE_IMAGE_SIZE_LIMIT = 200.kilobytes
+
+  # Returns [base64_string, mime_type] or nil on failure
   def download_and_encode_image(image_url)
     return nil if image_url.blank?
 
     Rails.logger.info "🔍 Rich Link - Starting download for: #{image_url}"
 
-    # Enhanced headers for better favicon access
     headers = {
       'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15',
-      'Accept' => 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'Accept' => 'image/jpeg,image/png,image/*,*/*;q=0.8',
       'Accept-Language' => 'en-US,en;q=0.9',
       'Cache-Control' => 'no-cache'
     }
 
-    # Download image with timeout and size limits
     response = HTTParty.get(
       image_url,
-      timeout: 15,  # Increased timeout for favicons
+      timeout: 15,
       headers: headers,
       follow_redirects: true
     )
@@ -405,34 +432,124 @@ class AppleMessagesForBusiness::SendRichLinkService
       return nil
     end
 
-    # Check file size (limit to 1MB for Rich Links)
-    if response.body.bytesize > 1.megabyte
-      Rails.logger.error "❌ Rich Link - Image too large: #{response.body.bytesize} bytes (max 1MB)"
-      return nil
-    end
-
-    # Validate content type
-    content_type = response.headers['content-type']
+    content_type = response.headers['content-type']&.split(';')&.first&.strip
     unless content_type&.start_with?('image/')
       Rails.logger.error "❌ Rich Link - Invalid content type: #{content_type}"
       return nil
     end
 
-    # Resize Apple Maps directions icon to 150x150 (icon format)
     image_data = response.body
+
+    # Convert unsupported formats (webp, gif, ico, bmp, etc.) to JPEG
+    unless APPLE_SUPPORTED_IMAGE_TYPES.include?(content_type)
+      Rails.logger.info "🔄 Rich Link - Converting #{content_type} to image/jpeg (not supported by Apple MSP)"
+      image_data = convert_to_jpeg(image_data, content_type)
+      content_type = 'image/jpeg'
+      return nil if image_data.nil?
+    end
+
+    # Resize Apple Maps directions icon to 150x150
     if apple_maps_directions_icon?(image_url)
       Rails.logger.info '🔍 Rich Link - Resizing Apple Maps directions icon to 150x150'
       image_data = resize_image_to_icon_format(image_data)
+      content_type = 'image/png'
     end
 
-    # Encode to base64
+    if image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
+      Rails.logger.info "🔄 Rich Link - Image too large (#{image_data.bytesize} bytes), compressing to fit 200KB limit..."
+      image_data = compress_image_to_limit(image_data, content_type)
+      content_type = 'image/jpeg'
+      if image_data.nil? || image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
+        Rails.logger.error '❌ Rich Link - Could not compress image under 200KB, skipping'
+        return nil
+      end
+      Rails.logger.info "✅ Rich Link - Compressed to #{image_data.bytesize} bytes"
+    end
+
     encoded = Base64.strict_encode64(image_data)
-    Rails.logger.info "✅ Rich Link - Successfully encoded image (#{encoded.length} chars)"
-    encoded
+    Rails.logger.info "✅ Rich Link - Successfully encoded image (#{image_data.bytesize} bytes, #{content_type})"
+    [encoded, content_type]
   rescue StandardError => e
     log_error "❌ Rich Link - Failed to download image #{image_url}: #{e.message}"
     log_error "❌ Rich Link - Backtrace: #{e.backtrace.first(3).join("\n")}"
     nil
+  end
+
+  def convert_to_jpeg(image_data, source_mime_type = nil)
+    require 'mini_magick'
+    require 'image_processing/mini_magick'
+    MiniMagick.configure { |c| c.cli = :imagemagick7 }
+
+    # MiniMagick needs the correct file extension to identify the format
+    ext = case source_mime_type
+          when 'image/x-icon', 'image/vnd.microsoft.icon' then '.ico'
+          when 'image/webp' then '.webp'
+          when 'image/gif' then '.gif'
+          when 'image/bmp' then '.bmp'
+          when 'image/tiff' then '.tiff'
+          else '.bin'
+          end
+
+    tempfile = Tempfile.new(['amb_image', ext])
+    tempfile.binmode
+    tempfile.write(image_data)
+    tempfile.rewind
+
+    processed = ImageProcessing::MiniMagick
+                .source(tempfile)
+                .convert('jpeg')
+                .call
+
+    File.binread(processed.path)
+  rescue StandardError => e
+    Rails.logger.error "❌ Rich Link - Failed to convert image to JPEG: #{e.message}"
+    nil
+  ensure
+    tempfile&.close
+    tempfile&.unlink
+    processed&.unlink if processed
+  end
+
+  # Compress an oversized image to fit within APPLE_IMAGE_SIZE_LIMIT (200KB).
+  # Strategy: convert to JPEG and progressively lower quality until it fits.
+  def compress_image_to_limit(image_data, source_mime_type = nil)
+    require 'mini_magick'
+    require 'image_processing/mini_magick'
+    MiniMagick.configure { |c| c.cli = :imagemagick7 }
+
+    ext = case source_mime_type
+          when 'image/png' then '.png'
+          when 'image/webp' then '.webp'
+          when 'image/gif' then '.gif'
+          else '.jpg'
+          end
+
+    tempfile = Tempfile.new(['amb_compress', ext])
+    tempfile.binmode
+    tempfile.write(image_data)
+    tempfile.rewind
+
+    # Try progressively lower JPEG quality until under the limit
+    [85, 70, 55, 40].each do |quality|
+      processed = ImageProcessing::MiniMagick
+                  .source(tempfile)
+                  .convert('jpeg')
+                  .saver(quality: quality)
+                  .call
+
+      result = File.binread(processed.path)
+      processed.unlink
+      Rails.logger.info "🔄 Rich Link - Compressed at quality #{quality}: #{result.bytesize} bytes"
+      return result if result.bytesize <= APPLE_IMAGE_SIZE_LIMIT
+    end
+
+    nil
+  rescue StandardError => e
+    Rails.logger.error "❌ Rich Link - Failed to compress image: #{e.message}"
+    nil
+  ensure
+    tempfile&.close
+    tempfile&.unlink
   end
 
   # Check if this is the Apple Maps directions default icon
@@ -442,7 +559,9 @@ class AppleMessagesForBusiness::SendRichLinkService
 
   # Resize image to 150x150 (icon format for rich links)
   def resize_image_to_icon_format(image_data)
+    require 'mini_magick'
     require 'image_processing/mini_magick'
+    MiniMagick.configure { |c| c.cli = :imagemagick7 }
 
     # Create a temporary file from the image data
     tempfile = Tempfile.new(['apple_maps_icon', '.png'])
@@ -472,14 +591,139 @@ class AppleMessagesForBusiness::SendRichLinkService
     processed&.unlink if processed
   end
 
-  def extract_title_from_url(url)
+  # Try to find a higher-resolution icon than the detected favicon.
+  # Priority:
+  # 1. Standard apple-touch-icon paths on the domain (180x180 PNG)
+  # 2. Google's favicon service (returns 128x128 PNG for any domain)
+  def fetch_best_domain_icon(favicon_url)
+    return favicon_url if favicon_url.blank?
+
+    uri = URI.parse(favicon_url)
+    base = "#{uri.scheme}://#{uri.host}"
+    host = uri.host
+
+    # Try standard apple-touch-icon paths first
+    high_res_paths = %w[
+      /apple-touch-icon-180x180.png
+      /apple-touch-icon-152x152.png
+      /apple-touch-icon-120x120.png
+      /apple-touch-icon.png
+      /apple-touch-icon-precomposed.png
+    ]
+
+    high_res_paths.each do |path|
+      candidate = "#{base}#{path}"
+      next if candidate == favicon_url
+
+      response = HTTParty.head(candidate, timeout: 5, headers: {
+                                 'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15'
+                               })
+      return candidate if response.success? && response.headers['content-type']&.start_with?('image/')
+    rescue StandardError
+      next
+    end
+
+    # Fall back to Google's favicon service — always returns a 128×128 PNG
+    "https://www.google.com/s2/favicons?domain=#{host}&sz=128"
+  rescue URI::InvalidURIError, StandardError
+    favicon_url
+  end
+
+  # Derives a human title from the URL path + brand name.
+  # Used when the page title is unavailable (bot-blocked, error page, bare domain).
+  #
+  # Examples:
+  #   /fr_fr/bague-josephine-aigrette-083590         → "Bague Josephine Aigrette – Chaumet"
+  #   /fr/fr/luggage/colour/green/cabin-plus/84256311.html → "Cabin Plus – Rimowa"
+  #   /hotel/hu/7seasons-apartments-budapest.en-gb.html    → "7seasons Apartments Budapest – Booking"
+  def extract_title_from_url(url, site_name = nil)
     return 'Rich Link' if url.blank?
 
-    # Try to extract domain name as fallback title
     uri = URI.parse(url)
-    uri.host&.gsub('www.', '')&.capitalize || 'Rich Link'
+    path = uri.path.to_s
+    product_title = nil
+
+    unless path.empty? || path == '/'
+      segments = path.split('/').reject(&:blank?)
+      # Walk segments from deepest to shallowest looking for a descriptive slug:
+      # must contain at least one letter AND a hyphen/underscore, and be >4 chars.
+      # Pure numeric IDs (e.g. "84256311") and locale codes (e.g. "fr_fr") are skipped.
+      content_segment = segments.reverse.find do |s|
+        s.length > 4 && s.match?(/[a-z]/i) && s.match?(/[-_]/) && !s.match?(/\A[\d_-]+\z/)
+      end
+
+      if content_segment
+        slug = content_segment
+               .sub(/\.[a-z]{2,4}$/i, '')              # strip extension (.html)
+               .sub(/\.[a-z]{2}(-[a-z]{2,4})?$/i, '')  # strip locale suffix (.en-gb)
+               .gsub(/[-_]+/, ' ')
+               .split
+               .map(&:capitalize)
+               .join(' ')
+        product_title = slug if slug.length > 3
+      end
+    end
+
+    brand = extract_brand_name(url, site_name)
+
+    if product_title.present? && brand.present?
+      "#{product_title} – #{brand}"
+    elsif product_title.present?
+      product_title
+    else
+      brand || 'Rich Link'
+    end
   rescue URI::InvalidURIError
     'Rich Link'
+  end
+
+  # Derives brand name from og:site_name (cleaned) or the first domain label.
+  def extract_brand_name(url, site_name = nil)
+    if site_name.present? && !error_page_title?(site_name)
+      # Strip common TLD suffixes left in site_name values like "Chaumet.com" or "Rimowa.com"
+      clean = site_name.sub(/\s*\.(com|fr|net|org|co\.uk|de|es|it|nl|be|ch|au|ca|jp|cn)\s*$/i, '').strip
+      return clean if clean.present?
+    end
+
+    uri = URI.parse(url)
+    uri.host&.delete_prefix('www.')&.split('.')&.first&.capitalize
+  rescue URI::InvalidURIError
+    nil
+  end
+
+  # Returns true when the frontend already sent meaningful OG data that we should trust.
+  # A title equal to the URL or the bare domain means the frontend scrape also failed.
+  # An image_url that looks like a tracking pixel (1×1, query-param-only, akamai/akam path) is not usable.
+  ERROR_PAGE_PATTERNS = /\b(error|404|403|not found|access denied|forbidden|blocked|page not found|something went wrong)\b/i
+
+  def error_page_title?(title)
+    return false if title.blank?
+
+    ERROR_PAGE_PATTERNS.match?(title)
+  end
+
+  def frontend_og_data_usable?(content_attrs, url)
+    title = content_attrs['title'].to_s.strip
+    image_url = (content_attrs['image_url'] || content_attrs['image_data']).to_s.strip
+
+    return false if title.blank?
+
+    # Title is just the URL itself — frontend scrape returned nothing useful
+    return false if title == url.to_s.strip
+
+    # Title is only a bare domain (e.g. "fnac.com") — bot-detection fallback page
+    begin
+      host = URI.parse(url).host.to_s.downcase.delete_prefix('www.')
+      return false if title.downcase == host
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # Image looks like a tracking pixel or Akamai challenge asset
+    return false if image_url.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking})
+    return false if image_url.blank?
+
+    true
   end
 
   def direct_video_url?(url)

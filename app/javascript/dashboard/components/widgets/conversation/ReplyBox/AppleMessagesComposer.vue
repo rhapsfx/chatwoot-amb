@@ -1133,17 +1133,12 @@ const sendAppleMessage = () => {
 
       // Clean items array - ensure no undefined values
       const cleanItems = (quickReplyData.value?.items || [])
-        .map(item => {
-          const cleanItem = {
-            title: item?.title || 'Option',
-            value: item?.value || item?.title || 'Option',
-          };
-          // Only add identifier if it exists and is not undefined
-          if (item?.identifier && item.identifier !== undefined) {
-            cleanItem.identifier = item.identifier;
-          }
-          return cleanItem;
-        })
+        .map(item => ({
+          title: item?.title || 'Option',
+          identifier:
+            item?.identifier ||
+            Math.random().toString(36).substring(2) + Date.now().toString(36),
+        }))
         .filter(item => item.title && item.title !== undefined); // Remove any items without valid title
 
       // Build content_attributes ensuring NO undefined values

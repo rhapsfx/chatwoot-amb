@@ -205,7 +205,11 @@ const isAppleMapsURL = url => {
   );
 };
 
-export const createRichLinkPreview = async (url, conversation = null) => {
+export const createRichLinkPreview = async (
+  url,
+  conversation = null,
+  allowAppClips = false
+) => {
   try {
     // Normalize URL before processing
     const normalizedURL = normalizeURL(url);
@@ -216,44 +220,23 @@ export const createRichLinkPreview = async (url, conversation = null) => {
       throw new Error('Account ID not found');
     }
 
-    // ⚠️ SKIP App Clips for:
-    // 1. Direct video URLs - they need manual rich link with video assets
-    // 2. Apple Maps URLs - they need manual rich link with location preview
+    // App Clips (constructPayload) is only attempted when explicitly requested via the modal.
+    // Automatic URL-to-rich-link conversion always uses OpenGraph so the device renders the
+    // preview immediately without showing "Click to Load Preview".
     const skipAppClips =
-      isDirectVideoURL(normalizedURL) || isAppleMapsURL(normalizedURL);
-    if (skipAppClips) {
-      if (isDirectVideoURL(normalizedURL)) {
-        // eslint-disable-next-line no-console
-        console.log(
-          '[Rich Link] Direct video URL detected, skipping App Clips:',
-          normalizedURL
-        );
-      } else if (isAppleMapsURL(normalizedURL)) {
-        // eslint-disable-next-line no-console
-        console.log(
-          '[Rich Link] Apple Maps URL detected, skipping App Clips:',
-          normalizedURL
-        );
-      }
-    }
+      !allowAppClips ||
+      isDirectVideoURL(normalizedURL) ||
+      isAppleMapsURL(normalizedURL);
 
-    // ✅ PRIORITY 1: Try App Clips (Construct Payload API) if conversation available
-    // BUT skip for direct video URLs and Apple Maps URLs - they need manual rich link
-    if (conversation?.inbox_id && !skipAppClips) {
+    if (!skipAppClips && conversation?.inbox_id) {
       try {
-        // Check if URL might support App Clips (basic HTTPS validation)
         if (ConstructPayloadAPI.mightSupportAppClips(normalizedURL)) {
-          // Attempt to generate App Clips richLinkDataRef
           const constructResult = await ConstructPayloadAPI.create(
             accountId,
             conversation.inbox_id,
-            {
-              url: normalizedURL,
-              storeRegion: 'US', // Default to US, could be made configurable
-            }
+            { url: normalizedURL, storeRegion: 'US' }
           );
 
-          // Success! URL supports App Clips
           if (constructResult.success && constructResult.rich_link_data_ref) {
             return {
               success: true,
@@ -261,36 +244,17 @@ export const createRichLinkPreview = async (url, conversation = null) => {
               richLinkData: {
                 url: normalizedURL,
                 rich_link_data_ref: constructResult.rich_link_data_ref,
-                // App Clips don't need title/description/image as they're hosted by Apple
               },
             };
           }
-
-          // If error_code is NO_APP_CLIPS_SUPPORT, fall through to OpenGraph
-          // For other errors, silently fall through to OpenGraph
         }
       } catch (error) {
         // Construct Payload API failed, fall through to OpenGraph
-        // Silently catch and continue to OpenGraph fallback
       }
     }
 
-    // ✅ PRIORITY 2: Fallback to OpenGraph scraping (manual rich link)
-    // This is also used for direct video URLs and Apple Maps URLs (bypassing App Clips)
-    if (skipAppClips) {
-      if (isDirectVideoURL(normalizedURL)) {
-        // eslint-disable-next-line no-console
-        console.log(
-          '[Rich Link] Using manual rich link for video URL (video assets will be added by backend)'
-        );
-      } else if (isAppleMapsURL(normalizedURL)) {
-        // eslint-disable-next-line no-console
-        console.log(
-          '[Rich Link] Using manual rich link for Apple Maps (location preview will be shown)'
-        );
-      }
-    }
-
+    // Use OpenGraph scraping — embeds title/description/image in the payload so the
+    // device renders the preview immediately without requiring the user to tap.
     const data = await ParseUrlAPI.parse(accountId, normalizedURL);
 
     return {

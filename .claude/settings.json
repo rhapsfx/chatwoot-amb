@@ -5,7 +5,8 @@
       "Bash(curl -sv --max-time 5 \"https://maps-api.apple.com/v1/snapshot?center=40.71,-74.00&z=15&size=180x180\")",
       "Bash(curl -s \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
       "Bash(curl -sL \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(magick -version)"
     ]
   }
 }

@@ -134,6 +134,9 @@ services:
       WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
       WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
 
+      # Playwright stealth scraper microservice
+      PLAYWRIGHT_SCRAPER_URL: http://playwright-scraper:3001
+
     ports:
       # Bound to localhost; cloudflared proxies public HTTPS traffic here
       - "127.0.0.1:3000:8080"
@@ -233,6 +236,9 @@ services:
       WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
       WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
 
+      # Playwright stealth scraper microservice
+      PLAYWRIGHT_SCRAPER_URL: http://playwright-scraper:3001
+
     volumes:
       - ./storage:/app/storage
       - ./log:/app/log
@@ -250,6 +256,36 @@ services:
         limits:
           memory: 1g
           cpus: "1.00"
+
+  # ---------------------------------------------------------------------------
+  # Playwright Stealth Scraper (Node.js microservice)
+  # Provides bot-resistant OG metadata scraping for rich links.
+  # Rails falls back to HTTParty if this service is unavailable.
+  # ---------------------------------------------------------------------------
+  playwright-scraper:
+    image: mcr.microsoft.com/playwright:v1.51.0-jammy
+    container_name: chatwoot-playwright-scraper
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./services/playwright-scraper:/app
+    command: sh -c "npm install --omit=dev && node server.js"
+    environment:
+      PORT: "3001"
+      NODE_ENV: production
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
 
 # =============================================================================
 # Volumes

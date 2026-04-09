@@ -17,21 +17,82 @@ class AppleMessagesForBusiness::OpenGraphParserService
     # Short URLs (maps.apple/p/...) should go through normal OpenGraph parsing
     return parse_apple_maps_url if apple_maps_url_with_params?
 
-    begin
+    # 1. Try standard HTTParty + Nokogiri scraping (fast, no overhead)
+    result = begin
       doc = fetch_document
       extract_open_graph_data(doc)
     rescue StandardError => e
       Rails.logger.error "OpenGraph parsing failed for #{@url}: #{e.message}"
-      # Provide better fallback for Apple Maps short URLs
-      if apple_maps_short_url?
-        apple_maps_fallback_data
-      else
-        default_data
-      end
+      apple_maps_short_url? ? apple_maps_fallback_data : default_data
     end
+
+    # 2. Use the HTTParty result if it produced a real title (not an error/bot-challenge page)
+    #    and at least some content we can work with.
+    if og_result_usable?(result)
+      Rails.logger.info "✅ OpenGraph - HTTParty scrape usable (title: #{result[:title]&.truncate(60)})"
+      return result
+    end
+
+    Rails.logger.info "⚠️ OpenGraph - HTTParty result not usable (title: '#{result[:title]}'), trying Playwright stealth scraper..."
+
+    # 3. Fall back to Playwright stealth scraper — bypasses bot-detection (Akamai, Cloudflare, etc.)
+    #    Only reached when HTTParty returned an error page or no meaningful content.
+    playwright_data = AppleMessagesForBusiness::PlaywrightScraperClient.fetch(@url)
+    if playwright_data && og_result_usable?(build_result_from_playwright(playwright_data))
+      @final_url = playwright_data[:url].presence || @url
+      Rails.logger.info "✅ OpenGraph - Playwright scrape succeeded (title: #{playwright_data[:title]&.truncate(60)})"
+      return build_result_from_playwright(playwright_data)
+    end
+
+    Rails.logger.warn '⚠️ OpenGraph - Playwright also failed or unavailable, returning best available result'
+
+    # Return whatever HTTParty gave us (even if partial) — caller handles further fallbacks
+    result
   end
 
   private
+
+  # Returns true when an OG scrape result is worth using — has a real title
+  # (not a bot-challenge/error page) with at least an image or description.
+  ERROR_TITLE_PATTERNS = /\b(access denied|403 forbidden|404|not found|forbidden|blocked|error|robot|captcha|checking your browser|just a moment|ddos|cloudflare|please wait)\b/i
+
+  def og_result_usable?(result)
+    return false unless result.is_a?(Hash) && result[:success]
+
+    title = result[:title].to_s.strip
+    return false if title.blank?
+    return false if ERROR_TITLE_PATTERNS.match?(title)
+
+    # Title must not be just the bare domain
+    begin
+      host = URI.parse(@url).host.to_s.downcase.delete_prefix('www.')
+      return false if title.downcase == host
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # Must have at least an image or a description to be worth sending
+    image = result[:image_url].to_s.strip
+    desc  = result[:description].to_s.strip
+
+    image.present? || desc.present?
+  end
+
+  # Build the standard result hash from Playwright scraper response.
+  # Resolves relative favicon/image URLs to absolute using the final page URL.
+  def build_result_from_playwright(data)
+    {
+      success: true,
+      title: data[:title],
+      description: data[:description],
+      image_url: make_absolute_url(data[:image_url]),
+      video_url: make_absolute_url(data[:video_url]),
+      video_mime_type: data[:video_mime_type],
+      favicon_url: make_absolute_url(data[:favicon_url]),
+      url: data[:url].presence || @url,
+      site_name: data[:site_name] || extract_domain_name
+    }
+  end
 
   # Check if URL is an Apple Maps URL with query parameters (needs special handling)
   def apple_maps_url_with_params?
@@ -203,6 +264,23 @@ class AppleMessagesForBusiness::OpenGraphParserService
     page_title = doc.at_css('title')&.text
     return page_title if page_title.present?
 
+    # Try JSON-LD structured data
+    doc.css('script[type="application/ld+json"]').each do |script|
+      json = JSON.parse(script.text.strip)
+      schemas = json.is_a?(Array) ? json : [json]
+      schemas.each do |schema|
+        next unless schema.is_a?(Hash)
+
+        nodes = schema['@graph'].is_a?(Array) ? schema['@graph'] : [schema]
+        nodes.each do |node|
+          title = node['name'] || node['headline']
+          return title if title.is_a?(String) && title.present?
+        end
+      end
+    rescue JSON::ParserError, StandardError
+      next
+    end
+
     # Final fallback to domain name
     extract_domain_name
   end
@@ -220,13 +298,18 @@ class AppleMessagesForBusiness::OpenGraphParserService
   end
 
   def extract_image_url(doc)
-    # Try OpenGraph image
+    # Try OpenGraph image first
     og_image = doc.at_css('meta[property="og:image"]')&.[]('content')
     return make_absolute_url(og_image) if og_image.present?
 
     # Try Twitter Card image
     twitter_image = doc.at_css('meta[name="twitter:image"]')&.[]('content')
     return make_absolute_url(twitter_image) if twitter_image.present?
+
+    # Try JSON-LD structured data (Product, ItemPage, etc.)
+    # Many e-commerce sites embed this even when OG tags are blocked
+    schema_image = extract_schema_image(doc)
+    return schema_image if schema_image.present?
 
     # Try to find the largest image on the page
     images = doc.css('img[src]')
@@ -238,11 +321,60 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
     return make_absolute_url(largest_image['src']) if largest_image
 
-    # Fallback to favicon as the last resort
-    favicon_url = extract_favicon_url(doc)
-    return favicon_url if favicon_url.present?
-
     nil
+  end
+
+  # Extract image from JSON-LD structured data (Schema.org)
+  # Handles Product, ItemPage, WebPage, Article, etc.
+  def extract_schema_image(doc)
+    scripts = doc.css('script[type="application/ld+json"]')
+    Rails.logger.info "🔍 Schema - Found #{scripts.length} JSON-LD scripts"
+
+    scripts.each do |script|
+      json = JSON.parse(script.text.strip)
+      schemas = json.is_a?(Array) ? json : [json]
+
+      schemas.each do |schema|
+        type = schema.is_a?(Hash) ? (schema['@type'] || schema.dig('@graph', 0, '@type')) : nil
+        Rails.logger.info "🔍 Schema - Processing schema type: #{type}"
+        image = extract_image_from_schema(schema)
+        if image.present?
+          Rails.logger.info "✅ Schema - Found image: #{image.truncate(100)}"
+          return make_absolute_url(image)
+        end
+      end
+    rescue JSON::ParserError, StandardError => e
+      Rails.logger.warn "⚠️ Schema - Failed to parse JSON-LD: #{e.message}"
+      next
+    end
+
+    Rails.logger.info '⚠️ Schema - No image found in JSON-LD'
+    nil
+  end
+
+  def extract_image_from_schema(schema)
+    return nil unless schema.is_a?(Hash)
+
+    # Unwrap @graph array (common pattern)
+    if schema['@graph'].is_a?(Array)
+      schema['@graph'].each do |node|
+        image = extract_image_from_schema(node)
+        return image if image.present?
+      end
+      return nil
+    end
+
+    # Extract image from this schema node
+    raw = schema['image']
+    image = case raw
+            when String then raw
+            when Hash   then raw['url'] || raw['contentUrl']
+            when Array
+              first = raw.first
+              first.is_a?(String) ? first : first&.dig('url') || first&.dig('contentUrl')
+            end
+
+    image.presence
   end
 
   def extract_video_url(doc)
