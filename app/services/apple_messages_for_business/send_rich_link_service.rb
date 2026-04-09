@@ -478,7 +478,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   def convert_to_jpeg(image_data, source_mime_type = nil)
     require 'mini_magick'
     require 'image_processing/mini_magick'
-    MiniMagick.configure { |c| c.cli = :imagemagick7 }
+    # Let MiniMagick auto-detect: uses `magick` (IM7) or `convert` (IM6) based on what is installed
 
     # MiniMagick needs the correct file extension to identify the format
     ext = case source_mime_type
@@ -515,7 +515,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   def compress_image_to_limit(image_data, source_mime_type = nil)
     require 'mini_magick'
     require 'image_processing/mini_magick'
-    MiniMagick.configure { |c| c.cli = :imagemagick7 }
+    # Let MiniMagick auto-detect: uses `magick` (IM7) or `convert` (IM6) based on what is installed
 
     ext = case source_mime_type
           when 'image/png' then '.png'
@@ -561,7 +561,7 @@ class AppleMessagesForBusiness::SendRichLinkService
   def resize_image_to_icon_format(image_data)
     require 'mini_magick'
     require 'image_processing/mini_magick'
-    MiniMagick.configure { |c| c.cli = :imagemagick7 }
+    # Let MiniMagick auto-detect: uses `magick` (IM7) or `convert` (IM6) based on what is installed
 
     # Create a temporary file from the image data
     tempfile = Tempfile.new(['apple_maps_icon', '.png'])
