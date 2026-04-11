@@ -311,6 +311,14 @@ class AppleMessagesForBusiness::SendRichLinkService
           result = playwright_fetch_image(source, page_url)
         end
 
+        # CDN fallback: if source is a .webp URL and all else failed, try the .jpg/.jpeg variant.
+        # Many CDNs (booking.com, etc.) serve JPEG when the extension is changed.
+        if result.nil? && source.match?(/\.webp(\?|$)/i)
+          jpg_url = source.sub(/\.webp(\?)/i, '.jpg\1').sub(/\.webp$/, '.jpg')
+          Rails.logger.info "🔄 Rich Link - Trying JPEG URL variant: #{jpg_url.truncate(100)}"
+          result = download_and_encode_image(jpg_url)
+        end
+
         next unless result
 
         encoded_image, actual_mime_type = result

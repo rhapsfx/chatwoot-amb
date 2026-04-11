@@ -235,7 +235,7 @@ app.post('/scrape', async (req, res) => {
       try {
         const imgRes = await page.request.get(meta.image_url, {
           timeout: 8000,
-          headers: { Referer: url, Accept: 'image/webp,image/apng,image/*,*/*;q=0.8' },
+          headers: { Referer: url, Accept: 'image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5' },
         });
         if (imgRes.ok()) {
           const contentType = (imgRes.headers()['content-type'] || 'image/jpeg').split(';')[0].trim();
@@ -304,7 +304,7 @@ app.post('/fetch-image', async (req, res) => {
       timeout: 10000,
       headers: {
         Referer: referer || image_url,
-        Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+        Accept: 'image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
