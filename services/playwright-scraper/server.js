@@ -227,6 +227,31 @@ app.post('/scrape', async (req, res) => {
 
     const meta = await extractMetadata(page);
 
+    // Fetch the og:image from within the browser's network context so CDN-protected
+    // images (booking.com, etc.) are accessible — same cookies/session as the page load.
+    let imageData = null;
+    let imageMimeType = null;
+    if (meta.image_url) {
+      try {
+        const imgRes = await page.request.get(meta.image_url, {
+          timeout: 8000,
+          headers: { Referer: url, Accept: 'image/webp,image/apng,image/*,*/*;q=0.8' },
+        });
+        if (imgRes.ok()) {
+          const contentType = (imgRes.headers()['content-type'] || 'image/jpeg').split(';')[0].trim();
+          if (contentType.startsWith('image/') && !contentType.includes('gif')) {
+            const buffer = await imgRes.body();
+            if (buffer.length > 0 && buffer.length <= 204800) { // 200KB cap
+              imageData = buffer.toString('base64');
+              imageMimeType = contentType;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[scraper] Could not fetch image for ${url}: ${e.message}`);
+      }
+    }
+
     clearTimeout(timeout);
 
     if (res.headersSent) return;
@@ -240,6 +265,8 @@ app.post('/scrape', async (req, res) => {
       title: meta.title,
       description: meta.description,
       image_url: meta.image_url,
+      image_data: imageData,
+      image_mime_type: imageMimeType,
       video_url: meta.video_url,
       video_mime_type: meta.video_mime_type,
       favicon_url: meta.favicon_url,

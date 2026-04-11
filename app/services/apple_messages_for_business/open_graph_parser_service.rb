@@ -30,6 +30,21 @@ class AppleMessagesForBusiness::OpenGraphParserService
     #    and at least some content we can work with.
     if og_result_usable?(result)
       Rails.logger.info "✅ OpenGraph - HTTParty scrape usable (title: #{result[:title]&.truncate(60)})"
+
+      # If no real image was found (e.g. JSON-LD/og:image injected by JS, or only a placeholder GIF),
+      # still try Playwright for the image
+      if result[:image_url].blank? || result[:image_url].to_s.start_with?('data:image/gif')
+        Rails.logger.info '🎭 OpenGraph - No image from HTTParty, trying Playwright for image...'
+        playwright_data = AppleMessagesForBusiness::PlaywrightScraperClient.fetch(@url)
+        if playwright_data
+          playwright_result = build_result_from_playwright(playwright_data)
+          if playwright_result[:image_url].present?
+            Rails.logger.info "✅ OpenGraph - Playwright provided image: #{playwright_result[:image_url]&.truncate(100)}"
+            result[:image_url] = playwright_result[:image_url]
+          end
+        end
+      end
+
       return result
     end
 
@@ -86,6 +101,8 @@ class AppleMessagesForBusiness::OpenGraphParserService
       title: data[:title],
       description: data[:description],
       image_url: make_absolute_url(data[:image_url]),
+      image_data: data[:image_data],
+      image_mime_type: data[:image_mime_type],
       video_url: make_absolute_url(data[:video_url]),
       video_mime_type: data[:video_mime_type],
       favicon_url: make_absolute_url(data[:favicon_url]),
@@ -311,8 +328,8 @@ class AppleMessagesForBusiness::OpenGraphParserService
     schema_image = extract_schema_image(doc)
     return schema_image if schema_image.present?
 
-    # Try to find the largest image on the page
-    images = doc.css('img[src]')
+    # Try to find the largest image on the page (skip data: URIs — they are lazy-load placeholders)
+    images = doc.css('img[src]').reject { |img| img['src'].to_s.start_with?('data:') }
     largest_image = images.max_by do |img|
       width = img['width']&.to_i || 0
       height = img['height']&.to_i || 0
@@ -455,7 +472,7 @@ class AppleMessagesForBusiness::OpenGraphParserService
   end
 
   def make_absolute_url(url)
-    return url if url.blank? || url.start_with?('http')
+    return url if url.blank? || url.start_with?('http') || url.start_with?('data:')
 
     # Use final URL after redirects for base URL, fallback to original
     base = @final_url || @url

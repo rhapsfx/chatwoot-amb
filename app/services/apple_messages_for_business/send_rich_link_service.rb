@@ -181,6 +181,8 @@ class AppleMessagesForBusiness::SendRichLinkService
         updates = {
           'title' => og_data[:title] || content_attrs['title'],
           'image_url' => scraped_image || content_attrs['image_url'],
+          'image_data' => og_data[:image_data].presence,
+          'image_mime_type' => og_data[:image_mime_type].presence,
           'favicon_url' => scraped_favicon,
           'video_url' => og_data[:video_url] || content_attrs['video_url'],
           'video_mime_type' => og_data[:video_mime_type] || content_attrs['video_mime_type'],
@@ -285,7 +287,7 @@ class AppleMessagesForBusiness::SendRichLinkService
       content_attrs['image_url'],
       best_favicon,
       google_favicon
-    ].compact.uniq.reject { |s| s.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking}) }
+    ].compact.uniq.reject { |s| s.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking|data:image/gif}) }
 
     # Try candidates in order; stop at first success.
     # This ensures CDN-protected images (e.g. booking.com) fall through to favicon/google icon.
@@ -719,8 +721,8 @@ class AppleMessagesForBusiness::SendRichLinkService
       nil
     end
 
-    # Image looks like a tracking pixel or Akamai challenge asset
-    return false if image_url.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking})
+    # Image looks like a tracking pixel, Akamai challenge asset, or lazy-load placeholder GIF
+    return false if image_url.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking|data:image/gif})
     return false if image_url.blank?
 
     true
