@@ -315,12 +315,12 @@ class AppleMessagesForBusiness::OpenGraphParserService
   end
 
   def extract_image_url(doc)
-    # Try OpenGraph image first
-    og_image = doc.at_css('meta[property="og:image"]')&.[]('content')
+    # Try OpenGraph image first — strip newlines from malformed meta tag values
+    og_image = doc.at_css('meta[property="og:image"]')&.[]('content')&.lines&.first&.strip
     return make_absolute_url(og_image) if og_image.present?
 
     # Try Twitter Card image
-    twitter_image = doc.at_css('meta[name="twitter:image"]')&.[]('content')
+    twitter_image = doc.at_css('meta[name="twitter:image"]')&.[]('content')&.lines&.first&.strip
     return make_absolute_url(twitter_image) if twitter_image.present?
 
     # Try JSON-LD structured data (Product, ItemPage, etc.)

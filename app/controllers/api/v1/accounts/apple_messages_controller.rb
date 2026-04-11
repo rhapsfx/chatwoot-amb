@@ -7,9 +7,12 @@ class Api::V1::Accounts::AppleMessagesController < Api::V1::Accounts::BaseContro
       return
     end
 
+    cache_key = "parse_url:#{Digest::MD5.hexdigest(url)}"
+
     begin
-      parser_service = AppleMessagesForBusiness::OpenGraphParserService.new(url)
-      result = parser_service.parse
+      result = Rails.cache.fetch(cache_key, expires_in: 5.minutes) do
+        AppleMessagesForBusiness::OpenGraphParserService.new(url).parse
+      end
 
       if result[:success]
         render json: {

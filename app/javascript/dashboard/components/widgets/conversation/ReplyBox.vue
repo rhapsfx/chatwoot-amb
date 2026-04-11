@@ -793,6 +793,15 @@ export default {
                 this.richLinkCachedData
               );
 
+              // Clear the input immediately — messages are queued and send in background
+              if (!this.isPrivate) {
+                this.clearEmailField();
+              }
+              this.clearMessage();
+              this.hideEmojiPicker();
+              this.hideRichLinkPreview();
+              this.$emit('update:popOutReplyBox', false);
+
               // Send processed messages (may be multiple: text + rich link)
               /* eslint-disable no-await-in-loop */
               for (let i = 0; i < processedMessages.length; i += 1) {
@@ -818,15 +827,6 @@ export default {
                 }
               }
               /* eslint-enable no-await-in-loop */
-
-              if (!this.isPrivate) {
-                this.clearEmailField();
-              }
-
-              this.clearMessage();
-              this.hideEmojiPicker();
-              this.hideRichLinkPreview();
-              this.$emit('update:popOutReplyBox', false);
               return;
             } catch (error) {
               // If URL processing fails, fall through to normal send

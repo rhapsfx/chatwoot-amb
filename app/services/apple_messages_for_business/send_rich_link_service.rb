@@ -471,6 +471,10 @@ class AppleMessagesForBusiness::SendRichLinkService
   def download_and_encode_image(image_url)
     return nil if image_url.blank?
 
+    # Strip newlines — some sites embed multiple URLs in og:image with newline separators
+    image_url = image_url.to_s.lines.first&.strip
+    return nil if image_url.blank?
+
     Rails.logger.info "🔍 Rich Link - Starting download for: #{image_url}"
 
     headers = {
