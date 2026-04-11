@@ -20,7 +20,7 @@ export default {
       required: true,
     },
   },
-  emits: ['send-as-text', 'send-as-rich-link', 'dismiss'],
+  emits: ['sendAsText', 'sendAsRichLink', 'dismiss', 'previewLoaded'],
   data() {
     return {
       isLoading: false,
@@ -55,11 +55,10 @@ export default {
 
         if (result.success) {
           this.previewData = result.richLinkData;
-        } else {
-          console.error('Rich Link preview failed:', result.error);
+          this.$emit('previewLoaded', result.richLinkData);
         }
-      } catch (error) {
-        console.error('Rich Link preview error:', error);
+      } catch {
+        // preview load failure is silent — UI handles empty state
       } finally {
         this.isLoading = false;
       }
@@ -71,13 +70,13 @@ export default {
     },
 
     sendAsText() {
-      this.$emit('send-as-text', this.originalMessage);
+      this.$emit('sendAsText', this.originalMessage);
       this.dismissPreview();
     },
 
     sendAsRichLink() {
       if (this.previewData) {
-        this.$emit('send-as-rich-link', {
+        this.$emit('sendAsRichLink', {
           url: this.url,
           richLinkData: this.previewData,
           originalMessage: this.originalMessage,

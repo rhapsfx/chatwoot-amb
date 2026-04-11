@@ -145,6 +145,7 @@ export default {
       richLinkPreviewUrl: '',
       showRichLinkPreview: false,
       richLinkDetectionTimeout: null,
+      richLinkCachedData: null,
     };
   },
   computed: {
@@ -788,7 +789,8 @@ export default {
 
               const processedMessages = await processMessageForAppleMessages(
                 this.message,
-                conversationWithInbox
+                conversationWithInbox,
+                this.richLinkCachedData
               );
 
               // Send processed messages (may be multiple: text + rich link)
@@ -2096,6 +2098,7 @@ export default {
     hideRichLinkPreview() {
       this.showRichLinkPreview = false;
       this.richLinkPreviewUrl = '';
+      this.richLinkCachedData = null;
     },
 
     onRichLinkSendAsText(message) {
@@ -2216,6 +2219,7 @@ export default {
         @send-as-text="onRichLinkSendAsText"
         @send-as-rich-link="onRichLinkSendAsRichLink"
         @dismiss="onRichLinkDismiss"
+        @preview-loaded="richLinkCachedData = $event"
       />
       <TemplateSelector
         v-if="showMentions && hasSlashCommand"

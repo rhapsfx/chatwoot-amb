@@ -337,7 +337,8 @@ export const createRichLinkSuggestion = (url, richLinkData) => {
 // Process message content and create multiple messages for Apple Messages
 export const processMessageForAppleMessages = async (
   messageContent,
-  conversation
+  conversation,
+  cachedPreviewData = null
 ) => {
   if (!isAppleMessagesConversation(conversation)) {
     return [{ type: 'text', content: messageContent }];
@@ -354,12 +355,15 @@ export const processMessageForAppleMessages = async (
     const urlPart = parts.find(part => part.type === 'url');
 
     if (urlPart) {
-      // Convert URL to Rich Link with full message text
-      // Pass conversation to enable App Clips detection
-      const richLinkPreview = await createRichLinkPreview(
-        urlPart.content,
-        conversation
-      );
+      // Use cached preview data if available (avoids a second parse_url API call on Enter)
+      const richLinkPreview =
+        cachedPreviewData && cachedPreviewData.url === urlPart.content
+          ? {
+              success: true,
+              isAppClips: false,
+              richLinkData: cachedPreviewData,
+            }
+          : await createRichLinkPreview(urlPart.content, conversation);
 
       if (richLinkPreview.success) {
         return [
