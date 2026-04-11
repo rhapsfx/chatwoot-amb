@@ -291,6 +291,9 @@ class AppleMessagesForBusiness::SendRichLinkService
 
     # Try candidates in order; stop at first success.
     # This ensures CDN-protected images (e.g. booking.com) fall through to favicon/google icon.
+    page_url = content_attrs['url']
+    playwright_image_tried = false
+
     candidate_sources.each_with_index do |source, idx|
       Rails.logger.info "🔍 Rich Link - Trying candidate #{idx + 1}/#{candidate_sources.size}: #{source.truncate(100)}"
 
@@ -299,6 +302,15 @@ class AppleMessagesForBusiness::SendRichLinkService
 
       if source.start_with?('http')
         result = download_and_encode_image(source)
+
+        # When the main image download fails, try Playwright's CDN-aware image fetch once.
+        # This handles sites like booking.com where CDN images are blocked for server requests.
+        if result.nil? && !playwright_image_tried && page_url.present? && idx == 0
+          playwright_image_tried = true
+          Rails.logger.info '🎭 Rich Link - Direct download failed, trying Playwright image fetch...'
+          result = playwright_fetch_image(source, page_url)
+        end
+
         next unless result
 
         encoded_image, actual_mime_type = result
@@ -404,6 +416,48 @@ class AppleMessagesForBusiness::SendRichLinkService
   APPLE_SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png].freeze
   # Apple spec: image binary size must be 200KB or smaller
   APPLE_IMAGE_SIZE_LIMIT = 200.kilobytes
+
+  # Fetch an image via Playwright's browser network context, bypassing CDN protection.
+  # Used as a fallback when the direct HTTParty download fails.
+  # Returns [base64_string, mime_type] or nil on failure.
+  def playwright_fetch_image(image_url, page_url = nil)
+    service_url = ENV.fetch('PLAYWRIGHT_SCRAPER_URL', 'http://localhost:3001')
+
+    response = HTTParty.post(
+      "#{service_url}/fetch-image",
+      body: { image_url: image_url, referer: page_url }.to_json,
+      headers: { 'Content-Type' => 'application/json', 'Accept' => 'application/json' },
+      timeout: 15
+    )
+
+    return nil unless response.success?
+
+    data = response.parsed_response
+    return nil unless data.is_a?(Hash) && data['success'] && data['image_data'].present?
+
+    content_type = data['image_mime_type'].to_s
+    image_data = Base64.decode64(data['image_data'])
+
+    # Convert unsupported formats (webp, etc.) to JPEG — same pipeline as download_and_encode_image
+    unless APPLE_SUPPORTED_IMAGE_TYPES.include?(content_type)
+      Rails.logger.info "🔄 Rich Link - Playwright: converting #{content_type} to image/jpeg"
+      image_data = convert_to_jpeg(image_data, content_type)
+      content_type = 'image/jpeg'
+      return nil if image_data.nil?
+    end
+
+    if image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
+      image_data = compress_image_to_limit(image_data, content_type)
+      content_type = 'image/jpeg'
+      return nil if image_data.nil? || image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
+    end
+
+    Rails.logger.info "✅ Rich Link - Playwright image fetch succeeded (#{content_type}, #{image_data.bytesize} bytes)"
+    [Base64.strict_encode64(image_data), content_type]
+  rescue StandardError => e
+    Rails.logger.warn "⚠️ Rich Link - Playwright image fetch failed: #{e.message}"
+    nil
+  end
 
   # Returns [base64_string, mime_type] or nil on failure
   def download_and_encode_image(image_url)

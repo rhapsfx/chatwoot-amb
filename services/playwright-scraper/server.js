@@ -285,6 +285,54 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
+// Lightweight image fetch — uses browser network context to bypass CDN protection.
+// Does NOT load the full page; creates a minimal context with the right Referer.
+app.post('/fetch-image', async (req, res) => {
+  const { image_url, referer } = req.body || {};
+  if (!image_url || typeof image_url !== 'string') {
+    return res.status(400).json({ success: false, error: 'image_url is required' });
+  }
+
+  let context = null;
+  try {
+    const b = await getBrowser();
+    context = await b.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15',
+    });
+
+    const imgRes = await context.request.get(image_url, {
+      timeout: 10000,
+      headers: {
+        Referer: referer || image_url,
+        Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+
+    if (!imgRes.ok()) {
+      return res.json({ success: false, error: `HTTP ${imgRes.status()}` });
+    }
+
+    const contentType = (imgRes.headers()['content-type'] || 'image/jpeg').split(';')[0].trim();
+    if (!contentType.startsWith('image/') || contentType.includes('gif')) {
+      return res.json({ success: false, error: `Unsupported type: ${contentType}` });
+    }
+
+    const buffer = await imgRes.body();
+    if (buffer.length === 0 || buffer.length > 204800) {
+      return res.json({ success: false, error: `Image size out of range: ${buffer.length}` });
+    }
+
+    console.log(`[scraper] fetch-image OK — ${buffer.length} bytes (${contentType})`);
+    res.json({ success: true, image_data: buffer.toString('base64'), image_mime_type: contentType });
+  } catch (err) {
+    console.error(`[scraper] fetch-image error: ${err.message}`);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    if (context) context.close().catch(() => {});
+  }
+});
+
 app.get('/health', async (_req, res) => {
   try {
     const b = await getBrowser();
