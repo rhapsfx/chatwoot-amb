@@ -287,7 +287,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         # After handling the interactive response, process the updated state.
         # Skip if: handler is waiting for user input, menu selection handled it,
         # or handler put us in DEMO_MODE (it already sent its own completion message).
-        waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1]
+        waiting_states = %w[AHB1_2 AHB1 AHG1 AHJ1 AHC1]
         skip_process_state_for_request_ids = %w[lp_menu_0319]
 
         if waiting_states.include?(@bot_state)
@@ -915,13 +915,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # NOTE: Removed blocking sleep(15.0) that was causing Rack timeouts
     # Schedule AR question after a short delay so the attachment is visible first
     log_info '[Bot] 🎨 Scheduling AR view question after AR attachment delivery'
-    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 8.0)
+    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 15.0)
 
     return if scheduled
 
     # Fallback for Redis/Sidekiq outages: run inline after a short delay
     log_warn '[Bot] ⚠️ AR view question scheduling failed; falling back to inline delay'
-    sleep 8.0
+    sleep 15.0
     send_ar_view_question_and_state
   end
 
@@ -1678,12 +1678,12 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     send_ar_file
     # State will be set to DEMO_MODE by handle_keyword_message, then
     # send_ar_view_question_and_state transitions to AHD1 so the response is handled.
-    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 8.0)
+    scheduled = schedule_delayed_action(:send_ar_view_question_and_state, delay: 15.0)
     return if scheduled
 
     # Fallback for Redis/Sidekiq outages: run inline after a short delay
     log_warn '[Bot] ⚠️ AR view question scheduling failed in demo; falling back to inline delay'
-    sleep 8.0
+    sleep 15.0
     send_ar_view_question_and_state
   end
 
@@ -2248,8 +2248,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_lesson_time_picker(location)
     @sender.send_lesson_time_picker(location)
-    # Schedule a proactive 10-second reminder if this is a fresh send (not a retry already in AHH1)
-    schedule_delayed_action(:send_time_picker_waiting_reminder, delay: 10.0) unless @bot_state == 'AHH1'
+    # Schedule a proactive reminder if this is a fresh send (not a retry already in AHH1)
+    schedule_delayed_action(:send_time_picker_waiting_reminder, delay: 15.0) unless @bot_state == 'AHH1'
   end
 
   def send_time_picker_waiting_reminder
@@ -2288,9 +2288,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   # Returns true if the form was sent successfully, false if template not found.
   # Callers are responsible for fallback behaviour.
   def send_guitar_info_form
-    return if @sender.send_guitar_info_form
-
-    handle_guitar_list_prompt
+    @sender.send_guitar_info_form
   end
 
   def handle_large_form_response(content_attributes)
@@ -2422,12 +2420,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     reset_retry_count
     send_text_message('Please find the store information of your appointment')
 
-    # Then send rich link message (Open Graph scraping will handle title/image automatically)
-    send_rich_link(
-      url: maps_url,
-      title: store[:name],
-      image_asset: nil
-    )
+    # Send as plain text — Apple MSP natively renders maps.apple.com URLs as
+    # map-thumbnail rich links. Using send_rich_link triggers OG scraping which
+    # embeds the generic Maps app icon instead of the live map preview.
+    send_text_message(maps_url)
 
     # Wait for rich link to be fully delivered before sending time picker
     sleep(2.0)
