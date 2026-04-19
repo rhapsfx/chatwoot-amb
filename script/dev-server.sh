@@ -610,7 +610,7 @@ ask_tailscale_funnel_url() {
 # Function to start Tailscale Funnel
 start_tailscale_funnel() {
     if [ "${SKIP_TAILSCALE:-false}" = "true" ]; then
-        print_warning "Tailscale skipped (--skip-tailscale)"
+        print_warning "Tailscale skipped (--quick)"
         return 0
     fi
     if is_running "$TAILSCALE_FUNNEL_PID_FILE"; then
@@ -1304,7 +1304,7 @@ restart_services() {
     
     # Test external connectivity after restart (unless skipped)
     if [ "${SKIP_TAILSCALE:-false}" = "true" ]; then
-        print_warning "Tailscale connectivity verification skipped (--skip-tailscale)"
+        print_warning "Tailscale connectivity verification skipped (--quick)"
     else
         print_status "Verifying external connectivity after restart..."
         sleep 3  # Give services a moment to fully start
@@ -1411,10 +1411,10 @@ stop_all_services() {
 # Function to show help
 show_help() {
     echo -e "\n${BLUE}Chatwoot Development Server Management${NC}"
-    echo -e "Usage: $0 {start|start-public|stop|restart|status|...} [--skip-tailscale]"
+    echo -e "Usage: $0 {start|start-public|stop|restart|status|...} [--quick]"
     echo ""
     echo -e "${YELLOW}Global Flags:${NC}"
-    echo -e "  --skip-tailscale   - Skip Tailscale start/stop/verification (works with any command)"
+    echo -e "  --quick   - Skip Tailscale start/stop/verification (works with any command)"
     echo ""
     echo -e "${YELLOW}Commands:${NC}"
     echo -e "  start              - Start Rails, Sidekiq, and Playwright scraper (localhost only)"
@@ -1478,11 +1478,11 @@ show_help() {
     echo ""
 }
 
-# Main script logic — parse --skip-tailscale from any position
+# Main script logic — parse --quick from any position
 SKIP_TAILSCALE=false
 COMMAND=""
 for arg in "$@"; do
-    if [ "$arg" = "--skip-tailscale" ]; then
+    if [ "$arg" = "--quick" ]; then
         SKIP_TAILSCALE=true
     elif [ -z "$COMMAND" ]; then
         COMMAND="$arg"

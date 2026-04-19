@@ -206,6 +206,9 @@
       "OPTED_OUT_BADGE": "Opted Out",
       "USER_LEFT": "User left the conversation and opted out of invitation messages."
     },
+    "PAYMENT": {
+      "PAY": "Pay"
+    },
     "RICH_LINK": {
       "MODAL_TITLE": "Rich Link",
       "MODAL_DESCRIPTION": "Create rich links with images, titles, and descriptions - or generate App Clips",

@@ -45,6 +45,7 @@ import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
 import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
 import AppleCustomAppBubble from './bubbles/AppleCustomApp.vue';
 import AppleInvitationBubble from './bubbles/AppleInvitation.vue';
+import ApplePayBubble from './bubbles/ApplePay.vue';
 import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
 
 import MessageError from './MessageError.vue';
@@ -336,6 +337,10 @@ const componentToRender = computed(() => {
 
   if (props.contentType === CONTENT_TYPES.APPLE_INVITATION) {
     return AppleInvitationBubble;
+  }
+
+  if (props.contentType === CONTENT_TYPES.APPLE_PAY) {
+    return ApplePayBubble;
   }
 
   // Check for tapback reactions (Apple Messages)

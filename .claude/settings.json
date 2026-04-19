@@ -6,7 +6,9 @@
       "Bash(curl -s \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
       "Bash(curl -sL \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
       "Bash(python3 -m json.tool)",
-      "Bash(magick -version)"
+      "Bash(magick -version)",
+      "Bash(identify -verbose /tmp/test_pin3.png)",
+      "Bash(identify -verbose public/apple-messages/list-circle.png)"
     ]
   }
 }

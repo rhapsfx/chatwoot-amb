@@ -2,6 +2,8 @@
 set -euo pipefail
 
 COMPOSE_FILE="docker-compose.production.yml"
+ENV_FILE=".env.production"
+AUTO_ENV_FILE="tmp/.env.production.auto"
 BUILD_STAMP_FILE="tmp/.docker-production-build"
 GIT_HEAD="$(git rev-parse HEAD)"
 CERTS_DIR="certs/apple_pay"
@@ -11,6 +13,8 @@ DOCKER_CONFIG_OVERRIDE=""
 BUILDX_CONFIG_OVERRIDE=""
 GLOBAL_DOCKER_CONFIG_FILE=""
 GLOBAL_DOCKER_CONFIG_BACKUP=""
+FORCE_BUILD=false
+NO_CACHE=false
 
 restore_certs_if_missing() {
   if [ -d "$CERTS_BACKUP_DIR" ]; then
@@ -82,6 +86,40 @@ docker_cmd_legacy_build() {
   fi
 }
 
+compose_cmd() {
+  docker_cmd compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+compose_cmd_legacy_build() {
+  docker_cmd_legacy_build compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+ensure_auto_env_file() {
+  local source_env=".env"
+  local redis_password=""
+
+  mkdir -p "$(dirname "$AUTO_ENV_FILE")"
+
+  if [ -f "$AUTO_ENV_FILE" ]; then
+    redis_password="$(sed -n 's/^REDIS_PASSWORD=//p' "$AUTO_ENV_FILE" | tail -n 1)"
+  fi
+
+  if [ -z "$redis_password" ]; then
+    redis_password="$(openssl rand -hex 24)"
+  fi
+
+  cp "$source_env" "$AUTO_ENV_FILE"
+  if grep -q '^REDIS_PASSWORD=' "$AUTO_ENV_FILE"; then
+    sed -i.bak "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=$redis_password/" "$AUTO_ENV_FILE"
+  else
+    printf '\nREDIS_PASSWORD=%s\n' "$redis_password" >> "$AUTO_ENV_FILE"
+  fi
+  rm -f "$AUTO_ENV_FILE.bak"
+
+  ENV_FILE="$AUTO_ENV_FILE"
+  echo "=== .env.production not found; using $AUTO_ENV_FILE with a production Redis password ==="
+}
+
 build_images_with_global_config_fallback() {
   local config_file="$DOCKER_CONFIG_SOURCE/config.json"
   if [ ! -f "$config_file" ]; then
@@ -94,12 +132,22 @@ build_images_with_global_config_fallback() {
   sed '/"credsStore"[[:space:]]*:/d' "$GLOBAL_DOCKER_CONFIG_BACKUP" > "$config_file"
 
   echo "=== Retrying build with sanitized global Docker config and BuildKit disabled ==="
-  DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f "$COMPOSE_FILE" build web worker
+  if [ "$NO_CACHE" = true ]; then
+    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build --no-cache web worker
+  else
+    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build web worker
+  fi
 }
 
 build_images() {
   local build_output
-  if build_output="$(docker_cmd compose -f "$COMPOSE_FILE" build web worker 2>&1)"; then
+  local build_args=(build)
+  if [ "$NO_CACHE" = true ]; then
+    build_args+=(--no-cache)
+  fi
+  build_args+=(web worker)
+
+  if build_output="$(compose_cmd "${build_args[@]}" 2>&1)"; then
     printf '%s\n' "$build_output"
     return 0
   fi
@@ -108,7 +156,7 @@ build_images() {
   if printf '%s' "$build_output" | grep -qi "keychain cannot be accessed"; then
     echo "=== Retrying build with BuildKit disabled to bypass keychain-backed credential flow ==="
     local legacy_output
-    if legacy_output="$(docker_cmd_legacy_build compose -f "$COMPOSE_FILE" build web worker 2>&1)"; then
+    if legacy_output="$(compose_cmd_legacy_build "${build_args[@]}" 2>&1)"; then
       printf '%s\n' "$legacy_output"
       return 0
     fi
@@ -128,14 +176,52 @@ build_images() {
 trap cleanup EXIT
 setup_docker_config_fallback
 
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force|-f)
+      FORCE_BUILD=true
+      shift
+      ;;
+    --no-cache)
+      NO_CACHE=true
+      FORCE_BUILD=true
+      shift
+      ;;
+    --env-file)
+      if [ $# -lt 2 ]; then
+        echo "=== Missing value for --env-file ==="
+        exit 1
+      fi
+      ENV_FILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "=== Unknown option: $1 ==="
+      echo "Usage: $0 [--force|-f] [--no-cache] [--env-file FILE]"
+      exit 1
+      ;;
+  esac
+done
+
+if [ ! -f "$ENV_FILE" ]; then
+  if [ "$ENV_FILE" = ".env.production" ] && [ -f ".env" ]; then
+    ensure_auto_env_file
+  else
+    echo "=== Missing $ENV_FILE ==="
+    echo "Use --env-file FILE to point to a production env file."
+    exit 1
+  fi
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "=== Missing $ENV_FILE ==="
+  echo "Create $ENV_FILE for production Docker settings. Keep local dev values in .env."
+  exit 1
+fi
+
 if [ -d "$CERTS_DIR" ]; then
   mkdir -p "$CERTS_BACKUP_DIR"
   cp -f "$CERTS_DIR"/* "$CERTS_BACKUP_DIR"/ 2>/dev/null || true
-fi
-
-FORCE_BUILD=false
-if [ "${1:-}" = "--force" ] || [ "${1:-}" = "-f" ]; then
-  FORCE_BUILD=true
 fi
 
 should_build=true
@@ -162,10 +248,10 @@ else
 fi
 
 echo "=== Starting dependencies (postgres, redis) ==="
-docker_cmd compose -f "$COMPOSE_FILE" up -d postgres redis
+compose_cmd up -d postgres redis
 
 echo "=== Starting services ==="
-docker_cmd compose -f "$COMPOSE_FILE" up -d web worker
+compose_cmd up -d web worker
 
 # Hot-patch: copy any locally modified or new Ruby/config files into running containers.
 # This ensures uncommitted changes are live without a full image rebuild.
@@ -191,7 +277,7 @@ hotpatch_ruby_files() {
   done
 
   echo "=== Restarting web and worker to load patched code (60s timeout for Sidekiq graceful shutdown) ==="
-  docker_cmd compose -f "$COMPOSE_FILE" restart --timeout 60 web worker
+  compose_cmd restart --timeout 60 web worker
 }
 hotpatch_ruby_files
 
@@ -202,7 +288,7 @@ else
 fi
 
 echo "=== Current container status ==="
-docker_cmd compose -f "$COMPOSE_FILE" ps
+compose_cmd ps
 
 echo "=== Health checks (if defined) ==="
 docker_cmd ps --format "table {{.Names}}\t{{.Status}}" | grep -E "chatwoot-(web|worker|postgres|redis)" || true

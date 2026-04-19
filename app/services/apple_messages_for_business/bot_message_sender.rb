@@ -692,7 +692,7 @@ module AppleMessagesForBusiness
               'reply_style' => 'icon',
               'event' => {
                 'identifier' => SecureRandom.uuid,
-                'title' => "Guitar Lesson - #{guitar}",
+                'title' => 'Scheduled Guitar lesson',
                 'location' => {
                   'latitude' => location[:latitude],
                   'longitude' => location[:longitude],
@@ -947,40 +947,66 @@ module AppleMessagesForBusiness
       []
     end
 
-    # Load pin-circle.png from public/apple-messages/light/ and encode for icon style (120×120).
+    # Load the static pin-circle icon, flatten transparency onto white, output as JPEG.
+    # JPEG has no alpha channel — without explicit flattening ImageMagick fills transparent
+    # pixels with black, making the icon appear as a solid black square on device.
     def load_pin_circle_image
-      path = Rails.public_path.join('apple-messages/light/pin-circle.png')
-      return nil unless File.exist?(path)
+      png_path = Rails.public_path.join('apple-messages/light/pin-circle.png')
+      return nil unless File.exist?(png_path)
 
-      raw = File.binread(path)
-      encoded = encode_image_for_amb(raw, width: 120, height: 120)
+      output_tmp = Tempfile.new(['amb_pin', '.jpg'])
+      output_tmp.close
+
+      MiniMagick::Tool::Convert.new do |cmd|
+        cmd.background('white')
+        cmd << png_path.to_s
+        cmd.flatten          # replace transparency with white background
+        cmd.resize('120x120')
+        cmd.quality('90')
+        cmd << output_tmp.path
+      end
+
+      encoded = Base64.strict_encode64(File.binread(output_tmp.path))
       { 'identifier' => 'pin_circle', 'data' => encoded, 'description' => 'Location pin' }
     rescue StandardError => e
       log_error "[Bot] Failed to load pin-circle image: #{e.message}"
       nil
+    ensure
+      output_tmp&.unlink
     end
 
     # Resize image to exact dimensions, convert to JPEG at 72 DPI (Apple MSP requirement).
     # Uses resize_to_fill so the output is always exactly width×height.
     # Falls back to raw base64 if ImageMagick is unavailable.
-    def encode_image_for_amb(raw_bytes, width:, height:)
+    def encode_image_for_amb(raw_bytes, width:, height:, format: :jpeg)
       source_tmp = Tempfile.new(['amb_img', '.png'])
       source_tmp.binmode
       source_tmp.write(raw_bytes)
       source_tmp.flush
       source_tmp.close
 
-      processed = ImageProcessing::MiniMagick
-                  .source(source_tmp.path)
-                  .resize_to_fill(width, height)
-                  .convert('jpeg')
-                  .saver(quality: 85)
-                  .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
-                  .call
+      pipeline = ImageProcessing::MiniMagick
+                 .source(source_tmp.path)
+                 .resize_to_fill(width, height)
+
+      processed = if format == :png
+                    pipeline
+                      .convert('png')
+                      # -background none prevents transparent pixels from being filled with black
+                      # during resize_to_fill canvas extension
+                      .custom { |cmd| cmd.background('none').units('PixelsPerInch').density('72x72') }
+                      .call
+                  else
+                    pipeline
+                      .convert('jpeg')
+                      .saver(quality: 85)
+                      .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
+                      .call
+                  end
 
       Base64.strict_encode64(File.binread(processed.path))
     rescue StandardError => e
-      log_error "[Bot] Image encoding failed (#{width}×#{height}): #{e.message}"
+      log_error "[Bot] Image encoding failed (#{width}×#{height}, #{format}): #{e.message}"
       Base64.strict_encode64(raw_bytes)
     ensure
       source_tmp&.unlink
@@ -1100,7 +1126,7 @@ module AppleMessagesForBusiness
     def get_guitar_image_identifier(guitar_name)
       return nil if guitar_name.blank?
 
-      fallback_identifier = 'guitar_lespaul'
+      fallback_identifier = 'guitar_stratocaster'
 
       guitar_image_map = {
         'Fender American Elite Stratocaster' => 'guitar_stratocaster',

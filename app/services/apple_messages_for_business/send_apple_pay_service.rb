@@ -277,7 +277,6 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
   # Fetch and encode images from AppleListPickerImage model
   # Returns array of base64-encoded images for the interactive message
   def fetch_images
-    # Collect all unique image identifiers from payment_data
     identifiers = [
       @payment_data['received_image_identifier'],
       @payment_data['reply_image_identifier']
@@ -285,35 +284,15 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
 
     return [] if identifiers.empty?
 
-    # Fetch images from database
-    # Get inbox_id from the channel's inbox
-    inbox_id = @channel.inbox&.id
-
-    return [] unless inbox_id
-
-    picker_images = AppleListPickerImage
-                    .where(inbox_id: inbox_id, identifier: identifiers)
-                    .includes(image_attachment: :blob)
-
-    # Convert to base64 array format
-    picker_images.filter_map do |picker_image|
-      next unless picker_image.image.attached?
-
-      begin
-        # Download and encode image as base64
-        image_data = picker_image.image.download
-        base64_data = Base64.strict_encode64(image_data)
-
-        {
-          identifier: picker_image.identifier,
-          data: base64_data,
-          description: picker_image.description || ''
-        }
-      rescue StandardError => e
-        Rails.logger.error "[AMB ApplePay] Failed to encode image #{picker_image.identifier}: #{e.message}"
-        nil
-      end
-    end
+    # Use ImageFetchService for three-tier fallback:
+    # Tier 1: inbox-specific (AppleListPickerImage)
+    # Tier 2: account-wide shared (SharedAppleImage) — guitar images live here
+    # Tier 3: embedded (none for Apple Pay)
+    AppleMessagesForBusiness::ImageFetchService.new(
+      account_id: @channel.inbox&.account_id,
+      inbox_id: @channel.inbox&.id,
+      embedded_images: []
+    ).fetch_and_encode(identifiers)
   end
 
   # Construct payment gateway URL

@@ -190,9 +190,9 @@ class ContentAttributeValidator < ActiveModel::Validator
         content_attrs.delete('timezone_offset') # Remove from top level
       end
 
-      # Apple MSP requires specific event structure
+      # Apple MSP requires specific event structure, but preserve a provided title.
       event['identifier'] ||= '1' # Apple sample uses "1"
-      event['title'] = '' # Apple sample uses empty string for title
+      event['title'] = event['title'].presence || record.content || 'Select a time'
 
       content_attrs['event'] = event
 

@@ -593,12 +593,13 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
         service.send(:send_ar_file)
       end
 
-      it 'falls back to guitar list when form template missing' do
+      it 'asks for name when form template missing' do
         conversation.custom_attributes = { 'bot_state' => 'AHA3' }
         conversation.save!
-        allow(service).to receive(:handle_guitar_list_prompt)
-        expect(service).to receive(:handle_guitar_list_prompt)
-        service.send(:send_guitar_info_form)
+        allow(service.instance_variable_get(:@contact)).to receive(:additional_attributes)
+          .and_return({ 'apple_messages_capabilities' => 'FORM' })
+        expect(service).to receive(:send_text_message).with("What's your name?")
+        service.send(:handle_form_or_name_prompt)
       end
     end
 
@@ -660,12 +661,12 @@ RSpec.describe AppleMessagesForBusiness::AcousticHouseBotService do
       it 'sends first retry message after one attempt' do
         conversation.custom_attributes = { 'retry_count' => 0, 'bot_state' => 'AHC1' }
         conversation.save!
-        expect(service).to receive(:send_text_message).with(/Please select a guitar/)
+        expect(service).to receive(:send_text_message).with(/waiting for you to select a guitar/)
         service.send(:handle_guitar_list_catcher)
       end
 
-      it 'resends list picker after three attempts' do
-        conversation.custom_attributes = { 'retry_count' => 2, 'bot_state' => 'AHC1' }
+      it 'resends list picker after two attempts' do
+        conversation.custom_attributes = { 'retry_count' => 1, 'bot_state' => 'AHC1' }
         conversation.save!
         expect(service).to receive(:send_guitar_list_picker)
         service.send(:handle_guitar_list_catcher)

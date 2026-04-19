@@ -136,11 +136,24 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
 
         Rails.logger.info "[AMB ListPicker] Existing image found: #{existing_image.present?}, has attachment: #{existing_image&.image&.attached?}"
 
-        # Skip if already saved with attachment
+        # Skip if already saved with same format; purge stale cache if format changed (e.g. PNG→JPEG fix)
         if existing_image&.image&.attached?
-          Rails.logger.info "[AMB ListPicker] Image #{image_data['identifier']} already exists, skipping"
-          skipped_count += 1
-          next
+          bytes = Base64.strict_decode64(image_data['data']).byteslice(0, 4).bytes
+          new_ct = if bytes[0..1] == [0xFF, 0xD8] then 'image/jpeg'
+                   elsif bytes[0..3] == [0x89, 0x50, 0x4E, 0x47] then 'image/png'
+                   else
+                     existing_image.image.content_type
+                   end
+
+          if new_ct == existing_image.image.content_type
+            Rails.logger.info "[AMB ListPicker] Image #{image_data['identifier']} already exists, skipping"
+            skipped_count += 1
+            next
+          end
+
+          Rails.logger.info "[AMB ListPicker] Image #{image_data['identifier']} format changed " \
+                            "(#{existing_image.image.content_type} → #{new_ct}), replacing stale cache"
+          existing_image.image.purge
         end
 
         # Create or update the image record

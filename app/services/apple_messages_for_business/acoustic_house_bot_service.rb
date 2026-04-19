@@ -1346,8 +1346,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         return
       end
 
-      # Normal flow: send wallet pass then continue
-      send_wallet_pass
+      # Send the wallet pass immediately after the appointment is scheduled.
+      send_wallet_pass_once
       update_bot_state('AHH2')
       handle_continue_prompt
     else
@@ -2214,6 +2214,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def send_wallet_pass
     @sender.send_wallet_pass
+  end
+
+  def send_wallet_pass_once
+    return if get_conversation_attribute('wallet_pass_sent')
+
+    send_wallet_pass
+    update_conversation_attribute('wallet_pass_sent', true)
   end
 
   def send_delivery_confirmation(address_data, customer_name = nil)
