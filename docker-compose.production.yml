@@ -45,14 +45,16 @@ services:
     platform: linux/arm64
     networks:
       - backend_net           # internal only — NOT on cloudflare network
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env for production compose}
     # requirepass enforces authentication on every connection
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command: sh -ec 'exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"'
     volumes:
       - redis_data:/data
     # No host port binding — Redis is internal to the Docker network only.
     # Access it for debugging via: docker exec -it chatwoot-redis redis-cli -a $REDIS_PASSWORD
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $REDIS_PASSWORD ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -101,8 +103,9 @@ services:
       POSTGRES_USERNAME: chatwoot_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # Redis — include password in URL
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Redis — pass password separately to avoid URI encoding issues
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
       # Application
       FRONTEND_URL: https://msp.rhaps.net
@@ -200,8 +203,9 @@ services:
       POSTGRES_USERNAME: chatwoot_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # Redis — include password in URL
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Redis — pass password separately to avoid URI encoding issues
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
       ACTIVE_STORAGE_SERVICE: local
 
