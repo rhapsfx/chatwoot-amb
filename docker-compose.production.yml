@@ -147,6 +147,7 @@ services:
       - ./storage:/app/storage
       - ./log:/app/log
       - ./tmp:/app/tmp
+      - ./certs/apple_pay:/app/certs/apple_pay:ro
     command: >
       sh -c "
         echo 'Waiting for database...' &&
@@ -247,6 +248,7 @@ services:
       - ./storage:/app/storage
       - ./log:/app/log
       - ./tmp:/app/tmp
+      - ./certs/apple_pay:/app/certs/apple_pay:ro
     command: bundle exec sidekiq -C config/sidekiq.yml
     healthcheck:
       # Use SidekiqAlive's built-in HTTP endpoint instead of relying on procps.

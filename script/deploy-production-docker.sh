@@ -195,7 +195,11 @@ hotpatch_ruby_files() {
 }
 hotpatch_ruby_files
 
-echo "=== Skipping Apple Pay certificate deployment ==="
+if [ -f "$CERTS_DIR/apple_pay_cert.pem" ] && [ -f "$CERTS_DIR/apple_pay_private.key" ]; then
+  echo "=== Apple Pay certs available via bind mount: $CERTS_DIR ==="
+else
+  echo "=== Apple Pay certs missing on host; containers will not have /app/certs/apple_pay merchant files ==="
+fi
 
 echo "=== Current container status ==="
 docker_cmd compose -f "$COMPOSE_FILE" ps
