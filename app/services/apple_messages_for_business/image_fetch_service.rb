@@ -143,7 +143,9 @@ class AppleMessagesForBusiness::ImageFetchService
                 .resize_to_limit(300, 300)
                 .convert('jpeg')
                 .saver(quality: 85)
-                .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
+                # Flatten transparency onto white before JPEG conversion.
+                # JPEG has no alpha channel — without this, transparent pixels become black.
+                .custom { |cmd| cmd.background('white').flatten.units('PixelsPerInch').density('72x72') }
                 .call
 
     result = File.binread(processed.path)
