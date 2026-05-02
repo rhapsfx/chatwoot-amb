@@ -7,7 +7,6 @@ class Conversations::MessageWindowService
   end
 
   def can_reply?
-    # Check if user has opted out of Apple Messages (prevents replies)
     return false if apple_messages_user_blocked?
 
     return true if messaging_window.blank?
@@ -25,14 +24,14 @@ class Conversations::MessageWindowService
       messenger_messaging_window
     when 'Channel::Instagram'
       instagram_messaging_window
+    when 'Channel::Tiktok'
+      tiktok_messaging_window
+    when 'Channel::AppleMessagesForBusiness'
+      nil
     when 'Channel::Whatsapp'
       MESSAGING_WINDOW_24_HOURS
     when 'Channel::TwilioSms'
       twilio_messaging_window
-    when 'Channel::AppleMessagesForBusiness'
-      # Apple Messages has no time-based messaging window restrictions
-      # But we handle blocking via apple_messages_user_blocked? check above
-      nil
     end
   end
 
@@ -62,13 +61,18 @@ class Conversations::MessageWindowService
     meta_messaging_window('ENABLE_INSTAGRAM_CHANNEL_HUMAN_AGENT')
   end
 
+  def tiktok_messaging_window
+    48.hours
+  end
+
   def meta_messaging_window(config_key)
     GlobalConfigService.load(config_key, nil) ? MESSAGING_WINDOW_7_DAYS : MESSAGING_WINDOW_24_HOURS
   end
 
   def last_incoming_message
-    @last_incoming_message ||= @conversation.messages&.incoming&.last
+    @last_incoming_message ||= @conversation.messages.where(account_id: @conversation.account_id).incoming&.last
   end
+end
 
   # Check if the contact has opted out of Apple Messages for Business
   def apple_messages_user_blocked?

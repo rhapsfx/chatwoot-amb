@@ -82,6 +82,8 @@ class Message < ApplicationRecord
 
   # when you have a temperory id in your frontend and want it echoed back via action cable
   attr_accessor :echo_id
+  # Transient flag used to skip waiting_since clearing for specific bot/system messages.
+  attr_accessor :preserve_waiting_since
 
   enum message_type: { incoming: 0, outgoing: 1, activity: 2, template: 3 }
   enum content_type: {
@@ -187,6 +189,13 @@ class Message < ApplicationRecord
     data
   end
 
+  def webhook_push_event_data
+    push_event_data.merge(
+      content: Messages::WebhookContentNormalizer.normalize(content),
+      processed_message_content: Messages::WebhookContentNormalizer.normalize(processed_message_content)
+    )
+  end
+
   def webhook_data
     data = {
       account: account.webhook_data,
@@ -210,6 +219,11 @@ class Message < ApplicationRecord
   # Method to get content with survey URL for outgoing channel delivery
   def outgoing_content
     MessageContentPresenter.new(self).outgoing_content
+  end
+
+  # Raw content with survey URL (no markdown rendering) for webhook consumers
+  def webhook_content
+    MessageContentPresenter.new(self).webhook_content
   end
 
   def email_notifiable_message?
@@ -273,21 +287,34 @@ class Message < ApplicationRecord
     Messages::SearchDataPresenter.new(self).search_data
   end
 
+  # Returns message content suitable for LLM consumption
+  # Falls back to audio transcription or attachment placeholder when content is nil
+  def content_for_llm
+    return content if content.present?
+
+    audio_transcription = attachments
+                          .where(file_type: :audio)
+                          .filter_map { |att| att.meta&.dig('transcribed_text') }
+                          .join(' ')
+                          .presence
+    return "[Voice Message] #{audio_transcription}" if audio_transcription.present?
+
+    '[Attachment]' if attachments.any?
+  end
+
   private
 
   def normalize_sender_type(sender_type)
-    # Normalize sender_type from database class names to frontend-expected values
     case sender_type
     when 'AgentBot'
       'agent_bot'
     when 'User', 'AccountUser'
-      'User' # Both User and AccountUser represent agents, frontend expects 'User'
+      'User'
     when 'Contact'
       'Contact'
     when 'Captain::Assistant'
       'captain_assistant'
     else
-      # For any other types, convert to snake_case
       sender_type&.underscore
     end
   end
@@ -342,13 +369,13 @@ class Message < ApplicationRecord
       end
     end
 
-    # Default fallback
     self.content_type ||= Message.content_types[:text]
   end
 
   def execute_after_create_commit_callbacks
     # rails issue with order of active record callbacks being executed https://github.com/rails/rails/issues/20911
     reopen_conversation
+    mark_pending_conversation_as_open_for_human_response
     set_conversation_activity
     dispatch_create_events
     send_reply
@@ -361,12 +388,25 @@ class Message < ApplicationRecord
   end
 
   def update_waiting_since
-    if human_response? && !private && conversation.waiting_since.present?
+    clear_waiting_since_on_outgoing_response if conversation.waiting_since.present? && !private
+    set_waiting_since_on_incoming_message
+  end
+
+  def clear_waiting_since_on_outgoing_response
+    if human_response?
       Rails.configuration.dispatcher.dispatch(
         REPLY_CREATED, Time.zone.now, waiting_since: conversation.waiting_since, message: self
       )
       conversation.update(waiting_since: nil)
+      return
     end
+
+    # Bot responses also clear waiting_since (simpler than checking on next customer message)
+    conversation.update(waiting_since: nil) if bot_response? && !preserve_waiting_since
+  end
+
+  def set_waiting_since_on_incoming_message
+    # Set waiting_since when customer sends a message (if currently blank)
     conversation.update(waiting_since: created_at) if incoming? && conversation.waiting_since.blank?
   end
 
@@ -374,10 +414,15 @@ class Message < ApplicationRecord
     # if the sender is not a user, it's not a human response
     # if automation rule id is present, it's not a human response
     # if campaign id is present, it's not a human response
+    # external echo messages are responses sent from the native app (WhatsApp Business, Instagram)
     outgoing? &&
       content_attributes['automation_rule_id'].blank? &&
       additional_attributes['campaign_id'].blank? &&
-      sender.is_a?(User)
+      (sender.is_a?(User) || content_attributes['external_echo'].present?)
+  end
+
+  def bot_response?
+    outgoing? && sender_type.in?(['AgentBot', 'Captain::Assistant'])
   end
 
   def dispatch_create_events
@@ -414,6 +459,18 @@ class Message < ApplicationRecord
     reopen_resolved_conversation if conversation.resolved?
   end
 
+  def mark_pending_conversation_as_open_for_human_response
+    return unless captain_pending_conversation?
+    return unless human_response?
+    return if private?
+
+    conversation.open!
+  end
+
+  def captain_pending_conversation?
+    false
+  end
+
   def reopen_resolved_conversation
     # mark resolved bot conversation as pending to be reopened by bot processor service
     if conversation.inbox.active_bot?
@@ -440,7 +497,7 @@ class Message < ApplicationRecord
 
   def set_conversation_activity
     # rubocop:disable Rails/SkipsModelValidations
-    conversation.update_columns(last_activity_at: created_at)
+    conversation.update_columns(last_activity_at: created_at, updated_at: Time.current)
     # rubocop:enable Rails/SkipsModelValidations
   end
 
@@ -450,3 +507,4 @@ class Message < ApplicationRecord
 end
 
 Message.prepend_mod_with('Message')
+Message.include_mod_with('Concerns::Message')

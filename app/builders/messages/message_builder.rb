@@ -24,13 +24,12 @@ class Messages::MessageBuilder
 
   def perform
     @message = @conversation.messages.build(message_params)
-
     process_attachments
     process_emails
-
+    # When the message has no quoted content, it will just be rendered as a regular message
+    # The frontend is equipped to handle this case
     process_email_content
     @message.save!
-
     @message
   end
 
@@ -237,3 +236,5 @@ class Messages::MessageBuilder
                                        })
   end
 end
+
+Messages::MessageBuilder.prepend_mod_with('Messages::MessageBuilder')

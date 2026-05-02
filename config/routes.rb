@@ -8,6 +8,8 @@ Rails.application.routes.draw do
     omniauth_callbacks: 'devise_overrides/omniauth_callbacks'
   }, via: [:get, :post]
 
+  post 'resend_confirmation', to: 'auth/resend_confirmations#create'
+
   ## renders the frontend paths only if its not an api only server
   if ActiveModel::Type::Boolean.new.cast(ENV.fetch('CW_API_ONLY_SERVER', false))
     root to: 'api#index'
@@ -19,10 +21,13 @@ Rails.application.routes.draw do
     get '/app/accounts/:account_id/settings/inboxes/new/twitter', to: 'dashboard#index', as: 'app_new_twitter_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/microsoft', to: 'dashboard#index', as: 'app_new_microsoft_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/instagram', to: 'dashboard#index', as: 'app_new_instagram_inbox'
+    get '/app/accounts/:account_id/settings/inboxes/new/tiktok', to: 'dashboard#index', as: 'app_new_tiktok_inbox'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_twitter_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_email_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_instagram_inbox_agents'
+    get '/app/accounts/:account_id/settings/inboxes/new/:inbox_id/agents', to: 'dashboard#index', as: 'app_tiktok_inbox_agents'
     get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_instagram_inbox_settings'
+    get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_tiktok_inbox_settings'
     get '/app/accounts/:account_id/settings/inboxes/:inbox_id', to: 'dashboard#index', as: 'app_email_inbox_settings'
 
     resource :widget, only: [:show]
@@ -51,6 +56,7 @@ Rails.application.routes.draw do
     end
   }
 
+  get '/health', to: 'health#show'
   get '/api', to: 'api#index'
   namespace :api, defaults: { format: 'json' } do
     namespace :v1 do
@@ -71,6 +77,7 @@ Rails.application.routes.draw do
             post :bulk_create, on: :collection
           end
           namespace :captain do
+            resource :preferences, only: [:show, :update]
             resources :assistants do
               member do
                 post :playground
@@ -86,13 +93,23 @@ Rails.application.routes.draw do
             resources :copilot_threads, only: [:index, :create] do
               resources :copilot_messages, only: [:index, :create]
             end
-            resources :custom_tools
+            resources :custom_tools do
+              post :test, on: :collection
+            end
             resources :documents, only: [:index, :show, :create, :destroy]
+            resource :tasks, only: [], controller: 'tasks' do
+              post :rewrite
+              post :summarize
+              post :reply_suggestion
+              post :label_suggestion
+              post :follow_up
+            end
           end
           resource :saml_settings, only: [:show, :create, :update, :destroy]
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
             delete :avatar, on: :member
             post :reset_access_token, on: :member
+            post :reset_secret, on: :member
           end
           # Template endpoints for CRUD operations
           resources :templates, only: [:index, :show, :create, :update, :destroy] do
@@ -168,17 +185,6 @@ Rails.application.routes.draw do
               get :app_metadata
             end
           end
-          resources :shared_apple_images, only: [:index, :show, :create, :update, :destroy] do
-            collection do
-              get :system_images
-              get :branding_images
-              get :template_images
-            end
-            member do
-              post :upload
-              delete :remove_image
-            end
-          end
           resources :conversations, only: [:index, :create, :show, :update, :destroy] do
             collection do
               get :meta
@@ -217,7 +223,6 @@ Rails.application.routes.draw do
             end
           end
 
-          # Apple Pay payment gateway (outside of accounts scope)
           resources :search, only: [:index] do
             collection do
               get :conversations
@@ -250,12 +255,16 @@ Rails.application.routes.draw do
               resources :contact_inboxes, only: [:create]
               resources :labels, only: [:create, :index]
               resources :notes
+              post :call, on: :member, to: 'calls#create' if ChatwootApp.enterprise?
             end
           end
           resources :csat_survey_responses, only: [:index] do
             collection do
               get :metrics
               get :download
+            end
+            member do
+              patch :update if ChatwootApp.enterprise?
             end
           end
           resources :applied_slas, only: [:index] do
@@ -274,6 +283,19 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             delete :avatar, on: :member
             post :sync_templates, on: :member
+            get :health, on: :member
+            post :register_webhook, on: :member
+            post :reset_secret, on: :member
+            if ChatwootApp.enterprise?
+              resource :conference, only: %i[create destroy], controller: 'conference' do
+                get :token, on: :member
+              end
+            end
+
+            resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates' do
+              post :analyze, on: :collection
+            end
+
             # Apple AMB image management
             resources :apple_amb_images, only: [:index, :create, :destroy], module: :inboxes do
               collection do
@@ -283,8 +305,8 @@ Rails.application.routes.draw do
             end
             # Apple Messages for Business construct_payload (App Clips)
             resource :apple_construct_payload, only: [:create], module: :inboxes, controller: 'apple_construct_payload'
-            get :health, on: :member
           end
+
           resources :inbox_members, only: [:create, :show], param: :inbox_id do
             collection do
               delete :destroy
@@ -337,6 +359,10 @@ Rails.application.routes.draw do
           end
 
           namespace :instagram do
+            resource :authorization, only: [:create]
+          end
+
+          namespace :tiktok do
             resource :authorization, only: [:create]
           end
 
@@ -400,7 +426,9 @@ Rails.application.routes.draw do
               post :send_instructions
               get :ssl_status
             end
-            resources :categories
+            resources :categories do
+              post :reorder, on: :collection
+            end
             resources :articles do
               post :reorder, on: :collection
             end
@@ -486,6 +514,7 @@ Rails.application.routes.draw do
               get :team
               get :inbox
               get :label
+              get :channel
             end
           end
           resources :reports, only: [:index] do
@@ -497,10 +526,15 @@ Rails.application.routes.draw do
               get :labels
               get :teams
               get :conversations
+              get :conversations_summary
               get :conversation_traffic
               get :bot_metrics
+              get :inbox_label_matrix
+              get :first_response_time_distribution
+              get :outgoing_messages_count
             end
           end
+          resource :year_in_review, only: [:show]
           resources :live_reports, only: [] do
             collection do
               get :conversation_metrics
@@ -522,6 +556,7 @@ Rails.application.routes.draw do
               post :subscription
               get :limits
               post :toggle_deletion
+              post :topup_checkout
             end
           end
         end
@@ -552,6 +587,7 @@ Rails.application.routes.draw do
               delete :destroy
             end
           end
+          resources :email_channel_migrations, only: [:create]
         end
       end
     end
@@ -613,6 +649,8 @@ Rails.application.routes.draw do
   post 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#process_payload'
   get 'webhooks/instagram', to: 'webhooks/instagram#verify'
   post 'webhooks/instagram', to: 'webhooks/instagram#events'
+  post 'webhooks/tiktok', to: 'webhooks/tiktok#events'
+  post 'webhooks/shopify', to: 'webhooks/shopify#events'
   # Apple Messages for Business webhook - permanent URL without MSP ID
   # The business_id is extracted from the destination-id header sent by Apple
   # Apple appends /message to the base URL configured in Apple Business Register
@@ -669,6 +707,7 @@ Rails.application.routes.draw do
         collection do
           post 'call/:phone', action: :call_twiml
           post 'status/:phone', action: :status
+          post 'conference_status/:phone', action: :conference_status
         end
       end
     end
@@ -677,6 +716,7 @@ Rails.application.routes.draw do
   get 'microsoft/callback', to: 'microsoft/callbacks#show'
   get 'google/callback', to: 'google/callbacks#show'
   get 'instagram/callback', to: 'instagram/callbacks#show'
+  get 'tiktok/callback', to: 'tiktok/callbacks#show'
   get 'notion/callback', to: 'notion/callbacks#show'
   # ----------------------------------------------------------------------
   # Routes for external service verifications

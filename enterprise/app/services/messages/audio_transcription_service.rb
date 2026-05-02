@@ -1,4 +1,8 @@
-class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
+class Messages::AudioTranscriptionService< Llm::LegacyBaseOpenAiService
+  include Integrations::LlmInstrumentation
+
+  WHISPER_MODEL = 'whisper-1'.freeze
+
   attr_reader :attachment, :message, :account
 
   def initialize(attachment)
@@ -15,6 +19,9 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
     transcriptions = transcribe_audio
     Rails.logger.info "Audio transcription successful: #{transcriptions}"
     { success: true, transcriptions: transcriptions }
+  rescue Faraday::UnauthorizedError
+    Rails.logger.warn('Skipping audio transcription: OpenAI configuration is invalid or disabled (401 Unauthorized).')
+    { error: 'OpenAI configuration is invalid or disabled (401)' }
   end
 
   private
@@ -27,16 +34,29 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
   end
 
   def fetch_audio_file
-    temp_dir = Rails.root.join('tmp/uploads')
+    blob = attachment.file.blob
+    temp_dir = Rails.root.join('tmp/uploads/audio-transcriptions')
     FileUtils.mkdir_p(temp_dir)
-    temp_file_path = File.join(temp_dir, attachment.file.filename.to_s)
-    File.write(temp_file_path, attachment.file.download, mode: 'wb')
+    temp_file_name = "#{blob.key}-#{blob.filename}"
 
-    # Convert AMR to MP3 if needed (OpenAI Whisper doesn't support AMR)
-    if attachment.file.content_type == 'audio/amr' || temp_file_path.end_with?('.amr')
+    if blob.filename.extension_without_delimiter.blank?
+      extension = extension_from_content_type(blob.content_type)
+      temp_file_name = "#{temp_file_name}.#{extension}" if extension.present?
+    end
+
+    temp_file_path = File.join(temp_dir, temp_file_name)
+
+    File.open(temp_file_path, 'wb') do |file|
+      blob.open do |blob_file|
+        IO.copy_stream(blob_file, file)
+      end
+    end
+
+    # Convert AMR to MP3 if needed (Apple Messages sends AMR, OpenAI Whisper doesn't support it)
+    if attachment.file.content_type == 'audio/amr' || temp_file_path.to_s.end_with?('.amr')
       Rails.logger.info "[AudioTranscription] Converting AMR to MP3: #{temp_file_path}"
-      converted_path = convert_amr_to_mp3(temp_file_path)
-      FileUtils.rm_f(temp_file_path) # Clean up original AMR file
+      converted_path = convert_amr_to_mp3(temp_file_path.to_s)
+      FileUtils.rm_f(temp_file_path)
       return converted_path
     end
 
@@ -46,12 +66,6 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
   def convert_amr_to_mp3(amr_file_path)
     mp3_file_path = amr_file_path.gsub(/\.amr$/, '.mp3')
 
-    # Use ffmpeg to convert AMR to MP3
-    # -y: overwrite output file if it exists
-    # -i: input file
-    # -ar 16000: set audio sample rate to 16kHz (good for speech)
-    # -ac 1: set audio channels to mono
-    # -b:a 64k: set audio bitrate to 64kbps
     command = "ffmpeg -y -i #{Shellwords.escape(amr_file_path)} -ar 16000 -ac 1 -b:a 64k #{Shellwords.escape(mp3_file_path)} 2>&1"
 
     Rails.logger.info "[AudioTranscription] Running ffmpeg: #{command}"
@@ -62,7 +76,6 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
       raise "Failed to convert AMR to MP3: #{output}"
     end
 
-    Rails.logger.info "[AudioTranscription] Successfully converted AMR to MP3: #{mp3_file_path}"
     mp3_file_path
   end
 
@@ -71,22 +84,33 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
     return transcribed_text if transcribed_text.present?
 
     temp_file_path = fetch_audio_file
+    transcribed_text = nil
 
-    begin
+    File.open(temp_file_path, 'rb') do |file|
       response = @client.audio.transcribe(
         parameters: {
-          model: 'whisper-1',
-          file: File.open(temp_file_path),
+          model: WHISPER_MODEL,
+          file: file,
           temperature: 0.4
         }
       )
-
-      update_transcription(response['text'])
-      response['text']
-    ensure
-      # Clean up temporary file (could be original or converted MP3)
-      FileUtils.rm_f(temp_file_path)
+      transcribed_text = response['text']
     end
+
+    update_transcription(transcribed_text)
+    transcribed_text
+  ensure
+    FileUtils.rm_f(temp_file_path) if temp_file_path.present?
+  end
+
+  def instrumentation_params(file_path)
+    {
+      span_name: 'llm.messages.audio_transcription',
+      model: WHISPER_MODEL,
+      account_id: account&.id,
+      feature_name: 'audio_transcription',
+      file_path: file_path
+    }
   end
 
   def update_transcription(transcribed_text)
@@ -99,5 +123,16 @@ class Messages::AudioTranscriptionService < Llm::BaseOpenAiService
     return unless ChatwootApp.advanced_search_allowed?
 
     message.reindex
+  end
+
+  def extension_from_content_type(content_type)
+    subtype = content_type.to_s.downcase.split(';').first.to_s.split('/').last.to_s
+    return if subtype.blank?
+
+    {
+      'x-m4a' => 'm4a',
+      'x-wav' => 'wav',
+      'x-mp3' => 'mp3'
+    }.fetch(subtype, subtype)
   end
 end

@@ -9,11 +9,16 @@
 #  updated_at :datetime         not null
 #  article_id :bigint           not null
 #
+# Indexes
+#
+#
 class ArticleEmbedding < ApplicationRecord
   belongs_to :article
   has_neighbors :embedding, normalize: true
 
   after_commit :update_response_embedding
+
+  delegate :account_id, to: :article
 
   private
 

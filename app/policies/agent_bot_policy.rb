@@ -26,6 +26,10 @@ class AgentBotPolicy < ApplicationPolicy
   def reset_access_token?
     @account_user.administrator?
   end
+
+  def reset_secret?
+    @account_user.administrator?
+  end
 end
 
 AgentBotPolicy.prepend_mod_with('AgentBotPolicy')

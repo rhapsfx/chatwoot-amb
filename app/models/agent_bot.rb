@@ -2,15 +2,16 @@
 #
 # Table name: agent_bots
 #
-#  id                                                                     :bigint           not null, primary key
-#  bot_config                                                             :jsonb
+#  id           :bigint           not null, primary key
+#  bot_config   :jsonb
 #  bot_type(Bot type: 0 = webhook, 1 = apple_messages_for_business (AMB)) :integer          default("webhook")
-#  description                                                            :string
-#  name                                                                   :string
-#  outgoing_url                                                           :string
-#  created_at                                                             :datetime         not null
-#  updated_at                                                             :datetime         not null
-#  account_id                                                             :bigint
+#  description  :string
+#  name         :string
+#  outgoing_url :string
+#  secret       :string
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  account_id   :bigint
 #
 # Indexes
 #
@@ -20,6 +21,8 @@
 class AgentBot < ApplicationRecord
   include AccessTokenable
   include Avatarable
+
+  include WebhookSecretable
 
   scope :accessible_to, lambda { |account|
     account_id = account&.id
@@ -63,3 +66,5 @@ class AgentBot < ApplicationRecord
     account.nil?
   end
 end
+
+AgentBot.include_mod_with('Audit::AgentBot')

@@ -47,10 +47,11 @@ class Attachment < ApplicationRecord
   belongs_to :account
   belongs_to :message
   has_one_attached :file
+  before_save :set_extension
   validate :acceptable_file
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
-                    :contact => 8, :ig_reel => 9 }
+                    :contact => 8, :ig_reel => 9, :ig_post => 10, :ig_story => 11, :embed => 12 }
 
   # Encryption support for Apple Messages for Business
   def encrypted?
@@ -96,6 +97,10 @@ class Attachment < ApplicationRecord
     end
   end
 
+  def with_attached_file?
+    [:image, :audio, :video, :file].include?(file_type.to_sym)
+  end
+
   private
 
   def with_custom_host
@@ -103,7 +108,6 @@ class Attachment < ApplicationRecord
     original_protocol = Rails.application.routes.default_url_options[:protocol]
 
     Rails.logger.debug { "[Attachment] Entering with_custom_host block. Original host: #{original_host}" }
-    # Use environment variable, or check for active dev server URL, or fallback to localhost
     custom_host = ENV['FRONTEND_URL'] || detect_active_public_url || 'localhost:10750'
     Rails.logger.debug { "[Attachment] Using custom host: #{custom_host}. Setting it for URL generation." }
     Rails.application.routes.default_url_options[:host] = custom_host
@@ -118,64 +122,7 @@ class Attachment < ApplicationRecord
     result
   end
 
-  def ngrok_available?
-    require 'net/http'
-    require 'json'
-
-    begin
-      # Try to connect to ngrok's local API
-      uri = URI('http://localhost:4040/api/tunnels')
-      response = Net::HTTP.get_response(uri)
-
-      if response.code == '200'
-        tunnels = JSON.parse(response.body)['tunnels']
-
-        # Check if there's an HTTPS tunnel pointing to port 3000
-        tunnel = tunnels.find do |t|
-          t['config']['addr'] == 'http://localhost:3000' && t['public_url'].start_with?('https://')
-        end
-
-        return !tunnel.nil?
-      end
-    rescue StandardError => e
-      Rails.logger.debug { "[Apple Messages for Business] Could not detect ngrok: #{e.message}" }
-    end
-
-    false
-  end
-
-  def detect_current_ngrok_host
-    require 'net/http'
-    require 'json'
-
-    begin
-      # Try to connect to ngrok's local API
-      uri = URI('http://localhost:4040/api/tunnels')
-      response = Net::HTTP.get_response(uri)
-
-      if response.code == '200'
-        tunnels = JSON.parse(response.body)['tunnels']
-
-        # Find the HTTPS tunnel pointing to port 3000
-        tunnel = tunnels.find do |t|
-          t['config']['addr'] == 'http://localhost:3000' && t['public_url'].start_with?('https://')
-        end
-
-        if tunnel
-          # Extract just the host from the full URL
-          return URI.parse(tunnel['public_url']).host
-        end
-      end
-    rescue StandardError => e
-      Rails.logger.debug { "[Apple Messages for Business] Could not detect ngrok host: #{e.message}" }
-    end
-
-    # Fallback to localhost if ngrok is not available
-    'localhost:3000'
-  end
-
   def generate_attachment_token(attachment_id)
-    # Generate a simple token based on attachment ID and a secret
     secret = Rails.application.secret_key_base
     Digest::SHA256.hexdigest("#{attachment_id}-#{secret}")[0..15]
   end
@@ -185,7 +132,6 @@ class Attachment < ApplicationRecord
 
     Rails.logger.debug { "[Attachment] Generating file_url for attachment ID: #{id}" }
 
-    # Use custom controller for Apple Messages for Business attachments
     if apple_messages_channel?
       Rails.logger.debug '[Attachment] AMB channel detected. Using custom URL generator with domain.'
       token = generate_attachment_token(id)
@@ -205,7 +151,6 @@ class Attachment < ApplicationRecord
 
     Rails.logger.debug { "[Attachment] Generating thumb_url for attachment ID: #{id}" }
     begin
-      # Use custom controller for Apple Messages for Business attachments
       if apple_messages_channel?
         Rails.logger.debug '[Attachment] AMB channel detected for thumb. Using custom URL generator with domain.'
         token = generate_attachment_token(id)
@@ -228,10 +173,6 @@ class Attachment < ApplicationRecord
     @is_apple_messages ||= message&.inbox&.channel_type == 'Channel::AppleMessagesForBusiness'
   end
 
-  def with_attached_file?
-    [:image, :audio, :video, :file].include?(file_type.to_sym)
-  end
-
   def metadata_for_file_type
     case file_type.to_sym
     when :location
@@ -242,9 +183,17 @@ class Attachment < ApplicationRecord
       contact_metadata
     when :audio
       audio_metadata
+    when :embed
+      embed_data
     else
-      file_metadata
+      file.attached? ? file_metadata : { data_url: external_url, thumb_url: '' }
     end
+  end
+
+  def embed_data
+    {
+      data_url: external_url
+    }
   end
 
   def audio_metadata
@@ -259,15 +208,16 @@ class Attachment < ApplicationRecord
   def file_metadata
     metadata = {
       extension: extension,
+      content_type: file.content_type,
       data_url: file_url,
       thumb_url: thumb_url,
       file_size: file.byte_size,
-      file_name: file.filename.to_s,  # Add filename for UI display
+      file_name: file.filename.to_s,
       width: file.metadata[:width],
       height: file.metadata[:height]
     }
 
-    metadata[:data_url] = metadata[:thumb_url] = external_url if message.inbox.instagram? && message.incoming?
+    metadata[:data_url] = metadata[:thumb_url] = external_url if instagram_incoming_message?
     metadata
   end
 
@@ -303,6 +253,21 @@ class Attachment < ApplicationRecord
     }
   end
 
+  def instagram_incoming_message?
+    return false unless message.incoming?
+
+    return true if message.inbox.instagram_direct?
+
+    message.inbox.instagram? && message.conversation&.additional_attributes&.dig('type') == 'instagram_direct_message'
+  end
+
+  def set_extension
+    return unless file.attached?
+    return if extension.present?
+
+    self.extension = File.extname(file.filename.to_s).delete_prefix('.').presence
+  end
+
   def should_validate_file?
     return unless file.attached?
     # we are only limiting attachment types in case of website widget
@@ -319,21 +284,17 @@ class Attachment < ApplicationRecord
   end
 
   def validate_file_content_type(file_content_type)
-    # Check if it's a USDZ file by extension (fallback for incorrect MIME types)
     is_usdz = file.filename.to_s.downcase.end_with?('.usdz')
 
     errors.add(:file, 'type not supported') unless media_file?(file_content_type) || ACCEPTABLE_FILE_TYPES.include?(file_content_type) || is_usdz
   end
 
   def validate_file_size(byte_size)
-    # Use configurable limit from GlobalConfigService (upstream feature)
     limit_mb = GlobalConfigService.load('MAXIMUM_FILE_UPLOAD_SIZE', 40).to_i
     limit_mb = 40 if limit_mb <= 0
 
     # Override for Apple Messages for Business - 100 MB per Apple MSP REST API v4.1.5
-    if message.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
-      limit_mb = 100
-    end
+    limit_mb = 100 if message.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
 
     errors.add(:file, 'size is too big') if byte_size > limit_mb.megabytes
   end
@@ -342,19 +303,15 @@ class Attachment < ApplicationRecord
     file_content_type.start_with?('image/', 'video/', 'audio/')
   end
 
-  # Detect the active public URL by checking what the dev server is using
   def detect_active_public_url
-    # Cache for 30 seconds to avoid repeated file I/O and HTTP requests
     Rails.cache.fetch('attachment_active_public_url', expires_in: 30.seconds) do
       begin
-        # Check if Tailscale URL is saved (from dev-server.sh)
         tailscale_url_file = Rails.root.join('tmp/pids/tailscale_url.txt')
         if File.exist?(tailscale_url_file)
           tailscale_url = File.read(tailscale_url_file).strip
           return tailscale_url if tailscale_url.present?
         end
 
-        # Check if ngrok is running by trying to fetch tunnel info
         require 'net/http'
         uri = URI('http://localhost:4040/api/tunnels')
         response = Net::HTTP.get_response(uri)
@@ -368,11 +325,10 @@ class Attachment < ApplicationRecord
         Rails.logger.debug { "[Attachment] Could not detect active public URL: #{e.message}" }
       end
 
-      # Check if custom domain mode is being used (nginx running on port 443)
       begin
         require 'socket'
         TCPSocket.new('localhost', 443).close
-        return 'dev.rhaps.net'  # Custom domain is available
+        return 'dev.rhaps.net'
       rescue Errno::ECONNREFUSED
         # Custom domain not available
       end
