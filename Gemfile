@@ -40,14 +40,14 @@ gem 'json_refs'
 gem 'rack-attack', '>= 6.7.0'
 # a utility tool for streaming, flexible and safe downloading of remote files
 gem 'down'
+# SSRF-safe URL fetching
+gem 'ssrf_filter', '~> 1.5'
 # authentication type to fetch and send mail over oauth2.0
 gem 'gmail_xoauth'
 # Lock net-smtp to 0.3.4 to avoid issues with gmail_xoauth2
 gem 'net-smtp',  '~> 0.3.4'
 # Prevent CSV injection
 gem 'csv-safe'
-# Apple Wallet pass generation (.pkpass files)
-gem 'passbook2'
 
 ##-- for active storage --##
 gem 'aws-sdk-s3', require: false
@@ -164,7 +164,7 @@ gem 'working_hours'
 gem 'pg_search'
 
 # Subscriptions, Billing
-gem 'stripe'
+gem 'stripe', '~> 18.0'
 
 ## - helper gems --##
 ## to populate db with sample data
@@ -193,10 +193,13 @@ gem 'reverse_markdown'
 
 gem 'iso-639'
 gem 'ruby-openai'
-gem 'ai-agents', '>= 0.4.3'
+gem 'ai-agents', '>= 0.9.1'
 
 # TODO: Move this gem as a dependency of ai-agents
+gem 'ruby_llm', '>= 1.8.2'
 gem 'ruby_llm-schema'
+
+gem 'cld3', '~> 3.7'
 
 # OpenTelemetry for LLM observability
 gem 'opentelemetry-sdk'
@@ -215,8 +218,12 @@ group :production do
   gem 'judoscale-sidekiq', require: false
 end
 
+
+# Apple Wallet pass generation (.pkpass files)
+gem 'passbook2'
+
 group :development do
-  gem 'annotate'
+  gem 'annotaterb'
   gem 'bullet'
   gem 'letter_opener'
   gem 'scss_lint', require: false
@@ -269,6 +276,7 @@ group :development, :test do
   gem 'seed_dump'
   gem 'shoulda-matchers'
   gem 'simplecov', '>= 0.21', require: false
+  gem 'skooma'
   gem 'spring'
   gem 'spring-watcher-listen'
 end

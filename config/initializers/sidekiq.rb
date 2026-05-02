@@ -13,7 +13,6 @@ Sidekiq.configure_client do |config|
     config.logger.level = Logger::INFO
     # Skip verbose job logging (prevents "Enqueued JobName with arguments:" logs)
     config[:skip_default_job_logging] = true
-  end
 end
 
 # Logs whenever a job is pulled off Redis for execution.
@@ -39,18 +38,23 @@ Sidekiq.configure_server do |config|
     config.logger.formatter = Sidekiq::Logger::Formatters::JSON.new
     config[:skip_default_job_logging] = true
     config.logger.level = Logger.const_get(ENV.fetch('LOG_LEVEL', 'info').upcase.to_s)
-  elsif Rails.env.development?
-    # Route Sidekiq logs to separate file to avoid polluting development.log
-    log_file = File.open(Rails.root.join('log/sidekiq.log'), 'a')
-    log_file.set_encoding('UTF-8')
-    config.logger = Logger.new(log_file)
-    config.logger.level = Logger::INFO
-    # Skip verbose job logging (prevents "Performing JobName with arguments:" logs)
-    config[:skip_default_job_logging] = true
   end
 end
 
 # https://github.com/ondrejbartas/sidekiq-cron
 Rails.application.reloader.to_prepare do
-  Sidekiq::Cron::Job.load_from_hash YAML.load_file(schedule_file) if File.exist?(schedule_file) && Sidekiq.server?
+  # load_from_hash! upserts jobs from the YAML and removes any Redis-persisted
+  # jobs that share the same source tag but are no longer in the file.
+  # This ensures deleted schedule entries are cleaned up on deploy.
+  if File.exist?(schedule_file) && Sidekiq.server?
+    schedule = YAML.load_file(schedule_file)
+
+    # Cron entries removed from schedule.yml but possibly still in Redis
+    # with source:'dynamic' (predating the source tag). load_from_hash!
+    # only cleans up source:'schedule' entries, so these need explicit removal.
+    # Remove names from this list once they've been through a deploy cycle.
+    %w[bulk_auto_assignment_job].each { |name| Sidekiq::Cron::Job.destroy(name) }
+
+    Sidekiq::Cron::Job.load_from_hash!(schedule, source: 'schedule')
+  end
 end
