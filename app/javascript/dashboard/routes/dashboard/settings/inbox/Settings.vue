@@ -115,7 +115,7 @@ export default {
     tabs() {
       let visibleToAllChannelTabs = [
         {
-          key: 'inbox-settings',
+          key: 'inbox_settings',
           name: this.$t('INBOX_MGMT.TABS.SETTINGS'),
         },
         {
@@ -128,7 +128,7 @@ export default {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
           {
-            key: 'business-hours',
+            key: 'businesshours',
             name: this.$t('INBOX_MGMT.TABS.BUSINESS_HOURS'),
           },
           {
@@ -142,11 +142,11 @@ export default {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
           {
-            key: 'pre-chat-form',
+            key: 'preChatForm',
             name: this.$t('INBOX_MGMT.TABS.PRE_CHAT_FORM'),
           },
           {
-            key: 'widget-builder',
+            key: 'widgetBuilder',
             name: this.$t('INBOX_MGMT.TABS.WIDGET_BUILDER'),
           },
         ];
@@ -159,8 +159,7 @@ export default {
         this.isAVoiceChannel ||
         (this.isAnEmailChannel && !this.inbox.provider) ||
         this.shouldShowWhatsAppConfiguration ||
-        this.isAWebWidgetInbox ||
-        this.isAnAppleMessagesForBusinessChannel
+        this.isAWebWidgetInbox
       ) {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
@@ -177,7 +176,7 @@ export default {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
           {
-            key: 'bot-configuration',
+            key: 'botConfiguration',
             name: this.$t('INBOX_MGMT.TABS.BOT_CONFIGURATION'),
           },
         ];
@@ -186,7 +185,7 @@ export default {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
           {
-            key: 'whatsapp-health',
+            key: 'whatsappHealth',
             name: this.$t('INBOX_MGMT.TABS.ACCOUNT_HEALTH'),
           },
         ];
@@ -356,39 +355,19 @@ export default {
       return [...selected, current];
     },
     refreshAvatarUrlOnTabChange(index) {
-      // Refresh avatar URL on tab change from inbox-settings and widget-builder tabs, to ensure real-time updates
+      // Refresh avatar URL on tab change from inbox_settings and widgetBuilder tabs, to ensure real-time updates
       if (
         this.inbox &&
-        ['inbox-settings', 'widget-builder'].includes(this.tabs[index].key)
+        ['inbox_settings', 'widgetBuilder'].includes(this.tabs[index].key)
       )
         this.avatarUrl = this.inbox.avatar_url;
     },
     onTabChange(selectedTabIndex) {
       this.selectedTabIndex = selectedTabIndex;
       this.refreshAvatarUrlOnTabChange(selectedTabIndex);
-      this.updateRouteWithoutRefresh(selectedTabIndex);
-    },
-    updateRouteWithoutRefresh(selectedTabIndex) {
-      const tab = this.tabs[selectedTabIndex];
-      if (!tab) return;
-
-      const { accountId, inboxId } = this.$route.params;
-      const baseUrl = `/app/accounts/${accountId}/settings/inboxes/${inboxId}`;
-
-      // Append the tab key only if it's not the default.
-      const newUrl =
-        tab.key === 'inbox-settings' ? baseUrl : `${baseUrl}/${tab.key}`;
-      // Update URL without triggering route watcher
-      window.history.replaceState(null, '', newUrl);
-    },
-    setTabFromRouteParam() {
-      const { tab: tabParam } = this.$route.params;
-      if (!tabParam) return;
-      const tabIndex = this.tabs.findIndex(tab => tab.key === tabParam);
-
-      this.selectedTabIndex = tabIndex === -1 ? 0 : tabIndex;
     },
     fetchInboxSettings() {
+      this.selectedTabIndex = 0;
       this.selectedAgents = [];
       this.$store.dispatch('agents/get');
       this.$store.dispatch('teams/get');
@@ -414,9 +393,6 @@ export default {
         this.selectedPortalSlug = this.inbox.help_center
           ? this.inbox.help_center.slug
           : '';
-
-        // Set initial tab after inbox data is loaded
-        this.setTabFromRouteParam();
       });
     },
     async updateInbox() {
@@ -537,7 +513,7 @@ export default {
         :content="$t('INBOX_MGMT.ADD.INSTAGRAM.DUPLICATE_INBOX_BANNER')"
         class="mx-8 mt-5"
       />
-      <div v-if="selectedTabKey === 'inbox-settings'" class="mx-8">
+      <div v-if="selectedTabKey === 'inbox_settings'" class="mx-8">
         <SettingsSection
           :title="$t('INBOX_MGMT.SETTINGS_POPUP.INBOX_UPDATE_TITLE')"
           :sub-title="$t('INBOX_MGMT.SETTINGS_POPUP.INBOX_UPDATE_SUB_TEXT')"
@@ -929,19 +905,19 @@ export default {
       <div v-if="selectedTabKey === 'csat'">
         <CustomerSatisfactionPage :inbox="inbox" />
       </div>
-      <div v-if="selectedTabKey === 'pre-chat-form'">
+      <div v-if="selectedTabKey === 'preChatForm'">
         <PreChatFormSettings :inbox="inbox" />
       </div>
-      <div v-if="selectedTabKey === 'business-hours'">
+      <div v-if="selectedTabKey === 'businesshours'">
         <WeeklyAvailability :inbox="inbox" />
       </div>
-      <div v-if="selectedTabKey === 'widget-builder'">
+      <div v-if="selectedTabKey === 'widgetBuilder'">
         <WidgetBuilder :inbox="inbox" />
       </div>
-      <div v-if="selectedTabKey === 'bot-configuration'">
+      <div v-if="selectedTabKey === 'botConfiguration'">
         <BotConfiguration :inbox="inbox" />
       </div>
-      <div v-if="selectedTabKey === 'whatsapp-health'">
+      <div v-if="selectedTabKey === 'whatsappHealth'">
         <AccountHealth :health-data="healthData" />
       </div>
     </section>

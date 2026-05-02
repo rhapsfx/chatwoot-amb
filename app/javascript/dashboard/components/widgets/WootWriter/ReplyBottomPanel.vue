@@ -11,19 +11,12 @@ import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
 import VideoCallButton from '../VideoCallButton.vue';
 import AIAssistanceButton from '../AIAssistanceButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
-import AppleMessagesButton from '../AppleMessagesButton.vue';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
   name: 'ReplyBottomPanel',
-  components: {
-    NextButton,
-    FileUpload,
-    VideoCallButton,
-    AIAssistanceButton,
-    AppleMessagesButton,
-  },
+  components: { NextButton, FileUpload, VideoCallButton, AIAssistanceButton },
   mixins: [inboxMixin],
   props: {
     isNote: {
@@ -140,7 +133,6 @@ export default {
     'toggleEditor',
     'selectWhatsappTemplate',
     'selectContentTemplate',
-    'sendAppleMessage',
     'toggleQuotedReply',
   ],
   setup() {
@@ -227,11 +219,6 @@ export default {
         channelType = INBOX_TYPES.INSTAGRAM;
       }
 
-      // Apple Messages for Business supports USDZ files - use ALLOWED_FILE_TYPES which includes USDZ
-      if (channelType === 'Channel::AppleMessagesForBusiness') {
-        return this.ALLOWED_FILE_TYPES;
-      }
-
       return getAllowedFileTypesByChannel({
         channelType,
         medium: this.inbox?.medium,
@@ -289,14 +276,6 @@ export default {
     },
     toggleInsertArticle() {
       this.$emit('toggleInsertArticle');
-    },
-    handleSendAppleMessage(messageData) {
-      // eslint-disable-next-line no-console
-      console.log(
-        '[DEBUG ReplyBottomPanel] Received messageData:',
-        JSON.parse(JSON.stringify(messageData))
-      );
-      this.$emit('sendAppleMessage', messageData);
     },
   },
 };
@@ -401,10 +380,6 @@ export default {
         faded
         sm
         @click="$emit('selectContentTemplate')"
-      />
-      <AppleMessagesButton
-        :inbox="inbox"
-        @send-apple-message="handleSendAppleMessage"
       />
       <VideoCallButton
         v-if="(isAWebWidgetInbox || isAPIInbox) && !isOnPrivateNote"
