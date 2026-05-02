@@ -168,10 +168,12 @@ export default {
           search: this.searchKey,
           channel: this.channelType,
         });
+        const templates =
+          this.$store.getters['messageTemplates/getTemplates'] || [];
         // eslint-disable-next-line no-console
         console.log(
           '[TemplateSelector] fetchTemplates completed. Templates in store:',
-          this.$store.getters['messageTemplates/getTemplates'].length
+          templates.length
         );
       } catch (error) {
         // eslint-disable-next-line no-console
