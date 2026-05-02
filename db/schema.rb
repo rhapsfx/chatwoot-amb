@@ -488,11 +488,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_092753) do
     t.integer "sync_status"
     t.datetime "last_synced_at"
     t.datetime "last_sync_attempted_at"
+    t.index ["account_id", "sync_status"], name: "index_captain_documents_on_account_id_and_sync_status"
     t.index ["account_id"], name: "index_captain_documents_on_account_id"
     t.index ["assistant_id", "external_link"], name: "index_captain_documents_on_assistant_id_and_external_link", unique: true
     t.index ["assistant_id"], name: "index_captain_documents_on_assistant_id"
     t.index ["status"], name: "index_captain_documents_on_status"
-    t.index ["account_id", "sync_status"], name: "index_captain_documents_on_account_id_and_sync_status"
   end
 
   create_table "captain_inboxes", force: :cascade do |t|
@@ -1316,20 +1316,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_092753) do
     t.index ["user_id"], name: "index_reporting_events_on_user_id"
   end
 
-  create_table "shared_apple_images", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.string "identifier", null: false
-    t.string "image_type", default: "system", null: false
-    t.text "description"
-    t.string "original_name"
-    t.jsonb "metadata", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["account_id", "identifier"], name: "index_shared_apple_images_on_account_id_and_identifier", unique: true
-    t.index ["account_id"], name: "index_shared_apple_images_on_account_id"
-    t.index ["image_type"], name: "index_shared_apple_images_on_image_type"
-  end
-
   create_table "reporting_events_rollups", force: :cascade do |t|
     t.integer "account_id", null: false
     t.date "date", null: false
@@ -1344,6 +1330,20 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_10_092753) do
     t.index ["account_id", "date", "dimension_type", "dimension_id", "metric"], name: "index_rollup_unique_key", unique: true
     t.index ["account_id", "dimension_type", "date"], name: "index_rollup_summary"
     t.index ["account_id", "metric", "date"], name: "index_rollup_timeseries"
+  end
+
+  create_table "shared_apple_images", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "identifier", null: false
+    t.string "image_type", default: "system", null: false
+    t.text "description"
+    t.string "original_name"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "identifier"], name: "index_shared_apple_images_on_account_id_and_identifier", unique: true
+    t.index ["account_id"], name: "index_shared_apple_images_on_account_id"
+    t.index ["image_type"], name: "index_shared_apple_images_on_image_type"
   end
 
   create_table "sla_events", force: :cascade do |t|

@@ -6,13 +6,13 @@
 #  app_icon_url   :string
 #  app_name       :string
 #  app_store_url  :string
-#  bundle_id      :string           not null
 #  description    :text
 #  developer_name :string
 #  metadata       :jsonb
 #  price          :decimal(10, 2)
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
+#  bundle_id      :string           not null
 #
 # Indexes
 #

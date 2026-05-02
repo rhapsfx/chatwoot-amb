@@ -1,0 +1,20 @@
+
+
+rspec ./spec/services/apple_messages_for_business/conversation_close_service_spec.rb:59 # AppleMessagesForBusiness::ConversationCloseService#perform when contact has apple_messages_source_id in additional_attributes (legacy) still finds and closes the conversation
+rspec ./spec/services/apple_messages_for_business/conversation_close_service_spec.rb:96 # AppleMessagesForBusiness::ConversationCloseService#perform when conversation is already closed by AMB skips duplicate processing
+rspec ./spec/services/apple_messages_for_business/image_fetch_service_spec.rb:509 # AppleMessagesForBusiness::ImageFetchService#fetch_and_encode with Apple MSP image encoding requirements sets DPI to 72 in JFIF header for inbox images
+rspec ./spec/services/apple_messages_for_business/image_fetch_service_spec.rb:526 # AppleMessagesForBusiness::ImageFetchService#fetch_and_encode with Apple MSP image encoding requirements sets DPI to 72 in JFIF header for shared images
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:120 # AppleMessagesForBusiness::SendRichLinkService#extract_title_from_url with a luxury product URL and site_name strips .com suffix from site_name and combines with slug
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:179 # AppleMessagesForBusiness::SendRichLinkService#build_assets when image_url download fails and favicon is available falls through to favicon candidate
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:247 # AppleMessagesForBusiness::SendRichLinkService#build_assets when image is over 200KB falls to next candidate if compression fails
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:380 # AppleMessagesForBusiness::SendRichLinkService OG data priority when frontend title is an error page derives title from URL slug + brand
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:434 # AppleMessagesForBusiness::SendRichLinkService OG data priority when scrape returns a tracking pixel image discards tracking pixel and uses favicon instead
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:499 # AppleMessagesForBusiness::SendRichLinkService payload structure includes all required Apple MSP fields
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:508 # AppleMessagesForBusiness::SendRichLinkService payload structure sets body to the URL
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:513 # AppleMessagesForBusiness::SendRichLinkService payload structure generates a UUID message ID
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:525 # AppleMessagesForBusiness::SendRichLinkService authentication headers sends JWT Bearer token
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:535 # AppleMessagesForBusiness::SendRichLinkService authentication headers includes Source-Id and Destination-Id
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:563 # AppleMessagesForBusiness::SendRichLinkService Redis lock acquires and releases lock around send
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:592 # AppleMessagesForBusiness::SendRichLinkService response handling marks message as sent on success
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:597 # AppleMessagesForBusiness::SendRichLinkService response handling stores Apple MSP payload in message
+rspec ./spec/services/apple_messages_for_business/send_rich_link_service_spec.rb:603 # AppleMessagesForBusiness::SendRichLinkService response handling returns error and stores failed payload on HTTP error

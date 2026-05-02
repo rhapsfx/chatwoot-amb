@@ -22,15 +22,16 @@
 #
 # Indexes
 #
-#  index_message_templates_on_account_id               (account_id)
-#  index_message_templates_on_account_id_and_category  (account_id,category)
-#  index_message_templates_on_account_id_and_status    (account_id,status)
-#  index_message_templates_on_attachment_metadata      (attachment_metadata) USING gin
-#  index_message_templates_on_category                 (category)
-#  index_message_templates_on_metadata                 (metadata) USING gin
-#  index_message_templates_on_status                   (status)
-#  index_message_templates_on_supported_channels       (supported_channels) USING gin
-#  index_message_templates_on_tags                     (tags) USING gin
+#  index_message_templates_on_account_id                 (account_id)
+#  index_message_templates_on_account_id_and_category    (account_id,category)
+#  index_message_templates_on_account_id_and_created_at  (account_id,created_at DESC)
+#  index_message_templates_on_account_id_and_status      (account_id,status)
+#  index_message_templates_on_attachment_metadata        (attachment_metadata) USING gin
+#  index_message_templates_on_category                   (category)
+#  index_message_templates_on_metadata                   (metadata) USING gin
+#  index_message_templates_on_status                     (status)
+#  index_message_templates_on_supported_channels         (supported_channels) USING gin
+#  index_message_templates_on_tags                       (tags) USING gin
 #
 # Foreign Keys
 #
