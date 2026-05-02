@@ -10,7 +10,9 @@
       "Bash(identify -verbose /tmp/test_pin3.png)",
       "Bash(identify -verbose public/apple-messages/list-circle.png)",
       "Bash(git checkout *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)"
     ]
   }
 }
