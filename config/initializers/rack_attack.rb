@@ -247,37 +247,6 @@ class Rack::Attack
     "#{user_identifier}:#{match_data[:account_id]}" if user_identifier.present?
   end
 
-  ## ----------------------------------------------- ##
-end
-
-# Log blocked events
-ActiveSupport::Notifications.subscribe('throttle.rack_attack') do |_name, _start, _finish, _request_id, payload|
-  req = payload[:request]
-
-  user_uid = req.get_header('HTTP_UID')
-  api_access_token = req.get_header('HTTP_API_ACCESS_TOKEN') || req.get_header('api_access_token')
-
-  # Mask the token if present
-  masked_api_token = api_access_token.present? ? "#{api_access_token[0..4]}...[REDACTED]" : nil
-
-  # Use uid if present, otherwise fallback to masked api_access_token for tracking
-  user_identifier = user_uid.presence || masked_api_token.presence || 'unknown_user'
-
-  # Extract account ID if present
-  account_match = %r{/accounts/(?<account_id>\d+)}.match(req.path)
-  account_id = account_match ? account_match[:account_id] : 'unknown_account'
-
-  Rails.logger.warn(
-    "[Rack::Attack][Blocked] remote_ip: \"#{req.remote_ip}\", " \
-    "path: \"#{req.path}\", " \
-    "user_identifier: \"#{user_identifier}\", " \
-    "account_id: \"#{account_id}\", " \
-    "method: \"#{req.request_method}\", " \
-    "user_agent: \"#{req.user_agent}\""
-  )
-end
-
-
   ###-----------------------------------------------###
   ###---------Bot Template API Throttling-----------###
   ###-----------------------------------------------###
@@ -313,6 +282,33 @@ end
   end
 
   ## ----------------------------------------------- ##
+end
+
+# Log blocked events
+ActiveSupport::Notifications.subscribe('throttle.rack_attack') do |_name, _start, _finish, _request_id, payload|
+  req = payload[:request]
+
+  user_uid = req.get_header('HTTP_UID')
+  api_access_token = req.get_header('HTTP_API_ACCESS_TOKEN') || req.get_header('api_access_token')
+
+  # Mask the token if present
+  masked_api_token = api_access_token.present? ? "#{api_access_token[0..4]}...[REDACTED]" : nil
+
+  # Use uid if present, otherwise fallback to masked api_access_token for tracking
+  user_identifier = user_uid.presence || masked_api_token.presence || 'unknown_user'
+
+  # Extract account ID if present
+  account_match = %r{/accounts/(?<account_id>\d+)}.match(req.path)
+  account_id = account_match ? account_match[:account_id] : 'unknown_account'
+
+  Rails.logger.warn(
+    "[Rack::Attack][Blocked] remote_ip: \"#{req.remote_ip}\", " \
+    "path: \"#{req.path}\", " \
+    "user_identifier: \"#{user_identifier}\", " \
+    "account_id: \"#{account_id}\", " \
+    "method: \"#{req.request_method}\", " \
+    "user_agent: \"#{req.user_agent}\""
+  )
 end
 
 # Log blocked events

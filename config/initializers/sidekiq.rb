@@ -13,6 +13,7 @@ Sidekiq.configure_client do |config|
     config.logger.level = Logger::INFO
     # Skip verbose job logging (prevents "Enqueued JobName with arguments:" logs)
     config[:skip_default_job_logging] = true
+  end
 end
 
 # Logs whenever a job is pulled off Redis for execution.
