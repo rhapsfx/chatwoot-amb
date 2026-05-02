@@ -29,27 +29,15 @@ export default {
       // Get channel type from inbox
       const inboxChannelType = this.inbox?.channel_type || '';
       // Normalize to snake_case for API compatibility
-      const normalized = inboxChannelType
+      return inboxChannelType
         .replace(/^Channel::/, '')
         .replace(/([A-Z])/g, '_$1')
         .toLowerCase()
         .replace(/^_/, '');
-      // eslint-disable-next-line no-console
-      console.log('[TemplateSelector] channelType calculation:', {
-        inboxChannelType,
-        normalized,
-      });
-      return normalized;
     },
     templates() {
       // This will be populated from Vuex store
-      const tmpl = this.$store.getters['messageTemplates/getTemplates'] || [];
-      // eslint-disable-next-line no-console
-      console.log(
-        '[TemplateSelector] templates from store count:',
-        tmpl.length
-      );
-      return tmpl;
+      return this.$store.getters['messageTemplates/getTemplates'] || [];
     },
     filteredTemplates() {
       if (!this.searchKey) return this.templates;
@@ -72,17 +60,6 @@ export default {
       }));
     },
     templateItems() {
-      // eslint-disable-next-line no-console
-      console.log(
-        '🔍 [TemplateSelector] Filtering templates. channelType:',
-        this.channelType
-      );
-      // eslint-disable-next-line no-console
-      console.log(
-        '🔍 [TemplateSelector] filteredTemplates count:',
-        this.filteredTemplates.length
-      );
-
       return this.filteredTemplates
         .filter(template => {
           const supportedChannels =
@@ -92,26 +69,7 @@ export default {
           const useCases = template.useCases || template.use_cases || [];
           const notBotOnly = !useCases.includes('bot_api_only');
 
-          const passes = channelMatch && statusMatch && notBotOnly;
-
-          // Debug log for templates that don't pass
-          if (!passes) {
-            // eslint-disable-next-line no-console
-            console.log(
-              `🔍 [TemplateSelector] Template "${template.name}" filtered out:`,
-              {
-                supportedChannels,
-                channelType: this.channelType,
-                channelMatch,
-                status: template.status,
-                statusMatch,
-                useCases,
-                notBotOnly,
-              }
-            );
-          }
-
-          return passes;
+          return channelMatch && statusMatch && notBotOnly;
         })
         .map(template => ({
           label: template.name,
@@ -131,9 +89,7 @@ export default {
     },
   },
   watch: {
-    searchKey(newVal) {
-      // eslint-disable-next-line no-console
-      console.log('[TemplateSelector] searchKey changed to:', newVal);
+    searchKey() {
       this.fetchCannedResponses();
       this.fetchTemplates();
       this.selectedIndex = 0; // Reset selection on search
@@ -158,26 +114,13 @@ export default {
       this.$store.dispatch('getCannedResponse', { searchKey: this.searchKey });
     },
     async fetchTemplates() {
-      // eslint-disable-next-line no-console
-      console.log('[TemplateSelector] fetchTemplates called with:', {
-        searchKey: this.searchKey,
-        channelType: this.channelType,
-      });
       try {
         await this.$store.dispatch('messageTemplates/get', {
           search: this.searchKey,
           channel: this.channelType,
         });
-        const templates =
-          this.$store.getters['messageTemplates/getTemplates'] || [];
-        // eslint-disable-next-line no-console
-        console.log(
-          '[TemplateSelector] fetchTemplates completed. Templates in store:',
-          templates.length
-        );
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('[TemplateSelector] fetchTemplates error:', error);
+        // Ignore errors
       }
     },
     handleSelect(item = {}) {
