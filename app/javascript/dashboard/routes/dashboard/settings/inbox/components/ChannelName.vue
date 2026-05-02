@@ -31,6 +31,7 @@ const i18nMap = {
   'Channel::Instagram': 'INSTAGRAM',
   'Channel::Tiktok': 'TIKTOK',
   'Channel::Voice': 'VOICE',
+  'Channel::AppleMessagesForBusiness': 'APPLE_MESSAGES_FOR_BUSINESS',
 };
 
 const twilioChannelName = () => {
