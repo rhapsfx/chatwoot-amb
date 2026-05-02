@@ -14,7 +14,6 @@ import bulkActions from './modules/bulkActions';
 import campaigns from './modules/campaigns';
 import cannedResponse from './modules/cannedResponse';
 import categories from './modules/helpCenterCategories';
-import companies from './modules/companies';
 import contactConversations from './modules/contactConversations';
 import contactLabels from './modules/contactLabels';
 import contactNotes from './modules/contactNotes';
@@ -29,7 +28,6 @@ import conversationTypingStatus from './modules/conversationTypingStatus';
 import conversationWatchers from './modules/conversationWatchers';
 import csat from './modules/csat';
 import customRole from './modules/customRole';
-import messageTemplates from './modules/messageTemplates';
 import customViews from './modules/customViews';
 import dashboardApps from './modules/dashboardApps';
 import draftMessages from './modules/draftMessages';
@@ -79,7 +77,6 @@ export default createStore({
     campaigns,
     cannedResponse,
     categories,
-    companies,
     contactConversations,
     contactLabels,
     contactNotes,
@@ -104,7 +101,6 @@ export default createStore({
     integrations,
     labels,
     macros,
-    messageTemplates,
     notifications,
     portals,
     reports,

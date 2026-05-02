@@ -19,6 +19,7 @@ export const INBOX_FEATURE_MAP = {
     INBOX_TYPES.WHATSAPP,
     INBOX_TYPES.TELEGRAM,
     INBOX_TYPES.API,
+    INBOX_TYPES.TIKTOK,
     INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
   [INBOX_FEATURES.REPLY_TO_OUTGOING]: [
@@ -27,6 +28,7 @@ export const INBOX_FEATURE_MAP = {
     INBOX_TYPES.WHATSAPP,
     INBOX_TYPES.TELEGRAM,
     INBOX_TYPES.API,
+    INBOX_TYPES.TIKTOK,
     INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
   [INBOX_FEATURES.INTERACTIVE_MESSAGES]: [
@@ -138,6 +140,10 @@ export const useInbox = (inboxId = null) => {
     return channelType.value === INBOX_TYPES.VOICE;
   });
 
+  const isATiktokChannel = computed(() => {
+    return channelType.value === INBOX_TYPES.TIKTOK;
+  });
+
   const isAnAppleMessagesForBusinessChannel = computed(() => {
     return channelType.value === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS;
   });
@@ -160,6 +166,7 @@ export const useInbox = (inboxId = null) => {
     isAnEmailChannel,
     isAnInstagramChannel,
     isAVoiceChannel,
+    isATiktokChannel,
     isAnAppleMessagesForBusinessChannel,
   };
 };

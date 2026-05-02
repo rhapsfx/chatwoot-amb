@@ -3,7 +3,7 @@ import { ref, computed, reactive, watch } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
-import { required, helpers } from '@vuelidate/validators';
+import { required, helpers, url } from '@vuelidate/validators';
 import { useVuelidate } from '@vuelidate/core';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import { useToggle } from '@vueuse/core';
@@ -47,16 +47,7 @@ const formState = reactive({
 
 const [showAccessToken, toggleAccessToken] = useToggle();
 const accessToken = ref('');
-
-// Custom URL validator that accepts localhost, IP addresses, and standard URLs
-const isValidWebhookUrl = value => {
-  if (!value) return true; // Optional field
-
-  // Allow localhost, IP addresses, and standard URLs
-  const urlPattern =
-    /^https?:\/\/(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w.-]+\.[\w.-]+)(:\d+)?(\/.*)?$/i;
-  return urlPattern.test(value);
-};
+const botSecret = ref('');
 
 const v$ = useVuelidate(
   {
@@ -67,10 +58,13 @@ const v$ = useVuelidate(
       ),
     },
     botUrl: {
-      // Webhook URL is optional, but if provided, it must be valid
-      isValidWebhookUrl: helpers.withMessage(
+      required: helpers.withMessage(
+        () => t('AGENT_BOTS.FORM.ERRORS.URL'),
+        required
+      ),
+      url: helpers.withMessage(
         () => t('AGENT_BOTS.FORM.ERRORS.VALID_URL'),
-        isValidWebhookUrl
+        url
       ),
     },
   },
@@ -186,15 +180,21 @@ const handleSubmit = async () => {
       : t('AGENT_BOTS.EDIT.API.SUCCESS_MESSAGE');
     useAlert(alertKey);
 
-    // Show access token after creation
+    // Show access token and secret after creation
     if (isCreate) {
-      const { access_token: responseAccessToken, id } = response || {};
+      const {
+        access_token: responseAccessToken,
+        secret: responseSecret,
+        id,
+      } = response || {};
 
       if (id && responseAccessToken) {
         accessToken.value = responseAccessToken;
+        botSecret.value = responseSecret || '';
         toggleAccessToken(true);
       } else {
         accessToken.value = '';
+        botSecret.value = '';
         dialogRef.value.close();
       }
     } else {
@@ -219,14 +219,16 @@ const initializeForm = () => {
       thumbnail,
       bot_config: botConfig,
       access_token: botAccessToken,
+      secret: botSecretValue,
     } = props.selectedBot;
     formState.botName = name || '';
     formState.botDescription = description || '';
     formState.botUrl = botUrl || botConfig?.webhook_url || '';
     formState.botAvatarUrl = thumbnail || '';
 
-    if (botAccessToken && props.type === MODAL_TYPES.EDIT) {
-      accessToken.value = botAccessToken;
+    if (props.type === MODAL_TYPES.EDIT) {
+      if (botAccessToken) accessToken.value = botAccessToken;
+      if (botSecretValue) botSecret.value = botSecretValue;
     }
   } else {
     resetForm();
@@ -236,6 +238,24 @@ const initializeForm = () => {
 const onCopyToken = async value => {
   await copyTextToClipboard(value);
   useAlert(t('AGENT_BOTS.ACCESS_TOKEN.COPY_SUCCESSFUL'));
+};
+
+const onCopySecret = async value => {
+  await copyTextToClipboard(value || botSecret.value);
+  useAlert(t('AGENT_BOTS.SECRET.COPY_SUCCESS'));
+};
+
+const onResetSecret = async () => {
+  const response = await store.dispatch(
+    'agentBots/resetSecret',
+    props.selectedBot.id
+  );
+  if (response) {
+    botSecret.value = response.secret;
+    useAlert(t('AGENT_BOTS.SECRET.RESET_SUCCESS'));
+  } else {
+    useAlert(t('AGENT_BOTS.SECRET.RESET_ERROR'));
+  }
 };
 
 const onResetToken = async () => {
@@ -254,6 +274,7 @@ const onResetToken = async () => {
 const closeModal = () => {
   if (!showAccessToken.value) v$.value?.$reset();
   accessToken.value = '';
+  botSecret.value = '';
   toggleAccessToken(false);
 };
 
@@ -325,6 +346,20 @@ defineExpose({ dialogRef });
         />
       </div>
 
+      <div
+        v-if="botSecret && type === MODAL_TYPES.EDIT"
+        class="flex flex-col gap-1"
+      >
+        <label class="mb-0.5 text-sm font-medium text-n-slate-12">
+          {{ $t('AGENT_BOTS.SECRET.LABEL') }}
+        </label>
+        <AccessToken
+          :value="botSecret"
+          @on-copy="onCopySecret"
+          @on-reset="onResetSecret"
+        />
+      </div>
+
       <div v-if="showAccessTokenInput" class="flex flex-col gap-1">
         <label
           v-if="type === MODAL_TYPES.EDIT"
@@ -343,6 +378,23 @@ defineExpose({ dialogRef });
           :value="accessToken"
           :show-reset-button="false"
           @on-copy="onCopyToken"
+        />
+      </div>
+
+      <div
+        v-if="botSecret && showAccessToken && type === MODAL_TYPES.CREATE"
+        class="flex flex-col gap-1"
+      >
+        <p class="text-sm text-n-slate-11">
+          {{ $t('AGENT_BOTS.SECRET.CREATED_DESC') }}
+        </p>
+        <label class="mb-0.5 text-sm font-medium text-n-slate-12">
+          {{ $t('AGENT_BOTS.SECRET.LABEL') }}
+        </label>
+        <AccessToken
+          :value="botSecret"
+          :show-reset-button="false"
+          @on-copy="onCopySecret"
         />
       </div>
 

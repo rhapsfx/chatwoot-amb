@@ -8,7 +8,9 @@
       "Bash(python3 -m json.tool)",
       "Bash(magick -version)",
       "Bash(identify -verbose /tmp/test_pin3.png)",
-      "Bash(identify -verbose public/apple-messages/list-circle.png)"
+      "Bash(identify -verbose public/apple-messages/list-circle.png)",
+      "Bash(git checkout *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

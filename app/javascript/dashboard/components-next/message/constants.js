@@ -49,6 +49,10 @@ export const ATTACHMENT_TYPES = {
   STORY_MENTION: 'story_mention',
   CONTACT: 'contact',
   IG_REEL: 'ig_reel',
+  EMBED: 'embed',
+  IG_POST: 'ig_post',
+  IG_STORY: 'ig_story',
+  IG_STORY_REPLY: 'ig_story_reply',
 };
 
 export const CONTENT_TYPES = {
@@ -74,6 +78,19 @@ export const CONTENT_TYPES = {
   APPLE_FORM_RESPONSE: 'apple_form_response',
   APPLE_CUSTOM_APP: 'apple_custom_app',
   APPLE_INVITATION: 'apple_invitation',
+};
+
+export const VOICE_CALL_STATUS = {
+  IN_PROGRESS: 'in-progress',
+  RINGING: 'ringing',
+  COMPLETED: 'completed',
+  NO_ANSWER: 'no-answer',
+  FAILED: 'failed',
+};
+
+export const VOICE_CALL_DIRECTION = {
+  INBOUND: 'inbound',
+  OUTBOUND: 'outbound',
 };
 
 export const MEDIA_TYPES = [

@@ -42,20 +42,17 @@ const props = defineProps({
 const emit = defineEmits(['retry']);
 
 const allMessages = computed(() => {
-  // CRITICAL: Preserve appleMspPayload contents from camelization
-  // Apple MSP Gateway requires exact field names like 'quick-reply' (with hyphen)
-  // The camelcase-keys library doesn't have a way to exclude nested content,
-  // so we must manually preserve and restore appleMspPayload
-
+  // Preserve appleMspPayload contents from camelization.
+  // Apple MSP Gateway requires exact field names like 'quick-reply' (with hyphen).
   const messages = props.messages.map(msg => {
-    // Store original appleMspPayload if it exists
     const originalAppleMspPayload =
       msg.appleMspPayload || msg.apple_msp_payload;
 
-    // Camelize the message
-    const camelized = useCamelCase(msg, { deep: true });
+    const camelized = useCamelCase(msg, {
+      deep: true,
+      stopPaths: ['content_attributes.translations'],
+    });
 
-    // Restore original appleMspPayload (not camelized)
     if (originalAppleMspPayload) {
       camelized.appleMspPayload = originalAppleMspPayload;
     }
@@ -181,7 +178,7 @@ const getInReplyToMessage = parentMessage => {
 </script>
 
 <template>
-  <ul class="px-4 bg-n-background">
+  <ul class="px-4 bg-n-surface-1">
     <slot name="beforeAll" />
     <template v-for="(message, index) in allMessages" :key="message.id">
       <slot

@@ -10,11 +10,6 @@ import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
 import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
-import PriorityNone from 'dashboard/assets/images/dashboard/priority/none.svg';
-import PriorityUrgent from 'dashboard/assets/images/dashboard/priority/urgent.svg';
-import PriorityHigh from 'dashboard/assets/images/dashboard/priority/high.svg';
-import PriorityMedium from 'dashboard/assets/images/dashboard/priority/medium.svg';
-import PriorityLow from 'dashboard/assets/images/dashboard/priority/low.svg';
 
 export default {
   components: {
@@ -41,27 +36,27 @@ export default {
         {
           id: null,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.NONE'),
-          thumbnail: PriorityNone,
+          icon: 'i-woot-priority-empty',
         },
         {
           id: CONVERSATION_PRIORITY.URGENT,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.URGENT'),
-          thumbnail: PriorityUrgent,
+          icon: 'i-woot-priority-urgent',
         },
         {
           id: CONVERSATION_PRIORITY.HIGH,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.HIGH'),
-          thumbnail: PriorityHigh,
+          icon: 'i-woot-priority-high',
         },
         {
           id: CONVERSATION_PRIORITY.MEDIUM,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.MEDIUM'),
-          thumbnail: PriorityMedium,
+          icon: 'i-woot-priority-medium',
         },
         {
           id: CONVERSATION_PRIORITY.LOW,
           name: this.$t('CONVERSATION.PRIORITY.OPTIONS.LOW'),
-          thumbnail: PriorityLow,
+          icon: 'i-woot-priority-low',
         },
       ],
     };
@@ -90,7 +85,10 @@ export default {
       },
       set(agent) {
         const agentId = agent ? agent.id : null;
-        this.$store.dispatch('setCurrentChatAssignee', agent);
+        this.$store.dispatch('setCurrentChatAssignee', {
+          conversationId: this.currentChat.id,
+          assignee: agent,
+        });
         this.$store
           .dispatch('assignAgent', {
             conversationId: this.currentChat.id,
@@ -212,8 +210,8 @@ export default {
 </script>
 
 <template>
-  <div class="bg-n-background">
-    <div class="multiselect-wrap--small">
+  <div>
+    <div>
       <ContactDetailsItem
         compact
         :title="$t('CONVERSATION_SIDEBAR.ASSIGNEE_LABEL')"
@@ -244,7 +242,7 @@ export default {
         @select="onClickAssignAgent"
       />
     </div>
-    <div class="multiselect-wrap--small">
+    <div>
       <ContactDetailsItem
         compact
         :title="$t('CONVERSATION_SIDEBAR.TEAM_LABEL')"
@@ -263,7 +261,7 @@ export default {
         @select="onClickAssignTeam"
       />
     </div>
-    <div class="multiselect-wrap--small">
+    <div>
       <ContactDetailsItem compact :title="$t('CONVERSATION.PRIORITY.TITLE')" />
       <MultiselectDropdown
         :options="priorityOptions"

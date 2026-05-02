@@ -14,15 +14,7 @@ defineProps({
     type: String,
     required: true,
   },
-  thumbnail: {
-    type: String,
-    default: '',
-  },
   isComingSoon: {
-    type: Boolean,
-    default: false,
-  },
-  disabled: {
     type: Boolean,
     default: false,
   },
@@ -37,18 +29,11 @@ defineProps({
         !isComingSoon,
       'cursor-not-allowed disabled:opacity-80': isComingSoon,
     }"
-    :disabled="disabled || isComingSoon"
   >
     <div
       class="flex size-10 items-center justify-center rounded-full bg-n-alpha-2"
     >
-      <img
-        v-if="thumbnail"
-        :src="thumbnail"
-        :alt="title"
-        class="size-6 object-contain"
-      />
-      <Icon v-else :icon="icon" class="text-n-slate-10 size-6" />
+      <Icon :icon="icon" class="text-n-slate-10 size-6" />
     </div>
 
     <div class="flex flex-col items-start gap-1.5">
@@ -62,7 +47,7 @@ defineProps({
 
     <div
       v-if="isComingSoon"
-      class="absolute inset-0 flex items-center justify-center backdrop-blur-[2px] rounded-2xl bg-gradient-to-br from-n-background/90 via-n-background/70 to-n-background/95 cursor-not-allowed"
+      class="absolute inset-0 flex items-center justify-center backdrop-blur-[2px] rounded-2xl bg-gradient-to-br from-n-surface-1/90 via-n-surface-1/70 to-n-surface-1/95 cursor-not-allowed"
     >
       <span class="text-n-slate-12 font-medium text-sm">
         {{ $t('CHANNEL_SELECTOR.COMING_SOON') }} 🚀
