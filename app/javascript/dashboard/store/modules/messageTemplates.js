@@ -35,12 +35,24 @@ export const actions = {
   ) {
     commit(types.SET_TEMPLATE_UI_FLAG, { isFetching: true });
     try {
+      // eslint-disable-next-line no-console
+      console.log('[messageTemplates/get] Calling API with:', {
+        search,
+        channel,
+      });
       const response = await TemplatesAPI.get({ search, channel });
+      // eslint-disable-next-line no-console
+      console.log('[messageTemplates/get] API response:', response);
       // Extract templates array from paginated response
       const templates = response.data.templates || response.data;
+      // eslint-disable-next-line no-console
+      console.log('[messageTemplates/get] Extracted templates:', templates);
       commit(types.SET_TEMPLATES, templates);
+      // eslint-disable-next-line no-console
+      console.log('[messageTemplates/get] Templates committed to store');
     } catch (error) {
-      // Ignore error
+      // eslint-disable-next-line no-console
+      console.error('[messageTemplates/get] Error fetching templates:', error);
     } finally {
       commit(types.SET_TEMPLATE_UI_FLAG, { isFetching: false });
     }
@@ -137,7 +149,19 @@ export const mutations = {
       ...data,
     };
   },
-  [types.SET_TEMPLATES]: MutationHelpers.set,
+  [types.SET_TEMPLATES](_state, data) {
+    // eslint-disable-next-line no-console
+    console.log(
+      '[messageTemplates mutation SET_TEMPLATES] Received data:',
+      data
+    );
+    _state.records = Array.isArray(data) ? data : [];
+    // eslint-disable-next-line no-console
+    console.log(
+      '[messageTemplates mutation SET_TEMPLATES] State updated. records.length:',
+      _state.records.length
+    );
+  },
   [types.ADD_TEMPLATE]: MutationHelpers.create,
   [types.EDIT_TEMPLATE]: MutationHelpers.update,
   [types.DELETE_TEMPLATE]: MutationHelpers.destroy,
