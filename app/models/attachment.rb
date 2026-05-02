@@ -137,13 +137,12 @@ class Attachment < ApplicationRecord
       token = generate_attachment_token(id)
       url = with_custom_host { Rails.application.routes.url_helpers.apple_messages_for_business_attachment_url(id, token: token) }
       Rails.logger.debug { "[Attachment] Generated AMB custom domain URL: #{url}" }
-      url
     else
       Rails.logger.debug '[Attachment] Using standard url_for helper.'
       url = url_for(file)
       Rails.logger.debug { "[Attachment] Generated standard URL: #{url}" }
-      url
     end
+    url
   end
 
   def generate_thumb_url
@@ -156,13 +155,12 @@ class Attachment < ApplicationRecord
         token = generate_attachment_token(id)
         url = with_custom_host { Rails.application.routes.url_helpers.apple_messages_for_business_attachment_url(id, token: token) }
         Rails.logger.debug { "[Attachment] Generated AMB custom domain thumb URL: #{url}" }
-        url
       else
         Rails.logger.debug '[Attachment] Using standard url_for helper for thumb.'
         url = url_for(file.representation(resize_to_fill: [250, nil]))
         Rails.logger.debug { "[Attachment] Generated standard thumb URL: #{url}" }
-        url
       end
+      url
     rescue ActiveStorage::UnrepresentableError => e
       Rails.logger.warn "[Attachment] Unrepresentable image attachment: #{id} (#{file.filename}) - #{e.message}"
       ''
@@ -170,7 +168,7 @@ class Attachment < ApplicationRecord
   end
 
   def apple_messages_channel?
-    @is_apple_messages ||= message&.inbox&.channel_type == 'Channel::AppleMessagesForBusiness'
+    @apple_messages_channel ||= message&.inbox&.channel_type == 'Channel::AppleMessagesForBusiness'
   end
 
   def metadata_for_file_type

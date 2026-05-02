@@ -72,9 +72,7 @@ class Conversations::MessageWindowService
   def last_incoming_message
     @last_incoming_message ||= @conversation.messages.where(account_id: @conversation.account_id).incoming&.last
   end
-end
 
-  # Check if the contact has opted out of Apple Messages for Business
   def apple_messages_user_blocked?
     return false unless @conversation.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
 
