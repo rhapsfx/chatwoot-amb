@@ -32,6 +32,21 @@
 │  │  └─ AppleCustomApp.vue                                           │
 │  │     └─ All receive: content_attributes (from API)                │
 │  │                                                                   │
+│  ├─ Message Composition (3 components) ⭐ CRITICAL FOR "/" CMD     │
+│  │  ├─ ReplyBox.vue                                                 │
+│  │  │  ├─ Imports: TemplateSelector.vue                             │
+│  │  │  └─ Imports: ReplyBottomPanel.vue                             │
+│  │  ├─ ReplyBottomPanel.vue                                         │
+│  │  │  ├─ Imports: AppleMessagesButton.vue ⭐ KEY FIX              │
+│  │  │  ├─ Emits: sendAppleMessage → ReplyBox                        │
+│  │  │  └─ Routes to: Apple Messages Modal                           │
+│  │  └─ TemplateSelector.vue ⭐ "/" COMMAND HANDLER                 │
+│  │     ├─ Triggered by: "/" in message input                        │
+│  │     ├─ Dispatches: messageTemplates/get (store action)           │
+│  │     ├─ Filters by: channelType, status='active'                  │
+│  │     ├─ Depends on: Vuex messageTemplates module                  │
+│  │     └─ Items: Canned responses + Templates                       │
+│  │                                                                   │
 │  ├─ Modal Builders (5 components)                                   │
 │  │  ├─ AppleFormBuilder.vue                                         │
 │  │  │  ├─ Depends on: SharedImageSelector.vue                      │
@@ -57,6 +72,50 @@
 │     │  └─ Calls: Shared Images API                                 │
 │     └─ AppleMessagesButton.vue                                      │
 │                                                                      │
+└──────────────────────────┬────────────────────────────────────────────┘
+                           ↓
+┌───────────────────────────────────────────────────────────────────────┐
+│                    VUEX STORE LAYER ⭐ CRITICAL                       │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  messageTemplates Module (stores/modules/messageTemplates.js)         │
+│  ├─ **MUST be registered** in store/index.js (line 41, module list)  │
+│  │  └─ Import: import messageTemplates from './modules/messageTemplates'
+│  │                                                                    │
+│  ├─ State:                                                            │
+│  │  ├─ records: [] (template array)                                  │
+│  │  ├─ selectedTemplate: null                                        │
+│  │  └─ uiFlags: { isFetching, isCreating, isDeleting }              │
+│  │                                                                    │
+│  ├─ Getters:                                                          │
+│  │  ├─ getTemplates → returns records array                          │
+│  │  ├─ getUIFlags → returns uiFlags                                  │
+│  │  ├─ getTemplate(id) → find by ID                                  │
+│  │  └─ getSelectedTemplate → returns selectedTemplate                │
+│  │                                                                    │
+│  ├─ Actions:                                                          │
+│  │  ├─ get({ search='', channel='' }) → fetch from API              │
+│  │  │  └─ Calls: TemplatesAPI.get                                    │
+│  │  ├─ show(id) → fetch single template                              │
+│  │  ├─ create(templateObj) → create new template                     │
+│  │  ├─ update(id, templateObj) → update template                     │
+│  │  ├─ delete(id) → delete template                                  │
+│  │  ├─ render(templateId, parameters, channelType) → preview         │
+│  │  └─ createFromAppleMessage(payload) → create from webhook         │
+│  │                                                                    │
+│  ├─ Mutations ⭐ MUST BE DEFINED IN mutation-types.js:               │
+│  │  ├─ SET_TEMPLATE_UI_FLAG (line 139-142)                           │
+│  │  ├─ SET_TEMPLATES (line 140-142)                                  │
+│  │  ├─ ADD_TEMPLATE (uses MutationHelpers.create)                    │
+│  │  ├─ EDIT_TEMPLATE (uses MutationHelpers.update)                   │
+│  │  ├─ DELETE_TEMPLATE (uses MutationHelpers.destroy)                │
+│  │  └─ SET_SELECTED_TEMPLATE (line 146-148)                          │
+│  │                                                                    │
+│  └─ Usage by TemplateSelector:                                       │
+│     ├─ Getter: this.$store.getters['messageTemplates/getTemplates']  │
+│     ├─ Action: this.$store.dispatch('messageTemplates/get', {...})   │
+│     └─ Triggers when: "/" typed or search changes                    │
+│                                                                        │
 └──────────────────────────┬────────────────────────────────────────────┘
                            ↓
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -375,6 +434,41 @@ WebSocket → Dashboard
 Agent sees message (Vue component)
 ```
 
+### "/" Command Template Selector Flow ⭐ CRITICAL
+
+```
+Agent types "/" in ReplyBox message input
+  ↓ triggers mounted/searchKey watcher
+TemplateSelector.vue
+  ↓ calls fetchTemplates() method
+this.$store.dispatch('messageTemplates/get', { search, channel })
+  ↓ commits SET_TEMPLATE_UI_FLAG { isFetching: true }
+TemplatesAPI.get({ search, channel })
+  ↓ HTTP GET /api/v1/message_templates?search=X&channel=Y
+Backend returns: response.data.templates = [...]
+  ↓ commits SET_TEMPLATES with template array
+Vuex state.records ← [template1, template2, ...]
+  ↓ computed getter returns updated records
+TemplateSelector.vue re-renders
+  ↓ shows filtered items
+filteredTemplates → templates filtered by:
+  ├─ name.includes(searchKey)
+  ├─ description.includes(searchKey)
+  ├─ tags include searchKey
+  ↓
+templateItems → filters by:
+  ├─ supported_channels includes channelType
+  ├─ status == 'active'
+  └─ NOT in use_cases: 'bot_api_only'
+  ↓ displays items + canned responses
+Agent clicks template item
+  ↓ emits 'select' event
+ReplyBox handles selection
+  ↓ inserts template content into message input
+Agent sends message
+  ↓ goes through outgoing message flow (above)
+```
+
 ---
 
 ## Template System Dependencies
@@ -409,6 +503,44 @@ Template Usage Flow:
   ImageFetchService.fetch_and_encode
     ↓ add images to data
   Returns: complete template data with images
+```
+
+### Apple Messages Button Flow ⭐ KEY COMPONENT
+
+```
+Agent working in ReplyBox (AMB conversation)
+  ↓
+ReplyBottomPanel.vue (emits from ReplyBox)
+  ├─ Imported AppleMessagesButton.vue (CRITICAL FIX)
+  └─ Only renders when channel_type == 'Channel::AppleMessagesForBusiness'
+  ↓
+Agent clicks AppleMessagesButton
+  ├─ Button icon: "icon-apple"
+  └─ Tooltip: $t('TEMPLATES.APPLE_MESSAGES.BUTTON')
+  ↓ emits sendAppleMessage event with { action, payload }
+ReplyBox receives sendAppleMessage event
+  ↓
+ReplyBox opens AppleMessagesComposer modal
+  ├─ Props: conversation, inbox, message
+  └─ Shows interactive message builder
+  ↓
+Agent selects/builds interactive message (e.g., list picker)
+  ↓
+Agent clicks "Send"
+  ↓
+MessagesController receives message data
+  └─ Normal outgoing message flow (from above)
+
+**Why This Component Is Critical**:
+- Without AppleMessagesButton, agents cannot access interactive message builders
+- It must be registered in ReplyBottomPanel.vue components list
+- It must emit 'sendAppleMessage' to parent (ReplyBox)
+- It must be conditional on AMB channel type
+
+**Registration Requirement** (app/javascript/dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue):
+- Import: import AppleMessagesButton from '../AppleMessagesButton.vue'
+- In components: AppleMessagesButton
+- In template: <AppleMessagesButton :inbox="inbox" @send-apple-message="$emit('sendAppleMessage', $event)" />
 ```
 
 ---
@@ -525,6 +657,59 @@ Message Creation Validation:
 - ImageFetchService (operates on snake_case identifiers)
 - Database models (store snake_case)
 - TemplateFacade (internal snake_case)
+
+### Vuex Mutation Types Registration ⭐ CRITICAL
+
+**File**: `app/javascript/dashboard/store/mutation-types.js`
+
+**Required Definitions for messageTemplates Module**:
+
+```javascript
+// Message Templates (MUST be defined for Vuex mutations to work)
+SET_TEMPLATE_UI_FLAG: 'SET_TEMPLATE_UI_FLAG',
+SET_TEMPLATES: 'SET_TEMPLATES',
+ADD_TEMPLATE: 'ADD_TEMPLATE',
+EDIT_TEMPLATE: 'EDIT_TEMPLATE',
+DELETE_TEMPLATE: 'DELETE_TEMPLATE',
+SET_SELECTED_TEMPLATE: 'SET_SELECTED_TEMPLATE',
+```
+
+**Why Critical**:
+
+- Without these type definitions, Vuex mutations cannot execute
+- TemplateSelector cannot fetch templates without SET_TEMPLATES mutation
+- "/" command will show only canned responses, no templates
+- Outgoing messages through templates will fail silently
+
+**Module Registration** (`app/javascript/dashboard/store/index.js`):
+
+```javascript
+// Line 41: Import the module
+import messageTemplates from './modules/messageTemplates';
+
+// Lines 65-126: Register in modules object
+modules: {
+  // ... other modules
+  messageTemplates,
+  // ... other modules
+}
+```
+
+**Without proper registration**:
+
+1. Store module not loaded → getter returns undefined
+2. Action dispatch fails → templates not fetched
+3. TemplateSelector breaks → "/" command unusable
+
+**Verification**:
+
+```bash
+# Check if mutations are defined
+grep -n "SET_TEMPLATE" app/javascript/dashboard/store/mutation-types.js
+
+# Check if module is registered
+grep -n "messageTemplates" app/javascript/dashboard/store/index.js
+```
 
 ### LogSanitizer Usage
 
@@ -655,7 +840,137 @@ E2E Testing Stack:
 
 ---
 
-**Document Generated**: 2025-11-28
+## Phase 6-7 Critical Fixes Summary (May 2026)
+
+### Recently Fixed Issues
+
+These fixes were critical for the v4.12→v4.13.0 upgrade and are documented in commits:
+
+- ceea86655: Display AMB conversation URL on inbox list
+- 51d5a12cb: Cleanup debug logging from template selector
+- 5497add6d: Complete AMB templates and button support
+- 0439c0b64: Register messageTemplates store module
+- 3926523c3: Add AppleMessagesButton to ReplyBottomPanel
+
+### 1. ⭐ Missing Vuex Store Module Registration
+
+**Problem**: messageTemplates store module existed but wasn't imported/registered.
+
+**Impact**: "/" command showed only canned responses; no templates appeared.
+
+**Files Changed**:
+
+- `app/javascript/dashboard/store/index.js`: Added import and module registration
+- `app/javascript/dashboard/store/mutation-types.js`: Added 6 mutation type definitions
+
+**Verification**:
+
+```bash
+grep "import messageTemplates" app/javascript/dashboard/store/index.js
+grep "messageTemplates," app/javascript/dashboard/store/index.js
+grep "SET_TEMPLATE" app/javascript/dashboard/store/mutation-types.js
+```
+
+### 2. ⭐ Missing AppleMessagesButton Integration
+
+**Problem**: AppleMessagesButton component existed but wasn't imported into ReplyBottomPanel.
+
+**Impact**: AMB users couldn't access interactive message composer modal.
+
+**Files Changed**:
+
+- `app/javascript/dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue`: Added import, component registration, event emission
+
+**Verification**:
+
+```bash
+grep -A2 "import AppleMessagesButton" app/javascript/dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue
+grep "AppleMessagesButton" app/javascript/dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue | grep -c "."
+```
+
+### 3. ✅ Missing Mutation Type Definitions
+
+**Problem**: 6 mutation types for messageTemplates were never defined in mutation-types.js.
+
+**Root Cause**: Without type definitions, Vuex couldn't execute mutations even though actions were properly written.
+
+**Files Changed**:
+
+- `app/javascript/dashboard/store/mutation-types.js`: Added SET_TEMPLATE_UI_FLAG, SET_TEMPLATES, ADD_TEMPLATE, EDIT_TEMPLATE, DELETE_TEMPLATE, SET_SELECTED_TEMPLATE
+
+**Impact Chain**:
+
+1. TemplateSelector calls `messageTemplates/get` action
+2. Action dispatches `SET_TEMPLATES` mutation
+3. Without type definition, mutation fails silently
+4. State never updates
+5. Getter returns empty array
+6. Templates never display
+
+### 4. ✅ Debug Logging Cleanup
+
+**Problem**: Excessive debug logging in TemplateSelector and messageTemplates module.
+
+**Files Changed**:
+
+- `app/javascript/dashboard/components/widgets/conversation/TemplateSelector.vue`: Removed console.log statements
+- `app/javascript/dashboard/store/modules/messageTemplates.js`: Removed debug logging
+
+### 5. ✅ AMB Conversation URL Display
+
+**Problem**: "/app/accounts/1/settings/inboxes/list" didn't show full conversation starter URL for AMB inboxes.
+
+**Files Changed**:
+
+- `app/javascript/dashboard/routes/dashboard/settings/inbox/Index.vue`: Added getAMBConversationURL() function and displayed full URL
+
+**Format**: `https://bcrw.apple.com/sms:open?service=iMessage&recipient=urn:biz:{business_id}`
+
+### Recommended Verification Steps
+
+**After pulling latest changes**:
+
+1. Check store module registration:
+
+   ```bash
+   grep "import messageTemplates" app/javascript/dashboard/store/index.js
+   grep -c "messageTemplates," app/javascript/dashboard/store/index.js
+   ```
+
+2. Check mutation types:
+
+   ```bash
+   grep "SET_TEMPLATE" app/javascript/dashboard/store/mutation-types.js | wc -l
+   # Should return 6
+   ```
+
+3. Check AppleMessagesButton integration:
+
+   ```bash
+   grep -c "AppleMessagesButton" app/javascript/dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue
+   # Should be 3+ (import, component, template)
+   ```
+
+4. Check debug logging is removed:
+
+   ```bash
+   grep "console.log" app/javascript/dashboard/components/widgets/conversation/TemplateSelector.vue
+   grep "console.log" app/javascript/dashboard/store/modules/messageTemplates.js
+   # Both should return empty
+   ```
+
+5. Test in browser:
+
+   - Open conversation with AMB inbox
+   - Type "/" in message input
+   - Should see both canned responses AND templates
+   - AppleMessagesButton should be visible in reply panel
+   - Click AppleMessagesButton → modal should open
+   - Visit `/app/accounts/1/settings/inboxes/list` → AMB inboxes should show conversation URL
+
+---
+
+**Document Generated**: 2025-11-28 (Updated May 2, 2026 with Phase 6-7 fixes)
 **Companion to**: AMB_INTEGRATION_STATUS_REPORT.md
 
 Generated with Claude Code
