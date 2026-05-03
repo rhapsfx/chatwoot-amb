@@ -7,18 +7,20 @@ class ContentAttributeValidator < ActiveModel::Validator
 
   # Apple Messages for Business validation keys
   ALLOWED_APPLE_LIST_PICKER_KEYS = [:sections, :images, :request_identifier, :received_title, :received_subtitle, :received_image_identifier, :received_style,
-                                    :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
+                                    :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style,
+                                    :external_error, :interactive_data].freeze
   ALLOWED_APPLE_LIST_PICKER_SECTION_KEYS = [:title, :multiple_selection, :order, :items].freeze
   ALLOWED_APPLE_LIST_PICKER_ITEM_KEYS = [:identifier, :title, :subtitle, :image_identifier, :order, :style].freeze
   ALLOWED_APPLE_TIME_PICKER_KEYS = [:event, :request_identifier, :timezone_offset, :timeslots, :received_title, :received_subtitle, :received_image_identifier,
-                                    :received_style, :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style].freeze
+                                    :received_style, :reply_title, :reply_subtitle, :reply_image_title, :reply_image_subtitle, :reply_secondary_subtitle, :reply_tertiary_subtitle, :reply_image_identifier, :reply_style,
+                                    :external_error, :interactive_data].freeze
   ALLOWED_APPLE_QUICK_REPLY_KEYS = [:summary_text, :request_identifier, :items, :received_title, :received_subtitle, :received_style,
                                     :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
-                                    :reply_secondary_subtitle, :reply_tertiary_subtitle].freeze
+                                    :reply_secondary_subtitle, :reply_tertiary_subtitle, :external_error, :interactive_data].freeze
   ALLOWED_APPLE_QUICK_REPLY_ITEM_KEYS = [:identifier, :title].freeze
   ALLOWED_APPLE_IMAGE_KEYS = [:identifier, :data, :description].freeze
   ALLOWED_APPLE_RICH_LINK_KEYS = [:url, :title, :description, :subtitle, :image_data, :image_url, :favicon_url, :image_mime_type, :video_url,
-                                  :video_mime_type, :site_name, :rich_link_data_ref].freeze
+                                  :video_mime_type, :site_name, :rich_link_data_ref, :external_error, :interactive_data].freeze
   ALLOWED_APPLE_PAY_KEYS = [:payment_request, :merchant_session, :endpoints,
                             :merchant_name, :currency_code, :country_code,
                             :line_items, :total, :shipping_methods,
@@ -26,10 +28,11 @@ class ContentAttributeValidator < ActiveModel::Validator
                             :requires_shipping, :requires_billing,
                             :received_title, :received_subtitle, :received_style,
                             :received_image_identifier, :reply_style,
-                            :reply_image_identifier, :reply_title, :reply_subtitle].freeze
+                            :reply_image_identifier, :reply_title, :reply_subtitle,
+                            :external_error, :interactive_data].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
   ALLOWED_APPLE_FORM_KEYS = [:title, :description, :request_identifier, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
-                             :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary].freeze
+                             :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary, :external_error, :interactive_data].freeze
   ALLOWED_APPLE_CUSTOM_APP_KEYS = [:app_id, :app_name, :bid, :url, :use_live_layout].freeze
 
   # Apple MSP style values
