@@ -1,5 +1,5 @@
 <script setup>
-import Label from 'dashboard/components-next/label/Label.vue';
+import Label from 'dashboard/components-next/Label/Label.vue';
 
 const props = defineProps({
   id: {

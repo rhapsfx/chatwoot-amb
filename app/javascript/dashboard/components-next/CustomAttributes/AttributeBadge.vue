@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
-import Label from 'dashboard/components-next/label/Label.vue';
+import Label from 'dashboard/components-next/Label/Label.vue';
 
 const props = defineProps({
   type: {
