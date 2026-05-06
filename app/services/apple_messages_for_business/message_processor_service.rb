@@ -77,24 +77,32 @@ class AppleMessagesForBusiness::MessageProcessorService
       message_params[:content] = @message_params[:content_attributes]['title']
     end
 
+    # Check if this message will have attachments added from a template
+    template = @message_params[:template_id].present? ? MessageTemplate.find_by(id: @message_params[:template_id]) : nil
+    has_template_attachments = template&.attachments&.attached?
+
     # Clean placeholder content if template has attachments
-    if @message_params[:template_id].present?
-      template = MessageTemplate.find_by(id: @message_params[:template_id])
-      message_params[:content] = clean_placeholder_content(message_params[:content]) if template&.attachments&.attached?
-    end
+    message_params[:content] = clean_placeholder_content(message_params[:content]) if has_template_attachments
+
+    # If template will add attachments, mark the message to skip immediate SendReplyJob
+    # The job will be triggered manually AFTER attachments are attached
+    message_params[:skip_send_reply_job] = true if has_template_attachments
 
     # Create the message using MessageBuilder (this validates and saves to DB)
-    # The message will be automatically sent via SendReplyJob after_create_commit callback
     message = Messages::MessageBuilder.new(@user, @conversation, message_params).perform
 
     # If template_id is present, attach template files to the message
-    attach_template_files(message, @message_params[:template_id]) if @message_params[:template_id].present?
+    if @message_params[:template_id].present?
+      attach_template_files(message, @message_params[:template_id])
 
-    Rails.logger.info '[AMB MessageProcessor] Message created and will be sent automatically via SendReplyJob'
+      # After attaching files, trigger SendReplyJob if it was skipped
+      if has_template_attachments
+        Rails.logger.info "[AMB MessageProcessor] Template files attached, triggering SendReplyJob for message #{message.id}"
+        ::SendReplyJob.set(wait: 2.seconds).perform_later(message.id)
+      end
+    end
 
-    # Don't manually send here - the after_create_commit callback in Message model
-    # will trigger SendReplyJob.perform_later(id) which handles the actual sending
-    # This prevents duplicate messages being sent to the device
+    Rails.logger.info '[AMB MessageProcessor] Message created and sent'
 
     message
   end

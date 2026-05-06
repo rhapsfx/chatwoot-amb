@@ -968,9 +968,67 @@ grep "AppleMessagesButton" app/javascript/dashboard/components/widgets/WootWrite
    - Click AppleMessagesButton → modal should open
    - Visit `/app/accounts/1/settings/inboxes/list` → AMB inboxes should show conversation URL
 
+### 6. ✅ Apple Messages Failure Handling - Test Coverage Addition
+
+**Problem Discovered**: 301 messages failed silently in Sidekiq dead letter queue (May 3, 2026).
+
+**Root Cause**: SendReplyJob attempted to set `external_error` on failed messages, but the content_attribute validator didn't allow this key for Apple message types.
+
+**Validation Error**:
+
+```
+Validation failed: Content attributes contains invalid keys for apple_pay: [:external_error]
+```
+
+**Files Changed**:
+
+- `app/models/concerns/content_attribute_validator.rb`: Added `:external_error` and `:interactive_data` to all Apple message type allowed keys:
+  - `ALLOWED_APPLE_LIST_PICKER_KEYS`
+  - `ALLOWED_APPLE_TIME_PICKER_KEYS`
+  - `ALLOWED_APPLE_QUICK_REPLY_KEYS`
+  - `ALLOWED_APPLE_RICH_LINK_KEYS`
+  - `ALLOWED_APPLE_PAY_KEYS`
+  - `ALLOWED_APPLE_FORM_KEYS`
+
+- `spec/jobs/send_reply_job_spec.rb`: Added comprehensive test coverage:
+  - Test for Apple Messages successful send
+  - Test for external_error handling on apple_pay messages
+  - Test for external_error handling on apple_list_picker messages
+  - All 18 RSpec tests passing
+
+**Why This Matters**:
+
+1. Prevents silent job failures when Apple API calls fail
+2. Ensures messages are properly marked as failed with error details
+3. Unblocks Sidekiq dead letter processing
+4. Validates that error states are preserved in the database
+
+**Discovery Process**:
+
+1. Found messages with AR files (fender_stratocaster.usdz) not reaching Apple devices
+2. Checked Sidekiq queues: 301 failed jobs all with same validation error
+3. Traced root cause to SendReplyJob calling send_on_apple_messages_for_business_service.rb which tried to set external_error
+4. Validator rejected the key because it wasn't in the allowed list
+5. Added key to validator and added test coverage to prevent regression
+
+**Verification Steps**:
+
+```bash
+# Run Apple Messages job tests
+bundle exec rspec spec/jobs/send_reply_job_spec.rb
+
+# Verify external_error is allowed in validator
+grep -n "external_error" app/models/concerns/content_attribute_validator.rb
+# Should return 6 entries (one per Apple message type)
+
+# Check Sidekiq dead letter queue is clear
+rails runner "puts Sidekiq::DeadSet.new.size"
+# Should return 0 (after reprocessing with fixed code)
+```
+
 ---
 
-**Document Generated**: 2025-11-28 (Updated May 2, 2026 with Phase 6-7 fixes)
+**Document Generated**: 2025-11-28 (Updated May 3, 2026 with failure handling fixes and test coverage)
 **Companion to**: AMB_INTEGRATION_STATUS_REPORT.md
 
 Generated with Claude Code

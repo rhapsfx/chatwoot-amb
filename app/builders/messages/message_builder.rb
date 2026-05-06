@@ -24,6 +24,10 @@ class Messages::MessageBuilder
 
   def perform
     @message = @conversation.messages.build(message_params)
+
+    # Skip SendReplyJob if explicitly requested (e.g., when template attachments will be added after creation)
+    @message.instance_variable_set(:@skip_send_reply_job, @params[:skip_send_reply_job].present?)
+
     process_attachments
     process_emails
     # When the message has no quoted content, it will just be rendered as a regular message

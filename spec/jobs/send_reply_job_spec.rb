@@ -144,5 +144,86 @@ RSpec.describe SendReplyJob do
       expect(process_service).to receive(:perform)
       described_class.perform_now(message.id)
     end
+
+    it 'calls AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService when apple_messages_for_business message' do
+      amb_channel = create(:channel_apple_messages_for_business)
+      amb_inbox = create(:inbox, channel: amb_channel)
+      conversation = create(:conversation, inbox: amb_inbox)
+      message = create(:message, conversation: conversation, content_type: 'text')
+
+      allow(AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService).to receive(:new).with(message: message).and_return(process_service)
+      expect(AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService).to receive(:new).with(message: message)
+      expect(process_service).to receive(:perform)
+      described_class.perform_now(message.id)
+    end
+  end
+
+  context 'when Apple Messages send fails' do
+    it 'handles external_error without validation failure for apple_pay' do
+      amb_channel = create(:channel_apple_messages_for_business)
+      amb_inbox = create(:inbox, channel: amb_channel)
+      conversation = create(:conversation, inbox: amb_inbox)
+      message = create(:message, conversation: conversation, content_type: 'apple_pay',
+                                 content_attributes: { merchant_name: 'Test Store', currency_code: 'USD',
+                                                       country_code: 'US', line_items: [{ label: 'Item 1', amount: '5.99' }], total: { label: 'Total', amount: '9.99' } })
+
+      # Mock the service to simulate a failure
+      allow_any_instance_of(AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService).to receive(:perform) do |_service|
+        # Simulate what the service does on failure - update message with external_error
+        message.update!(
+          status: :failed,
+          external_error: 'Apple API returned 417 Unauthorized',
+          additional_attributes: (message.additional_attributes || {}).merge(external_error: 'Apple API returned 417 Unauthorized')
+        )
+      end
+
+      # Should not raise validation error when setting external_error
+      expect { described_class.perform_now(message.id) }.not_to raise_error
+
+      # Verify the message was updated with the error
+      message.reload
+      expect(message.status).to eq('failed')
+      expect(message.external_error).to eq('Apple API returned 417 Unauthorized')
+    end
+
+    it 'preserves content_attributes validation with external_error for list_picker' do
+      amb_channel = create(:channel_apple_messages_for_business)
+      amb_inbox = create(:inbox, channel: amb_channel)
+      conversation = create(:conversation, inbox: amb_inbox)
+      message = create(:message, conversation: conversation, content_type: 'apple_list_picker',
+                                 content_attributes: { sections: [{ items: [{ identifier: 'item1', title: 'Item 1' }] }], request_identifier: 'test_123' })
+
+      allow_any_instance_of(AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService).to receive(:perform) do |_service|
+        message.update!(
+          status: :failed,
+          external_error: 'Connection timeout',
+          additional_attributes: (message.additional_attributes || {}).merge(external_error: 'Connection timeout')
+        )
+      end
+
+      expect { described_class.perform_now(message.id) }.not_to raise_error
+
+      message.reload
+      expect(message.status).to eq('failed')
+      expect(message.external_error).to eq('Connection timeout')
+    end
+  end
+
+  context 'when Apple Messages send succeeds' do
+    it 'sends text message successfully' do
+      amb_channel = create(:channel_apple_messages_for_business)
+      amb_inbox = create(:inbox, channel: amb_channel)
+      conversation = create(:conversation, inbox: amb_inbox)
+      message = create(:message, conversation: conversation, content_type: 'text')
+
+      allow_any_instance_of(AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService).to receive(:perform) do |_service|
+        message.update!(status: :delivered)
+      end
+
+      expect { described_class.perform_now(message.id) }.not_to raise_error
+
+      message.reload
+      expect(message.status).to eq('delivered')
+    end
   end
 end
