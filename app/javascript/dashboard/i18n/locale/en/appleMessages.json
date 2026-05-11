@@ -97,6 +97,7 @@
         "FILE_TOO_LARGE": "Image file size must be less than 5MB"
       }
     },
+    "VIEW_MSP_PAYLOAD": "View Apple Messages payload",
     "CUSTOM_PAYLOAD": {
       "TAB_LABEL": "Custom Payload",
       "EDITOR": {

@@ -448,10 +448,9 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
 
     before do
       set_content_attrs(
-        'url' => 'https://www.example.com/app',
+        'url' => 'https://chibi.app',
         'rich_link_data_ref' => rich_link_data_ref
       )
-      # No OG data — ensures App Clips path is used
     end
 
     it 'sends richLinkDataRef instead of richLinkData' do
@@ -462,7 +461,7 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
 
     it 'applies CaseTransformer to richLinkDataRef keys' do
       set_content_attrs(
-        'url' => 'https://www.example.com/app',
+        'url' => 'https://chibi.app',
         'rich_link_data_ref' => { 'signature_base64' => 'c2ln', 'reference_id' => 'ref', 'cert_chain' => [] }
       )
 
@@ -473,20 +472,31 @@ RSpec.describe AppleMessagesForBusiness::SendRichLinkService, type: :service do
       expect(ref).to have_key('certChain')
     end
 
-    it 'does not use richLinkDataRef when frontend OG data is usable' do
+    it 'uses richLinkDataRef even when the message also has a good title and image_url' do
+      # App Clips must always use richLinkDataRef — OG scraping must be skipped.
+      # This was the root cause of the chibi.app bug: OG scraping succeeded and
+      # overwrote the richLinkDataRef path.
       set_content_attrs(
-        'url' => 'https://www.example.com/app',
-        'title' => 'Real Product',
-        'image_url' => 'https://example.com/real.jpg',
+        'url' => 'https://chibi.app',
+        'title' => 'Open App Clip',
+        'image_url' => 'https://chibi.app/assets/img/experience.jpg',
         'rich_link_data_ref' => rich_link_data_ref
       )
 
-      stub_request(:get, 'https://example.com/real.jpg')
-        .to_return(status: 200, body: 'img', headers: { 'Content-Type' => 'image/jpeg' })
-
       payload = captured_payload { build_service.perform }
-      expect(payload).to have_key('richLinkData')
-      expect(payload).not_to have_key('richLinkDataRef')
+      expect(payload).to have_key('richLinkDataRef')
+      expect(payload).not_to have_key('richLinkData')
+    end
+
+    it 'skips OG scraping entirely when rich_link_data_ref is present' do
+      set_content_attrs(
+        'url' => 'https://chibi.app',
+        'title' => 'Open App Clip',
+        'rich_link_data_ref' => rich_link_data_ref
+      )
+
+      expect_any_instance_of(described_class).not_to receive(:scrape_open_graph_data)
+      build_service.perform
     end
   end
 

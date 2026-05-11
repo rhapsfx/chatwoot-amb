@@ -1,10 +1,23 @@
 # frozen_string_literal: true
 
-# Prefer ImageMagick v7 when `magick` exists, but fall back to the legacy
-# `convert` CLI in environments where only ImageMagick 6 is installed.
-Rails.application.config.after_initialize do
-  require 'mini_magick'
-  MiniMagick.configure do |config|
-    config.cli = File.executable?('/usr/bin/magick') || File.executable?('/bin/magick') ? :imagemagick7 : :imagemagick
-  end
+# Prefer ImageMagick v7 (`magick`) when available; fall back to legacy `convert` (IM6).
+require 'mini_magick'
+
+magick_in_path = (ENV.fetch('PATH', '').split(File::PATH_SEPARATOR) + %w[/opt/homebrew/bin /usr/local/bin /usr/bin]).uniq.any? do |dir|
+  File.executable?(File.join(dir, 'magick'))
+end
+
+if magick_in_path
+  MiniMagick.configure { |c| c.cli = :imagemagick7 }
+
+  # IM7 prints a deprecation warning for `magick convert` — it wants just `magick`.
+  # ImageProcessing::MiniMagick hardcodes MiniMagick::Tool::Convert, which builds
+  # ["magick", "convert", ...] in imagemagick7 mode. Override executable to drop
+  # the subcommand so the command is simply ["magick", ...].
+  require 'mini_magick/tool/convert'
+  MiniMagick::Tool::Convert.prepend(Module.new do
+    def executable
+      MiniMagick.imagemagick7? ? ['magick'] : super
+    end
+  end)
 end

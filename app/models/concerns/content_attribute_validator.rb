@@ -32,7 +32,8 @@ class ContentAttributeValidator < ActiveModel::Validator
                             :external_error, :interactive_data].freeze
   ALLOWED_APPLE_AUTHENTICATION_KEYS = [:oauth2, :response_encryption_key, :state, :redirect_uri].freeze
   ALLOWED_APPLE_FORM_KEYS = [:title, :description, :request_identifier, :fields, :pages, :submit_url, :method, :validation_rules, :images, :received_message,
-                             :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary, :external_error, :interactive_data].freeze
+                             :reply_message, :version, :form_id, :use_live_layout, :submit_button, :cancel_button, :show_summary, :external_error, :interactive_data,
+                             :form].freeze
   ALLOWED_APPLE_CUSTOM_APP_KEYS = [:app_id, :app_name, :bid, :url, :use_live_layout].freeze
 
   # Apple MSP style values

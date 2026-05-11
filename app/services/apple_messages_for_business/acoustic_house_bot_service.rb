@@ -1536,7 +1536,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
   def handle_register_rich_link
     # AHK3: Send register rich link and reset flow
     send_rich_link(
-      url: 'https://register.apple.com/business-chat',
+      url: 'https://register.apple.com/messages',
       image_asset: 'heroImage.png',
       title: 'Apple Messages for Business'
     )

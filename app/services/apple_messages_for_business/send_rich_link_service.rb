@@ -145,6 +145,12 @@ class AppleMessagesForBusiness::SendRichLinkService
     content_attrs = @message.content_attributes
     url = content_attrs['url'] || @message.content
 
+    # App Clips always use richLinkDataRef — skip OG scraping entirely
+    if content_attrs['rich_link_data_ref'].present?
+      log_info '🔍 Rich Link - Using richLinkDataRef (App Clips mode), skipping OG scrape'
+      return build_from_rich_link_data_ref(content_attrs)
+    end
+
     # Only re-scrape if the frontend didn't already send usable OG data.
     # Sites with bot-protection (Akamai, Cloudflare) may return a tracking pixel or
     # a generic page on the second request, overwriting good data from the first scrape.
@@ -212,12 +218,6 @@ class AppleMessagesForBusiness::SendRichLinkService
       end
     end
 
-    # Use richLinkDataRef (App Clips) only when we have no usable OG data at all
-    if content_attrs['rich_link_data_ref'].present? && !frontend_og_data_usable?(content_attrs, url) && !og_data[:success]
-      log_info '🔍 Rich Link - Using richLinkDataRef (App Clips mode, no usable OG data)'
-      return build_from_rich_link_data_ref(content_attrs)
-    end
-
     # Build embedded richLinkData with assets (title/description/image inline)
     log_info '🔍 Rich Link - Building manual richLinkData with assets'
     url = content_attrs['url'] || @message.content
@@ -282,12 +282,17 @@ class AppleMessagesForBusiness::SendRichLinkService
     raw_favicon = content_attrs['favicon_url']
     best_favicon = raw_favicon.present? ? fetch_best_domain_icon(raw_favicon) : google_favicon
 
-    candidate_sources = [
-      content_attrs['image_data'],
+    # image_data is raw base64 — never run it through the URL tracking-pixel filter
+    # (base64 strings can coincidentally match URL substrings like "/akam/").
+    image_data_source = content_attrs['image_data'].presence
+
+    url_candidates = [
       content_attrs['image_url'],
       best_favicon,
       google_favicon
     ].compact.uniq.reject { |s| s.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking|data:image/gif}) }
+
+    candidate_sources = [image_data_source, *url_candidates].compact
 
     # Try candidates in order; stop at first success.
     # This ensures CDN-protected images (e.g. booking.com) fall through to favicon/google icon.
@@ -772,7 +777,7 @@ class AppleMessagesForBusiness::SendRichLinkService
 
   def frontend_og_data_usable?(content_attrs, url)
     title = content_attrs['title'].to_s.strip
-    image_url = (content_attrs['image_url'] || content_attrs['image_data']).to_s.strip
+    image_url = content_attrs['image_url'].to_s.strip
 
     return false if title.blank?
 
@@ -786,6 +791,10 @@ class AppleMessagesForBusiness::SendRichLinkService
     rescue URI::InvalidURIError
       nil
     end
+
+    # Bot/service already embedded a raw base64 image — no URL to validate against tracking patterns.
+    # A non-blank title + embedded image_data is always usable; skip OG scraping entirely.
+    return true if content_attrs['image_data'].present?
 
     # Image looks like a tracking pixel, Akamai challenge asset, or lazy-load placeholder GIF
     return false if image_url.match?(%r{/akam/|/pixel_|/beacon\.|1x1|tracking|data:image/gif})

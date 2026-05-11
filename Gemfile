@@ -2,6 +2,9 @@ source 'https://rubygems.org'
 
 ruby '3.4.4'
 
+# Required by reline; will no longer be a default gem in Ruby 3.5.0
+gem 'fiddle'
+
 ##-- base gems for rails --##
 gem 'rack-cors', '2.0.0', require: 'rack/cors'
 gem 'rails', '~> 7.1'
