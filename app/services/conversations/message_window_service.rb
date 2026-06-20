@@ -7,6 +7,8 @@ class Conversations::MessageWindowService
   end
 
   def can_reply?
+    return false if apple_messages_user_blocked?
+
     return true if messaging_window.blank?
 
     last_message_in_messaging_window?(messaging_window)
@@ -24,6 +26,8 @@ class Conversations::MessageWindowService
       instagram_messaging_window
     when 'Channel::Tiktok'
       tiktok_messaging_window
+    when 'Channel::AppleMessagesForBusiness'
+      nil
     when 'Channel::Whatsapp'
       MESSAGING_WINDOW_24_HOURS
     when 'Channel::TwilioSms'
@@ -38,9 +42,10 @@ class Conversations::MessageWindowService
   end
 
   def api_messaging_window
-    return if @conversation.inbox.channel.additional_attributes['agent_reply_time_window'].blank?
+    channel_attrs = @conversation.inbox.channel.respond_to?(:additional_attributes) ? @conversation.inbox.channel.additional_attributes : {}
+    return if channel_attrs['agent_reply_time_window'].blank?
 
-    @conversation.inbox.channel.additional_attributes['agent_reply_time_window'].to_i.hours
+    channel_attrs['agent_reply_time_window'].to_i.hours
   end
 
   # Check medium of the inbox to determine the messaging window
@@ -66,5 +71,11 @@ class Conversations::MessageWindowService
 
   def last_incoming_message
     @last_incoming_message ||= @conversation.messages.where(account_id: @conversation.account_id).incoming&.last
+  end
+
+  def apple_messages_user_blocked?
+    return false unless @conversation.inbox.channel_type == 'Channel::AppleMessagesForBusiness'
+
+    @conversation.contact.additional_attributes&.dig('apple_messages_blocked') == true
   end
 end

@@ -189,23 +189,23 @@ onBeforeMount(() => {
       </BaseTable>
     </template>
 
-    <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
+    <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
       <AddLabel @close="hideAddPopup" />
     </woot-modal>
 
-    <woot-modal v-model:show="showEditPopup" :on-close="hideEditPopup">
+    <woot-modal v-model:show="showEditPopup" @close="hideEditPopup">
       <EditLabel :selected-response="selectedLabel" @close="hideEditPopup" />
     </woot-modal>
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
-      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('LABEL_MGMT.DELETE.CONFIRM.TITLE')"
       :message="$t('LABEL_MGMT.DELETE.CONFIRM.MESSAGE')"
       :message-value="deleteMessage"
       :confirm-text="$t('LABEL_MGMT.DELETE.CONFIRM.YES')"
       :reject-text="$t('LABEL_MGMT.DELETE.CONFIRM.NO')"
+      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

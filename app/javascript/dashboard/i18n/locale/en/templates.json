@@ -1,0 +1,858 @@
+{
+  "TEMPLATES": {
+    "HEADER": "Message Templates",
+    "DESCRIPTION": "Create reusable message templates with rich content blocks that work across multiple channels. Build once, use everywhere.",
+    "LEARN_MORE": "Learn more about templates",
+    "HEADER_BTN_TXT": "Create Template",
+    "LOADING": "Loading templates...",
+    "SEARCH_PLACEHOLDER": "Search templates by name, description, or category...",
+    "CLEAR_FILTERS": "Clear Filters",
+    "FILTER_BY_CATEGORY": "Category",
+    "FILTER_BY_CHANNEL": "Channel",
+    "FILTER_BY_TAGS": "Filter by Tags",
+    "SORT_BY": "Sort By",
+    "SORT": {
+      "NAME": "Name (A-Z)",
+      "ID": "ID (Oldest First)",
+      "CREATED_DATE": "Created Date (Newest First)",
+      "UPDATED_DATE": "Updated Date (Newest First)"
+    },
+    "SUPPORTED_CHANNELS": "Channels",
+    "VERSION": "Version",
+    "UPDATED": "Updated",
+    "VERSION_LABEL": "Version {version}",
+    "TEMPLATE_ID_LABEL": "(ID: {id})",
+    "UPDATED_LABEL": "Updated {date}",
+    "TAGS_MORE": "+{count}",
+    "CREATE_FIRST_TEMPLATE": "Create Your First Template",
+    "NO_RESULTS": "No templates match your search criteria",
+    "SELECTOR": {
+      "TEMPLATE_ICON": "📋",
+      "CANNED_ICON": "📝",
+      "NO_MATCH": "No templates found matching \"{searchKey}\"",
+      "NO_AVAILABLE": "No templates available for this channel"
+    },
+    "CHANNELS": {
+      "ALL": "All Channels",
+      "APPLE_MESSAGES": "Apple Messages",
+      "WHATSAPP": "WhatsApp",
+      "WEB_WIDGET": "Web Widget",
+      "SMS": "SMS",
+      "EMAIL": "Email"
+    },
+    "CATEGORIES": {
+      "ALL": "All Categories",
+      "UNCATEGORIZED": "Uncategorized",
+      "GENERAL": "General",
+      "PAYMENT": "Payment",
+      "SCHEDULING": "Scheduling",
+      "SUPPORT": "Support",
+      "MARKETING": "Marketing",
+      "ONBOARDING": "Onboarding",
+      "FEEDBACK": "Feedback",
+      "NOTIFICATION": "Notification",
+      "CONFIRMATION": "Confirmation",
+      "SALES": "Sales",
+      "FORM": "Form",
+      "AUTHENTICATION": "Authentication"
+    },
+    "STATUS": {
+      "ACTIVE": "Active",
+      "DRAFT": "Draft",
+      "DEPRECATED": "Deprecated"
+    },
+    "EMPTY_STATE": {
+      "TITLE": "No templates yet",
+      "MESSAGE": "Create your first template to start using rich messaging across all channels"
+    },
+    "ACTIONS": {
+      "EDIT": "Edit",
+      "DUPLICATE": "Duplicate",
+      "DELETE": "Delete",
+      "TEST": "Test",
+      "PREVIEW": "Preview"
+    },
+    "DELETE_MODAL": {
+      "TITLE": "Delete Template",
+      "MESSAGE": "Are you sure you want to delete {name}? This action cannot be undone.",
+      "CONFIRM": "Yes, Delete",
+      "CANCEL": "Cancel"
+    },
+    "BUILDER": {
+      "TITLE_NEW": "Create New Template",
+      "TITLE_EDIT": "Edit Template",
+      "SAVE": "Save Template",
+      "CANCEL": "Cancel",
+      "SAVING": "Saving...",
+      "BASIC_INFO": "Basic Information",
+      "NAME": {
+        "LABEL": "Template Name",
+        "PLACEHOLDER": "Enter template name",
+        "ERROR": "Template name is required"
+      },
+      "DESCRIPTION": {
+        "LABEL": "Description",
+        "PLACEHOLDER": "Describe what this template does"
+      },
+      "CATEGORY": {
+        "LABEL": "Category",
+        "PLACEHOLDER": "Select a category"
+      },
+      "STATUS": {
+        "LABEL": "Status"
+      },
+      "CHANNELS": {
+        "LABEL": "Supported Channels",
+        "DESCRIPTION": "Select which channels this template can be used on"
+      },
+      "TAGS": {
+        "LABEL": "Tags",
+        "PLACEHOLDER": "Add tags (press Enter)",
+        "DESCRIPTION": "Add tags to help organize and search templates"
+      },
+      "USE_CASES": {
+        "LABEL": "Use Cases",
+        "PLACEHOLDER": "Add use cases (press Enter)",
+        "DESCRIPTION": "Describe scenarios where this template can be used"
+      },
+      "PARAMETERS": {
+        "TITLE": "Parameters",
+        "DESCRIPTION": "Define parameters that can be customized when using this template",
+        "ADD": "Add Parameter",
+        "EMPTY": "No parameters defined",
+        "NAME": {
+          "LABEL": "Parameter Name",
+          "PLACEHOLDER": "e.g., customer_name"
+        },
+        "TYPE": {
+          "LABEL": "Type",
+          "OPTIONS": {
+            "STRING": "Text",
+            "NUMBER": "Number",
+            "BOOLEAN": "True/False",
+            "DATE": "Date",
+            "DATETIME": "Date & Time",
+            "ARRAY": "List",
+            "OBJECT": "Object"
+          }
+        },
+        "REQUIRED": {
+          "LABEL": "Required"
+        },
+        "DEFAULT": {
+          "LABEL": "Default Value",
+          "PLACEHOLDER": "Enter default value"
+        },
+        "DESCRIPTION_LABEL": {
+          "LABEL": "Description",
+          "PLACEHOLDER": "Describe this parameter"
+        },
+        "EXAMPLE": {
+          "LABEL": "Example",
+          "PLACEHOLDER": "Provide an example value"
+        }
+      },
+      "CONTENT_BLOCKS": {
+        "TITLE": "Content Blocks",
+        "DESCRIPTION": "Build your template using content blocks. Drag to reorder.",
+        "ADD": "Add Content Block",
+        "EMPTY": "No content blocks added yet",
+        "BLOCK_POSITION": "Block {index} of {total}",
+        "TYPES": {
+          "TEXT": "Text Message",
+          "TIME_PICKER": "Time Picker",
+          "LIST_PICKER": "List Picker",
+          "PAYMENT": "Payment Request",
+          "FORM": "Form",
+          "BUTTON_GROUP": "Button Group",
+          "QUICK_REPLY": "Quick Reply",
+          "MEDIA": "Image/Video",
+          "LOCATION_PICKER": "Location Picker",
+          "FILE_UPLOAD": "File Upload",
+          "RICH_LINK": "Rich Link",
+          "AUTH_REQUEST": "Authentication Request"
+        },
+        "BLOCK_SETTINGS": "Block Settings",
+        "DELETE_BLOCK": "Delete Block",
+        "MOVE_UP": "Move Up",
+        "MOVE_DOWN": "Move Down"
+      },
+      "TEXT_BLOCK": {
+        "CONTENT": {
+          "LABEL": "Message Content",
+          "PLACEHOLDER": "Enter your message. Use {parameter_name} for dynamic values.",
+          "HELP": "Use double curly braces for parameters:"
+        },
+        "PARAMETERS": {
+          "LABEL": "Available Parameters (click to insert):"
+        }
+      },
+      "MEDIA_BLOCK": {
+        "TYPE": {
+          "LABEL": "Media Type"
+        },
+        "URL": {
+          "LABEL": "Media URL",
+          "PLACEHOLDER": "https://example.com/image.jpg",
+          "HELP": "Enter a URL or upload a file"
+        },
+        "UPLOAD": "Upload",
+        "PREVIEW": "Preview:",
+        "THUMBNAIL": {
+          "LABEL": "Thumbnail URL (Video)",
+          "PLACEHOLDER": "https://example.com/thumbnail.jpg",
+          "HELP": "Optional thumbnail image for videos"
+        },
+        "CAPTION": {
+          "LABEL": "Caption",
+          "PLACEHOLDER": "Optional caption for the media"
+        },
+        "ALT_TEXT": {
+          "LABEL": "Alt Text",
+          "PLACEHOLDER": "Describe the media content",
+          "HELP": "Accessibility text for screen readers"
+        }
+      },
+      "BUTTON_GROUP_BLOCK": {
+        "TITLE": "Buttons",
+        "DESCRIPTION": "Add action buttons to your message",
+        "ADD": "Add Button",
+        "ADD_FIRST": "Add First Button",
+        "EMPTY": "No buttons configured yet",
+        "BUTTON_TITLE": "Button Text",
+        "BUTTON_TITLE_PLACEHOLDER": "Click here",
+        "BUTTON_TYPE": "Type",
+        "URL": "URL",
+        "PHONE": "Phone Number",
+        "PAYLOAD": "Payload",
+        "LIMITS": "Most channels support up to 3 buttons"
+      },
+      "TIME_PICKER_BLOCK": {
+        "IMAGES": {
+          "TITLE": "Images",
+          "ADD": "Add Image",
+          "NONE": "No images added. Click 'Add Image' to upload.",
+          "REMOVE": "Remove"
+        },
+        "EVENT": {
+          "TITLE": "Event Details",
+          "EVENT_TITLE": "Event Title",
+          "EVENT_TITLE_PLACEHOLDER": "Schedule Appointment",
+          "DESCRIPTION": "Event Description",
+          "DESCRIPTION_PLACEHOLDER": "Select a time slot",
+          "TIMEZONE_OFFSET": "Timezone Offset",
+          "TIMEZONE_OFFSET_PLACEHOLDER": "-480",
+          "TIMEZONE_HELP": "Minutes offset from UTC (e.g., -480 for PST)"
+        },
+        "TIMESLOTS": {
+          "TITLE": "Time Slots",
+          "ADD": "Add Time Slot",
+          "NONE": "No time slots configured. Click 'Add Time Slot' to create one.",
+          "START_TIME": "Start Time",
+          "DURATION": "Duration (seconds)",
+          "DURATION_PLACEHOLDER": "3600",
+          "REMOVE": "Remove"
+        },
+        "RECEIVED_MESSAGE": {
+          "TITLE": "Received Message",
+          "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Please pick a time",
+          "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "Select your preferred time slot",
+          "IMAGE": "Image",
+          "NO_IMAGE": "No image",
+          "STYLE": "Style"
+        },
+        "REPLY_MESSAGE": {
+          "TITLE": "Reply Message",
+          "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Thank you!",
+          "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "We'll see you then!",
+          "IMAGE": "Image",
+          "NO_IMAGE": "No image",
+          "STYLE": "Style",
+          "IMAGE_TITLE": "Image Title",
+          "IMAGE_TITLE_PLACEHOLDER": "Optional image title",
+          "IMAGE_SUBTITLE": "Image Subtitle",
+          "IMAGE_SUBTITLE_PLACEHOLDER": "Optional image subtitle",
+          "SECONDARY_SUBTITLE": "Secondary Subtitle",
+          "SECONDARY_SUBTITLE_PLACEHOLDER": "Right-aligned title",
+          "TERTIARY_SUBTITLE": "Tertiary Subtitle",
+          "TERTIARY_SUBTITLE_PLACEHOLDER": "Right-aligned subtitle"
+        }
+      },
+      "LIST_PICKER_BLOCK": {
+        "TITLE": {
+          "LABEL": "Title",
+          "PLACEHOLDER": "Choose an option"
+        },
+        "SUBTITLE": {
+          "LABEL": "Subtitle",
+          "PLACEHOLDER": "Select one from the list"
+        },
+        "MULTIPLE_SELECTION": {
+          "LABEL": "Allow Multiple Selection"
+        },
+        "RECEIVED_MESSAGE": {
+          "TITLE": "Received Message",
+          "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Please select an option",
+          "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "Optional subtitle",
+          "HEADER_IMAGE": "Header Image",
+          "STYLE": "Style",
+          "NONE": "None"
+        },
+        "REPLY_MESSAGE": {
+          "TITLE": "Reply Message",
+          "MESSAGE_TITLE": "Title",
+          "MESSAGE_TITLE_PLACEHOLDER": "Selection Made",
+          "SUBTITLE": "Subtitle",
+          "SUBTITLE_PLACEHOLDER": "Your selection",
+          "IMAGE_TITLE": "Image Title",
+          "IMAGE_TITLE_PLACEHOLDER": "Optional image title",
+          "IMAGE_SUBTITLE": "Image Subtitle",
+          "IMAGE_SUBTITLE_PLACEHOLDER": "Optional image subtitle",
+          "SECONDARY_SUBTITLE": "Secondary Subtitle",
+          "SECONDARY_SUBTITLE_PLACEHOLDER": "Right-aligned title",
+          "TERTIARY_SUBTITLE": "Tertiary Subtitle",
+          "TERTIARY_SUBTITLE_PLACEHOLDER": "Right-aligned subtitle",
+          "STYLE": "Style"
+        },
+        "IMAGES": {
+          "TITLE": "Item Images",
+          "ADD": "Add Image",
+          "EMPTY": "No images added. Images can be referenced by list items.",
+          "UPLOAD_TAB": "Upload New Images",
+          "SHARED_TAB": "Use Shared Images",
+          "UPLOAD_DESCRIPTION": "Upload images directly to this template (stored inline)",
+          "REMOVE": "Remove"
+        },
+        "SECTIONS": {
+          "TITLE": "Sections & Options",
+          "ADD": "Add Section",
+          "SECTION_TITLE": "Section",
+          "SECTION_TITLE_PLACEHOLDER": "Enter section title",
+          "REMOVE": "Remove Section",
+          "MULTIPLE_SELECTION": "Allow multiple selections in this section"
+        },
+        "ITEMS": {
+          "LABEL": "List Items",
+          "ADD": "Add Item",
+          "IDENTIFIER": "ID",
+          "TITLE": "Title",
+          "TITLE_LABEL": "Title",
+          "TITLE_PLACEHOLDER": "Option title",
+          "SUBTITLE": "Subtitle",
+          "SUBTITLE_LABEL": "Description",
+          "SUBTITLE_PLACEHOLDER": "Description",
+          "IMAGE": "Image",
+          "IMAGE_LABEL": "Image:",
+          "NO_IMAGE_SELECTED": "No image selected",
+          "IMAGE_BUTTON_CHANGE": "Change",
+          "IMAGE_BUTTON_SELECT": "Select",
+          "ADD_IMAGES_FIRST": "Add images first",
+          "CLEAR": "Clear",
+          "REMOVE": "Remove Item"
+        },
+        "IMAGE_PICKER": {
+          "TITLE": "Select Image",
+          "INLINE_TAB": "Inline Images",
+          "SHARED_TAB": "Shared Images",
+          "NO_INLINE_IMAGES": "No inline images available",
+          "ADD_IMAGES_HINT": "Add images using the \"Upload New Images\" tab above",
+          "CLOSE": "✕"
+        },
+        "STYLE_OPTIONS": {
+          "ICON": "Icon",
+          "SMALL": "Small",
+          "LARGE": "Large"
+        }
+      },
+      "PAYMENT_BLOCK": {
+        "MERCHANT_NAME": {
+          "LABEL": "Merchant Name",
+          "PLACEHOLDER": "{{merchant_name}}"
+        },
+        "AMOUNT": {
+          "LABEL": "Amount",
+          "PLACEHOLDER": "{{amount}}"
+        },
+        "CURRENCY": {
+          "LABEL": "Currency",
+          "PLACEHOLDER": "USD"
+        },
+        "DESCRIPTION": {
+          "LABEL": "Description",
+          "PLACEHOLDER": "{{payment_description}}"
+        }
+      },
+      "FORM_BLOCK": {
+        "TITLE": {
+          "LABEL": "Form Title",
+          "PLACEHOLDER": "Please provide information"
+        },
+        "FIELDS": {
+          "LABEL": "Form Fields",
+          "ADD": "Add Field",
+          "NAME": "Field Name",
+          "TYPE": "Field Type",
+          "LABEL_TEXT": "Label",
+          "REQUIRED": "Required",
+          "PLACEHOLDER": "Placeholder"
+        }
+      },
+      "APPLE_FORM": {
+        "FORM_DETAILS": "Form Details",
+        "FORM_TITLE_LABEL": "Form Title",
+        "FORM_TITLE_PLACEHOLDER": "Enter form title",
+        "DESCRIPTION_LABEL": "Description",
+        "DESCRIPTION_PLACEHOLDER": "Optional form description",
+        "PAGES": "Pages",
+        "ADD_PAGE": "Add Page",
+        "PAGE_LABEL": "Page",
+        "PAGE_CONFIG": "Page Configuration",
+        "PAGE_TITLE_LABEL": "Page Title",
+        "PAGE_DESCRIPTION_LABEL": "Page Description",
+        "PAGE_TYPE_LABEL": "Page Type",
+        "PAGE_TYPE_MODULE": "Form Fields (Module)",
+        "PAGE_TYPE_SPLASH": "Splash Screen",
+        "PAGE_TYPE_HELP": "Splash screens are shown at the start of forms with image, header, text, and button. Module pages contain form fields.",
+        "MOVE_UP": "Move page up",
+        "MOVE_DOWN": "Move page down",
+        "SPLASH_FIELDS_TITLE": "Splash Screen Configuration",
+        "SPLASH_HEADER": "Header",
+        "SPLASH_HEADER_PLACEHOLDER": "Enter header title",
+        "SPLASH_HEADER_HELP": "Displays in bold beneath the image",
+        "SPLASH_TEXT": "Splash Text",
+        "SPLASH_TEXT_PLACEHOLDER": "Enter body text for the splash screen",
+        "SPLASH_TEXT_HELP": "Main body copy shown on the splash screen",
+        "SPLASH_BUTTON_TITLE": "Button Title",
+        "SPLASH_BUTTON_TITLE_PLACEHOLDER": "e.g., Get Started",
+        "SPLASH_BUTTON_TITLE_HELP": "REQUIRED: Without a button title, this splash screen will not display",
+        "SPLASH_IMAGE": "Splash Image",
+        "SPLASH_IMAGE_HELP": "Image displayed at the top of the splash screen",
+        "FIELDS_COUNT": "fields",
+        "FIELDS_TITLE": "Fields - {page}",
+        "ADD_FIELD": "Add Field",
+        "ADD_FIELD_TITLE": "Add Form Field",
+        "EDIT_FIELD_TITLE": "Edit Form Field",
+        "CANCEL": "Cancel",
+        "CREATE_FORM": "Create Form",
+        "FORM_PREVIEW": "Form Preview",
+        "NO_PAGES_YET": "No pages created yet. Click Add Page to start building your form.",
+        "NO_FIELDS_YET": "No fields added yet",
+        "MODAL_TITLE": "Create Apple Messages Form",
+        "MODAL_SUBTITLE": "Build an interactive form for Apple Messages for Business",
+        "TABS": {
+          "TEMPLATES": "Templates",
+          "BUILDER": "Builder",
+          "PREVIEW": "Preview"
+        },
+        "CHOOSE_TEMPLATE": "Choose a Template",
+        "SUMMARY": "{pages} pages, {fields} fields",
+        "SELECT_OPTION": "Select an option",
+        "TOGGLE_OPTION": "Toggle option",
+        "LINK_URL": "Link URL",
+        "FIELD_TYPE": "Field Type",
+        "FIELD_TITLE": "Field Title",
+        "FIELD_TITLE_PLACEHOLDER": "Enter field title",
+        "FIELD_DESCRIPTION_PLACEHOLDER": "Optional field description",
+        "REQUIRED_FIELD": "Required field",
+        "PLACEHOLDER": "Placeholder",
+        "PLACEHOLDER_TEXT": "Placeholder text",
+        "OPTIONS": "Options",
+        "OPTION_VALUE": "Option value",
+        "OPTION_LABEL": "Option label",
+        "ADD_OPTION": "Add Option",
+        "FIELD_TYPES": {
+          "TEXT": "Text Input",
+          "TEXT_AREA": "Text Area",
+          "EMAIL": "Email",
+          "PHONE": "Phone",
+          "SINGLE_CHOICE": "Single Choice",
+          "MULTIPLE_CHOICE": "Multiple Choice",
+          "DATE_TIME": "Date & Time",
+          "TOGGLE": "Toggle",
+          "STEPPER": "Number Stepper",
+          "RICH_LINK": "Rich Link"
+        },
+        "FIELD_DESCRIPTIONS": {
+          "TEXT": "Single line text input",
+          "TEXT_AREA": "Multi-line text input",
+          "EMAIL": "Email address input",
+          "PHONE": "Phone number input",
+          "SINGLE_CHOICE": "Select one option",
+          "MULTIPLE_CHOICE": "Select multiple options",
+          "DATE_TIME": "Date and time picker",
+          "TOGGLE": "Yes/No toggle switch",
+          "STEPPER": "Number input with +/- buttons",
+          "RICH_LINK": "Clickable link with preview"
+        },
+        "IMAGE_UPLOAD": {
+          "INVALID_FILE_TYPE": "Please select an image file"
+        },
+        "MESSAGES_TAB": {
+          "MESSAGE_CONFIGURATION": "Message Configuration",
+          "RECEIVED_MESSAGE_SUBTITLE_LABEL": "Received Message Subtitle",
+          "RECEIVED_MESSAGE_SUBTITLE_PLACEHOLDER": "Optional subtitle for received message",
+          "REPLY_MESSAGE": "Reply Message (After submission)",
+          "IMAGE_LABEL": "Image",
+          "NO_IMAGE": "No image",
+          "UPLOAD_BUTTON": "Upload",
+          "IMAGE_STYLE": "Image Style"
+        },
+        "REPLY_MESSAGE_TITLE_LABEL": "Title",
+        "REPLY_MESSAGE_TITLE_PLACEHOLDER": "Thank you for your submission!",
+        "REPLY_MESSAGE_SUBTITLE_LABEL": "Subtitle",
+        "REPLY_MESSAGE_SUBTITLE_PLACEHOLDER": "Optional subtitle",
+        "FIELD_OPTIONS": {
+          "LABEL_TEXT": "Label Text",
+          "LABEL_TEXT_PLACEHOLDER": "Optional label shown next to the field",
+          "PREFIX_TEXT_LABEL": "Prefix Text",
+          "PREFIX_TEXT_PLACEHOLDER": "Enter prefix text (optional)",
+          "HINT_TEXT_LABEL": "Hint Text",
+          "HINT_TEXT_PLACEHOLDER": "Enter hint text for the field",
+          "MAX_CHAR_COUNT": "Maximum Character Count",
+          "MAX_CHAR_COUNT_PLACEHOLDER": "Default: 30 for singleline, 300 for multiline",
+          "INPUT_TYPE_LABEL": "Input Type",
+          "INPUT_TYPE_SINGLELINE": "Single Line",
+          "INPUT_TYPE_MULTILINE": "Multi Line",
+          "KEYBOARD_TYPE_LABEL": "Keyboard Type",
+          "KEYBOARD_TYPE_DEFAULT": "Default",
+          "KEYBOARD_TYPE_ASCII": "ASCII Capable",
+          "KEYBOARD_TYPE_EMAIL": "Email",
+          "KEYBOARD_TYPE_PHONE_PAD": "Phone Pad",
+          "KEYBOARD_TYPE_NUMBER_PAD": "Number Pad",
+          "KEYBOARD_TYPE_NAME_PHONE": "Name & Phone",
+          "KEYBOARD_TYPE_URL": "URL",
+          "KEYBOARD_TYPE_DECIMAL": "Decimal",
+          "KEYBOARD_TYPE_TWITTER": "Twitter",
+          "KEYBOARD_TYPE_WEB_SEARCH": "Web Search",
+          "TEXT_CONTENT_TYPE_LABEL": "Text Content Type",
+          "TEXT_CONTENT_TYPE_NONE": "None",
+          "TEXT_CONTENT_TYPE_NAME": "Name",
+          "TEXT_CONTENT_TYPE_NAME_PREFIX": "Name Prefix",
+          "TEXT_CONTENT_TYPE_GIVEN_NAME": "Given Name",
+          "TEXT_CONTENT_TYPE_MIDDLE_NAME": "Middle Name",
+          "TEXT_CONTENT_TYPE_FAMILY_NAME": "Family Name",
+          "TEXT_CONTENT_TYPE_NAME_SUFFIX": "Name Suffix",
+          "TEXT_CONTENT_TYPE_NICKNAME": "Nickname",
+          "TEXT_CONTENT_TYPE_JOB_TITLE": "Job Title",
+          "TEXT_CONTENT_TYPE_ORG_NAME": "Organization Name",
+          "TEXT_CONTENT_TYPE_LOCATION": "Location",
+          "TEXT_CONTENT_TYPE_CITY": "City",
+          "TEXT_CONTENT_TYPE_STATE": "State",
+          "TEXT_CONTENT_TYPE_CITY_STATE": "City & State",
+          "TEXT_CONTENT_TYPE_SUBLOCALITY": "Sublocality",
+          "TEXT_CONTENT_TYPE_COUNTRY": "Country",
+          "TEXT_CONTENT_TYPE_POSTAL_CODE": "Postal Code",
+          "TEXT_CONTENT_TYPE_PHONE": "Phone Number",
+          "TEXT_CONTENT_TYPE_CREDIT_CARD": "Credit Card Number",
+          "TEXT_CONTENT_TYPE_USERNAME": "Username",
+          "TEXT_CONTENT_TYPE_PASSWORD": "Password",
+          "TEXT_CONTENT_TYPE_NEW_PASSWORD": "New Password",
+          "TEXT_CONTENT_TYPE_ONE_TIME_CODE": "One Time Code",
+          "IMAGE_NONE_OPTION": "No Image",
+          "REGEX_PLACEHOLDER": "Enter regex pattern (JSON encoded)",
+          "OPTION_IMAGE": "Image:",
+          "OPTION_IMAGE_LABEL": "Option Image",
+          "ENABLE_MULTIPLE_SELECTION": "Enable multiple selection",
+          "DATE_LABEL_PLACEHOLDER": "Select Date",
+          "DATE_HINT_PLACEHOLDER": "Choose a date",
+          "DATE_FORMAT_PLACEHOLDER": "MM/dd/yyyy",
+          "PICKER_TITLE_PLACEHOLDER": "Select an option"
+        },
+        "STEPPER": {
+          "MIN_VALUE": "Min Value",
+          "MAX_VALUE": "Max Value"
+        },
+        "RICH_LINK": {
+          "URL_LABEL": "URL",
+          "URL_PLACEHOLDER": "https://example.com",
+          "LOADING": "Loading...",
+          "AUTOFILL_BUTTON": "Auto-fill",
+          "AUTOFILL_DESCRIPTION": "Click Auto-fill to automatically populate title and description from the URL"
+        },
+        "RICH_LINK_AUTOFILL": {
+          "SUCCESS": "Rich Link data fetched successfully!",
+          "WARNING": "Could not fetch Rich Link data. Please fill manually.",
+          "ERROR": "Failed to fetch Rich Link data"
+        },
+        "TEMPLATES": {
+          "CONTACT": {
+            "NAME": "Contact Form",
+            "DESCRIPTION": "Collect contact information",
+            "FORM_TITLE": "Contact Us",
+            "FORM_DESC": "Please provide your contact information",
+            "PAGE_TITLE": "Contact Information",
+            "PAGE_DESC": "Enter your details",
+            "FIELD_FULL_NAME": "Full Name",
+            "PLACEHOLDER_FULL_NAME": "Enter your full name",
+            "FIELD_EMAIL": "Email Address",
+            "PLACEHOLDER_EMAIL": "your.email@example.com",
+            "FIELD_PHONE": "Phone Number",
+            "PLACEHOLDER_PHONE": "+1 (555) 123-4567"
+          },
+          "FEEDBACK": {
+            "NAME": "Feedback Form",
+            "DESCRIPTION": "Collect customer feedback",
+            "FORM_TITLE": "Share Your Feedback",
+            "FORM_DESC": "We value your opinion",
+            "PAGE_TITLE": "Your Feedback",
+            "PAGE_DESC": "Tell us about your experience",
+            "FIELD_RATING": "Rating",
+            "FIELD_COMMENTS": "Comments",
+            "PLACEHOLDER_COMMENTS": "Tell us what you think...",
+            "FIELD_RECOMMEND": "Would you recommend us?",
+            "DESC_RECOMMEND": "Help us improve by letting us know if you'd recommend our service"
+          },
+          "APPOINTMENT": {
+            "NAME": "Appointment Booking",
+            "DESCRIPTION": "Schedule an appointment",
+            "FORM_TITLE": "Book an Appointment",
+            "FORM_DESC": "Choose your preferred time",
+            "PAGE_TITLE": "Appointment Details",
+            "PAGE_DESC": "Select your appointment preferences",
+            "FIELD_NAME": "Name",
+            "PLACEHOLDER_NAME": "Your name",
+            "FIELD_DATE": "Preferred Date & Time",
+            "FIELD_SERVICE": "Service Type",
+            "OPTION_CONSULTATION": "Consultation",
+            "OPTION_MEETING": "Meeting",
+            "OPTION_DEMO": "Demo",
+            "FIELD_NOTES": "Additional Notes",
+            "PLACEHOLDER_NOTES": "Any special requirements?"
+          },
+          "SURVEY": {
+            "NAME": "Survey",
+            "DESCRIPTION": "Customer survey",
+            "FORM_TITLE": "Customer Survey",
+            "FORM_DESC": "Help us serve you better",
+            "PAGE1_TITLE": "Demographics",
+            "PAGE1_DESC": "Tell us about yourself",
+            "FIELD_AGE_GROUP": "Age Group",
+            "OPTION_18_24": "18-24",
+            "OPTION_25_34": "25-34",
+            "OPTION_35_44": "35-44",
+            "OPTION_45_PLUS": "45+",
+            "PAGE2_TITLE": "Preferences",
+            "PAGE2_DESC": "What matters to you?",
+            "FIELD_PREFERENCES": "What's most important to you?",
+            "OPTION_QUALITY": "Quality",
+            "OPTION_PRICE": "Price",
+            "OPTION_SUPPORT": "Support",
+            "OPTION_FEATURES": "Features",
+            "PAGE3_TITLE": "Satisfaction",
+            "PAGE3_DESC": "Rate your experience",
+            "FIELD_SATISFACTION": "Overall Satisfaction (1-10)"
+          },
+          "ORDER": {
+            "NAME": "Order Form",
+            "DESCRIPTION": "Place an order",
+            "FORM_TITLE": "Place Your Order",
+            "FORM_DESC": "Complete your order details",
+            "PAGE1_TITLE": "Product Selection",
+            "PAGE1_DESC": "Choose your product",
+            "FIELD_PRODUCT": "Product",
+            "OPTION_BASIC": "Basic Plan",
+            "OPTION_PRO": "Pro Plan",
+            "OPTION_ENTERPRISE": "Enterprise Plan",
+            "FIELD_QUANTITY": "Quantity",
+            "PAGE2_TITLE": "Billing Information",
+            "PAGE2_DESC": "Enter billing details",
+            "FIELD_BILLING_NAME": "Billing Name",
+            "PLACEHOLDER_BILLING_NAME": "Full name for billing",
+            "FIELD_BILLING_EMAIL": "Billing Email",
+            "PLACEHOLDER_BILLING_EMAIL": "billing@example.com",
+            "PAGE3_TITLE": "Terms & Conditions",
+            "PAGE3_DESC": "Review and accept",
+            "FIELD_TERMS": "I agree to the terms and conditions",
+            "DESC_TERMS": "Please read and accept our terms of service"
+          }
+        }
+      },
+      "QUICK_REPLY_BLOCK": {
+        "SUMMARY_TEXT": {
+          "LABEL": "Question / Prompt",
+          "PLACEHOLDER": "Quick Reply Question",
+          "DESCRIPTION": "The question or prompt that users will respond to"
+        },
+        "ITEMS": {
+          "LABEL": "Reply Options",
+          "ADD": "Add Reply Option",
+          "EMPTY": "No reply options added yet",
+          "TITLE_LABEL": "Reply Text",
+          "TITLE_PLACEHOLDER": "Enter reply option",
+          "DESCRIPTION": "Add quick reply buttons that users can tap to respond"
+        }
+      },
+      "PREVIEW": {
+        "TITLE": "Channel Preview",
+        "DESCRIPTION": "Preview how your template will appear on different channels",
+        "SELECT_CHANNEL": "Select Channel to Preview",
+        "NO_PREVIEW": "Preview not available for this channel",
+        "TEST_PARAMETERS": "Test with Parameters",
+        "ENTER_PARAMETERS": "Enter parameter values to see live preview"
+      },
+      "ATTACHMENTS": {
+        "TITLE": "Template Attachments",
+        "SAVE_FIRST": "Please save the template first before adding attachments. You can save now with just the basic information and add attachments after.",
+        "INFO_HINT": "For Apple Messages for Business, you can create attachment-only templates. Just save the template with basic info, then add your files in the Attachments tab."
+      },
+      "INVITATION": {
+        "HINT_TEXT": "To send Apple Invitation outbound messages, set Category to Notification, then configure the invitation settings in the Parameters tab.",
+        "HINT_LINK": "Parameters tab",
+        "CUSTOM_TEMPLATE_PLACEHOLDER": "e.g. myBrand.engage.promoOffer",
+        "USE_EXAMPLE": "Use example",
+        "TITLE": "Apple Invitation Settings",
+        "DESCRIPTION": "Required fields for sending proactive Apple Messages for Business invitations (Business Updates).",
+        "TEMPLATE_ID": {
+          "LABEL": "Apple Template ID",
+          "PLACEHOLDER": "e.g. order_confirmation_v2",
+          "HINT": "The template identifier registered with Apple for this invitation type."
+        },
+        "LOCALE": {
+          "LABEL": "Default Locale",
+          "HINT": "BCP-47 locale tag (e.g. en-US, fr-FR). Defaults to en-US if left blank."
+        },
+        "PARAMETERS": {
+          "LABEL": "Default Parameters",
+          "HINT": "Optional default values sent with every invitation using this template.",
+          "SWITCH_JSON": "Edit as JSON",
+          "SWITCH_VISUAL": "Visual editor",
+          "INVALID_JSON": "Invalid JSON — please fix before saving.",
+          "BRAND_NAME": {
+            "LABEL": "Brand Name",
+            "PLACEHOLDER": "Your Brand"
+          },
+          "BRAND_LOGO": {
+            "LABEL": "Brand Logo (PNG)",
+            "DROP_HINT": "Drop a PNG here or click to select",
+            "NO_IMAGE_TEMPLATE_WARNING": "This template type does not support images. The logo will not be sent."
+          }
+        }
+      },
+      "VALIDATION": {
+        "NAME_REQUIRED": "Template name is required",
+        "CATEGORY_REQUIRED": "Please select a category",
+        "CHANNEL_REQUIRED": "Select at least one channel",
+        "CONTENT_REQUIRED": "Add at least one content block",
+        "PARAMETER_NAME_REQUIRED": "Parameter name is required",
+        "PARAMETER_TYPE_REQUIRED": "Parameter type is required",
+        "DUPLICATE_PARAMETER": "Parameter name already exists"
+      }
+    },
+    "SAVE_AS_TEMPLATE": {
+      "TITLE": "Save as Template",
+      "SUBTITLE": "Save this {messageType} configuration as a reusable template",
+      "TEMPLATE_NAME": {
+        "LABEL": "Template Name",
+        "REQUIRED": "*",
+        "PLACEHOLDER": "Enter a descriptive template name",
+        "ERROR_REQUIRED": "Template name is required",
+        "ERROR_EXISTS": "Template name already exists",
+        "SUCCESS_AVAILABLE": "Template name is available",
+        "HELP": "A clear, descriptive name for your template"
+      },
+      "SHORT_CODE": {
+        "LABEL": "Short Code",
+        "REQUIRED": "*",
+        "PLACEHOLDER": "Enter a unique shortcode",
+        "ERROR_REQUIRED": "Shortcode is required",
+        "ERROR_EXISTS": "Shortcode already exists",
+        "SUCCESS_AVAILABLE": "Short code is available",
+        "HELP": "A unique identifier to quickly find this template"
+      },
+      "CATEGORY": {
+        "LABEL": "Category",
+        "HELP": "Organize templates by category for easier discovery"
+      },
+      "DESCRIPTION": {
+        "LABEL": "Description",
+        "REQUIRED": "*",
+        "HELP": "Help team members understand when to use this template"
+      },
+      "TAGS": {
+        "LABEL": "Tags (optional)",
+        "PLACEHOLDER": "e.g., urgent, follow-up, customer",
+        "HELP": "Add tags to improve searchability (separate with commas)"
+      },
+      "PREVIEW": {
+        "TITLE": "Template Preview",
+        "TYPE": "Type:",
+        "CODE": "Code:",
+        "CATEGORY": "Category:"
+      },
+      "ACTIONS": {
+        "CANCEL": "Cancel",
+        "SAVE": "Save Template",
+        "SAVE_AND_SEND": "Save & Send"
+      }
+    },
+    "API": {
+      "FETCH_ERROR": "Failed to load templates",
+      "CREATE_SUCCESS": "Template created successfully",
+      "CREATE_ERROR": "Failed to create template",
+      "UPDATE_SUCCESS": "Template updated successfully",
+      "UPDATE_ERROR": "Failed to update template",
+      "DELETE_SUCCESS": "Template deleted successfully",
+      "DELETE_ERROR": "Failed to delete template",
+      "DUPLICATE_SUCCESS": "Template duplicated successfully",
+      "DUPLICATE_ERROR": "Failed to duplicate template",
+      "TEST_SUCCESS": "Template test sent successfully",
+      "TEST_ERROR": "Failed to test template"
+    }
+  },
+  "TEMPLATE_ATTACHMENTS": {
+    "LABEL": "Template Attachments",
+    "DESCRIPTION": "Upload files to be sent with this template. Maximum {max} files allowed.",
+    "DRAG_DROP": "Drag and drop files here, or click to browse",
+    "DROP_HERE": "Drop files here to upload",
+    "FILE_TYPES": "Supported: Images, Videos, Audio, Documents, 3D Models (USDZ), Archives",
+    "MAX_SIZE": "Maximum file size: {size}",
+    "FILES_LABEL": "{count} of {max} files",
+    "DRAG_TO_REORDER": "Drag to reorder",
+    "NO_FILES": "No attachments added yet",
+    "UPLOADING": "Uploading files...",
+    "REMOVE": "Remove",
+    "ERRORS": {
+      "TOO_MANY_FILES": "Cannot add more than {max} files",
+      "FILE_TOO_LARGE": "File '{name}' is too large. Maximum size is {max}",
+      "INVALID_FILE_TYPE": "File '{name}' has an unsupported file type",
+      "UPLOAD_FAILED": "Failed to upload files. Please try again.",
+      "REMOVE_FAILED": "Failed to remove file. Please try again.",
+      "REORDER_FAILED": "Failed to reorder files. Please try again."
+    },
+    "SUCCESS": {
+      "FILES_UPLOADED": "Files uploaded successfully",
+      "FILE_REMOVED": "File removed successfully"
+    }
+  },
+  "IMAGE_VALIDATION": {
+    "TITLE": "Template Image Validation",
+    "SUBTITLE": "Template \"{name}\" uses {count} image identifier(s)",
+    "ISSUES_FOUND": "Missing Images Detected",
+    "ISSUES_DESCRIPTION": "{count} inbox(es) are missing some images required by this template",
+    "ALL_GOOD": "All Images Available",
+    "ALL_GOOD_DESCRIPTION": "All inboxes have all required images for this template",
+    "INBOXES_WITH_ISSUES": "Inboxes Missing Images",
+    "INBOXES_COMPLETE": "Inboxes with All Images",
+    "FIX_MISSING": "Fix Missing",
+    "MISSING_COUNT": "Missing {count} image(s)",
+    "ALL_IMAGES_AVAILABLE": "All {count} images available",
+    "COPY_IMAGES": "Copy Images Between Inboxes",
+    "SOURCE_INBOX": "Copy From",
+    "TARGET_INBOX": "Copy To",
+    "SELECT_SOURCE": "Select source inbox...",
+    "SELECT_TARGET": "Select target inbox...",
+    "IDENTIFIERS_TO_COPY": "Select identifiers to copy",
+    "COPY_SELECTED": "Copy Selected Images",
+    "CLOSE": "Close",
+    "FETCH_ERROR": "Failed to load image validation data",
+    "COPY_SUCCESS": "Successfully copied {count} of {total} images",
+    "COPY_PARTIAL_ERROR": "{count} image(s) could not be copied",
+    "COPY_ERROR": "Failed to copy images. Please try again."
+  }
+}

@@ -408,7 +408,8 @@
     "DOCS": "Read docs",
     "SECURITY": "Security",
     "CAPTAIN_AI": "Captain",
-    "CONVERSATION_WORKFLOW": "Conversation Workflow"
+    "CONVERSATION_WORKFLOW": "Conversation Workflow",
+    "TEMPLATES": "Templates"
   },
   "CAPTAIN_SETTINGS": {
     "TITLE": "Captain Settings",
@@ -478,7 +479,7 @@
       "DESCRIPTION": "Manage usage and credits for Captain AI.",
       "BUTTON_TXT": "Buy more credits",
       "DOCUMENTS": "Documents",
-      "RESPONSES": "Credits",
+      "RESPONSES": "Responses",
       "UPGRADE": "Captain is not available on the free plan, upgrade now to get access to assistants, copilot and more.",
       "REFRESH_CREDITS": "Refresh"
     },

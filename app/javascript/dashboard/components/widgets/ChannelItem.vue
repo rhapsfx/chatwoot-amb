@@ -75,6 +75,7 @@ const isActive = computed(() => {
     'instagram',
     'tiktok',
     'voice',
+    'apple_messages_for_business',
   ].includes(key);
 });
 

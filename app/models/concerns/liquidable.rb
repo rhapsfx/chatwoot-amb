@@ -19,7 +19,7 @@ module Liquidable
   end
 
   def liquid_processable_message?
-    content.present? && (message_type == 'outgoing' || message_type == 'template')
+    content.present? && (message_type.to_s == 'outgoing' || message_type.to_s == 'template')
   end
 
   def process_liquid_in_content
@@ -55,7 +55,7 @@ module Liquidable
   end
 
   def liquid_processable_template_params?
-    message_type == 'outgoing' || message_type == 'template'
+    message_type.to_s == 'outgoing' || message_type.to_s == 'template'
   end
 
   def template_params_data

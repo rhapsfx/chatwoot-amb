@@ -145,18 +145,18 @@ export default {
         </div>
       </div>
     </template>
-    <woot-modal v-model:show="showAddHookModal" :on-close="hideAddHookModal">
+    <woot-modal v-model:show="showAddHookModal" @close="hideAddHookModal">
       <NewHook :integration-id="integrationId" @close="hideAddHookModal" />
     </woot-modal>
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
-      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="deleteTitle"
       :message="deleteMessage"
       :confirm-text="confirmText"
       :reject-text="cancelText"
+      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

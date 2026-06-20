@@ -86,6 +86,7 @@
     "mitt": "^3.0.1",
     "opus-recorder": "^8.0.5",
     "pinia": "^3.0.4",
+    "posthog-js": "^1.260.3",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-schema-list": "^1.5.1",
     "qrcode": "^1.5.4",
@@ -106,6 +107,7 @@
     "vue-letter": "^0.2.1",
     "vue-router": "~4.4.5",
     "vue-upload-component": "^3.1.17",
+    "vue-virtual-scroller": "2.0.0-beta.8",
     "vue3-click-away": "^1.2.4",
     "vuedraggable": "^4.1.0",
     "vuex": "~4.1.0",
@@ -170,8 +172,7 @@
   },
   "lint-staged": {
     "app/**/*.{js,vue}": [
-      "eslint --fix",
-      "git add"
+      "eslint --fix"
     ],
     "*.scss": [
       "scss-lint"

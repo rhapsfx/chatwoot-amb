@@ -22,7 +22,7 @@ const props = defineProps({
     required: true,
   },
   firstUnreadId: {
-    type: Number,
+    type: [Number, String],
     default: null,
   },
   isAnEmailChannel: {
@@ -42,10 +42,25 @@ const props = defineProps({
 const emit = defineEmits(['retry']);
 
 const allMessages = computed(() => {
-  return useCamelCase(props.messages, {
-    deep: true,
-    stopPaths: ['content_attributes.translations'],
+  // Preserve appleMspPayload contents from camelization.
+  // Apple MSP Gateway requires exact field names like 'quick-reply' (with hyphen).
+  const messages = props.messages.map(msg => {
+    const originalAppleMspPayload =
+      msg.appleMspPayload || msg.apple_msp_payload;
+
+    const camelized = useCamelCase(msg, {
+      deep: true,
+      stopPaths: ['content_attributes.translations'],
+    });
+
+    if (originalAppleMspPayload) {
+      camelized.appleMspPayload = originalAppleMspPayload;
+    }
+
+    return camelized;
   });
+
+  return messages;
 });
 
 const currentChat = useMapGetter('getSelectedChat');

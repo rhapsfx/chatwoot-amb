@@ -36,6 +36,15 @@ const isEmpty = computed(() => {
   return !content.value && !attachments.value?.length;
 });
 
+// Check if this is a template with generic content that should be hidden
+const hasGenericTemplateContent = computed(() => {
+  return (
+    isTemplate.value &&
+    content.value === 'Message' &&
+    attachments.value?.length > 0
+  );
+});
+
 const handleSeeOriginal = () => {
   renderOriginal.value = !renderOriginal.value;
 };
@@ -47,7 +56,11 @@ const handleSeeOriginal = () => {
       <span v-if="isEmpty" class="text-n-slate-11">
         {{ $t('CONVERSATION.NO_CONTENT') }}
       </span>
-      <FormattedContent v-if="renderContent" :content="renderContent" />
+      <!-- Don't show generic "Message" content for templates with attachments -->
+      <FormattedContent
+        v-if="renderContent && !hasGenericTemplateContent"
+        :content="renderContent"
+      />
       <TranslationToggle
         v-if="hasTranslations"
         class="-mt-3"

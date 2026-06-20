@@ -671,7 +671,7 @@ onMounted(() => {
     <woot-modal
       v-if="showDeleteConfirmModal"
       :show="showDeleteConfirmModal"
-      :on-close="cancelDeletePolicy"
+      @close="cancelDeletePolicy"
     >
       <div class="p-6">
         <h3 class="text-lg font-medium text-n-slate-12 mb-4">

@@ -36,7 +36,7 @@ class AutomationRule < ApplicationRecord
 
   def conditions_attributes
     %w[content email country_code status message_type browser_language assignee_id team_id referer city company_name inbox_id
-       mail_subject phone_number priority conversation_language labels private_note]
+       mail_subject phone_number priority conversation_language labels private_note apple_messages_group apple_messages_intent]
   end
 
   def actions_attributes

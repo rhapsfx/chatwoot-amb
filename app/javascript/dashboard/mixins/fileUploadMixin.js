@@ -30,6 +30,12 @@ export default {
 
       const channelType = this.inbox?.channel_type;
 
+      // Apple Messages for Business supports 100 MB file uploads
+      // Per Apple MSP REST API v4.1.5 specification
+      if (channelType === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS) {
+        return 100; // 100 MB
+      }
+
       if (!channelType || channelType === INBOX_TYPES.WEB) {
         return this.installationLimit;
       }

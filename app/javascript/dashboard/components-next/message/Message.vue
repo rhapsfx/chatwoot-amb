@@ -41,6 +41,16 @@ import LocationBubble from './bubbles/Location.vue';
 import CSATBubble from './bubbles/CSAT.vue';
 import FormBubble from './bubbles/Form.vue';
 import VoiceCallBubble from './bubbles/VoiceCall.vue';
+import AppleListPickerBubble from './bubbles/AppleListPicker.vue';
+import AppleTimePickerBubble from './bubbles/AppleTimePicker.vue';
+import AppleQuickReplyBubble from './bubbles/AppleQuickReply.vue';
+import AppleFormBubble from './bubbles/AppleForm.vue';
+import AppleRichLinkBubble from './bubbles/AppleRichLink.vue';
+import AppleFormResponseBubble from './bubbles/AppleFormResponse.vue';
+import AppleCustomAppBubble from './bubbles/AppleCustomApp.vue';
+import AppleInvitationBubble from './bubbles/AppleInvitation.vue';
+import ApplePayBubble from './bubbles/ApplePay.vue';
+import TapbackReactionBubble from './bubbles/TapbackReaction.vue';
 
 import MessageError from './MessageError.vue';
 import ContextMenu from 'dashboard/modules/conversations/components/MessageContextMenu.vue';
@@ -102,7 +112,7 @@ import { useBranding } from 'shared/composables/useBranding';
 
 // eslint-disable-next-line vue/define-macros-order
 const props = defineProps({
-  id: { type: Number, required: true },
+  id: { type: [Number, String], required: true },
   messageType: {
     type: Number,
     required: true,
@@ -117,6 +127,7 @@ const props = defineProps({
   call: { type: Object, default: null }, // eslint-disable-line vue/no-unused-properties
   content: { type: String, default: null },
   contentAttributes: { type: Object, default: () => ({}) },
+  appleMspPayload: { type: Object, default: null }, // eslint-disable-line vue/no-unused-properties
   contentType: {
     type: String,
     default: 'text',
@@ -312,6 +323,26 @@ const componentToRender = computed(() => {
     return UnsupportedBubble;
   }
 
+  // Apple Messages for Business content types
+  if (props.contentType === CONTENT_TYPES.APPLE_LIST_PICKER)
+    return AppleListPickerBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_TIME_PICKER)
+    return AppleTimePickerBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_QUICK_REPLY)
+    return AppleQuickReplyBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_FORM) return AppleFormBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_RICH_LINK)
+    return AppleRichLinkBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_FORM_RESPONSE)
+    return AppleFormResponseBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_CUSTOM_APP)
+    return AppleCustomAppBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_INVITATION)
+    return AppleInvitationBubble;
+  if (props.contentType === CONTENT_TYPES.APPLE_PAY) return ApplePayBubble;
+  if (props.contentAttributes?.is_tapback_reaction)
+    return TapbackReactionBubble;
+
   if (props.contentAttributes.type === 'dyte') {
     return DyteBubble;
   }
@@ -401,6 +432,8 @@ const shouldRenderMessage = computed(() => {
     props.contentType === CONTENT_TYPES.INTEGRATIONS;
   const isFailedMessage = props.status === MESSAGE_STATUS.FAILED;
   const hasExternalError = !!props.contentAttributes?.externalError;
+  const isAppleInvitation =
+    props.contentType === CONTENT_TYPES.APPLE_INVITATION;
 
   return (
     hasAttachments ||
@@ -408,6 +441,7 @@ const shouldRenderMessage = computed(() => {
     isEmailContentType ||
     isUnsupported ||
     isAnIntegrationMessage ||
+    isAppleInvitation ||
     isFailedMessage ||
     hasExternalError
   );

@@ -1,0 +1,25 @@
+{
+  "docs" : [ {
+    "app-id" : "claude-code-toolkit",
+    "icon" : "fas fa-robot",
+    "title" : "Claude Toolkit",
+    "assetsRelativePath" : "./assets",
+    "path" : "docs",
+    "publish" : [ {
+      "branches" : [ "main" ],
+      "version" : "1.0.0",
+      "env" : "prod",
+      "parent_id" : 134
+    } ],
+    "admins" : {
+      "users" : [ "andrey_hihlovskiy" ],
+      "teams" : [ "maps-neutron-devops" ]
+    },
+    "notifications" : {
+      "users" : [ "andrey_hihlovskiy" ],
+      "teams" : [ "maps-neutron-devops" ]
+    },
+    "email" : "maps-neutron-devops@group.apple.com",
+    "should_fetch_release_notes" : false
+  } ]
+}

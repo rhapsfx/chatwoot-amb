@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose:*)",
+      "Bash(curl -sv --max-time 5 \"https://maps-api.apple.com/v1/snapshot?center=40.71,-74.00&z=15&size=180x180\")",
+      "Bash(curl -s \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
+      "Bash(curl -sL \"https://docs.developer.apple.com/tutorials/data/documentation/snapshots/get-a-map-snapshot.md\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(magick -version)",
+      "Bash(identify -verbose /tmp/test_pin3.png)",
+      "Bash(identify -verbose public/apple-messages/list-circle.png)",
+      "Bash(git checkout *)",
+      "Bash(python3 -c ' *)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git show *)",
+      "mcp__codegraph__codegraph_explore",
+      "Bash(codegraph --help)",
+      "Bash(codegraph status *)",
+      "Bash(codegraph init *)",
+      "Bash(xargs -P4 -n20 npx eslint --fix)",
+      "Bash(xargs -n20 npx eslint)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

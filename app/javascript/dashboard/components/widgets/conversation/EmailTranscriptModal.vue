@@ -100,7 +100,7 @@ export default {
 </script>
 
 <template>
-  <woot-modal v-model:show="localShow" :on-close="onCancel">
+  <woot-modal v-model:show="localShow" @close="onCancel">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="$t('EMAIL_TRANSCRIPT.TITLE')"

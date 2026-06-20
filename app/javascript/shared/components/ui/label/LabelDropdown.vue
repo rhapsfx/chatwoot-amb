@@ -168,7 +168,7 @@ export default {
 
           <woot-modal
             v-model:show="createModalVisible"
-            :on-close="hideCreateModal"
+            @close="hideCreateModal"
           >
             <AddLabelModal
               :prefill-title="parsedSearch"

@@ -1,0 +1,9 @@
+index
+install
+list
+reinstall
+uninstall
+use
+dry-run
+argument-processing
+troubleshooting

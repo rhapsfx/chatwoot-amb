@@ -58,7 +58,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
   end
 
   def format_message_content
-    message.message_type == 'activity' ? "_#{message_text}_" : message_text
+    message.message_type.to_s == 'activity' ? "_\#{message_text}_" : message_text
   end
 
   def message_text
@@ -178,7 +178,7 @@ class Integrations::Slack::SendOnSlackService < Base::SendOnChannelService
       'Contact'
     elsif sender.instance_of?(User)
       'Agent'
-    elsif message.message_type == 'activity' && sender.nil?
+    elsif message.message_type.to_s == 'activity' && sender.nil?
       'System'
     else
       'Bot'

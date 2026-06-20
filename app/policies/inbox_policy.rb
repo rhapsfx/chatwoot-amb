@@ -82,3 +82,5 @@ class InboxPolicy < ApplicationPolicy
     @account_user.administrator?
   end
 end
+
+InboxPolicy.prepend_mod_with('InboxPolicy')

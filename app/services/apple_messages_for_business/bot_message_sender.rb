@@ -1,0 +1,1183 @@
+# frozen_string_literal: true
+
+require 'base64'
+
+module AppleMessagesForBusiness
+  # Owns all outgoing message construction and delivery for the bot.
+  # Methods here must NOT update bot_state or call handler methods —
+  # those concerns belong in AcousticHouseBotService.
+  #
+  # State-machine constants (TYPING_INDICATORS_ENABLED, TYPING_INDICATOR_DELAY)
+  # are read from AcousticHouseBotService so behaviour stays consistent.
+  class BotMessageSender
+    include BotLogging
+
+    # Defer constant lookup to avoid load-order dependency on AcousticHouseBotService.
+    def typing_indicators_enabled?
+      AppleMessagesForBusiness::AcousticHouseBotService::TYPING_INDICATORS_ENABLED
+    end
+
+    def typing_indicator_delay
+      AppleMessagesForBusiness::AcousticHouseBotService::TYPING_INDICATOR_DELAY
+    end
+
+    def initialize(conversation)
+      @conversation = conversation
+    end
+
+    # === Core message senders ===
+
+    def send_text_message(content)
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: content
+          )
+        ).perform
+      end
+    end
+
+    def send_quick_reply(title:, request_id:, items:, message: nil)
+      log_info "[Bot] 📤 Sending quick reply: #{utf8_encode(title)} (request_id: #{request_id})"
+
+      send_text_message(message) if message.present?
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: title,
+            content_type: 'apple_quick_reply',
+            content_attributes: {
+              'request_identifier' => request_id,
+              'summary_text' => title,
+              'received_title' => title,
+              'reply_title' => 'Selected: ${item.title}',
+              'items' => items.map do |item|
+                {
+                  'title' => item[:title],
+                  'identifier' => request_id
+                }
+              end
+            }
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send quick reply: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_ar_view_question
+      send_quick_reply(
+        title: 'AR Preview',
+        request_id: 'qr_view_ar',
+        message: 'Did you experience the AR preview in your environment?',
+        items: [
+          { title: 'Yes', identifier: '111' },
+          { title: 'No', identifier: '222' }
+        ]
+      )
+    end
+
+    def send_ar_place_question
+      send_quick_reply(
+        title: 'Did you place the AR object?',
+        request_id: 'qr_place_ar',
+        message: 'Did you select AR from the top of the image and set it down in front of you?',
+        items: [
+          { title: 'Yes', identifier: '111' },
+          { title: 'No', identifier: '222' }
+        ]
+      )
+    end
+
+    def send_ar_file
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_ar_guitar'
+      )
+
+      unless template
+        log_error "[Bot] AR template 'ah_ar_guitar' not found - sending placeholder"
+        send_text_message('[AR File: Template not found]')
+        return
+      end
+
+      log_info "[Bot] 🎸 Sending AR content (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      unless template.attachments.attached?
+        log_error '[Bot] AR template has no attachments - sending placeholder'
+        send_text_message('[AR File: No AR file attached to template]')
+        return
+      end
+
+      with_typing_indicator do
+        sender = message_sender
+        params = bot_message_params(
+          message_type: :outgoing,
+          content: 'Check out this guitar in AR!',
+          content_type: 'text',
+          account_id: @conversation.account_id,
+          inbox_id: @conversation.inbox_id,
+          conversation_id: @conversation.id
+        )
+        params[:sender] = sender
+
+        message = @conversation.messages.build(params)
+
+        template.attachments.each do |template_attachment|
+          file_data = template_attachment.download
+          message_attachment = message.attachments.build(
+            account_id: message.account_id,
+            file_type: :file
+          )
+          message_attachment.file.attach(
+            io: StringIO.new(file_data),
+            filename: template_attachment.filename.to_s,
+            content_type: template_attachment.content_type
+          )
+          log_info "[Bot] 🎸 Attached AR file: #{utf8_encode(template_attachment.filename.to_s)}"
+        end
+
+        message.save!
+        log_info "[Bot] 🎸 AR message saved with #{message.attachments.count} attachment(s)"
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send AR file: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message('[AR File: Error sending AR content]')
+    end
+
+    def send_document(filename)
+      file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
+
+      unless File.exist?(file_path)
+        log_error "[Bot] Document not found: #{file_path}"
+        return
+      end
+
+      log_info "[Bot] Sending document: #{utf8_encode(filename)}"
+
+      with_typing_indicator do
+        sender = message_sender
+        params = bot_message_params(
+          message_type: :outgoing,
+          content: '',
+          content_type: 'text',
+          account_id: @conversation.account_id,
+          inbox_id: @conversation.inbox_id,
+          conversation_id: @conversation.id
+        )
+        params[:sender] = sender
+
+        message = @conversation.messages.build(params)
+        file_data = File.binread(file_path)
+
+        message_attachment = message.attachments.build(
+          account_id: message.account_id,
+          file_type: :file
+        )
+        message_attachment.file.attach(
+          io: StringIO.new(file_data),
+          filename: filename,
+          content_type: mime_type_for_filename(filename)
+        )
+
+        message.save!
+        log_info "[Bot] Document message saved with #{message.attachments.count} attachment(s)"
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send document: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_rich_link(url:, image_asset:, title:)
+      log_info "[Bot] Sending rich link: #{utf8_encode(url)} (#{utf8_encode(title)})"
+
+      # Embed image as base64 so OG scraping in SendRichLinkService cannot
+      # replace it with an SVG or otherwise unsupported image from the target URL.
+      image_data = encode_demo_image(image_asset)
+      log_info "[Bot] 🔗 Rich link image_data present: #{image_data.present?} (#{image_data&.length || 0} chars)"
+
+      content_attrs = { 'url' => url, 'title' => title }
+      if image_data.present?
+        content_attrs['image_data'] = image_data
+        content_attrs['image_mime_type'] = mime_type_for_image_asset(image_asset)
+      else
+        # Fallback to URL-based image when file not found locally
+        content_attrs['image_url'] = image_url_for_asset(image_asset)
+      end
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: url,
+            content_type: 'apple_rich_link',
+            content_attributes: content_attrs.compact
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send rich link: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_app_clip(url:)
+      log_info "[Bot] Sending App Clip: #{utf8_encode(url)}"
+
+      channel = @conversation.inbox.channel
+      rich_link_data_ref = build_app_clip_rich_link_data_ref(channel: channel, url: url)
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: url,
+            content_type: 'apple_rich_link',
+            content_attributes: {
+              'url' => url,
+              'title' => 'Open App Clip',
+              'rich_link_data_ref' => rich_link_data_ref
+            }
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send App Clip: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_apple_messages_rich_link
+      # No image_data provided — SendRichLinkService will scrape the OG image
+      # from the URL and download/encode it automatically.
+      log_info '[Bot] 🔗 Sending MacBook Neo rich link (OG image will be fetched by SendRichLinkService)'
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: 'https://www.apple.com/macbook-neo/',
+            content_type: 'apple_rich_link',
+            content_attributes: {
+              'url' => 'https://www.apple.com/macbook-neo/',
+              'title' => 'MacBook Neo'
+            }
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send rich link: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_imessage_app
+      log_info '[Bot] 🎵 Sending Shazam iMessage extension'
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: 'Shazam',
+            content_type: 'apple_custom_app',
+            content_attributes: {
+              'app_id' => '284993459',
+              'app_name' => 'Shazam',
+              'bid' => 'com.apple.messages.MSMessageExtensionBalloonPlugin:4GWDBCF5A4:com.shazam.Shazam.imessageextension',
+              'use_live_layout' => true
+            }
+          )
+        ).perform
+      end
+
+      send_text_message('🎵 Tap the Shazam bubble above to identify songs!')
+    rescue StandardError => e
+      log_error "[Bot] Failed to send iMessage app: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message('Sorry, there was an error sending the Shazam extension. Please try again.')
+    end
+
+    def send_wallet_pass
+      log_info '[Bot] 🎫 Generating Apple Wallet pass'
+      with_typing_indicator do
+        service = AppleMessagesForBusiness::WalletPassService.new(@conversation)
+        pkpass_data = service.generate
+
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: StringIO.new(pkpass_data),
+          filename: 'acoustic-house-pass.pkpass',
+          content_type: 'application/vnd.apple.pkpass'
+        )
+
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: '🎫 Your Guitar Lesson Pickup Pass — tap to add to Apple Wallet!',
+            attachments: [blob.signed_id]
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to generate wallet pass: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message("Sorry, we couldn't generate your Wallet pass. Please try again.")
+    end
+
+    def send_delivery_confirmation(address_data, customer_name = nil)
+      return unless address_data.present?
+
+      address_parts = []
+      address_parts << address_data[:street] if address_data[:street].present?
+      address_parts << address_data[:city]   if address_data[:city].present?
+      address_parts << address_data[:state]  if address_data[:state].present?
+      address_parts << address_data[:zip]    if address_data[:zip].present?
+      address_parts << address_data[:country] if address_data[:country].present?
+
+      formatted_address = address_parts.join(', ')
+
+      message = if customer_name.present?
+                  "Perfect #{customer_name}! Your order will be delivered to: #{formatted_address}"
+                else
+                  "Perfect! Your order will be delivered to: #{formatted_address}"
+                end
+
+      send_text_message(message)
+      log_info "[Bot] 📦 Sent delivery confirmation for address: #{utf8_encode(formatted_address)}"
+    end
+
+    # === Template-based senders ===
+
+    def send_guitar_list_picker
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_guitar_list_picker'
+      )
+
+      unless template
+        log_error "[Bot] Guitar List Picker template 'ah_guitar_list_picker' not found"
+        send_text_message('Guitar selection temporarily unavailable.')
+        return
+      end
+
+      log_info "[Bot] Sending Guitar List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+      data = facade.load_data_with_images('list_picker')
+
+      log_info "[Bot] 🎸 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+      log_info "[Bot] 🎸 Loaded template with #{data['images']&.length || 0} images"
+
+      sections = data['sections'] || []
+      if sections.blank?
+        log_error '[Bot] Guitar List Picker template has no sections'
+        send_text_message('Guitar selection temporarily unavailable.')
+        return
+      end
+
+      content_attrs = {
+        'sections' => sections,
+        'images' => data['images'] || [],
+        'request_identifier' => 'lp_guitar_0319'
+      }
+
+      if data['received_title'].present?
+        content_attrs['received_title']            = data['received_title']
+        content_attrs['received_subtitle']         = data['received_subtitle']
+        content_attrs['received_image_identifier'] = data['received_image_identifier']
+        content_attrs['received_style']            = data['received_style']
+      end
+
+      if data['reply_title'].present?
+        content_attrs['reply_title']            = data['reply_title']
+        content_attrs['reply_subtitle']         = data['reply_subtitle']
+        content_attrs['reply_image_identifier'] = data['reply_image_identifier']
+        content_attrs['reply_style']            = data['reply_style']
+      end
+
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: 'Select a guitar',
+          content_type: 'apple_list_picker',
+          content_attributes: content_attrs
+        )
+      ).perform
+
+      log_info '[Bot] Guitar List Picker sent successfully'
+    rescue StandardError => e
+      log_error "[Bot] Failed to send guitar list picker: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_large_content_form
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_large_form_demo'
+      )&.reload
+
+      unless template
+        log_error "[Bot] Large Content Form template 'ah_large_form_demo' not found"
+        send_text_message('Large content form is not available.')
+        return
+      end
+
+      log_info "[Bot] 📋 Sending Large Content Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      renderer = Templates::BotRendererService.new(
+        template_id: template.id,
+        parameters: {},
+        channel_type: 'apple_messages_for_business'
+      )
+
+      rendered = renderer.render_for_bot
+      rendered[:content_type] = 'apple_form' if rendered[:content_type] != 'apple_form'
+      rendered[:content_attributes]['request_identifier'] = 'form_large_content' if rendered[:content_attributes]['request_identifier'].blank?
+
+      log_info "[Bot] 📋 Form content_type: #{rendered[:content_type]}"
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: rendered[:content],
+            content_type: rendered[:content_type],
+            content_attributes: rendered[:content_attributes]
+          )
+        ).perform
+      end
+
+      log_info '[Bot] 📋 Large Content Form sent successfully'
+    rescue StandardError => e
+      log_error "[Bot] ❌ Failed to send large content form: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    # Returns true on success, false when template is missing or an error occurs.
+    # Callers decide the fallback behaviour.
+    def send_guitar_info_form
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_guitar_info_form'
+      )
+
+      unless template
+        log_error "[Bot] Guitar Info Form template 'ah_guitar_info_form' not found"
+        return false
+      end
+
+      log_info "[Bot] Sending Guitar Info Form (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      renderer = Templates::BotRendererService.new(
+        template_id: template.id,
+        parameters: {},
+        channel_type: 'apple_messages_for_business'
+      )
+
+      rendered = renderer.render_for_bot
+      rendered[:content_attributes]['request_identifier'] = 'form_0343' if rendered[:content_attributes]['request_identifier'].blank?
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: rendered[:content],
+            content_type: rendered[:content_type],
+            content_attributes: rendered[:content_attributes]
+          )
+        ).perform
+      end
+
+      log_info '[Bot] Guitar Info Form sent successfully'
+      true
+    rescue StandardError => e
+      log_error "[Bot] Failed to send guitar info form: #{e.message}"
+      log_error e.backtrace.join("\n")
+      false
+    end
+
+    def send_summary_list_picker
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_summary'
+      )
+
+      unless template
+        log_error "[Bot] Summary List Picker template 'ah_summary' not found"
+        send_text_message('Summary temporarily unavailable.')
+        return
+      end
+
+      log_info "[Bot] Sending Summary List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+      data = facade.load_data('list_picker')
+
+      log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+
+      sections = data['sections'] || []
+      if sections.blank?
+        log_error '[Bot] Summary List Picker template has no sections'
+        send_text_message('Summary temporarily unavailable.')
+        return
+      end
+
+      content_attrs = {
+        'sections' => sections,
+        'request_identifier' => 'lp_summary_0319'
+      }
+
+      if data['received_title'].present?
+        content_attrs['received_title']            = data['received_title']
+        content_attrs['received_subtitle']         = data['received_subtitle']
+        content_attrs['received_image_identifier'] = data['received_image_identifier']
+        content_attrs['received_style']            = data['received_style']
+      end
+
+      if data['reply_title'].present?
+        content_attrs['reply_title']            = data['reply_title']
+        content_attrs['reply_subtitle']         = data['reply_subtitle']
+        content_attrs['reply_image_identifier'] = data['reply_image_identifier']
+        content_attrs['reply_style']            = data['reply_style']
+      end
+
+      if data['images'].is_a?(Array)
+        content_attrs['images'] = data['images'].map do |image|
+          { 'identifier' => image['identifier'], 'data' => image['data'], 'description' => image['description'] }.compact
+        end
+      end
+
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: 'Feature Sheet',
+          content_type: 'apple_list_picker',
+          content_attributes: content_attrs
+        )
+      ).perform
+    rescue StandardError => e
+      log_error "[Bot] Failed to send summary list picker: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_menu_list_picker
+      log_info "[Bot] 🔍 Looking for menu template 'ah_main_menu' in account: #{@conversation.account_id}"
+
+      template = MessageTemplate.find_by(
+        account_id: @conversation.account_id,
+        name: 'ah_main_menu'
+      )
+
+      unless template
+        global_template = MessageTemplate.find_by(name: 'ah_main_menu')
+        if global_template
+          log_error "[Bot] ⚠️  Menu template 'ah_main_menu' EXISTS but in account #{global_template.account_id}, not #{@conversation.account_id}"
+        else
+          log_error "[Bot] ❌ Menu List Picker template 'ah_main_menu' not found in ANY account"
+        end
+        send_text_message('Menu temporarily unavailable.')
+        return
+      end
+
+      log_info "📋 [Bot] Sending Menu List Picker (Name: #{utf8_encode(template.name)}, ID: #{template.id})"
+
+      facade = AppleMessagesForBusiness::TemplateFacade.new(template)
+      data = facade.load_data_with_images('list_picker')
+
+      log_info "[Bot] 📋 Using #{facade.storage_type} (complexity: #{facade.complexity_score})"
+      log_info "[Bot] 📋 Loaded template with #{data['images']&.length || 0} images"
+
+      sections = data['sections'] || []
+      if sections.blank?
+        log_error '[Bot] ❌ Menu List Picker template has no sections'
+        send_text_message('Menu temporarily unavailable.')
+        return
+      end
+
+      content_attrs = {
+        'sections' => sections,
+        'images' => data['images'] || [],
+        'request_identifier' => 'lp_menu_0319'
+      }
+
+      if data['received_title'].present?
+        content_attrs['received_title']            = data['received_title']
+        content_attrs['received_subtitle']         = data['received_subtitle']
+        content_attrs['received_image_identifier'] = data['received_image_identifier']
+        content_attrs['received_style']            = data['received_style']
+      end
+
+      if data['reply_title'].present?
+        content_attrs['reply_title']            = data['reply_title']
+        content_attrs['reply_subtitle']         = data['reply_subtitle']
+        content_attrs['reply_image_identifier'] = data['reply_image_identifier']
+        content_attrs['reply_style']            = data['reply_style']
+      end
+
+      Messages::MessageBuilder.new(
+        message_sender,
+        @conversation,
+        bot_message_params(
+          message_type: :outgoing,
+          content: 'Select an option',
+          content_type: 'apple_list_picker',
+          content_attributes: content_attrs
+        )
+      ).perform
+
+      log_info '[Bot] Menu List Picker sent successfully'
+    rescue StandardError => e
+      log_error "[Bot] Failed to send menu list picker: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    # === Location / store / lesson senders ===
+
+    def send_lesson_time_picker(location)
+      guitar = @conversation.custom_attributes&.dig('selected_guitar').presence || 'guitar'
+
+      day1 = 7.days.from_now.to_date
+      day2 = 8.days.from_now.to_date
+
+      timeslots = [
+        { 'identifier' => '0', 'start_time' => "#{day1}T15:30#{location[:timezone_offset]}", 'duration' => 3600 },
+        { 'identifier' => '1', 'start_time' => "#{day1}T17:00#{location[:timezone_offset]}", 'duration' => 3600 },
+        { 'identifier' => '2', 'start_time' => "#{day1}T19:30#{location[:timezone_offset]}", 'duration' => 3600 },
+        { 'identifier' => '3', 'start_time' => "#{day2}T15:00#{location[:timezone_offset]}", 'duration' => 3600 },
+        { 'identifier' => '4', 'start_time' => "#{day2}T17:30#{location[:timezone_offset]}", 'duration' => 3600 },
+        { 'identifier' => '5', 'start_time' => "#{day2}T19:00#{location[:timezone_offset]}", 'duration' => 3600 }
+      ]
+
+      time_picker_image_id = 'time_picker_lesson'
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: "Schedule a lesson with your #{guitar}",
+            content_type: 'apple_time_picker',
+            content_attributes: {
+              'request_identifier' => 'time_0319',
+              'received_title' => "Schedule a lesson with your #{guitar}",
+              'received_subtitle' => location[:name],
+              'received_image_identifier' => time_picker_image_id,
+              'received_style' => 'icon',
+              'reply_title' => 'Thank you!',
+              'reply_image_identifier' => time_picker_image_id,
+              'reply_style' => 'icon',
+              'event' => {
+                'identifier' => SecureRandom.uuid,
+                'title' => 'Scheduled Guitar lesson',
+                'location' => {
+                  'latitude' => location[:latitude],
+                  'longitude' => location[:longitude],
+                  'radius' => 300.0,
+                  'title' => location[:name]
+                },
+                'timeslots' => timeslots
+              }
+            }
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send time picker: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_store_quick_reply(stores, user_coordinates)
+      log_info "[Bot] 🏪 Sending #{stores.length} stores as quick reply"
+
+      minimal_stores = stores.map do |store|
+        {
+          'id' => store[:id],
+          'name' => store[:name],
+          'latitude' => store[:latitude],
+          'longitude' => store[:longitude],
+          'distance_km' => store[:distance_km]
+        }
+      end
+
+      set_conv_attr('available_stores', minimal_stores.to_json)
+      set_conv_attr('store_search_lat', user_coordinates[:latitude])
+      set_conv_attr('store_search_lon', user_coordinates[:longitude])
+
+      items = stores.map.with_index { |store, index| { title: store[:name], value: index.to_s } }
+
+      send_quick_reply(
+        title: "Select your nearest Apple Store (#{stores.length} found)",
+        request_id: 'qr_store_selection',
+        items: items
+      )
+    rescue StandardError => e
+      log_error "[Bot] Failed to send store quick reply: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    def send_store_selection_list_picker(stores, user_coordinates)
+      return if stores.blank?
+
+      set_conv_attr('store_search_lat', user_coordinates[:latitude])
+      set_conv_attr('store_search_lon', user_coordinates[:longitude])
+
+      minimal_stores = stores.map do |store|
+        {
+          'id' => store[:id],
+          'name' => store[:name],
+          'latitude' => store[:latitude],
+          'longitude' => store[:longitude],
+          'distance_km' => store[:distance_km]
+        }
+      end
+      set_conv_attr('available_stores', minimal_stores.to_json)
+
+      # Build per-store map snapshots (180×180 — ideal list picker item size @3x)
+      store_map_images = fetch_store_map_snapshots(stores)
+
+      # Load pin-circle for the received/reply bubble (icon style = 120×120)
+      pin_circle = load_pin_circle_image
+
+      images = []
+      images << pin_circle if pin_circle
+      images.concat(store_map_images)
+
+      # Items reference their own map image; fall back gracefully if snapshot failed
+      items = stores.map.with_index do |store, index|
+        item = {
+          'identifier' => index.to_s,
+          'title' => store[:name],
+          'subtitle' => "#{store[:distance_km]} km away • #{store[:formatted_address]}"
+        }
+        item['image_identifier'] = "store_map_#{index}" if store_map_images.any? { |img| img['identifier'] == "store_map_#{index}" }
+        item
+      end
+
+      sections = [{ 'title' => 'Nearby Apple Stores', 'multiple_selection' => false, 'items' => items }]
+      bubble_image_id = pin_circle ? 'pin_circle' : nil
+
+      log_info "[Bot] 🏪 Store list picker: #{store_map_images.length}/#{stores.length} map snapshots, pin_circle=#{pin_circle.present?}"
+
+      with_typing_indicator do
+        Messages::MessageBuilder.new(
+          message_sender,
+          @conversation,
+          bot_message_params(
+            message_type: :outgoing,
+            content: 'Select an Apple Store',
+            content_type: 'apple_list_picker',
+            content_attributes: {
+              'request_identifier' => 'lp_store_selection',
+              'sections' => sections,
+              'images' => images,
+              'received_title' => 'Select a Store',
+              'received_subtitle' => "Found #{stores.length} stores nearby",
+              'received_image_identifier' => bubble_image_id,
+              'received_style' => 'icon',
+              'reply_title' => 'Great choice!',
+              'reply_subtitle' => "Let's schedule your lesson",
+              'reply_image_identifier' => bubble_image_id,
+              'reply_style' => 'icon'
+            }.compact
+          )
+        ).perform
+      end
+    rescue StandardError => e
+      log_error "[Bot] Failed to send store selection list picker: #{e.message}"
+      log_error e.backtrace.join("\n")
+    end
+
+    # === Apple Pay ===
+
+    def send_apple_pay_request(guitar_name)
+      with_typing_indicator do
+        image_identifier = get_guitar_image_identifier(guitar_name)
+        log_info "[Bot] 💳 Apple Pay request for '#{utf8_encode(guitar_name)}' with image: #{image_identifier}"
+
+        payment_data = {
+          'request_identifier' => 'applepay_1018',
+          'merchant_name' => 'Acoustic House',
+          'currency_code' => 'USD',
+          'country_code' => 'US',
+          'line_items' => [{ 'label' => guitar_name, 'amount' => '0.01', 'type' => 'final' }],
+          'total' => { 'label' => 'Acoustic House', 'amount' => '0.01', 'type' => 'final' },
+          'received_title' => "Secure your #{guitar_name} today",
+          'received_subtitle' => 'Complete your purchase with Apple Pay',
+          'received_style' => 'large',
+          'received_image_identifier' => image_identifier,
+          'reply_style' => 'large',
+          'reply_image_identifier' => image_identifier
+        }
+
+        service = AppleMessagesForBusiness::SendApplePayService.new(
+          channel: @conversation.inbox.channel,
+          destination_id: @conversation.contact_inbox.source_id,
+          payment_data: payment_data
+        )
+
+        log_info '[Bot] 💳 Calling SendApplePayService.perform...'
+        response = service.perform
+        log_info "[Bot] 💳 SendApplePayService returned: #{response.inspect}"
+
+        if response[:success]
+          stored_payment_data = payment_data.except('request_identifier', 'reply_image_identifier')
+
+          message_params = bot_message_params(
+            message_type: :outgoing,
+            content: "Secure your #{guitar_name} today",
+            content_type: 'apple_pay',
+            content_attributes: stored_payment_data,
+            source_id: response[:message_id],
+            sender: message_sender,
+            account_id: @conversation.account_id,
+            inbox_id: @conversation.inbox_id,
+            conversation_id: @conversation.id
+          )
+
+          message = @conversation.messages.create(message_params)
+          if message.persisted?
+            log_info '[Bot] ✅ Apple Pay message created successfully'
+          else
+            log_warn "[Bot] ⚠️ Apple Pay message creation failed: #{message.errors.full_messages.join(', ')}"
+          end
+
+          { success: true }
+        else
+          log_info "[Bot] ❌ Apple Pay failed: #{utf8_encode(response[:error])}"
+          response
+        end
+      end
+    rescue StandardError => e
+      log_error "[Bot] 💳 Exception in send_apple_pay_request: #{e.message}"
+      log_error e.backtrace.join("\n")
+      { success: false, error: e.message }
+    end
+
+    # === OAuth ===
+
+    def send_oauth_authentication(provider)
+      log_info "[Bot] 🔐 Sending OAuth authentication for provider: #{provider}"
+
+      message_content = case provider.downcase
+                        when 'linkedin' then 'Sign in with LinkedIn to access your professional profile'
+                        when 'google'   then 'Sign in with Google to continue'
+                        when 'facebook' then 'Sign in with Facebook to continue'
+                        else "Sign in with #{provider.capitalize} to continue"
+                        end
+
+      service = AppleMessagesForBusiness::SendAuthenticationService.new(
+        channel: @conversation.inbox.channel,
+        destination_id: @conversation.contact_inbox.source_id,
+        authentication_data: { 'provider' => provider },
+        message_content: message_content
+      )
+
+      result = service.perform
+
+      if result[:success]
+        log_info '[Bot] ✅ OAuth authentication message sent successfully'
+      else
+        log_warn "[Bot] ❌ OAuth authentication failed: #{result[:error] || 'unknown error'}"
+        send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
+      end
+    rescue StandardError => e
+      log_error "[Bot] ❌ Exception in send_oauth_authentication: #{e.message}"
+      log_error e.backtrace.join("\n")
+      send_text_message('Sorry, there was an error sending the authentication request. Please try again.')
+    end
+
+    # === Image helpers ===
+
+    def fetch_and_encode_images(identifiers)
+      return [] if identifiers.empty?
+
+      images = AppleMessagesForBusiness::ImageFetchService.new(
+        account_id: @conversation.account_id,
+        inbox_id: @conversation.inbox_id,
+        embedded_images: []
+      ).fetch_and_encode(identifiers)
+
+      log_info "[Bot] 🖼️ Looking for images with identifiers: #{identifiers.inspect}"
+      log_info "[Bot] 🖼️ Found #{images.count}/#{identifiers.count} images"
+
+      images.map do |image|
+        { 'identifier' => image[:identifier], 'data' => image[:data], 'description' => image[:description] || '' }
+      end
+    end
+
+    # Fetch a MapKit map snapshot for each store via Apple Maps Snapshot API.
+    # List picker item images: 180×180 px — ideal for 60×60pt @3x items.
+    # Degrades gracefully: stores without a snapshot simply have no image_identifier.
+    def fetch_store_map_snapshots(stores)
+      maps_service = AppleMessagesForBusiness::AppleMapsService.new
+
+      stores.map.with_index do |store, index|
+        raw = maps_service.snapshot(store[:latitude], store[:longitude], width: 180, height: 180, scale: 1, zoom: 15)
+        next nil if raw.nil?
+
+        encoded = encode_image_for_amb(raw.b, width: 180, height: 180)
+        { 'identifier' => "store_map_#{index}", 'data' => encoded, 'description' => store[:name] }
+      end.compact
+    rescue StandardError => e
+      log_error "[Bot] Failed to fetch store map snapshots: #{e.message}"
+      []
+    end
+
+    # Load the static pin-circle icon, flatten transparency onto white, output as JPEG.
+    # JPEG has no alpha channel — without explicit flattening ImageMagick fills transparent
+    # pixels with black, making the icon appear as a solid black square on device.
+    def load_pin_circle_image
+      png_path = Rails.public_path.join('apple-messages/light/pin-circle.png')
+      return nil unless File.exist?(png_path)
+
+      output_tmp = Tempfile.new(['amb_pin', '.jpg'])
+      output_tmp.close
+
+      MiniMagick::Tool::Convert.new do |cmd|
+        cmd.background('white')
+        cmd << png_path.to_s
+        cmd.flatten          # replace transparency with white background
+        cmd.resize('120x120')
+        cmd.quality('90')
+        cmd << output_tmp.path
+      end
+
+      encoded = Base64.strict_encode64(File.binread(output_tmp.path))
+      { 'identifier' => 'pin_circle', 'data' => encoded, 'description' => 'Location pin' }
+    rescue StandardError => e
+      log_error "[Bot] Failed to load pin-circle image: #{e.message}"
+      nil
+    ensure
+      output_tmp&.unlink
+    end
+
+    # Resize image to exact dimensions, convert to JPEG at 72 DPI (Apple MSP requirement).
+    # Uses resize_to_fill so the output is always exactly width×height.
+    # Falls back to raw base64 if ImageMagick is unavailable.
+    def encode_image_for_amb(raw_bytes, width:, height:, format: :jpeg)
+      source_tmp = Tempfile.new(['amb_img', '.png'])
+      source_tmp.binmode
+      source_tmp.write(raw_bytes)
+      source_tmp.flush
+      source_tmp.close
+
+      pipeline = ImageProcessing::MiniMagick
+                 .source(source_tmp.path)
+                 .resize_to_fill(width, height)
+
+      processed = if format == :png
+                    pipeline
+                      .convert('png')
+                      # -background none prevents transparent pixels from being filled with black
+                      # during resize_to_fill canvas extension
+                      .custom { |cmd| cmd.background('none').units('PixelsPerInch').density('72x72') }
+                      .call
+                  else
+                    pipeline
+                      .convert('jpeg')
+                      .saver(quality: 85)
+                      .custom { |cmd| cmd.units('PixelsPerInch').density('72x72') }
+                      .call
+                  end
+
+      Base64.strict_encode64(File.binread(processed.path))
+    rescue StandardError => e
+      log_error "[Bot] Image encoding failed (#{width}×#{height}, #{format}): #{e.message}"
+      Base64.strict_encode64(raw_bytes)
+    ensure
+      source_tmp&.unlink
+    end
+
+    # === Typing indicators ===
+    # Public so the main service can wrap its own MessageBuilder calls.
+
+    def with_typing_indicator
+      return yield unless typing_indicators_enabled?
+
+      send_typing_indicator(:start)
+      sleep(typing_indicator_delay)
+      result = yield
+      send_typing_indicator(:end)
+      result
+    rescue StandardError => e
+      send_typing_indicator(:end)
+      raise e
+    end
+
+    private
+
+    def send_typing_indicator(action)
+      return unless typing_indicators_enabled?
+      return unless apple_messages_channel?
+
+      apple_source_urn = @conversation.contact&.additional_attributes&.dig('apple_messages_source_id')
+      return unless apple_source_urn
+
+      destination_id = apple_source_urn.sub(/^urn:biz:/, '')
+
+      service = AppleMessagesForBusiness::OutgoingTypingIndicatorService.new(
+        channel: @conversation.inbox.channel,
+        destination_id: destination_id,
+        action: action
+      )
+
+      result = service.perform
+      log_info "[Bot] Typing indicator #{action}: #{result[:success] ? 'success' : utf8_encode(result[:error])}"
+    rescue StandardError => e
+      Rails.logger.error utf8_encode("[Bot] Failed to send typing indicator: #{e.message}")
+    end
+
+    def apple_messages_channel?
+      @conversation.inbox.channel.is_a?(Channel::AppleMessagesForBusiness)
+    end
+
+    # === Message building ===
+
+    def bot_message_params(base_params)
+      agent_bot = bot_user
+      return base_params unless agent_bot.present?
+
+      base_params.merge(sender_type: 'AgentBot', sender_id: agent_bot.id)
+    end
+
+    def message_sender
+      bot_user.presence || @conversation.account.users.first
+    end
+
+    def bot_user
+      @conversation.inbox.agent_bot
+    end
+
+    # === Misc helpers ===
+
+    def image_url_for_asset(image_asset)
+      return nil if image_asset.blank?
+      return image_asset if image_asset.start_with?('http://', 'https://')
+
+      base_url = ENV.fetch('FRONTEND_URL', nil) ||
+                 @conversation.inbox&.channel&.webhook_url&.match(%r{^https?://[^/]+})&.to_s
+
+      base_url.present? ? "#{base_url}/demo_files/apple_messages/#{image_asset}" : nil
+    end
+
+    def mime_type_for_filename(filename)
+      case File.extname(filename).downcase
+      when '.pdf'     then 'application/pdf'
+      when '.numbers' then 'application/vnd.apple.numbers'
+      when '.pages'   then 'application/vnd.apple.pages'
+      when '.key'     then 'application/vnd.apple.keynote'
+      else 'application/octet-stream'
+      end
+    end
+
+    def mime_type_for_image_asset(filename)
+      case File.extname(filename.to_s).downcase
+      when '.png'  then 'image/png'
+      when '.gif'  then 'image/gif'
+      when '.webp' then 'image/webp'
+      else 'image/jpeg'
+      end
+    end
+
+    def build_app_clip_rich_link_data_ref(channel:, url:)
+      return { 'url' => url } unless channel
+
+      construct_result = AppleMessagesForBusiness::ConstructPayloadService.new(
+        channel: channel,
+        url: url
+      ).perform
+
+      if construct_result[:success] && construct_result[:rich_link_data_ref].present?
+        construct_result[:rich_link_data_ref]
+      else
+        log_warn "[Bot] App Clip constructPayload failed: #{construct_result[:error] || 'unknown error'}"
+        { 'url' => url }
+      end
+    rescue StandardError => e
+      log_warn "[Bot] App Clip constructPayload exception: #{e.message}"
+      { 'url' => url }
+    end
+
+    # rubocop:disable Metrics/MethodLength
+    def get_guitar_image_identifier(guitar_name)
+      return nil if guitar_name.blank?
+
+      fallback_identifier = 'guitar_stratocaster'
+
+      guitar_image_map = {
+        'Fender American Elite Stratocaster' => 'guitar_stratocaster',
+        'Gibson ES-335' => 'guitar_gibson_es335',
+        'Martin DC28E Dreadnought' => 'guitar_martin_dreadnought',
+        'Gibson Les Paul Standard' => 'guitar_lespaul',
+        'PRS Custom 24' => 'guitar_prs_custom24',
+        'Taylor 814ce' => 'guitar_taylor',
+        'Stratocaster' => 'guitar_stratocaster',
+        'Les Paul' => 'guitar_lespaul',
+        'Martin' => 'guitar_martin_dreadnought',
+        'Dreadnought' => 'guitar_martin_dreadnought',
+        'Gibson' => 'guitar_lespaul',
+        'Fender' => 'guitar_stratocaster',
+        'PRS' => 'guitar_prs_custom24',
+        'Taylor' => 'guitar_taylor',
+        'Demo Guitar - Fender Stratocaster' => 'guitar_stratocaster'
+      }
+
+      return guitar_image_map[guitar_name] if guitar_image_map.key?(guitar_name)
+
+      match = guitar_image_map.find { |key, _| guitar_name.include?(key) }
+      return match[1] if match
+
+      Rails.logger.info "[Bot] 🎸 No image found for guitar '#{guitar_name}', using fallback: #{fallback_identifier}"
+      fallback_identifier
+    end
+    # rubocop:enable Metrics/MethodLength
+
+    # Reads a static demo asset from public/demo_files/apple_messages/ and returns
+    # it as a raw base64 string (no data-URI prefix) suitable for content_attributes['image_data'].
+    def encode_demo_image(filename)
+      return nil if filename.blank?
+
+      file_path = Rails.public_path.join('demo_files', 'apple_messages', filename)
+      unless File.exist?(file_path)
+        log_warn "[Bot] Demo image not found: #{file_path}"
+        return nil
+      end
+
+      Base64.strict_encode64(File.binread(file_path))
+    rescue StandardError => e
+      log_warn "[Bot] Could not encode demo image #{filename}: #{e.message}"
+      nil
+    end
+
+    # Directly write a conversation attribute (bypasses state_manager for simple writes).
+    def set_conv_attr(key, value)
+      @conversation.custom_attributes ||= {}
+      @conversation.custom_attributes[key] = value
+      @conversation.save!
+    end
+  end
+end

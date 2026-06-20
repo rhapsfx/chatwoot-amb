@@ -1,0 +1,140 @@
+# Chatwoot Production Dockerfile for GCP Cloud Run
+# Optimized multi-stage build for Apple Messages for Business support
+
+# ============================================
+# Stage 1: Ruby Base Image
+# ============================================
+FROM ruby:3.4.4-slim AS base
+
+# Install essential system packages
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    imagemagick \
+    libwebp-dev \
+    libvips42 \
+    libssl-dev \
+    curl \
+    gnupg \
+    ca-certificates \
+    tzdata \
+    shared-mime-info \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 (required by package.json engines field)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set production environment
+ENV RAILS_ENV=production \
+    NODE_ENV=production \
+    RACK_ENV=production \
+    RAILS_SERVE_STATIC_FILES=true \
+    RAILS_LOG_TO_STDOUT=true
+
+# Create app directory
+RUN mkdir -p /app
+WORKDIR /app
+
+# ============================================
+# Stage 2: Node.js Setup
+# ============================================
+FROM base AS node-builder
+
+# Install pnpm 10.x
+RUN npm install -g pnpm@10.2.0
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install Node dependencies
+RUN pnpm install --no-frozen-lockfile --prod=false
+
+# ============================================
+# Stage 3: Build Assets
+# ============================================
+FROM node-builder AS asset-builder
+
+# Copy application code needed for asset compilation
+COPY app/javascript ./app/javascript
+COPY app/assets ./app/assets
+COPY config ./config
+COPY public ./public
+COPY theme ./theme
+COPY vite.config.ts ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+
+# Build frontend assets with Vite directly (increase heap for build)
+RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --mode=production
+
+# ============================================
+# Stage 4: Ruby Dependencies
+# ============================================
+FROM base AS ruby-builder
+
+# Copy Gemfile
+COPY Gemfile Gemfile.lock ./
+
+# Install Ruby gems (using bundler version from Gemfile.lock)
+# Updated 2025-12-02 to fix bundler version mismatch
+RUN gem install bundler:2.5.16 && \
+    bundle config set --local deployment 'true' && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3
+
+# ============================================
+# Stage 5: Production Image
+# ============================================
+FROM base AS production
+
+# Install pnpm for ViteRuby (needed during asset precompilation)
+RUN npm install -g pnpm@10.2.0
+
+# Create non-root user first
+RUN useradd -m -u 1000 -s /bin/bash chatwoot
+
+# Copy installed gems from ruby-builder
+COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
+COPY --from=ruby-builder /app/vendor/bundle /app/vendor/bundle
+
+# Copy application code FIRST (includes all source files)
+COPY . .
+
+# Copy ONLY the built Vite assets (not the entire public directory)
+# This preserves public/apple-messages/ and other static files from COPY . .
+# Note: public/packs is created by Rails precompile later, not by Vite
+COPY --from=asset-builder /app/public/vite /app/public/vite
+
+# Create required directories and set ownership in one step
+RUN mkdir -p /app/tmp/pids \
+    /app/tmp/cache \
+    /app/log \
+    /app/storage \
+    /app/public/packs && \
+    chmod -R 755 /app/tmp /app/log /app/storage /app/public && \
+    chown -R chatwoot:chatwoot /app/tmp /app/log /app/storage
+
+# Precompile Rails assets (if any remaining)
+RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile || true
+
+# Set ownership only for directories that need write access
+RUN chown -R chatwoot:chatwoot /app/public/packs /app/public/vite
+
+# Switch to non-root user
+USER chatwoot
+
+# Expose port for Cloud Run (Cloud Run uses PORT env var)
+ENV PORT=8080
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# Default command (can be overridden in Cloud Run)
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]

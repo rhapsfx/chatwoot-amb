@@ -253,6 +253,11 @@ function createSuggestionPlugin({
     suggestionClass: '',
     onEnter: args => {
       if (!isAllowed()) return false;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[Editor] suggestion onEnter trigger="${trigger}" text="${args.text}" range=`,
+        args.range
+      );
       showMenu.value = true;
       range.value = args.range;
       editorView = args.view;
@@ -260,12 +265,18 @@ function createSuggestionPlugin({
       return false;
     },
     onChange: args => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[Editor] suggestion onChange trigger="${trigger}" text="${args.text}"`
+      );
       editorView = args.view;
       range.value = args.range;
       if (searchTerm) searchTerm.value = args.text;
       return false;
     },
     onExit: () => {
+      // eslint-disable-next-line no-console
+      console.log(`[Editor] suggestion onExit trigger="${trigger}"`);
       if (searchTerm) searchTerm.value = '';
       showMenu.value = false;
       return false;
@@ -441,6 +452,19 @@ function reloadState(content = props.modelValue) {
     { onImageUpload: openFileBrowser, onCopilotClick: handleCopilotClick },
     editorMenuOptions.value
   );
+
+  // updateState bypasses dispatchTransaction so suggestion plugins never fire
+  // onExit — close any open menus manually before swapping in the new state.
+  showCannedMenu.value = false;
+  showUserMentions.value = false;
+  showVariables.value = false;
+  showEmojiMenu.value = false;
+  showToolsMenu.value = false;
+  cannedSearchTerm.value = '';
+  mentionSearchKey.value = '';
+  variableSearchTerm.value = '';
+  emojiSearchTerm.value = '';
+  toolSearchKey.value = '';
 
   editorView.updateState(state);
   focusEditor(unrefContent);
@@ -679,7 +703,14 @@ function insertContentIntoEditor(content, defaultFrom = 0) {
  * @param {Object|string} content - The content to insert, depending on the type.
  */
 function insertSpecialContent(type, content) {
+  // eslint-disable-next-line no-console
+  console.log(`[Editor] insertSpecialContent type="${type}"`, {
+    content,
+    range: range.value,
+  });
   if (!editorView) {
+    // eslint-disable-next-line no-console
+    console.warn('[Editor] insertSpecialContent: no editorView');
     return;
   }
 
@@ -691,7 +722,15 @@ function insertSpecialContent(type, content) {
     props.variables
   );
 
-  if (!node) return;
+  // eslint-disable-next-line no-console
+  console.log(`[Editor] insertSpecialContent node=`, node, { from, to });
+  if (!node) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[Editor] insertSpecialContent: getContentNode returned no node'
+    );
+    return;
+  }
 
   insertNodeIntoEditor(node, from, to);
 

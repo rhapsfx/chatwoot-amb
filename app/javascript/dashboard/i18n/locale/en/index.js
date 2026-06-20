@@ -1,6 +1,7 @@
 import advancedFilters from './advancedFilters.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
+import appleMessages from './appleMessages.json';
 import attributesMgmt from './attributesMgmt.json';
 import auditLogs from './auditLogs.json';
 import automation from './automation.json';
@@ -38,6 +39,7 @@ import snooze from './snooze.json';
 import teamsSettings from './teamsSettings.json';
 import whatsappTemplates from './whatsappTemplates.json';
 import contentTemplates from './contentTemplates.json';
+import templates from './templates.json';
 import mfa from './mfa.json';
 import onboarding from './onboarding.json';
 import sessionLimit from './sessionLimit.json';
@@ -47,6 +49,7 @@ export default {
   ...advancedFilters,
   ...agentBots,
   ...agentMgmt,
+  ...appleMessages,
   ...attributesMgmt,
   ...auditLogs,
   ...automation,
@@ -84,6 +87,7 @@ export default {
   ...teamsSettings,
   ...whatsappTemplates,
   ...contentTemplates,
+  ...templates,
   ...mfa,
   ...onboarding,
   ...sessionLimit,

@@ -2,6 +2,9 @@ source 'https://rubygems.org'
 
 ruby '3.4.4'
 
+# Required by reline; will no longer be a default gem in Ruby 3.5.0
+gem 'fiddle'
+
 ##-- base gems for rails --##
 gem 'rack-cors', '2.0.0', require: 'rack/cors'
 gem 'rails', '~> 7.1'
@@ -211,6 +214,9 @@ gem 'shopify_api'
 
 gem 'firecrawl-sdk', '~> 1.0', require: 'firecrawl'
 
+# Apple Wallet pass generation (.pkpass files)
+gem 'passbook2'
+
 ### Gems required only in specific deployment environments ###
 ##############################################################
 
@@ -249,6 +255,8 @@ group :test do
   # test profiling
   gem 'test-prof'
   gem 'simplecov_json_formatter', require: false
+  # parallel test execution
+  gem 'parallel_tests'
 end
 
 group :development, :test do

@@ -6,6 +6,7 @@ import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useTrack } from 'dashboard/composables';
 import keyboardEventListenerMixins from 'shared/mixins/keyboardEventListenerMixins';
 
+import TemplateSelector from './TemplateSelector.vue';
 import ReplyToMessage from './ReplyToMessage.vue';
 import AttachmentPreview from 'dashboard/components/widgets/AttachmentsPreview.vue';
 import ReplyTopPanel from 'dashboard/components/widgets/WootWriter/ReplyTopPanel.vue';
@@ -26,6 +27,7 @@ import { CMD_AI_ASSIST } from 'dashboard/helper/commandbar/events';
 import {
   getMessageVariables,
   getUndefinedVariablesInMessage,
+  replaceVariablesInMessage,
 } from '@chatwoot/utils';
 import WhatsappTemplates from './WhatsappTemplates/Modal.vue';
 import ContentTemplates from './ContentTemplates/ContentTemplatesModal.vue';
@@ -47,11 +49,19 @@ import fileUploadMixin from 'dashboard/mixins/fileUploadMixin';
 import {
   appendSignature,
   removeSignature,
+  replaceSignature,
+  extractTextFromMarkdown,
   getEffectiveChannelType,
 } from 'dashboard/helper/editorHelper';
 import { useCopilotReply } from 'dashboard/composables/useCopilotReply';
 import { useKbd } from 'dashboard/composables/utils/useKbd';
 import { isFileTypeAllowedForChannel } from 'shared/helpers/FileHelper';
+import AppleRichLinkPreview from './AppleRichLinkPreview.vue';
+import {
+  URL_REGEX,
+  detectURLsInText,
+  processMessageForAppleMessages,
+} from 'dashboard/helper/appleMessagesRichLink';
 
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { LocalStorage } from 'shared/helpers/localStorage';
@@ -63,9 +73,11 @@ const EmojiIconPicker = defineAsyncComponent(
 
 export default {
   components: {
+    AppleRichLinkPreview,
     ArticleSearchPopover,
     AttachmentPreview,
     AudioRecorder,
+    TemplateSelector,
     ReplyBoxBanner,
     EmojiIconPicker,
     MessageSignatureMissingAlert,
@@ -81,10 +93,17 @@ export default {
     CopilotReplyBottomPanel,
   },
   mixins: [inboxMixin, fileUploadMixin, keyboardEventListenerMixins],
-  emits: ['toggleEditorSize'],
+  props: {
+    popOutReplyBox: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  emits: ['toggleEditorSize', 'update:popOutReplyBox'],
   setup() {
     const {
       uiSettings,
+      updateUISettings,
       isEditorHotKeyEnabled,
       fetchSignatureFlagFromUISettings,
       setQuotedReplyFlagForInbox,
@@ -98,6 +117,7 @@ export default {
 
     return {
       uiSettings,
+      updateUISettings,
       isEditorHotKeyEnabled,
       fetchSignatureFlagFromUISettings,
       setQuotedReplyFlagForInbox,
@@ -118,7 +138,10 @@ export default {
       isRecordingAudio: false,
       recordingAudioState: '',
       recordingAudioDurationText: '',
+      isUploading: false,
       replyType: REPLY_EDITOR_MODES.REPLY,
+      mentionSearchKey: '',
+      hasSlashCommand: false,
       bccEmails: '',
       ccEmails: '',
       toEmails: '',
@@ -135,6 +158,11 @@ export default {
       showArticleSearchPopover: false,
       hasRecordedAudio: false,
       copilotAcceptedMessages: {},
+      // Rich Link preview
+      richLinkPreviewUrl: '',
+      showRichLinkPreview: false,
+      richLinkDetectionTimeout: null,
+      richLinkCachedData: null,
     };
   },
   computed: {
@@ -159,6 +187,20 @@ export default {
         !this.copilot.isActive.value
       );
     },
+    showRichContentEditor() {
+      if (this.isOnPrivateNote || this.isRichEditorEnabled) {
+        return true;
+      }
+
+      if (this.isAPIInbox) {
+        const {
+          display_rich_content_editor: displayRichContentEditor = false,
+        } = this.uiSettings;
+        return displayRichContentEditor;
+      }
+
+      return false;
+    },
     showWhatsappTemplates() {
       // We support templates for API channels if someone updates templates manually via API
       // That's why we don't explicitly check for channel type here
@@ -168,6 +210,8 @@ export default {
       return !!(templates && templates.length) && !this.isPrivate;
     },
     showContentTemplates() {
+      // Only show for Twilio WhatsApp, not for Apple Messages
+      // Apple Messages uses the / command (TemplateSelector)
       return this.isATwilioWhatsAppChannel && !this.isPrivate;
     },
     isPrivate() {
@@ -206,6 +250,9 @@ export default {
     },
     inbox() {
       return this.$store.getters['inboxes/getInbox'](this.inboxId);
+    },
+    isAppleMessagesConversation() {
+      return this.inbox?.channel_type === 'Channel::AppleMessagesForBusiness';
     },
     messagePlaceHolder() {
       if (this.isEditorDisabled) {
@@ -300,7 +347,8 @@ export default {
         this.isATelegramChannel ||
         this.isALineChannel ||
         this.isAnInstagramChannel ||
-        (this.isATiktokChannel && tiktokAttachmentSupported)
+        (this.isATiktokChannel && tiktokAttachmentSupported) ||
+        this.isAnAppleMessagesForBusinessChannel
       );
     },
     replyButtonLabel() {
@@ -321,6 +369,9 @@ export default {
     },
     hasAttachments() {
       return this.attachedFiles.length;
+    },
+    isRichEditorEnabled() {
+      return this.isAWebWidgetInbox || this.isAnEmailChannel;
     },
     showAudioRecorder() {
       return !this.isOnPrivateNote && this.showFileUpload;
@@ -366,6 +417,16 @@ export default {
     sendWithSignature() {
       return this.fetchSignatureFlagFromUISettings(this.channelType);
     },
+    editorMessageKey() {
+      const { editor_message_key: isEnabled } = this.uiSettings;
+      return isEnabled;
+    },
+    commandPlusEnterToSendEnabled() {
+      return this.editorMessageKey === 'cmd_enter';
+    },
+    enterToSendEnabled() {
+      return this.editorMessageKey === 'enter';
+    },
     conversationId() {
       return this.currentChat.id;
     },
@@ -394,6 +455,12 @@ export default {
         inbox: this.inbox,
       });
       return variables;
+    },
+    // ensure that the signature is plain text depending on `showRichContentEditor`
+    signatureToApply() {
+      return this.showRichContentEditor
+        ? this.messageSignature
+        : extractTextFromMarkdown(this.messageSignature);
     },
     connectedPortalSlug() {
       const { help_center: portal = {} } = this.inbox;
@@ -489,7 +556,28 @@ export default {
         this.resetRecorderAndClearAttachments();
       }
     },
-    message() {
+    message(updatedMessage) {
+      // Check if the message starts with a slash.
+      const bodyWithoutSignature = removeSignature(
+        updatedMessage,
+        this.signatureToApply
+      );
+      const startsWithSlash = bodyWithoutSignature.startsWith('/');
+
+      // Determine if the user is potentially typing a slash command.
+      // This is true if the message starts with a slash and the rich content editor is not active.
+      this.hasSlashCommand = startsWithSlash && !this.showRichContentEditor;
+      this.showMentions = this.hasSlashCommand;
+
+      // If a slash command is active, extract the command text after the slash.
+      // If not, reset the mentionSearchKey.
+      this.mentionSearchKey = this.hasSlashCommand
+        ? bodyWithoutSignature.substring(1)
+        : '';
+
+      // Check for URLs in Apple Messages conversations
+      this.checkForURLsInMessage(updatedMessage);
+
       // Autosave the current message draft.
       this.doAutoSaveDraft();
     },
@@ -515,7 +603,7 @@ export default {
     );
 
     this.fetchAndSetReplyTo();
-    emitter.on(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
+    emitter.on(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.fetchAndSetReplyTo);
 
     // A hacky fix to solve the drag and drop
     // Is showing on top of new conversation modal drag and drop
@@ -530,7 +618,7 @@ export default {
   unmounted() {
     document.removeEventListener('paste', this.onPaste);
     document.removeEventListener('keydown', this.handleKeyEvents);
-    emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
+    emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.fetchAndSetReplyTo);
     emitter.off(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
     emitter.off(
       BUS_EVENTS.NEW_CONVERSATION_MODAL,
@@ -562,16 +650,44 @@ export default {
     },
     handleInsert(article) {
       const { url, title } = article;
-      // Removing empty lines from the title
-      const lines = title.split('\n');
-      const nonEmptyLines = lines.filter(line => line.trim() !== '');
-      const filteredMarkdown = nonEmptyLines.join(' ');
-      emitter.emit(
-        BUS_EVENTS.INSERT_INTO_RICH_EDITOR,
-        `[${filteredMarkdown}](${url})`
-      );
+      if (this.isRichEditorEnabled) {
+        // Removing empty lines from the title
+        const lines = title.split('\n');
+        const nonEmptyLines = lines.filter(line => line.trim() !== '');
+        const filteredMarkdown = nonEmptyLines.join(' ');
+        emitter.emit(
+          BUS_EVENTS.INSERT_INTO_RICH_EDITOR,
+          `[${filteredMarkdown}](${url})`
+        );
+      } else {
+        this.addIntoEditor(
+          `${this.$t('CONVERSATION.REPLYBOX.INSERT_READ_MORE')} ${url}`
+        );
+      }
 
       useTrack(CONVERSATION_EVENTS.INSERT_ARTICLE_LINK);
+    },
+    toggleRichContentEditor() {
+      this.updateUISettings({
+        display_rich_content_editor: !this.showRichContentEditor,
+      });
+
+      const plainTextSignature = extractTextFromMarkdown(this.messageSignature);
+
+      if (!this.showRichContentEditor && this.messageSignature) {
+        // remove the old signature -> extract text from markdown -> attach new signature
+        let message = removeSignature(this.message, this.messageSignature);
+        message = extractTextFromMarkdown(message);
+        message = appendSignature(message, plainTextSignature);
+
+        this.message = message;
+      } else {
+        this.message = replaceSignature(
+          this.message,
+          plainTextSignature,
+          this.messageSignature
+        );
+      }
     },
     toggleQuotedReply() {
       if (!this.isAnEmailChannel) {
@@ -765,7 +881,7 @@ export default {
     hideContentTemplatesModal() {
       this.showContentTemplatesModal = false;
     },
-    confirmOnSendReply() {
+    async confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
         return;
       }
@@ -781,6 +897,72 @@ export default {
         // To handle both cases, text and attachments are always sent as separate messages.
         const isOnInstagram = this.isAnInstagramChannel;
         const isOnTiktok = this.isATiktokChannel;
+
+        // ✅ NEW: Auto-convert URLs to Rich Links for Apple Messages conversations
+        if (
+          this.isAppleMessagesConversation &&
+          !this.isPrivate &&
+          !this.hasAttachments
+        ) {
+          const detectedURLs = detectURLsInText(this.message);
+          if (detectedURLs.length > 0) {
+            // Process message to convert URLs to rich links
+            try {
+              // Add inbox to conversation object for App Clips detection
+              const conversationWithInbox = {
+                ...this.currentChat,
+                inbox: this.inbox,
+                inbox_id: this.inboxId,
+              };
+
+              const processedMessages = await processMessageForAppleMessages(
+                this.message,
+                conversationWithInbox,
+                this.richLinkCachedData
+              );
+
+              // Clear the input immediately — messages are queued and send in background
+              if (!this.isPrivate) {
+                this.clearEmailField();
+              }
+              this.clearMessage();
+              this.hideEmojiPicker();
+              this.hideRichLinkPreview();
+              this.$emit('update:popOutReplyBox', false);
+
+              // Send processed messages (may be multiple: text + rich link)
+              /* eslint-disable no-await-in-loop */
+              for (let i = 0; i < processedMessages.length; i += 1) {
+                const messagePart = processedMessages[i];
+                const messagePayload = {
+                  conversationId: this.currentChat.id,
+                  message: messagePart.content,
+                  private: false,
+                  content_type: messagePart.content_type,
+                  content_attributes: messagePart.content_attributes || {},
+                };
+
+                await this.$store.dispatch(
+                  'createPendingMessageAndSend',
+                  messagePayload
+                );
+
+                // Brief delay between messages (per Apple MSP docs)
+                if (i < processedMessages.length - 1) {
+                  await new Promise(resolve => {
+                    setTimeout(resolve, 1500);
+                  });
+                }
+              }
+              /* eslint-enable no-await-in-loop */
+              return;
+            } catch (error) {
+              // If URL processing fails, fall through to normal send
+            }
+          }
+        }
+
+        // Normal send flow (WhatsApp, Instagram, TikTok, or Apple Messages without URLs)
         if ((isOnWhatsApp || isOnInstagram || isOnTiktok) && !this.isPrivate) {
           this.sendMessageAsMultipleMessages(
             this.message,
@@ -798,6 +980,7 @@ export default {
         if (!this.isPrivate) {
           this.clearEmailField();
         }
+        this.$emit('update:popOutReplyBox', false);
 
         this.clearMessage();
         this.hideEmojiPicker();
@@ -907,6 +1090,16 @@ export default {
       }
     },
     async onSendWhatsAppReply(messagePayload) {
+      // Check if this is a unified template - if so, use handleUnifiedTemplate
+      if (messagePayload.templateParams?.source === 'unified') {
+        this.hideContentTemplatesModal();
+        await this.handleUnifiedTemplate(
+          messagePayload.templateParams.template
+        );
+        return;
+      }
+
+      // For Twilio templates, use the standard send flow
       this.sendMessage({
         conversationId: this.currentChat.id,
         ...messagePayload,
@@ -919,6 +1112,759 @@ export default {
         ...messagePayload,
       });
       this.hideContentTemplatesModal();
+    },
+    replaceText(message) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Called with message:', message);
+
+      if (this.sendWithSignature && !this.private) {
+        // if signature is enabled, append it to the message
+        // appendSignature ensures that the signature is not duplicated
+        // so we don't need to check if the signature is already present
+        message = appendSignature(message, this.signatureToApply);
+      }
+
+      const updatedMessage = replaceVariablesInMessage({
+        message,
+        variables: this.messageVariables,
+      });
+
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Updated message:', updatedMessage);
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG replaceText] Current this.message before update:',
+        this.message
+      );
+
+      setTimeout(() => {
+        useTrack(CONVERSATION_EVENTS.INSERTED_A_CANNED_RESPONSE);
+        this.message = updatedMessage;
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG replaceText] this.message after update:',
+          this.message
+        );
+
+        // Hide the slash command menu after inserting text
+        this.hideMentions();
+      }, 100);
+    },
+    handleTemplateSelect(item) {
+      if (item.type === 'canned') {
+        // Handle canned response - just replace text
+        this.replaceText(item.content);
+      } else if (item.type === 'template') {
+        // Clear the editor text before the async send so that the message watcher
+        // (which runs next-tick in Vue 3) sees an empty message and does not
+        // re-show the dropdown after hideMentions() has closed it.
+        this.clearMessage();
+        this.handleUnifiedTemplate(item.template);
+      }
+
+      // Hide the mentions menu immediately when a template is selected
+      this.hideMentions();
+    },
+    async handleUnifiedTemplate(template) {
+      try {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Starting with template:',
+          template
+        );
+
+        // Always fetch full template data to see content blocks
+        const fullTemplate = await this.$store.dispatch(
+          'messageTemplates/show',
+          {
+            id: template.id,
+          }
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Full template fetched:',
+          fullTemplate
+        );
+
+        // FIRST: Check if template has attachments
+        // Templates with attachments should be sent as messages, not inserted as text
+        const hasAttachments =
+          fullTemplate.attachmentsSummary &&
+          fullTemplate.attachmentsSummary.length > 0;
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] hasAttachments:',
+          hasAttachments
+        );
+
+        if (hasAttachments) {
+          const messageData = {
+            content: '', // Empty content - backend will handle placeholder text
+            content_type: 'text',
+            content_attributes: {},
+            template_id: fullTemplate.id,
+          };
+
+          await this.sendAppleMessage(messageData);
+          return;
+        }
+
+        // Check if this is an Apple Messages interactive template
+        // Interactive templates have specific content structures:
+        // - type field (explicit type like 'list_picker', 'time_picker', 'form', etc.)
+        // - OR specific structure patterns (images/replies for quick reply, etc.)
+        // - OR content_attributes with the structure inside
+        const content = fullTemplate.content;
+        const contentAttrs =
+          content?.content_attributes || content?.contentAttributes;
+
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG handleUnifiedTemplate] content:', content);
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] contentAttrs:',
+          contentAttrs
+        );
+
+        // Check if content is an array (multi-block template)
+        const isArrayContent = Array.isArray(content);
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isArrayContent:',
+          isArrayContent
+        );
+
+        // For array content, check if any block is interactive
+        let hasInteractiveBlock = false;
+        if (isArrayContent) {
+          hasInteractiveBlock = content.some(
+            block =>
+              block.type === 'quick_reply' ||
+              block.type === 'interactive' ||
+              block.type === 'list_picker' ||
+              block.type === 'time_picker' ||
+              block.type === 'form' ||
+              block.items ||
+              block.replies ||
+              block.sections ||
+              block.timeslots
+          );
+        }
+
+        const isAppleInteractive = !!(
+          (
+            fullTemplate.supportedChannels?.includes(
+              'apple_messages_for_business'
+            ) &&
+            ((isArrayContent && hasInteractiveBlock) || // Array with interactive blocks
+              (content &&
+                (content.type || // Explicit type field
+                  content.content_type || // Explicit content_type field
+                  content.items || // Quick reply structure (new format)
+                  content.replies || // Quick reply structure (legacy format)
+                  content.list_picker || // List picker structure (nested)
+                  content.time_picker || // Time picker structure (nested)
+                  content.event || // Time picker structure (with event object)
+                  content.form || // Form structure (legacy nested format)
+                  content.pages || // Form structure (new block editor format)
+                  content.apple_pay || // Apple Pay structure
+                  // AMB UPGRADE NOTE: Do NOT require `images` here. MetadataStrategy#load_data
+                  // calls .except('images') so images are never present in build_content output.
+                  // Sections alone is the correct discriminator for list_pickers.
+                  content.sections || // List picker structure (direct)
+                  (content.timeslots && content.timeslots.length > 0) || // Time picker structure (direct)
+                  contentAttrs?.sections || // List picker in content_attributes
+                  (contentAttrs?.timeslots &&
+                    contentAttrs.timeslots.length > 0) || // Time picker in content_attributes
+                  contentAttrs?.event || // Time picker with event in content_attributes
+                  contentAttrs?.pages || // Forms with pages in content_attributes
+                  contentAttrs?.form || // Forms with form in content_attributes
+                  contentAttrs?.replies || // Quick reply in content_attributes
+                  contentAttrs?.items)))
+          ) // Quick reply items in content_attributes
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isAppleInteractive:',
+          isAppleInteractive
+        );
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] this.isAppleMessagesConversation:',
+          this.isAppleMessagesConversation
+        );
+
+        if (isAppleInteractive && this.isAppleMessagesConversation) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] SENDING as Apple Interactive template'
+          );
+          // This is an Apple Messages interactive template - send it directly
+
+          // Check if this is an array-based template (content is an array of blocks)
+          if (isArrayContent) {
+            // Process each block in sequence
+            /* eslint-disable no-await-in-loop */
+            for (let i = 0; i < content.length; i += 1) {
+              const block = content[i];
+
+              // Show typing indicator before sending (except for first block)
+              if (i > 0) {
+                this.$store.dispatch('conversationTypingStatus/toggleTyping', {
+                  conversationId: this.currentChat.id,
+                  status: 'on',
+                  isPrivate: false,
+                });
+
+                // Wait 3500ms with typing indicator visible
+                await new Promise(resolve => {
+                  setTimeout(resolve, 3500);
+                });
+
+                // Turn off typing indicator
+                this.$store.dispatch('conversationTypingStatus/toggleTyping', {
+                  conversationId: this.currentChat.id,
+                  status: 'off',
+                  isPrivate: false,
+                });
+
+                // Small pause after turning off typing
+                await new Promise(resolve => {
+                  setTimeout(resolve, 200);
+                });
+              }
+
+              // Text block - just has content property
+              if (
+                block.content &&
+                !block.type &&
+                !block.items &&
+                !block.replies
+              ) {
+                // Send text block as a regular message
+                const textPayload = {
+                  conversationId: this.currentChat.id,
+                  message: block.content,
+                  private: false,
+                };
+                await this.sendMessage(textPayload);
+
+                // Longer delay after text message to let it render and be read
+                // Only add delay if this isn't the last block
+                if (i < content.length - 1) {
+                  await new Promise(resolve => {
+                    setTimeout(resolve, 1000);
+                  });
+                }
+              } else if (
+                block.items ||
+                block.replies ||
+                block.type === 'quick_reply'
+              ) {
+                // Quick reply block
+                const items = block.items || block.replies || [];
+                const messageData = {
+                  type: 'quick_reply',
+                  content_type: 'apple_quick_reply',
+                  content_attributes: {
+                    summary_text: block.summary_text || block.summaryText || '',
+                    items: items.map((item, index) => ({
+                      title: item.title,
+                      identifier: item.identifier || `reply_${index}`,
+                    })),
+                    received_title:
+                      block.received_title ||
+                      block.receivedTitle ||
+                      'Please select an option',
+                    received_subtitle:
+                      block.received_subtitle || block.receivedSubtitle || '',
+                    reply_title: block.reply_title || block.replyTitle || '',
+                    reply_subtitle:
+                      block.reply_subtitle || block.replySubtitle || '',
+                  },
+                };
+                await this.sendAppleMessage(messageData);
+              } else if (block.type === 'list_picker' || block.sections) {
+                // List picker block
+                const messageData = {
+                  type: 'list_picker',
+                  content_type: 'apple_list_picker',
+                  content_attributes: block,
+                };
+                await this.sendAppleMessage(messageData);
+              } else if (block.type === 'time_picker' || block.timeslots) {
+                // Time picker block
+                const messageData = {
+                  type: 'time_picker',
+                  content_type: 'apple_time_picker',
+                  content_attributes: block,
+                };
+                await this.sendAppleMessage(messageData);
+              }
+            }
+            /* eslint-enable no-await-in-loop */
+            return;
+          }
+
+          // Single interactive message - detect the message type and wrap the content appropriately
+
+          let messageData;
+          if (
+            (content.content_type || content.contentType) &&
+            (content.content_attributes || content.contentAttributes)
+          ) {
+            // Content already has content_type and content_attributes
+            // Check if this is a template type that needs render API for image loading
+            const contentType = content.content_type || content.contentType;
+            const needsRenderAPI =
+              contentType === 'apple_list_picker' ||
+              contentType === 'apple_time_picker' ||
+              contentType === 'apple_form';
+
+            if (needsRenderAPI) {
+              // Call render API to fetch images and ensure proper format
+              const rendered = await this.$store.dispatch(
+                'messageTemplates/render',
+                {
+                  templateId: fullTemplate.id,
+                  parameters: {}, // No dynamic parameters for these templates
+                  channelType:
+                    this.currentChat?.inbox?.channel_type ||
+                    'apple_messages_for_business',
+                }
+              );
+
+              const renderedData = rendered.data || rendered;
+
+              if (renderedData?.content_attributes) {
+                messageData = {
+                  content_type: renderedData.content_type || contentType,
+                  content_attributes: renderedData.content_attributes,
+                  type: content.type,
+                  template_id: fullTemplate.id,
+                };
+              } else {
+                // Fallback to direct content if render fails
+                messageData = {
+                  content_type: contentType,
+                  content_attributes:
+                    content.content_attributes || content.contentAttributes,
+                  type: content.type,
+                };
+              }
+            } else {
+              // Use content directly for non-template types
+              messageData = {
+                content_type: contentType,
+                content_attributes:
+                  content.content_attributes || content.contentAttributes,
+                type: content.type,
+              };
+            }
+          } else if (content.type) {
+            // Content has explicit type - use it directly
+            messageData = content;
+          } else if (
+            content.items ||
+            content.replies ||
+            contentAttrs?.items ||
+            contentAttrs?.replies
+          ) {
+            // Quick reply structure - normalize to the format backend expects
+            // Check both top-level and content_attributes for items/replies
+            const items =
+              content.items ||
+              content.replies ||
+              contentAttrs?.items ||
+              contentAttrs?.replies ||
+              [];
+            const summaryText =
+              content.summaryText ||
+              content.summary_text ||
+              contentAttrs?.text ||
+              '';
+
+            messageData = {
+              type: 'quick_reply',
+              content_type: 'apple_quick_reply',
+              content_attributes: {
+                summary_text: summaryText,
+                items: items.map((item, index) => ({
+                  title: item.title,
+                  identifier: item.identifier || `reply_${index}`,
+                })),
+                received_title: summaryText || 'Please select an option',
+                received_subtitle: '',
+                reply_title: '',
+                reply_subtitle: '',
+              },
+            };
+          } else if (
+            // AMB UPGRADE NOTE: sections alone identifies a list_picker.
+            // MetadataStrategy#load_data strips images (.except('images')), so
+            // (sections && images) would never match metadata-stored templates.
+            content.list_picker ||
+            content.listPicker ||
+            content.sections ||
+            contentAttrs?.sections
+          ) {
+            // List picker structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for list pickers
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              const listPickerData =
+                content.list_picker ||
+                content.listPicker ||
+                contentAttrs ||
+                content;
+
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: {
+                  sections: listPickerData.sections || [],
+                  images: listPickerData.images || [],
+                  received_title:
+                    listPickerData.received_title ||
+                    listPickerData.receivedTitle ||
+                    'Please select an option',
+                  received_subtitle:
+                    listPickerData.received_subtitle ||
+                    listPickerData.receivedSubtitle ||
+                    '',
+                  received_image_identifier:
+                    listPickerData.received_image_identifier ||
+                    listPickerData.receivedImageIdentifier ||
+                    '',
+                  received_style:
+                    listPickerData.received_style ||
+                    listPickerData.receivedStyle ||
+                    'icon',
+                  reply_title:
+                    listPickerData.reply_title ||
+                    listPickerData.replyTitle ||
+                    'Selection Made',
+                  reply_subtitle:
+                    listPickerData.reply_subtitle ||
+                    listPickerData.replySubtitle ||
+                    '',
+                  reply_style:
+                    listPickerData.reply_style ||
+                    listPickerData.replyStyle ||
+                    'icon',
+                  reply_image_title:
+                    listPickerData.reply_image_title ||
+                    listPickerData.replyImageTitle ||
+                    '',
+                  reply_image_subtitle:
+                    listPickerData.reply_image_subtitle ||
+                    listPickerData.replyImageSubtitle ||
+                    '',
+                  reply_secondary_subtitle:
+                    listPickerData.reply_secondary_subtitle ||
+                    listPickerData.replySecondarySubtitle ||
+                    '',
+                  reply_tertiary_subtitle:
+                    listPickerData.reply_tertiary_subtitle ||
+                    listPickerData.replyTertiarySubtitle ||
+                    '',
+                },
+              };
+            }
+          } else if (
+            content.time_picker ||
+            content.timePicker ||
+            content.event || // Time picker with event object
+            (content.timeslots && content.timeslots.length > 0) ||
+            (contentAttrs?.timeslots && contentAttrs.timeslots.length > 0) ||
+            contentAttrs?.event // Time picker with event in content_attributes
+          ) {
+            // ALWAYS use render API for time pickers to ensure proper formatting
+            // The adapter's format_timeslots method handles identifier → start_time conversion
+            // and ensures the payload matches Apple MSP requirements
+
+            // Get parameters for rendering
+            let parameters = {};
+
+            // If template has saved timeslots in content_blocks, extract them as available_slots
+            const savedTimeslots =
+              content.event?.timeslots ||
+              content.timeslots ||
+              contentAttrs?.event?.timeslots ||
+              contentAttrs?.timeslots;
+
+            if (savedTimeslots && savedTimeslots.length > 0) {
+              // Convert saved timeslots to available_slots parameter format
+              parameters.available_slots = savedTimeslots;
+            } else {
+              // No saved timeslots - use default dynamic slots
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(9, 0, 0, 0);
+
+              parameters = {
+                available_slots: [
+                  new Date(tomorrow.getTime()).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 2 * 60 * 60 * 1000
+                  ).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 4 * 60 * 60 * 1000
+                  ).toISOString(),
+                ],
+              };
+            }
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters,
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to stored content if rendering fails
+              const timePickerData =
+                content.time_picker ||
+                content.timePicker ||
+                contentAttrs ||
+                content;
+
+              const normalizeKeys = obj => {
+                if (!obj || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(normalizeKeys);
+
+                const normalized = {};
+                Object.keys(obj).forEach(key => {
+                  const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+                  normalized[snakeKey] = normalizeKeys(obj[key]);
+                });
+                return normalized;
+              };
+
+              const normalizedAttrs = normalizeKeys(timePickerData);
+              delete normalizedAttrs.images;
+
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: normalizedAttrs,
+              };
+            }
+          } else if (
+            content.form ||
+            (content.pages &&
+              (content.received_message || content.receivedMessage)) ||
+            contentAttrs?.form ||
+            (contentAttrs?.pages &&
+              (contentAttrs?.received_message || contentAttrs?.receivedMessage))
+          ) {
+            // Form structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for forms
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: content,
+              };
+            }
+          } else if (content.apple_pay || content.applePay) {
+            // Apple Pay structure
+            messageData = {
+              type: 'apple_pay',
+              content_type: 'apple_pay',
+              content_attributes: content,
+            };
+          } else {
+            // Unknown structure - use as-is
+            messageData = content;
+          }
+
+          // Clean up images array - remove base64 data and preview, keep only identifiers
+          if (messageData.content_attributes?.images) {
+            // Check if images is an object (dictionary) or array
+            const imagesData = messageData.content_attributes.images;
+
+            if (Array.isArray(imagesData)) {
+              // Array format - map over items
+              messageData.content_attributes.images = imagesData.map(img => ({
+                identifier: img.identifier,
+                description: img.description || '',
+                data: img.data,
+              }));
+            } else if (typeof imagesData === 'object') {
+              // Object/dictionary format (keys are identifiers, values are base64 strings)
+              // Convert to array format expected by backend
+
+              messageData.content_attributes.images = Object.entries(
+                imagesData
+              ).map(([identifier, data]) => ({
+                identifier: identifier,
+                description: '',
+                data: data,
+              }));
+            }
+          }
+
+          // Include template_id so backend can attach template files if present
+          messageData.template_id = fullTemplate.id;
+
+          // For time pickers, remove images from content_attributes
+          // Images are loaded by backend via template_id attachments
+          // Time picker validator doesn't allow images in content_attributes
+          if (
+            messageData.type === 'time_picker' &&
+            messageData.content_attributes?.images
+          ) {
+            delete messageData.content_attributes.images;
+          }
+
+          await this.sendAppleMessage(messageData);
+          return;
+        }
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] NOT sending as interactive - will render and insert as text'
+        );
+
+        // For templates without parameters, render and insert
+        const hasParameters =
+          fullTemplate.parameters &&
+          Object.keys(fullTemplate.parameters).length > 0;
+
+        // Check if all parameters have default values
+        const allParametersHaveDefaults = hasParameters
+          ? Object.values(fullTemplate.parameters).every(
+              param => param.default !== undefined
+            )
+          : false;
+
+        // Build default parameters object
+        const defaultParameters = {};
+        if (hasParameters) {
+          Object.entries(fullTemplate.parameters).forEach(([key, config]) => {
+            if (config.default !== undefined) {
+              defaultParameters[key] = config.default;
+            }
+          });
+        }
+
+        if (!hasParameters || allParametersHaveDefaults) {
+          // Simple template without parameters OR all parameters have defaults
+          // Render and insert as text
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Rendering template for text insertion'
+          );
+
+          const response = await this.$store.dispatch(
+            'messageTemplates/render',
+            {
+              templateId: fullTemplate.id,
+              parameters: defaultParameters,
+              channelType: this.channelType,
+            }
+          );
+
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Render response:',
+            response
+          );
+
+          if (response.data.content) {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] Calling replaceText with:',
+              response.data.content
+            );
+            this.replaceText(response.data.content);
+          } else {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] NO CONTENT in response.data.content'
+            );
+          }
+        } else {
+          // Template with parameters that need user input
+          this.$store.dispatch('alerts/show', {
+            message: this.$t('CONVERSATION.TEMPLATE_REQUIRES_PARAMETERS', {
+              name: fullTemplate.name,
+            }),
+            type: 'info',
+          });
+          // TODO: Open a modal to collect parameters
+        }
+      } catch (error) {
+        this.$store.dispatch('alerts/show', {
+          message: error?.message || 'Failed to load template',
+          type: 'error',
+        });
+      }
     },
     setReplyMode(mode = REPLY_EDITOR_MODES.REPLY) {
       // Clear attachments when switching between private note and reply modes
@@ -976,15 +1922,20 @@ export default {
     },
     toggleAudioRecorder() {
       this.isRecordingAudio = !this.isRecordingAudio;
+      this.isRecorderAudioStopped = !this.isRecordingAudio;
       if (!this.isRecordingAudio) {
         this.resetAudioRecorderInput();
       }
     },
     toggleAudioRecorderPlayPause() {
-      if (!this.$refs.audioRecorderInput) return;
-      if (!this.recordingAudioState) {
+      if (!this.isRecordingAudio) {
+        return;
+      }
+      if (!this.isRecorderAudioStopped) {
+        this.isRecorderAudioStopped = true;
+        if (!this.$refs.audioRecorderInput) return;
         this.$refs.audioRecorderInput.stopRecording();
-      } else {
+      } else if (this.isRecorderAudioStopped) {
         this.$refs.audioRecorderInput.playPause();
       }
     },
@@ -992,6 +1943,9 @@ export default {
       if (this.showEmojiPicker) {
         this.toggleEmojiPicker();
       }
+    },
+    hideMentions() {
+      this.showMentions = false;
     },
     onTypingOn() {
       this.toggleTyping('on');
@@ -1121,7 +2075,27 @@ export default {
       return multipleMessagePayload;
     },
     getMessagePayload(message) {
-      const messageWithQuote = this.getMessageWithQuotedEmailText(message);
+      // Normalize URLs in message for Apple Messages conversations
+      let processedMessage = message;
+      if (this.isAppleMessagesConversation) {
+        const detectedURLs = detectURLsInText(message);
+        if (detectedURLs.length > 0) {
+          // Replace URLs in the message with normalized versions
+          const originalUrls = message.match(URL_REGEX) || [];
+          detectedURLs.forEach((normalizedUrl, index) => {
+            if (originalUrls[index]) {
+              processedMessage = processedMessage.replace(
+                originalUrls[index],
+                normalizedUrl
+              );
+            }
+          });
+        }
+      }
+
+      // Apply quoted email text for email channels
+      const messageWithQuote =
+        this.getMessageWithQuotedEmailText(processedMessage);
 
       let messagePayload = {
         conversationId: this.currentChat.id,
@@ -1192,15 +2166,6 @@ export default {
         return false;
       });
     },
-    onReplyToMessage() {
-      this.fetchAndSetReplyTo();
-      if (this.inReplyTo) {
-        this.$nextTick(() => {
-          const pos = this.isSignatureEnabledForInbox ? 'start' : 'end';
-          this.messageEditor?.focusEditorInputField(pos);
-        });
-      }
-    },
     resetReplyToMessage() {
       const replyStorageKey = LOCAL_STORAGE_KEYS.MESSAGE_REPLY_TO;
       LocalStorage.deleteFromJsonStore(replyStorageKey, this.conversationId);
@@ -1234,10 +2199,190 @@ export default {
       this.$emit('toggleEditorSize');
       this.$nextTick(() => this.messageEditor?.focusEditorInputField());
     },
+    togglePopout() {
+      this.$emit('update:popOutReplyBox', !this.popOutReplyBox);
+    },
     onSubmitCopilotReply() {
       const acceptedMessage = this.copilot.accept();
       this.message = acceptedMessage;
       this.setCopilotAcceptedMessage(acceptedMessage);
+    },
+    async sendAppleMessage(messageData) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG ReplyBox] Received messageData:',
+        JSON.parse(JSON.stringify(messageData))
+      );
+      try {
+        // Handle content: allow empty string for attachment-only messages
+        let messageContent = 'Apple Message'; // default fallback
+        if (messageData.content !== undefined && messageData.content !== null) {
+          messageContent = messageData.content; // Use provided content (even if empty string)
+        } else if (messageData.summary_text) {
+          messageContent = messageData.summary_text;
+        }
+
+        const messagePayload = {
+          conversationId: this.currentChat.id,
+          message: messageContent,
+          content_type: messageData.content_type,
+          content_attributes: messageData.content_attributes,
+          private: false,
+        };
+
+        // Include template_id if present (for template attachments)
+        if (messageData.template_id) {
+          messagePayload.template_id = messageData.template_id;
+        }
+
+        // Use createPendingMessageAndSend directly to ensure proper message creation
+        await this.$store.dispatch(
+          'createPendingMessageAndSend',
+          messagePayload
+        );
+
+        this.clearMessage();
+        this.hideEmojiPicker();
+
+        // Note: Tracking removed to avoid $track dependency issues
+      } catch (error) {
+        const errorMessage =
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error?.message ||
+          this.$t('CONVERSATION.MESSAGE_ERROR');
+        this.$store.dispatch('alerts/show', {
+          message: errorMessage,
+          type: 'error',
+        });
+      }
+    },
+
+    // Rich Link URL detection methods
+    checkForURLsInMessage(message) {
+      if (!this.isAppleMessagesConversation || !message) {
+        this.hideRichLinkPreview();
+        return;
+      }
+
+      // Clear existing timeout
+      if (this.richLinkDetectionTimeout) {
+        clearTimeout(this.richLinkDetectionTimeout);
+      }
+
+      // Debounce URL detection
+      this.richLinkDetectionTimeout = setTimeout(() => {
+        // Use the enhanced URL detection from appleMessagesRichLink helper
+        const detectedURLs = detectURLsInText(message);
+
+        if (detectedURLs.length > 0) {
+          const url = detectedURLs[0]; // Use first detected URL (already normalized)
+          // Check if URL should trigger Rich Link preview
+          const urlRatio = url.length / message.length;
+          if (urlRatio > 0.3) {
+            // Show preview if URL is significant part of message
+            this.showRichLinkPreviewForUrl(url);
+          } else {
+            this.hideRichLinkPreview();
+          }
+        } else {
+          this.hideRichLinkPreview();
+        }
+      }, 500);
+    },
+
+    showRichLinkPreviewForUrl(url) {
+      this.richLinkPreviewUrl = url;
+      this.showRichLinkPreview = true;
+    },
+
+    hideRichLinkPreview() {
+      this.showRichLinkPreview = false;
+      this.richLinkPreviewUrl = '';
+      this.richLinkCachedData = null;
+    },
+
+    onRichLinkSendAsText(message) {
+      // Send as regular text message
+      this.message = message;
+      this.onSendReply();
+    },
+
+    async onRichLinkSendAsRichLink(data) {
+      try {
+        // ✅ FIX: Process the message to split text and URLs properly
+        const messageContent = data.originalMessage;
+        const conversation = this.currentChat;
+
+        // Use the processMessageForAppleMessages function to split the message
+        const processedMessages = await processMessageForAppleMessages(
+          messageContent,
+          conversation
+        );
+
+        // Process messages sequentially with delay per Apple MSP docs
+
+        if (processedMessages.length === 1) {
+          // Single message (likely combined rich link) - send directly
+          const messagePayload = {
+            conversationId: this.currentChat.id,
+            message: processedMessages[0].content,
+            private: false,
+            content_type: processedMessages[0].content_type,
+            content_attributes: processedMessages[0].content_attributes || {},
+          };
+
+          // Send single combined message
+
+          await this.$store.dispatch(
+            'createPendingMessageAndSend',
+            messagePayload
+          );
+        } else {
+          // Multiple messages - send sequentially with delays
+          /* eslint-disable no-await-in-loop */
+          for (let i = 0; i < processedMessages.length; i += 1) {
+            const messagePart = processedMessages[i];
+            const messagePayload = {
+              conversationId: this.currentChat.id,
+              message: messagePart.content,
+              private: false,
+              content_type: messagePart.content_type,
+              content_attributes: messagePart.content_attributes || {},
+            };
+
+            // Send message part
+            await this.$store.dispatch(
+              'createPendingMessageAndSend',
+              messagePayload
+            );
+
+            // Brief delay between messages (per Apple MSP docs)
+            if (i < processedMessages.length - 1) {
+              /* eslint-disable no-promise-executor-return */
+              await new Promise(resolve => {
+                setTimeout(resolve, 1500);
+              });
+              /* eslint-enable no-promise-executor-return */
+            }
+          }
+          /* eslint-enable no-await-in-loop */
+        }
+
+        this.clearMessage();
+        this.hideRichLinkPreview();
+      } catch (error) {
+        const errorMessage =
+          error?.message || this.$t('CONVERSATION.MESSAGE_ERROR');
+        this.$store.dispatch('alerts/show', {
+          message: errorMessage,
+          type: 'error',
+        });
+      }
+    },
+
+    onRichLinkDismiss() {
+      this.hideRichLinkPreview();
     },
   },
 };
@@ -1259,10 +2404,12 @@ export default {
       :characters-remaining="charactersRemaining"
       :editor-content="message"
       :has-content="hasMeaningfulEditorContent"
+      :popout-reply-box="popOutReplyBox"
       @set-reply-mode="setReplyMode"
       @toggle-editor-size="toggleEditorSize"
       @toggle-copilot="copilot.toggleEditor"
       @execute-copilot-action="executeCopilotAction"
+      @toggle-popout="togglePopout"
     />
     <ArticleSearchPopover
       v-if="showArticleSearchPopover && connectedPortalSlug"
@@ -1284,6 +2431,23 @@ export default {
           v-if="shouldShowReplyToMessage"
           :message="inReplyTo"
           @dismiss="resetReplyToMessage"
+        />
+        <AppleRichLinkPreview
+          v-if="showRichLinkPreview"
+          :url="richLinkPreviewUrl"
+          :conversation="currentChat"
+          :original-message="message"
+          @send-as-text="onRichLinkSendAsText"
+          @send-as-rich-link="onRichLinkSendAsRichLink"
+          @dismiss="onRichLinkDismiss"
+          @preview-loaded="richLinkCachedData = $event"
+        />
+        <TemplateSelector
+          v-if="showMentions && hasSlashCommand"
+          v-on-clickaway="hideMentions"
+          class="normal-editor__template-box"
+          :search-key="mentionSearchKey"
+          @select="handleTemplateSelect"
         />
         <EmojiIconPicker
           v-if="showEmojiPicker"
@@ -1433,6 +2597,8 @@ export default {
         @select-content-template="openContentTemplateModal"
         @toggle-insert-article="toggleInsertArticle"
         @toggle-quoted-reply="toggleQuotedReply"
+        @send-apple-message="sendAppleMessage"
+        @replace-text="replaceText"
       />
     </Transition>
 
@@ -1497,5 +2663,20 @@ export default {
     transform: rotate(0deg);
     @apply ltr:left-1 rtl:right-1 -bottom-2;
   }
+}
+
+.normal-editor__template-box {
+  width: calc(100% - 2 * 1rem);
+  left: 1rem;
+  position: absolute;
+  bottom: 100%;
+  z-index: 100;
+  @apply bg-white dark:bg-n-slate-1;
+  @apply border border-n-slate-4 dark:border-n-slate-6;
+  border-radius: 8px;
+  @apply shadow-lg dark:shadow-2xl;
+  margin-bottom: 8px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 </style>

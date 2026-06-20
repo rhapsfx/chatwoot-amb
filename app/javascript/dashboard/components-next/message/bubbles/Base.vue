@@ -1,22 +1,35 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import MessageMeta from '../MessageMeta.vue';
+import ApplePayloadModal from '../modals/ApplePayloadModal.vue';
 
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
 import { useI18n } from 'vue-i18n';
+import { useMapGetter } from 'dashboard/composables/store';
 
 import MessageFormatter from 'shared/helpers/MessageFormatter.js';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
-import { MESSAGE_VARIANTS, ORIENTATION } from '../constants';
+import { MESSAGE_VARIANTS, MESSAGE_TYPES, ORIENTATION } from '../constants';
 
 const props = defineProps({
   hideMeta: { type: Boolean, default: false },
 });
 
-const { variant, orientation, inReplyTo, shouldGroupWithNext } =
-  useMessageContext();
+defineOptions({ inheritAttrs: false });
+
+const {
+  variant,
+  orientation,
+  inReplyTo,
+  shouldGroupWithNext,
+  messageType,
+  inboxId,
+  appleMspPayload,
+  contentAttributes,
+  status,
+} = useMessageContext();
 const { t } = useI18n();
 
 const varaintBaseMap = {
@@ -91,10 +104,23 @@ const replyToPreview = computed(() => {
 
   return t('CONVERSATION.REPLY_MESSAGE_NOT_FOUND');
 });
+
+const showPayloadModal = ref(false);
+const inboxGetter = useMapGetter('inboxes/getInbox');
+const inbox = computed(() => inboxGetter.value(inboxId?.value) || {});
+const isAppleMessagesChannel = computed(
+  () => inbox.value.channel_type === 'Channel::AppleMessagesForBusiness'
+);
+const hasApplePayloadData = computed(
+  () =>
+    isAppleMessagesChannel.value &&
+    messageType?.value === MESSAGE_TYPES.OUTGOING
+);
 </script>
 
 <template>
   <div
+    v-bind="$attrs"
     class="text-sm min-w-0"
     :class="[
       messageClass,
@@ -114,16 +140,40 @@ const replyToPreview = computed(() => {
       />
     </div>
     <slot />
-    <MessageMeta
-      v-if="shouldShowMeta"
+    <div
+      v-if="shouldShowMeta || hasApplePayloadData"
+      class="mt-2 flex items-center gap-1"
       :class="[
         flexOrientationClass,
         variant === MESSAGE_VARIANTS.EMAIL ? 'px-3 pb-3' : '',
-        variant === MESSAGE_VARIANTS.PRIVATE
-          ? 'text-n-amber-12/50'
-          : 'text-n-slate-11',
       ]"
-      class="mt-2"
-    />
+    >
+      <MessageMeta
+        v-if="shouldShowMeta"
+        :class="
+          variant === MESSAGE_VARIANTS.PRIVATE
+            ? 'text-n-amber-12/50'
+            : 'text-n-slate-11'
+        "
+      />
+      <button
+        v-if="hasApplePayloadData"
+        class="p-0.5 rounded hover:bg-n-alpha-3 transition-colors text-n-slate-10"
+        :title="t('APPLE_MESSAGES.VIEW_MSP_PAYLOAD')"
+        @click.stop="showPayloadModal = true"
+      >
+        <fluent-icon icon="info" size="12" />
+      </button>
+    </div>
   </div>
+  <Teleport to="body">
+    <ApplePayloadModal
+      v-if="hasApplePayloadData"
+      v-model:show="showPayloadModal"
+      :payload="appleMspPayload"
+      :status="status"
+      :content-attributes="contentAttributes"
+      @close="showPayloadModal = false"
+    />
+  </Teleport>
 </template>

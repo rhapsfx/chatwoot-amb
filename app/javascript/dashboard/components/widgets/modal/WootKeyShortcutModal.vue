@@ -36,7 +36,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <woot-modal :show="show" size="medium" :on-close="() => $emit('close')">
+  <woot-modal :show="show" size="medium" @close="() => $emit('close')">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="$t('SIDEBAR_ITEMS.KEYBOARD_SHORTCUTS')"

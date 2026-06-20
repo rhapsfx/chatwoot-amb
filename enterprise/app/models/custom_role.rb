@@ -23,6 +23,9 @@
 # - 'contact_manage': Can manage contacts.
 # - 'report_manage': Can manage reports.
 # - 'knowledge_base_manage': Can manage knowledge base portals.
+# - 'template_manage': Can manage message templates.
+# - 'inbox_manage': Can manage inboxes and channels.
+# - 'agent_bot_manage': Can manage agent bots.
 
 class CustomRole < ApplicationRecord
   belongs_to :account
@@ -35,6 +38,9 @@ class CustomRole < ApplicationRecord
     contact_manage
     report_manage
     knowledge_base_manage
+    template_manage
+    inbox_manage
+    agent_bot_manage
   ].freeze
 
   validates :name, presence: true

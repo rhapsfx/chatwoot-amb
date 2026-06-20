@@ -33,9 +33,18 @@ export default {
   },
   methods: {
     fetchCannedResponses() {
-      this.$store.dispatch('getCannedResponse', { searchKey: this.searchKey });
+      // eslint-disable-next-line no-console
+      console.log('[CannedResponse] fetching, searchKey:', this.searchKey);
+      this.$store
+        .dispatch('getCannedResponse', { searchKey: this.searchKey })
+        .then(() => {
+          // eslint-disable-next-line no-console
+          console.log('[CannedResponse] results:', this.cannedMessages);
+        });
     },
     handleMentionClick(item = {}) {
+      // eslint-disable-next-line no-console
+      console.log('[CannedResponse] selected item:', item);
       this.$emit('replace', item.description);
     },
   },

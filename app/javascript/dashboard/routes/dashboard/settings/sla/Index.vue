@@ -8,7 +8,7 @@ import {
   BaseTableRow,
   BaseTableCell,
 } from 'dashboard/components-next/table';
-import WootLabel from 'dashboard/components-next/label/Label.vue';
+import WootLabel from 'dashboard/components-next/Label/Label.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
@@ -299,19 +299,19 @@ export default {
         </template>
       </BaseTable>
 
-      <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
+      <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
         <AddSLA @close="hideAddPopup" />
       </woot-modal>
 
       <woot-delete-modal
         v-model:show="showDeleteConfirmationPopup"
-        :on-close="closeDeletePopup"
         :on-confirm="confirmDeletion"
         :title="$t('SLA.DELETE.CONFIRM.TITLE')"
         :message="$t('SLA.DELETE.CONFIRM.MESSAGE')"
         :message-value="deleteMessage"
         :confirm-text="deleteConfirmText"
         :reject-text="deleteRejectText"
+        @close="closeDeletePopup"
       />
     </template>
   </SettingsLayout>

@@ -183,6 +183,15 @@ export const ARTICLE_EDITOR_MENU_OPTIONS = [
   'insertTable',
 ];
 
+// Editor menu options for Widget Builder
+export const WIDGET_BUILDER_EDITOR_MENU_OPTIONS = [
+  'strong',
+  'em',
+  'link',
+  'undo',
+  'redo',
+];
+
 /**
  * Markdown formatting patterns for stripping unsupported formatting.
  *

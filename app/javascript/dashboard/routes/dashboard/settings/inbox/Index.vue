@@ -78,6 +78,10 @@ const openDelete = inbox => {
   showDeletePopup.value = true;
   selectedInbox.value = inbox;
 };
+
+const getAMBConversationURL = inbox => {
+  return `https://bcrw.apple.com/sms:open?service=iMessage&recipient=urn:biz:${inbox.business_id}`;
+};
 </script>
 
 <template>
@@ -148,6 +152,24 @@ const openDelete = inbox => {
                 :voice-enabled="inbox.voice_enabled"
                 class="text-body-main text-n-slate-11"
               />
+              <div
+                v-if="
+                  inbox.channel_type === 'Channel::AppleMessagesForBusiness'
+                "
+                class="text-xs text-n-slate-11 space-y-1"
+              >
+                <span class="block">
+                  {{ $t('INBOX_MGMT.APPLE_MESSAGES_STARTER_LINK') }}
+                </span>
+                <a
+                  :href="getAMBConversationURL(inbox)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block text-n-woot-9 hover:text-n-woot-10 hover:underline break-all"
+                >
+                  {{ getAMBConversationURL(inbox) }}
+                </a>
+              </div>
             </div>
           </div>
           <div class="flex gap-3 justify-end">

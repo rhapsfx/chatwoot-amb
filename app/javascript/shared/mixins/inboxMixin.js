@@ -134,6 +134,9 @@ export default {
     isATiktokChannel() {
       return this.channelType === INBOX_TYPES.TIKTOK;
     },
+    isAnAppleMessagesForBusinessChannel() {
+      return this.channelType === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS;
+    },
   },
   methods: {
     inboxHasFeature(feature) {

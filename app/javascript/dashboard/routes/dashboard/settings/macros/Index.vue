@@ -118,13 +118,13 @@ const tableHeaders = computed(() => {
       </BaseTable>
       <woot-delete-modal
         v-model:show="showDeleteConfirmationPopup"
-        :on-close="closeDeletePopup"
         :on-confirm="confirmDeletion"
         :title="$t('LABEL_MGMT.DELETE.CONFIRM.TITLE')"
         :message="$t('MACROS.DELETE.CONFIRM.MESSAGE')"
         :message-value="deleteMessage"
         :confirm-text="$t('MACROS.DELETE.CONFIRM.YES')"
         :reject-text="$t('MACROS.DELETE.CONFIRM.NO')"
+        @close="closeDeletePopup"
       />
     </template>
   </SettingsLayout>

@@ -107,7 +107,7 @@ class Integrations::App
 
   class << self
     def apps
-      Hashie::Mash.new(APPS_CONFIG)
+      Hashie::Mash.quiet.new(APPS_CONFIG)
     end
 
     def all

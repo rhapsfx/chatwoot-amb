@@ -3,12 +3,26 @@ module AccessTokenAuthHelper
     'api/v1/accounts/conversations' => %w[show toggle_status toggle_typing_status toggle_priority create update custom_attributes],
     'api/v1/accounts/conversations/messages' => ['create'],
     'api/v1/accounts/conversations/assignments' => ['create'],
-    'api/v1/accounts/conversations/labels' => %w[index create]
+    'api/v1/accounts/conversations/labels' => %w[index create],
+    'api/v1/accounts/bot_templates' => %w[search render_template send_message],
+    'api/v1/accounts/templates' => %w[index show]
   }.freeze
 
   def ensure_access_token
-    token = request.headers[:api_access_token] || request.headers[:HTTP_API_ACCESS_TOKEN]
+    # Try multiple header formats (some may be stripped by proxies)
+    token = request.headers['X-Api-Access-Token'] ||
+            request.headers['HTTP_X_API_ACCESS_TOKEN'] ||
+            request.headers[:api_access_token] ||
+            request.headers[:HTTP_API_ACCESS_TOKEN] ||
+            params[:api_access_token]
+
+    Rails.logger.info "[AccessToken] Token found: #{token.present?}"
+    Rails.logger.info "[AccessToken] Token value (first 10 chars): #{token&.first(10)}"
+
     @access_token = AccessToken.find_by(token: token) if token.present?
+
+    Rails.logger.info "[AccessToken] AccessToken record found: #{@access_token.present?}"
+    Rails.logger.info "[AccessToken] Owner type: #{@access_token&.owner&.class&.name}"
   end
 
   def authenticate_access_token!
@@ -29,7 +43,7 @@ module AccessTokenAuthHelper
 
   def validate_bot_access_token!
     return if Current.user.is_a?(User)
-    return if @resource.is_a?(AgentBot) && agent_bot_accessible?
+    return if agent_bot_accessible?
 
     render_unauthorized('Access to this endpoint is not authorized for bots')
   end

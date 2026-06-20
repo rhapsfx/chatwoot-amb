@@ -10,6 +10,7 @@ import {
 export const INBOX_FEATURES = {
   REPLY_TO: 'replyTo',
   REPLY_TO_OUTGOING: 'replyToOutgoing',
+  INTERACTIVE_MESSAGES: 'interactiveMessages',
 };
 
 // This is a single source of truth for inbox features
@@ -23,6 +24,7 @@ export const INBOX_FEATURE_MAP = {
     INBOX_TYPES.TELEGRAM,
     INBOX_TYPES.TIKTOK,
     INBOX_TYPES.API,
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
   [INBOX_FEATURES.REPLY_TO_OUTGOING]: [
     INBOX_TYPES.WEB,
@@ -31,6 +33,10 @@ export const INBOX_FEATURE_MAP = {
     INBOX_TYPES.TELEGRAM,
     INBOX_TYPES.TIKTOK,
     INBOX_TYPES.API,
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
+  ],
+  [INBOX_FEATURES.INTERACTIVE_MESSAGES]: [
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
 };
 
@@ -138,6 +144,10 @@ export const useInbox = (inboxId = null) => {
     return channelType.value === INBOX_TYPES.TIKTOK;
   });
 
+  const isAnAppleMessagesForBusinessChannel = computed(() => {
+    return channelType.value === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS;
+  });
+
   const voiceCallEnabled = computed(() => isVoiceCallEnabled(inbox.value));
 
   const voiceCallProvider = computed(() => getVoiceCallProvider(inbox.value));
@@ -160,6 +170,7 @@ export const useInbox = (inboxId = null) => {
     isAnEmailChannel,
     isAnInstagramChannel,
     isATiktokChannel,
+    isAnAppleMessagesForBusinessChannel,
     voiceCallEnabled,
     voiceCallProvider,
   };

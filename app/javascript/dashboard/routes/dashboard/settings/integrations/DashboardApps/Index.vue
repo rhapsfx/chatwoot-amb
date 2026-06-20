@@ -164,7 +164,6 @@ export default {
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
-      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.TITLE')"
       :message="
@@ -176,6 +175,7 @@ export default {
         $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.CONFIRM_YES')
       "
       :reject-text="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.CONFIRM_NO')"
+      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

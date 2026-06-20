@@ -74,6 +74,7 @@ class Inbox < ApplicationRecord
   has_one :agent_bot, through: :agent_bot_inbox
   has_many :webhooks, dependent: :destroy_async
   has_many :hooks, dependent: :destroy_async, class_name: 'Integrations::Hook'
+  has_many :apple_list_picker_images, dependent: :destroy
 
   enum sender_name_type: { friendly: 0, professional: 1 }
 
@@ -164,6 +165,10 @@ class Inbox < ApplicationRecord
 
   def twilio_whatsapp?
     channel_type == 'Channel::TwilioSms' && channel.medium == 'whatsapp'
+  end
+
+  def apple_messages_for_business?
+    channel_type == 'Channel::AppleMessagesForBusiness'
   end
 
   def assignable_agents

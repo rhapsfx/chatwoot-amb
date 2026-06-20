@@ -65,7 +65,31 @@ class Messages::AudioTranscriptionService< Llm::LegacyBaseOpenAiService
       end
     end
 
+    # Convert AMR to MP3 if needed (Apple Messages sends AMR, OpenAI Whisper doesn't support it)
+    if attachment.file.content_type == 'audio/amr' || temp_file_path.to_s.end_with?('.amr')
+      Rails.logger.info "[AudioTranscription] Converting AMR to MP3: #{temp_file_path}"
+      converted_path = convert_amr_to_mp3(temp_file_path.to_s)
+      FileUtils.rm_f(temp_file_path)
+      return converted_path
+    end
+
     temp_file_path
+  end
+
+  def convert_amr_to_mp3(amr_file_path)
+    mp3_file_path = amr_file_path.gsub(/\.amr$/, '.mp3')
+
+    command = "ffmpeg -y -i #{Shellwords.escape(amr_file_path)} -ar 16000 -ac 1 -b:a 64k #{Shellwords.escape(mp3_file_path)} 2>&1"
+
+    Rails.logger.info "[AudioTranscription] Running ffmpeg: #{command}"
+    output = `#{command}`
+
+    unless File.exist?(mp3_file_path)
+      Rails.logger.error "[AudioTranscription] ffmpeg conversion failed: #{output}"
+      raise "Failed to convert AMR to MP3: #{output}"
+    end
+
+    mp3_file_path
   end
 
   def transcribe_audio

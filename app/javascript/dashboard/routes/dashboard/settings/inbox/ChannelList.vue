@@ -102,6 +102,15 @@ const channelList = computed(() => {
     icon: 'i-woot-whatsapp',
   });
 
+  channels.push({
+    key: 'apple_messages_for_business',
+    title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.TITLE'),
+    description: t(
+      'INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.DESCRIPTION'
+    ),
+    icon: 'i-woot-apple-messages',
+  });
+
   return channels;
 });
 

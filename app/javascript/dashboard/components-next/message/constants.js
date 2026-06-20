@@ -69,6 +69,15 @@ export const CONTENT_TYPES = {
   INTEGRATIONS: 'integrations',
   STICKER: 'sticker',
   VOICE_CALL: 'voice_call',
+  APPLE_LIST_PICKER: 'apple_list_picker',
+  APPLE_TIME_PICKER: 'apple_time_picker',
+  APPLE_QUICK_REPLY: 'apple_quick_reply',
+  APPLE_FORM: 'apple_form',
+  APPLE_PAY: 'apple_pay',
+  APPLE_RICH_LINK: 'apple_rich_link',
+  APPLE_FORM_RESPONSE: 'apple_form_response',
+  APPLE_CUSTOM_APP: 'apple_custom_app',
+  APPLE_INVITATION: 'apple_invitation',
 };
 
 export const MEDIA_TYPES = [

@@ -94,13 +94,65 @@ yarn-debug.log*
 .vscode
 .claude/settings.local.json
 .cursor
+CLAUDE.local.md
 .codex/
 .claude/
-CLAUDE.local.md
 
 # Histoire deployment
 .netlify
 .histoire
+
+# Apple Messages development files
+_apple/
+
+# Build artifacts and deployment files
+*.tar.gz
+deploy-assets-only.sh
+
+# Test and validation scripts
+test_*.rb
+validate_*.rb
+debug_*.rb
+diagnose_*.rb
+find_*.rb
+
+# Dialogflow exports
+dialogflow_cx_export*
+
+# Debug output files
+output.txt
+
+# Sensitive files - certificates and keys
+certs/**/*.key
+*.key
+*.pem
+
+# Database backups
+docs/backups/*.sql
+*.sql
+
+# Documentation PDFs (may contain sensitive info)
+docs/**/*.pdf
+.roo/mcp.json
+/n8n-flows
+nohup.out
+
+# pnpm cache and local development
 .pnpm-store/*
 local/
-Procfile.worktree
+
+# Temporary script files (keep deploy* scripts)
+script/*
+!script/deploy*.sh
+!script/deploy-*.sh
+
+# Temporary documentation and status files
+*_STATUS.md
+*_COMPLETE.md
+*_FIX.md
+*_REPORT.md
+*_INDEX.md
+*_SUMMARY.md
+CLEANUP_LIST.md
+
+.env.bak7-3-26

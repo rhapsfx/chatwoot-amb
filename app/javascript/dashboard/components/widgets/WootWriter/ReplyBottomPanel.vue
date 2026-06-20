@@ -8,13 +8,14 @@ import inboxMixin from 'shared/mixins/inboxMixin';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getAllowedFileTypesByChannel } from '@chatwoot/utils';
 import VideoCallButton from '../VideoCallButton.vue';
+import AppleMessagesButton from '../AppleMessagesButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
   name: 'ReplyBottomPanel',
-  components: { NextButton, FileUpload, VideoCallButton },
+  components: { NextButton, FileUpload, VideoCallButton, AppleMessagesButton },
   mixins: [inboxMixin],
   props: {
     isNote: {
@@ -131,6 +132,7 @@ export default {
     'selectWhatsappTemplate',
     'selectContentTemplate',
     'toggleQuotedReply',
+    'sendAppleMessage',
   ],
   setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
@@ -348,6 +350,10 @@ export default {
         sm
         :aria-pressed="quotedReplyEnabled"
         @click="$emit('toggleQuotedReply')"
+      />
+      <AppleMessagesButton
+        :inbox="inbox"
+        @send-apple-message="$emit('sendAppleMessage', $event)"
       />
       <NextButton
         v-if="enableWhatsAppTemplates"

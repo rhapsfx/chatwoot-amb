@@ -246,29 +246,29 @@ const tableHeaders = computed(() => {
         </template>
       </BaseTable>
     </template>
-    <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
-      <AddCanned :on-close="hideAddPopup" />
+    <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
+      <AddCanned @close="hideAddPopup" />
     </woot-modal>
 
-    <woot-modal v-model:show="showEditPopup" :on-close="hideEditPopup">
+    <woot-modal v-model:show="showEditPopup" @close="hideEditPopup">
       <EditCanned
         v-if="showEditPopup"
         :id="activeResponse.id"
         :edshort-code="activeResponse.short_code"
         :edcontent="activeResponse.content"
-        :on-close="hideEditPopup"
+        @close="hideEditPopup"
       />
     </woot-modal>
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
-      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('CANNED_MGMT.DELETE.CONFIRM.TITLE')"
       :message="$t('CANNED_MGMT.DELETE.CONFIRM.MESSAGE')"
       :message-value="deleteMessage"
       :confirm-text="deleteConfirmText"
       :reject-text="deleteRejectText"
+      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

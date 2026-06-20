@@ -1,0 +1,98 @@
+# Chatwoot Production Dockerfile - LIGHTWEIGHT VERSION
+# Skips asset compilation - expects pre-built assets in public/vite
+
+FROM ruby:3.4.4-slim AS base
+
+# Install essential system packages INCLUDING Node.js
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    imagemagick \
+    libvips42 \
+    libssl-dev \
+    curl \
+    gnupg \
+    ca-certificates \
+    tzdata \
+    shared-mime-info \
+    git && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set production environment
+ENV RAILS_ENV=production \
+    NODE_ENV=production \
+    RACK_ENV=production \
+    RAILS_SERVE_STATIC_FILES=true \
+    RAILS_LOG_TO_STDOUT=true
+
+# Create app directory
+RUN mkdir -p /app
+WORKDIR /app
+
+# ============================================
+# Ruby Dependencies
+# ============================================
+FROM base AS ruby-builder
+
+# Copy Gemfile
+COPY Gemfile Gemfile.lock ./
+
+# Install Ruby gems and create binstubs
+RUN gem install bundler:2.5.23 && \
+    bundle config set --local deployment 'true' && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3 && \
+    bundle binstubs --all
+
+# ============================================
+# Production Image
+# ============================================
+FROM base AS production
+
+# Copy installed gems and binstubs from ruby-builder
+COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
+
+# Copy application code
+COPY . .
+
+# Install bundler and ensure git-based gems are checked out
+RUN gem install bundler:2.5.23 && \
+    bundle config set --local deployment 'true' && \
+    bundle config set --local without 'development test' && \
+    bundle install
+
+# Create required directories
+RUN mkdir -p /app/tmp/pids \
+    /app/tmp/cache \
+    /app/log \
+    /app/storage \
+    /app/public/packs && \
+    chmod -R 755 /app/tmp /app/log /app/storage /app/public
+
+# Precompile Rails assets (lightweight, skips Vite)
+RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile || true
+
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash chatwoot && \
+    chown -R chatwoot:chatwoot /app
+
+# Switch to non-root user
+USER chatwoot
+
+# Add /app/bin to PATH so binstubs work
+ENV PATH="/app/bin:${PATH}"
+
+# Expose port for Cloud Run
+ENV PORT=8080
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# Default command
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]
