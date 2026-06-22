@@ -34,6 +34,7 @@ NC='\033[0m' # No Color
 # PID files
 RAILS_PID_FILE="tmp/pids/server.pid"
 SIDEKIQ_PID_FILE="tmp/pids/sidekiq.pid"
+VITE_PID_FILE="tmp/pids/vite.pid"
 PLAYWRIGHT_PID_FILE="tmp/pids/playwright.pid"
 NGROK_PID_FILE="tmp/pids/ngrok.pid"
 TAILSCALE_FUNNEL_PID_FILE="tmp/pids/tailscale_funnel.pid"
@@ -133,6 +134,14 @@ cleanup_stale_processes() {
     if [ -n "$ngrok_pids" ]; then
         print_status "Killing stale ngrok processes: $ngrok_pids"
         echo "$ngrok_pids" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+
+    # Kill any Vite dev server processes that might be orphaned
+    local vite_pids=$(pgrep -f "bin/vite dev" 2>/dev/null || true)
+    if [ -n "$vite_pids" ]; then
+        print_status "Killing stale Vite dev server processes: $vite_pids"
+        echo "$vite_pids" | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
 
@@ -775,6 +784,44 @@ stop_sidekiq() {
     fi
 }
 
+# Function to start Vite dev server
+start_vite() {
+    if is_running "$VITE_PID_FILE"; then
+        print_warning "Vite dev server is already running (PID: $(cat $VITE_PID_FILE))"
+        return
+    fi
+
+    print_status "Starting Vite dev server..."
+    mkdir -p log
+
+    nohup bin/vite dev > log/vite.log 2>&1 &
+    VITE_PID=$!
+    echo $VITE_PID > "$VITE_PID_FILE"
+
+    sleep 3
+    if is_running "$VITE_PID_FILE"; then
+        print_success "Vite dev server started (PID: $VITE_PID)"
+    else
+        print_error "Failed to start Vite dev server"
+        print_status "Check log/vite.log for details"
+        rm -f "$VITE_PID_FILE"
+    fi
+}
+
+# Function to stop Vite dev server
+stop_vite() {
+    local quiet_mode=${1:-false}
+    if is_running "$VITE_PID_FILE"; then
+        local pid=$(cat "$VITE_PID_FILE")
+        print_status "Stopping Vite dev server (PID: $pid)..."
+        kill "$pid"
+        rm -f "$VITE_PID_FILE"
+        print_success "Vite dev server stopped"
+    elif [ "$quiet_mode" != "true" ]; then
+        print_warning "Vite dev server is not running"
+    fi
+}
+
 # Function to start Playwright scraper
 start_playwright() {
     if is_running "$PLAYWRIGHT_PID_FILE"; then
@@ -1179,6 +1226,12 @@ show_status() {
         echo -e "Sidekiq: ${RED}STOPPED${NC}"
     fi
 
+    if is_running "$VITE_PID_FILE"; then
+        echo -e "Vite Dev Server: ${GREEN}RUNNING${NC} (PID: $(cat $VITE_PID_FILE))"
+    else
+        echo -e "Vite Dev Server: ${RED}STOPPED${NC}"
+    fi
+
     if is_running "$PLAYWRIGHT_PID_FILE"; then
         echo -e "Playwright Scraper: ${GREEN}RUNNING${NC} (PID: $(cat $PLAYWRIGHT_PID_FILE), port $PLAYWRIGHT_PORT)"
     else
@@ -1278,6 +1331,7 @@ restart_services() {
     print_status "Restarting development services..."
     stop_rails true
     stop_sidekiq true
+    stop_vite true
     stop_playwright true
     if [ "$USE_CUSTOM_DOMAIN" = true ]; then
         stop_nginx
@@ -1298,10 +1352,11 @@ restart_services() {
     else
         start_ngrok
     fi
+    start_vite
     start_rails
     start_sidekiq
     start_playwright
-    
+
     # Test external connectivity after restart (unless skipped)
     if [ "${SKIP_TAILSCALE:-false}" = "true" ]; then
         print_warning "Tailscale connectivity verification skipped (--quick)"
@@ -1351,6 +1406,7 @@ start_all_services() {
         print_status "  External port 3000 -> Internal IP ($(ipconfig getifaddr en0 || echo '192.168.1.x')):3000"
 
         start_nginx
+        start_vite
         start_rails
         start_sidekiq
         start_playwright
@@ -1368,6 +1424,7 @@ start_all_services() {
             print_warning "Tailscale Funnel failed to start, continuing with localhost only..."
         fi
 
+        start_vite
         start_rails
         start_sidekiq
         start_playwright
@@ -1385,6 +1442,7 @@ start_all_services() {
             print_warning "Ngrok failed to start, continuing with localhost only..."
         fi
 
+        start_vite
         start_rails
         start_sidekiq
         start_playwright
@@ -1397,6 +1455,7 @@ stop_all_services() {
     print_status "Stopping Chatwoot development server..."
     stop_rails
     stop_sidekiq
+    stop_vite
     stop_playwright
     if [ "$USE_CUSTOM_DOMAIN" = true ]; then
         stop_nginx
@@ -1494,6 +1553,7 @@ case "$COMMAND" in
         print_status "Starting Chatwoot development server (localhost only)..."
         cleanup_stale_processes
         archive_and_cleanup_logs
+        start_vite
         start_rails
         start_sidekiq
         start_playwright

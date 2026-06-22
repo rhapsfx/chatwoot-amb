@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
-import Label from 'dashboard/components-next/Label/Label.vue';
+import Label from 'dashboard/components-next/label/Label.vue';
 import AttributeBadge from 'dashboard/components-next/CustomAttributes/AttributeBadge.vue';
 
 const props = defineProps({

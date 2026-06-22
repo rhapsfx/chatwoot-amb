@@ -1,6 +1,6 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
-import Label from 'dashboard/components-next/Label/Label.vue';
+import Label from 'dashboard/components-next/label/Label.vue';
 
 const props = defineProps({
   id: {

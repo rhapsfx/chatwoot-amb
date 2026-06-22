@@ -133,15 +133,15 @@ build_images_with_global_config_fallback() {
 
   echo "=== Retrying build with sanitized global Docker config and BuildKit disabled ==="
   if [ "$NO_CACHE" = true ]; then
-    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build --no-cache web worker
+    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build --no-cache --build-arg "GIT_SHA=$GIT_HEAD" web worker
   else
-    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build web worker
+    DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build --build-arg "GIT_SHA=$GIT_HEAD" web worker
   fi
 }
 
 build_images() {
   local build_output
-  local build_args=(build)
+  local build_args=(build --build-arg "GIT_SHA=$GIT_HEAD")
   if [ "$NO_CACHE" = true ]; then
     build_args+=(--no-cache)
   fi
@@ -255,14 +255,28 @@ compose_cmd up -d web worker
 
 # Hot-patch: copy any locally modified or new Ruby/config files into running containers.
 # This ensures uncommitted changes are live without a full image rebuild.
+# NOTE: JS/Vue/TS changes in app/javascript require a full image rebuild — they cannot be hot-patched.
 hotpatch_ruby_files() {
   local changed_files=()
+  local frontend_changed_files=()
+
   while IFS= read -r line; do
     local file="${line:3}"
     if [[ "$file" == *.rb ]] && [[ "$file" == app/* || "$file" == config/* ]]; then
       changed_files+=("$file")
+    elif [[ "$file" == app/javascript/* ]] && [[ "$file" == *.js || "$file" == *.vue || "$file" == *.ts ]]; then
+      frontend_changed_files+=("$file")
     fi
   done < <(git status --porcelain)
+
+  if [ ${#frontend_changed_files[@]} -gt 0 ]; then
+    echo "=== WARNING: ${#frontend_changed_files[@]} uncommitted frontend file(s) detected (JS/Vue/TS) ==="
+    echo "=== These require a full image rebuild (--force) to take effect in production: ==="
+    for file in "${frontend_changed_files[@]}"; do
+      echo "  $file"
+    done
+    echo "=== Run: $0 --force to rebuild and redeploy with frontend changes ==="
+  fi
 
   if [ ${#changed_files[@]} -eq 0 ]; then
     echo "=== No local Ruby changes to hot-patch ==="

@@ -20,7 +20,15 @@
       "Bash(codegraph status *)",
       "Bash(codegraph init *)",
       "Bash(xargs -P4 -n20 npx eslint --fix)",
-      "Bash(xargs -n20 npx eslint)"
+      "Bash(xargs -n20 npx eslint)",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot show 3337a8dc75 -- app/javascript/dashboard/components/ChannelSelector.vue)",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot show --name-only 3337a8dc75)",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot ls-tree HEAD app/javascript/dashboard/components-next/)",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot ls-tree HEAD app/javascript/dashboard/components-next/Label/)",
+      "Bash(git -c core.ignorecase=false ls-files \"app/javascript/dashboard/components-next/label/\")",
+      "Bash(xargs sed -i '' 's|components-next/Label/|components-next/label/|g')",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot -c core.ignorecase=false ls-tree HEAD app/javascript/dashboard/components-next/)",
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot status --short)"
     ],
     "additionalDirectories": [
       "/tmp"

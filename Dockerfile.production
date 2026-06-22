@@ -59,6 +59,10 @@ RUN pnpm install --no-frozen-lockfile --prod=false
 # ============================================
 FROM node-builder AS asset-builder
 
+# Bust the layer cache when git HEAD changes so new/removed JS files are always picked up.
+ARG GIT_SHA=unknown
+RUN echo "Building from git SHA: $GIT_SHA"
+
 # Copy application code needed for asset compilation
 COPY app/javascript ./app/javascript
 COPY app/assets ./app/assets
@@ -66,6 +70,7 @@ COPY config ./config
 COPY public ./public
 COPY theme ./theme
 COPY vite.config.ts ./
+COPY vite.shared.ts ./
 COPY tailwind.config.js ./
 COPY postcss.config.js ./
 

@@ -8,7 +8,7 @@ import {
   BaseTableRow,
   BaseTableCell,
 } from 'dashboard/components-next/table';
-import WootLabel from 'dashboard/components-next/Label/Label.vue';
+import WootLabel from 'dashboard/components-next/label/Label.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
