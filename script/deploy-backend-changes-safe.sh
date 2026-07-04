@@ -40,33 +40,6 @@ rsync -avz --delete \
     --include='lib/***' \
     ./ root@msp.rhaps.net:/opt/chatwoot/
 
-# Step 1.5: Sync n8n custom AMB nodes (if they exist locally)
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo ""
-    echo "Step 1.5: Syncing n8n custom AMB nodes to server..."
-    echo "  → Chatwoot AMB List Picker"
-    echo "  → Chatwoot AMB Time Picker"
-    echo "  → Chatwoot AMB Quick Reply"
-    echo "  → Chatwoot AMB Form"
-    echo "  → Chatwoot AMB Apple Pay"
-    echo "  → Chatwoot AMB Rich Link"
-    echo "  → Chatwoot AMB Send File (Template Message)"
-
-    # Create remote n8n data directory structure
-    ssh root@msp.rhaps.net 'mkdir -p /opt/n8n/data/custom/node_modules'
-
-    # Sync custom nodes (delete old files to ensure clean update)
-    rsync -avz --delete \
-        ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb/ \
-        root@msp.rhaps.net:/opt/n8n/data/custom/node_modules/n8n-nodes-chatwoot-amb/
-
-    echo "  ✓ Custom nodes synced to /opt/n8n/data/"
-else
-    echo ""
-    echo "Step 1.5: Skipping n8n custom nodes sync (not found locally)"
-    echo "  To enable: Build nodes with 'cd n8n-nodes-chatwoot-amb && npm run build'"
-fi
-
 # Step 1.6: Sync Apple Maps token configuration to production .env
 echo ""
 echo "Step 1.6: Syncing Apple Maps token configuration to production..."
@@ -384,47 +357,10 @@ echo ""
 echo "Verifying services are running..."
 docker compose -f docker-compose.production.yml ps
 
-# Restart n8n container if custom nodes were synced
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo ""
-    echo "Restarting n8n container to load custom nodes..."
-
-    # Check if n8n is running via docker-compose in /opt/n8n/
-    if [ -f /opt/n8n/docker-compose.yml ]; then
-        cd /opt/n8n
-        docker compose restart
-        echo "  ✓ n8n restarted via docker-compose"
-
-        # Wait for n8n to be ready
-        echo "  Waiting for n8n to be ready..."
-        sleep 10
-
-        # Verify n8n is running
-        if docker compose ps | grep -q "running"; then
-            echo "  ✓ n8n is running and ready"
-            echo "  📋 Check custom nodes via Nginx proxy"
-        else
-            echo "  ⚠️  n8n may not be running - check: cd /opt/n8n && docker compose ps"
-        fi
-    elif docker ps -a --format '{{.Names}}' | grep -q '^n8n$'; then
-        # Fallback: standalone container named 'n8n'
-        docker restart n8n
-        echo "  ✓ n8n container restarted (standalone)"
-        sleep 10
-    else
-        echo "  ⚠️  n8n setup not found at /opt/n8n/"
-        echo "  To restart manually:"
-        echo "    cd /opt/n8n && docker compose restart"
-    fi
-fi
-
 echo ""
 echo "✅ Backend deployment complete!"
 echo "✅ Apple Pay configuration preserved (stored in database)"
 echo "✅ Certificates preserved (not synced)"
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo "✅ n8n custom AMB nodes deployed to /opt/n8n/data/"
-fi
 ENDSSH
 
 echo ""
@@ -443,33 +379,12 @@ echo "✅ Services restarted"
 echo "✅ Apple Pay configuration preserved in database"
 echo "✅ Certificates copied to production container"
 
-# Check if n8n nodes were deployed
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo "✅ n8n custom AMB nodes deployed"
-fi
-
 echo ""
 echo "Application: https://msp.rhaps.net"
-
-# Add n8n link if nodes were deployed
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo "n8n Dashboard: https://n8n.msp.rhaps.net (via Nginx Proxy Manager)"
-fi
 
 echo ""
 echo "Test bot API:"
 echo "  curl https://msp.rhaps.net/api/v1/accounts/1/bot_templates/search -H \"api_access_token: YOUR_BOT_TOKEN\""
-
-# Add n8n verification if nodes were deployed
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo ""
-    echo "Verify n8n custom nodes:"
-    echo "  1. Open https://n8n.msp.rhaps.net"
-    echo "  2. Create new workflow"
-    echo "  3. Click '+ Add node'"
-    echo "  4. Search for 'Chatwoot AMB'"
-    echo "  5. Verify all 7 custom nodes appear (List Picker, Time Picker, Quick Reply, Form, Apple Pay, Rich Link, Send File)"
-fi
 
 echo ""
 echo "Verify custom roles feature:"
@@ -487,8 +402,3 @@ echo "  ssh root@msp.rhaps.net \"docker exec chatwoot-web bundle exec rails runn
 echo ""
 echo "Monitor logs:"
 echo "  ssh root@msp.rhaps.net \"cd /opt/chatwoot && docker compose -f docker-compose.production.yml logs web -f\""
-
-# Add n8n logs if nodes were deployed
-if [ -d ~/.n8n/custom/node_modules/n8n-nodes-chatwoot-amb ]; then
-    echo "  ssh root@msp.rhaps.net \"cd /opt/n8n && docker compose logs -f\""
-fi

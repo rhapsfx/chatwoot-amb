@@ -2,7 +2,7 @@
 
 ## Problem Overview
 
-When sending the Guitar Information Form template (ID 343) via n8n Bot API, the form failed with:
+When sending the Guitar Information Form template (ID 343) via the Bot API, the form failed with:
 ```
 "Payload validation failed: Form must have at least one page"
 ```
@@ -226,8 +226,8 @@ metadata: {
 rails runner script/create_guitar_info_form_corrected.rb --account-id 1 --inbox-id 6
 ```
 
-### 3. Test from n8n
-Use the new template ID in your n8n workflow and send the form.
+### 3. Test via Bot API
+Use the new template ID and send the form via the Bot API.
 
 ### 4. Expected Result
 Form should:
@@ -247,7 +247,7 @@ Form should:
 
 ### Data Flow
 ```
-n8n → Bot API → BotMessagingService
+Bot API client → Bot API → BotMessagingService
   → BotRendererService.render_from_metadata
     → detect_content_type_from_attributes (detects 'apple_form')
     → transform_form_format (handles pages at root)
@@ -285,7 +285,7 @@ n8n → Bot API → BotMessagingService
 
 **Lines modified**: ~80 lines
 
-**Result**: Form template now works end-to-end from n8n Bot API to Apple device ✅
+**Result**: Form template now works end-to-end from the Bot API to Apple device ✅
 
 ---
 

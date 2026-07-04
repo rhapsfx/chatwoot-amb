@@ -427,16 +427,16 @@ INTERACTIVE_HANDLERS = {
 - Photo sharing (AHJ1)
 - Summary & wrap-up (AHK1)
 
-### Performance vs. n8n Workflow
+### Performance Characteristics
 
-| Metric | n8n Workflow | Ruby Bot | Improvement |
-|--------|--------------|----------|-------------|
-| **Response Time** | ~500ms | ~150ms | 70% faster |
-| **Maintainability** | 80+ nodes | 1 Ruby class | 98% reduction |
-| **Debugging Time** | ~20 min | ~5 min | 75% faster |
-| **Code Reuse** | Low (duplicate nodes) | High (shared methods) | 10x better |
-| **Testing** | Manual only | RSpec unit tests | Automatable |
-| **Version Control** | JSON export | Git-tracked | Native |
+| Metric | Ruby Bot |
+|--------|----------|
+| **Response Time** | ~150ms |
+| **Maintainability** | 1 Ruby class |
+| **Debugging Time** | ~5 min |
+| **Code Reuse** | High (shared methods) |
+| **Testing** | RSpec unit tests |
+| **Version Control** | Git-tracked |
 
 ---
 
@@ -551,10 +551,10 @@ end
 
 ## 📚 Related Documentation
 
-- **README_BOT_SERVICE.md** - Overview and quick start
-- **RUBY_BOT_SERVICE_GUIDE.md** - Technical implementation details
+- **[README_BOT_SERVICE.md](../../archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md)** - Overview and quick start (archived)
+- **[RUBY_BOT_SERVICE_GUIDE.md](../../archive/n8n-legacy/docs/apple-messages/RUBY_BOT_SERVICE_GUIDE.md)** - Technical implementation details (archived)
 - **PHASE_1_IMPLEMENTATION_SUMMARY.md** - Phase 1 development log
-- **CHATWOOT_BOT_INTEGRATION_PROPOSAL.md** - Architecture proposal
+- **[CHATWOOT_BOT_INTEGRATION_PROPOSAL.md](../../archive/n8n-legacy/docs/apple-messages/CHATWOOT_BOT_INTEGRATION_PROPOSAL.md)** - Architecture proposal (archived)
 
 ---
 

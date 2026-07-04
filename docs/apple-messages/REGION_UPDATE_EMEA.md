@@ -122,7 +122,7 @@ This change is **non-breaking**:
 
 - [Global Store Search](GLOBAL_STORE_SEARCH.md)
 - [Apple Maps Store Locator Implementation](implementation/APPLE_MAPS_STORE_LOCATOR_IMPLEMENTATION.md)
-- [Bot Service Overview](README_BOT_SERVICE.md)
+- [Bot Service Overview](../../archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md) (archived)
 
 ## Status
 

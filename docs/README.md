@@ -56,7 +56,7 @@ Documentation for migrating the old Acoustic House Flask/Python bot to Chatwoot'
 - [`COMPLETE_MIGRATION_SUMMARY.md`](bot-migration/COMPLETE_MIGRATION_SUMMARY.md) - Complete migration toolkit summary
 - [`ACOUSTIC_HOUSE_FILTER_RESULTS.md`](bot-migration/ACOUSTIC_HOUSE_FILTER_RESULTS.md) - Core vs test template filtering results
 - [`DRY_RUN_REFERENCE.md`](bot-migration/DRY_RUN_REFERENCE.md) - Dry-run mode examples
-- [`n8n-bot-migration-analysis.md`](bot-migration/n8n-bot-migration-analysis.md) - Technical analysis of old bot
+- [`n8n-bot-migration-analysis.md`](../archive/n8n-legacy/docs/bot-migration/n8n-bot-migration-analysis.md) - Technical analysis of old bot (archived, n8n integration retired)
 
 ### `/templates/`
 Documentation for template import, fixes, and troubleshooting.
@@ -70,7 +70,7 @@ Documentation for template import, fixes, and troubleshooting.
 - [`MESSAGETEMPLATE_API_REFERENCE.md`](templates/MESSAGETEMPLATE_API_REFERENCE.md) - Template API reference
 - [`BOT_RENDERER_VERIFICATION_REPORT.md`](templates/BOT_RENDERER_VERIFICATION_REPORT.md) - Bot renderer verification results
 - [`GUITAR_FORM_TEMPLATE.md`](templates/GUITAR_FORM_TEMPLATE.md) - Guitar form template example
-- [`SENDING_FILES_VIA_BOT_API.md`](templates/SENDING_FILES_VIA_BOT_API.md) - File sending via bot API
+- [`SENDING_FILES_VIA_BOT_API.md`](../archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md) - File sending via bot API (archived, uses n8n as example client)
 - [`TEMPLATE_ATTACHMENT_TESTS.md`](templates/TEMPLATE_ATTACHMENT_TESTS.md) - Template attachment test documentation
 - [`TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md`](templates/TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md) - Test implementation summary
 - [`TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md`](templates/TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md) - Quick reference guide

@@ -22,7 +22,7 @@ Essential technical documentation for working with the MessageTemplate system:
    - Error response codes
    - Best practices for template usage
 
-3. **[SENDING_FILES_VIA_BOT_API.md](./SENDING_FILES_VIA_BOT_API.md)** - File Attachments Guide
+3. **[SENDING_FILES_VIA_BOT_API.md](../../archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md)** - File Attachments Guide (archived)
    - Current file attachment patterns
    - Implementation details
    - API usage examples
@@ -350,7 +350,7 @@ All Apple Messages features use CaseTransformer:
 For questions about:
 - **Architecture**: See MESSAGETEMPLATE_ARCHITECTURE.md (Section 8: Critical Patterns)
 - **API Usage**: See MESSAGETEMPLATE_API_REFERENCE.md
-- **Current Implementation**: See SENDING_FILES_VIA_BOT_API.md
+- **Current Implementation**: See `archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md` (archived)
 - **Examples**: See examples/GUITAR_FORM_TEMPLATE.md
 - **Testing**: See testing/ directory for comprehensive test documentation
 - **Bug Fixes**: See fixes/ directory for known issues and solutions

@@ -663,7 +663,7 @@ Features:
 
 ## Resources
 
-- **Chatwoot Template Docs**: [docs/templates/SENDING_FILES_VIA_BOT_API.md](/docs/templates/SENDING_FILES_VIA_BOT_API.md)
+- **Chatwoot Template Docs**: [docs/templates/SENDING_FILES_VIA_BOT_API.md](/archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md)
 - **n8n Node Development**: https://docs.n8n.io/integrations/creating-nodes/
 - **Chatwoot Bot API**: https://www.chatwoot.com/docs/product/channels/live-chat/integrations/chatwoot-bot
 - **Apple Messages for Business**: https://developer.apple.com/documentation/businesschatapi

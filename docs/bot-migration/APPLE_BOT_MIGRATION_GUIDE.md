@@ -23,7 +23,7 @@ The old bot served **three business experiences**:
 Review the analysis document:
 
 ```bash
-cat docs/n8n-bot-migration-analysis.md
+cat archive/n8n-legacy/docs/bot-migration/n8n-bot-migration-analysis.md
 ```
 
 Key findings:
@@ -364,7 +364,7 @@ After successful migration:
 
 ```bash
 # Step 1: Analyze
-cat docs/n8n-bot-migration-analysis.md
+cat archive/n8n-legacy/docs/bot-migration/n8n-bot-migration-analysis.md
 
 # Step 2: Migrate (dry run first)
 ruby script/migrate_apple_bot.rb --dry-run
@@ -396,7 +396,7 @@ rails console
 ## Support
 
 For questions or issues:
-- Review `docs/n8n-bot-migration-analysis.md`
+- Review `archive/n8n-legacy/docs/bot-migration/n8n-bot-migration-analysis.md` (archived, n8n integration retired)
 - Check migration script logs in `tmp/bot_migration/`
 - Review Chatwoot bot documentation
 

@@ -10,7 +10,7 @@ We have **2 primary deployment scripts** for different scenarios:
 2. **`script/deploy-production-docker.sh`** - Hot-patch backend code (Ruby-only changes)
 
 Plus **2 specialized utilities**:
-3. **`script/deploy-production-docker.sh`** - Comprehensive backend + Apple Pay + n8n + bots
+3. **`script/deploy-production-docker.sh`** - Comprehensive backend + Apple Pay + bots
 4. **`script/deploy-apple-pay-certs.sh`** - Apple Pay certificate deployment
 
 ---
@@ -29,7 +29,7 @@ Need to deploy changes?
 ├─ Changed routes or initializers? ───────────────────────→ deploy-production-docker.sh
 ├─ Need to run database migrations? ──────────────────────→ deploy-production-docker.sh
 │
-├─ Deploying Apple Pay/n8n/bot templates together? ───────→ deploy-production-docker.sh
+├─ Deploying Apple Pay/bot templates together? ────────────→ deploy-production-docker.sh
 └─ Updating Apple Pay certificates? ──────────────────────→ deploy-apple-pay-certs.sh
 ```
 
@@ -147,7 +147,6 @@ Use this when you've changed **Ruby code ONLY**:
 
 Use this for **complex deployments** involving multiple subsystems:
 - ✅ Backend code changes + Apple Pay configuration
-- ✅ Backend code changes + n8n custom nodes
 - ✅ Backend code changes + Acoustic House Bot templates
 - ✅ Backend code changes + Apple Maps tokens
 - ✅ **Any feature requiring multiple component updates**
@@ -162,7 +161,6 @@ Use this for **complex deployments** involving multiple subsystems:
 
 Everything in `deploy-production-docker.sh` PLUS:
 - Deploys Apple Pay certificates and configuration
-- Updates n8n custom AMB nodes
 - Syncs bot templates
 - Updates Apple Maps API tokens
 - Comprehensive verification checks

@@ -215,7 +215,7 @@ For production:
 
 ## Related Documentation
 
-- [Bot Service README](README_BOT_SERVICE.md)
+- [Bot Service README](../../archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md) (archived)
 - [Apple Pay Integration Guide](APPLE_PAY_INTEGRATION.md) (if exists)
 - [Merchant Session Service](../../app/services/apple_messages_for_business/merchant_session_service.rb)
 - [Send Apple Pay Service](../../app/services/apple_messages_for_business/send_apple_pay_service.rb)

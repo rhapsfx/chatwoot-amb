@@ -198,5 +198,5 @@ Processed to include:
 ## Related Documentation
 
 - [Apple Maps Store Locator Implementation](APPLE_MAPS_STORE_LOCATOR_IMPLEMENTATION.md)
-- [Bot Service Overview](README_BOT_SERVICE.md)
+- [Bot Service Overview](../../archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md) (archived)
 - [Testing Scripts](../script/test_apple_maps_integration.rb)
