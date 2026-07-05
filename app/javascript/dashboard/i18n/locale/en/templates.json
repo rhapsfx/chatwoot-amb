@@ -119,7 +119,9 @@
         "TITLE": "Parameters",
         "DESCRIPTION": "Define parameters that can be customized when using this template",
         "ADD": "Add Parameter",
+        "UPDATE": "Update Parameter",
         "EMPTY": "No parameters defined",
+        "CANCEL": "Cancel",
         "NAME": {
           "LABEL": "Parameter Name",
           "PLACEHOLDER": "e.g., customer_name"
