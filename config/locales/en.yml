@@ -574,6 +574,7 @@ en:
     invitation:
       user_left_conversation: User left the conversation and opted out of invitation messages.
       opt_out_recorded: Opt-out recorded for this contact.
+      undeliverable_fallback_required: Apple could not deliver the invitation to this contact (404). Consider following up via another channel.
     shared_images:
       tabs:
         system: System

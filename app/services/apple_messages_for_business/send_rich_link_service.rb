@@ -341,6 +341,13 @@ class AppleMessagesForBusiness::SendRichLinkService
 
       next if encoded_image.blank?
 
+      # Unconditional PNG gate: normalize every candidate source (URL download, data: URI, raw
+      # base64 pass-through) to PNG here, rather than relying on each branch above to have
+      # already produced the right format. Closes the loophole where a data: URI or a raw base64
+      # string with a caller-supplied mimeType previously bypassed conversion entirely.
+      encoded_image, actual_mime_type = normalize_to_png(encoded_image, actual_mime_type)
+      next if encoded_image.blank?
+
       assets[:image] = { data: encoded_image, mimeType: actual_mime_type }
       Rails.logger.info "✅ Rich Link - Image asset set from candidate #{idx + 1}"
       break
@@ -425,10 +432,15 @@ class AppleMessagesForBusiness::SendRichLinkService
     end
   end
 
-  # Apple MSP only supports image/jpeg and image/png for richLinkData assets.
-  APPLE_SUPPORTED_IMAGE_TYPES = %w[image/jpeg image/png].freeze
+  # Formats we know how to decode/re-encode from a source image. As of spec v4.2.2, Apple MSP
+  # requires richLinkData image assets to be PNG only — this list is no longer "what Apple
+  # accepts", just "what we can read in" before converting to APPLE_OUTPUT_IMAGE_TYPE below.
+  KNOWN_DECODABLE_IMAGE_TYPES = %w[image/jpeg image/png].freeze
+  APPLE_OUTPUT_IMAGE_TYPE = 'image/png'
   # Apple spec: image binary size must be 200KB or smaller
   APPLE_IMAGE_SIZE_LIMIT = 200.kilobytes
+  # Apple spec: rich-link images are optimized for 240x240 (type-richlink.md "Image Size")
+  RICH_LINK_IMAGE_DIMENSION = 240
 
   # Fetch an image via Playwright's browser network context, bypassing CDN protection.
   # Used as a fallback when the direct HTTParty download fails.
@@ -451,17 +463,17 @@ class AppleMessagesForBusiness::SendRichLinkService
     content_type = data['image_mime_type'].to_s
     image_data = Base64.decode64(data['image_data'])
 
-    # Convert unsupported formats (webp, etc.) to JPEG — same pipeline as download_and_encode_image
-    unless APPLE_SUPPORTED_IMAGE_TYPES.include?(content_type)
-      Rails.logger.info "🔄 Rich Link - Playwright: converting #{content_type} to image/jpeg"
-      image_data = convert_to_jpeg(image_data, content_type)
-      content_type = 'image/jpeg'
+    # Convert to PNG (Apple MSP's only accepted format for rich-link images) — same pipeline as
+    # download_and_encode_image
+    unless content_type == APPLE_OUTPUT_IMAGE_TYPE
+      Rails.logger.info "🔄 Rich Link - Playwright: converting #{content_type} to #{APPLE_OUTPUT_IMAGE_TYPE}"
+      image_data = convert_to_png(image_data, content_type)
+      content_type = APPLE_OUTPUT_IMAGE_TYPE
       return nil if image_data.nil?
     end
 
     if image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
-      image_data = compress_image_to_limit(image_data, content_type)
-      content_type = 'image/jpeg'
+      image_data = compress_image_to_limit(image_data)
       return nil if image_data.nil? || image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
     end
 
@@ -513,11 +525,11 @@ class AppleMessagesForBusiness::SendRichLinkService
 
     image_data = response.body
 
-    # Convert unsupported formats (webp, gif, ico, bmp, etc.) to JPEG
-    unless APPLE_SUPPORTED_IMAGE_TYPES.include?(content_type)
-      Rails.logger.info "🔄 Rich Link - Converting #{content_type} to image/jpeg (not supported by Apple MSP)"
-      image_data = convert_to_jpeg(image_data, content_type)
-      content_type = 'image/jpeg'
+    # Convert anything that isn't already PNG (Apple MSP's only accepted format for rich-link images)
+    unless content_type == APPLE_OUTPUT_IMAGE_TYPE
+      Rails.logger.info "🔄 Rich Link - Converting #{content_type} to #{APPLE_OUTPUT_IMAGE_TYPE} (required by Apple MSP)"
+      image_data = convert_to_png(image_data, content_type)
+      content_type = APPLE_OUTPUT_IMAGE_TYPE
       return nil if image_data.nil?
     end
 
@@ -525,13 +537,11 @@ class AppleMessagesForBusiness::SendRichLinkService
     if apple_maps_directions_icon?(image_url)
       Rails.logger.info '🔍 Rich Link - Resizing Apple Maps directions icon to 150x150'
       image_data = resize_image_to_icon_format(image_data)
-      content_type = 'image/png'
     end
 
     if image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
       Rails.logger.info "🔄 Rich Link - Image too large (#{image_data.bytesize} bytes), compressing to fit 200KB limit..."
-      image_data = compress_image_to_limit(image_data, content_type)
-      content_type = 'image/jpeg'
+      image_data = compress_image_to_limit(image_data)
       if image_data.nil? || image_data.bytesize > APPLE_IMAGE_SIZE_LIMIT
         Rails.logger.error '❌ Rich Link - Could not compress image under 200KB, skipping'
         return nil
@@ -548,7 +558,26 @@ class AppleMessagesForBusiness::SendRichLinkService
     nil
   end
 
-  def convert_to_jpeg(image_data, source_mime_type = nil)
+  PNG_SIGNATURE = "\x89PNG\r\n\x1a\n".b.freeze
+
+  # Ensures a base64-encoded candidate image is PNG, converting it if it isn't. Sniffs the
+  # decoded bytes for the PNG magic number rather than trusting the caller-supplied mimeType,
+  # since candidates can arrive as data: URIs or raw base64 pass-through with an unverified
+  # mimeType string.
+  def normalize_to_png(base64_data, mime_type)
+    decoded = Base64.decode64(base64_data)
+    return [base64_data, APPLE_OUTPUT_IMAGE_TYPE] if decoded.byteslice(0, PNG_SIGNATURE.bytesize) == PNG_SIGNATURE
+
+    converted = convert_to_png(decoded, mime_type)
+    return [nil, nil] if converted.nil?
+
+    [Base64.strict_encode64(converted), APPLE_OUTPUT_IMAGE_TYPE]
+  rescue StandardError => e
+    Rails.logger.error "❌ Rich Link - Failed to normalize image to PNG: #{e.message}"
+    [nil, nil]
+  end
+
+  def convert_to_png(image_data, source_mime_type = nil)
     require 'mini_magick'
     require 'image_processing/mini_magick'
     # Let MiniMagick auto-detect: uses `magick` (IM7) or `convert` (IM6) based on what is installed
@@ -560,6 +589,7 @@ class AppleMessagesForBusiness::SendRichLinkService
           when 'image/gif' then '.gif'
           when 'image/bmp' then '.bmp'
           when 'image/tiff' then '.tiff'
+          when 'image/jpeg' then '.jpg'
           else '.bin'
           end
 
@@ -570,12 +600,13 @@ class AppleMessagesForBusiness::SendRichLinkService
 
     processed = ImageProcessing::MiniMagick
                 .source(tempfile)
-                .convert('jpeg')
+                .convert('png')
+                .custom { |cmd| cmd.background('white').flatten.strip }
                 .call
 
     File.binread(processed.path)
   rescue StandardError => e
-    Rails.logger.error "❌ Rich Link - Failed to convert image to JPEG: #{e.message}"
+    Rails.logger.error "❌ Rich Link - Failed to convert image to PNG: #{e.message}"
     nil
   ensure
     tempfile&.close
@@ -583,46 +614,19 @@ class AppleMessagesForBusiness::SendRichLinkService
     processed&.unlink if processed
   end
 
-  # Compress an oversized image to fit within APPLE_IMAGE_SIZE_LIMIT (200KB).
-  # Strategy: convert to JPEG and progressively lower quality until it fits.
-  def compress_image_to_limit(image_data, source_mime_type = nil)
-    require 'mini_magick'
-    require 'image_processing/mini_magick'
-    # Let MiniMagick auto-detect: uses `magick` (IM7) or `convert` (IM6) based on what is installed
-
-    ext = case source_mime_type
-          when 'image/png' then '.png'
-          when 'image/webp' then '.webp'
-          when 'image/gif' then '.gif'
-          else '.jpg'
-          end
-
-    tempfile = Tempfile.new(['amb_compress', ext])
-    tempfile.binmode
-    tempfile.write(image_data)
-    tempfile.rewind
-
-    # Try progressively lower JPEG quality until under the limit
-    [85, 70, 55, 40].each do |quality|
-      processed = ImageProcessing::MiniMagick
-                  .source(tempfile)
-                  .convert('jpeg')
-                  .saver(quality: quality)
-                  .call
-
-      result = File.binread(processed.path)
-      processed.unlink
-      Rails.logger.info "🔄 Rich Link - Compressed at quality #{quality}: #{result.bytesize} bytes"
-      return result if result.bytesize <= APPLE_IMAGE_SIZE_LIMIT
-    end
-
-    nil
+  # Compress an oversized image to fit within APPLE_IMAGE_SIZE_LIMIT (200KB) as PNG.
+  # PNG is lossless, so this uses palette reduction + progressive downscale rather than a JPEG
+  # quality ladder — see PngEncoderService for the strategy and its tradeoffs.
+  def compress_image_to_limit(image_data)
+    AppleMessagesForBusiness::PngEncoderService.encode(
+      image_data,
+      max_width: RICH_LINK_IMAGE_DIMENSION,
+      max_height: RICH_LINK_IMAGE_DIMENSION,
+      max_bytes: APPLE_IMAGE_SIZE_LIMIT
+    )
   rescue StandardError => e
     Rails.logger.error "❌ Rich Link - Failed to compress image: #{e.message}"
     nil
-  ensure
-    tempfile&.close
-    tempfile&.unlink
   end
 
   # Check if this is the Apple Maps directions default icon

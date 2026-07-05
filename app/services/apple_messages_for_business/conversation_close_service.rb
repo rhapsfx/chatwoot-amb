@@ -12,17 +12,25 @@ class AppleMessagesForBusiness::ConversationCloseService
 
     return unless valid_close_event?
 
-    find_conversation
-    return unless @conversation
-
-    close_conversation
-    block_future_messages
-    create_activity_message
+    if phone_source_id?
+      process_phone_close
+    else
+      process_opaque_close
+    end
 
     Rails.logger.info '[AMB ConversationClose] Conversation close processing completed successfully'
   end
 
   private
+
+  # Per the Apple MSP spec, a CloseSession's sourceId is either:
+  # - the customer's opaque ID, when a conversation previously existed, or
+  # - the customer's phone number in `tel:+1234567890` form, when it never did
+  #   (e.g. they declined an invitation, or left before ever texting).
+  # Both cases arrive as the same `type: close` event and are distinguished only by this shape.
+  def phone_source_id?
+    source_id.to_s.start_with?('tel:')
+  end
 
   def valid_close_event?
     has_id = @params['id'].present?
@@ -34,6 +42,17 @@ class AppleMessagesForBusiness::ConversationCloseService
     Rails.logger.info "[AMB ConversationClose] Close event validation result: #{valid}"
 
     valid
+  end
+
+  # --- Opaque-ID path: an existing AMB conversation is being closed ---
+
+  def process_opaque_close
+    find_conversation
+    return unless @conversation
+
+    close_conversation
+    block_future_messages
+    create_activity_message
   end
 
   def find_conversation
@@ -152,6 +171,60 @@ class AppleMessagesForBusiness::ConversationCloseService
     )
 
     Rails.logger.info '[AMB ConversationClose] Activity message created successfully'
+  end
+
+  # --- Phone path: the customer never had (or no longer has) an opaque-ID conversation ---
+  # This covers both a declined invitation and a customer leaving before ever texting the business.
+
+  def process_phone_close
+    Rails.logger.info "[AMB ConversationClose] Processing phone-based close for #{source_id}"
+
+    contact = find_contact_by_phone
+    unless contact
+      Rails.logger.warn "[AMB ConversationClose] No contact found for phone #{source_id}, skipping"
+      return
+    end
+
+    record_invitation_opt_out(contact)
+    add_activity_to_phone_conversation(contact)
+  end
+
+  def find_contact_by_phone
+    @inbox.account.contacts.where(phone_number: normalized_phone).first
+  end
+
+  def normalized_phone
+    source_id.to_s.sub(/\Atel:/, '')
+  end
+
+  def record_invitation_opt_out(contact)
+    AppleInvitationOptOut.find_or_initialize_by(
+      account_id: @inbox.account_id,
+      phone_number: source_id,
+      inbox_id: @inbox.id
+    ).update!(
+      contact: contact,
+      opted_out_at: Time.current,
+      reference_ids: @params['referenceIds'] || []
+    )
+
+    Rails.logger.info "[AMB ConversationClose] Invitation opt-out recorded for #{source_id}"
+  end
+
+  def add_activity_to_phone_conversation(contact)
+    conversation = @inbox.conversations
+                         .where(contact_id: contact.id)
+                         .order(created_at: :desc)
+                         .first
+    return unless conversation
+
+    conversation.messages.create!(
+      message_type: :activity,
+      content: I18n.t('apple_messages.invitation.user_left_conversation'),
+      account_id: @inbox.account_id
+    )
+
+    Rails.logger.info "[AMB ConversationClose] Activity message added to conversation #{conversation.id}"
   end
 
   def source_id

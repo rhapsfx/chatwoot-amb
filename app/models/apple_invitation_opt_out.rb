@@ -36,8 +36,9 @@ class AppleInvitationOptOut < ApplicationRecord
 
   scope :for_phone, ->(phone) { where(phone_number: phone) }
   scope :for_inbox, ->(inbox_id) { where(inbox_id: inbox_id) }
+  scope :for_account, ->(account_id) { where(account_id: account_id) }
 
-  def self.opted_out?(phone_number:, inbox_id:)
-    for_phone(phone_number).for_inbox(inbox_id).exists?
+  def self.opted_out?(account_id:, phone_number:, inbox_id:)
+    for_account(account_id).for_phone(phone_number).for_inbox(inbox_id).exists?
   end
 end

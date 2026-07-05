@@ -7,6 +7,11 @@ class AppleMessagesForBusiness::ConversationReopenService
   def perform
     Rails.logger.info "[AMB ConversationReopen] Re-enabling messages for source_id: #{@source_id}"
 
+    # NOTE: this only clears the opaque-ID `apple_messages_blocked` flag on Contact. It
+    # deliberately does NOT touch any AppleInvitationOptOut row for this contact's phone number —
+    # per spec, receiving a message must not by itself re-enable invitations; the customer must
+    # explicitly re-subscribe with the same phone number through a valid opt-in channel.
+
     # Find the contact by ContactInbox source_id (reliable - always set for AMB)
     # Fallback to JSONB query on contact additional_attributes for backwards compatibility
     contact_inbox = ContactInbox.joins(:contact)

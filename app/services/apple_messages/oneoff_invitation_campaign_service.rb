@@ -47,7 +47,7 @@ class AppleMessages::OneoffInvitationCampaignService
 
     dest = phone.start_with?('tel:') ? phone : "tel:#{phone}"
 
-    if AppleInvitationOptOut.opted_out?(phone_number: dest, inbox_id: inbox.id)
+    if AppleInvitationOptOut.opted_out?(account_id: campaign.account_id, phone_number: dest, inbox_id: inbox.id)
       Rails.logger.info "[AMB Campaign #{campaign.id}] Skipping #{dest} - opted out"
       return
     end
@@ -61,11 +61,37 @@ class AppleMessages::OneoffInvitationCampaignService
       locale: campaign.template_params['locale']
     ).perform
 
-    store_message_record(contact, result) if result[:success]
+    if result[:error_code] == 'UNDELIVERABLE_FALLBACK_REQUIRED'
+      flag_undeliverable(contact, dest)
+    elsif result[:success]
+      store_message_record(contact, result)
+    end
   rescue StandardError => e
     Rails.logger.error "[AMB Campaign #{campaign.id}] Failed for #{dest}: #{e.message}"
   end
   # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+
+  # Apple could not deliver the invitation at all (404). Per the spec, the MSP must fall back to
+  # another channel - for now we just record + flag so a human agent or automation rule can follow
+  # up manually, rather than auto-sending an unreviewed SMS.
+  def flag_undeliverable(contact, dest)
+    Rails.logger.warn "[AMB Campaign #{campaign.id}] #{dest} undeliverable (404) - flagging for manual fallback"
+    return unless contact
+
+    attrs = contact.additional_attributes || {}
+    attrs['apple_invitation_undeliverable'] = true
+    attrs['apple_invitation_undeliverable_at'] = Time.current.iso8601
+    contact.update!(additional_attributes: attrs)
+
+    conversation = find_or_create_conversation(contact)
+    return unless conversation
+
+    conversation.messages.create!(
+      message_type: :activity,
+      content: I18n.t('apple_messages.invitation.undeliverable_fallback_required'),
+      account_id: campaign.account_id
+    )
+  end
 
   def store_message_record(contact, _result)
     conversation = find_or_create_conversation(contact)

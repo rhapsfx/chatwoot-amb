@@ -20,6 +20,7 @@ class AppleMessagesForBusiness::PayloadValidatorService
     validate_payload_structure
     validate_required_fields
     validate_iso8601_dates
+    validate_request_identifier
     validate_base64_images
 
     if @errors.any?
@@ -54,6 +55,27 @@ class AppleMessagesForBusiness::PayloadValidatorService
     # Validate type
     valid_types = %w[text interactive]
     @errors << "Invalid type: #{@payload[:type]}" unless valid_types.include?(@payload[:type])
+
+    # Spec: id must be a valid RFC 4122 UUID
+    id = @payload[:id]
+    @errors << "id must be a valid UUID (got: #{id.inspect})" if id.present? && !AppleMessagesForBusiness::UuidValidator.valid?(id)
+  end
+
+  def validate_request_identifier
+    return unless @payload.is_a?(Hash)
+
+    interactive_data = @payload[:interactiveData] || @payload['interactiveData']
+    return unless interactive_data
+
+    data = interactive_data[:data] || interactive_data['data']
+    return unless data
+
+    request_identifier = data[:requestIdentifier] || data['requestIdentifier']
+    return if request_identifier.blank?
+
+    return if AppleMessagesForBusiness::UuidValidator.valid?(request_identifier)
+
+    @errors << "requestIdentifier must be a valid UUID (got: #{request_identifier.inspect})"
   end
 
   def validate_required_fields
@@ -404,14 +426,30 @@ class AppleMessagesForBusiness::PayloadValidatorService
     end
 
     # Validate base64 encoding
-    @errors << "Image #{index} has invalid base64 encoding" unless valid_base64?(data)
+    unless valid_base64?(data)
+      @errors << "Image #{index} has invalid base64 encoding"
+      return
+    end
 
-    # Validate base64 data size (Apple has limits)
-    decoded_size = Base64.decode64(data).bytesize
-    max_size = 10 * 1024 * 1024 # 10MB limit
+    decoded = Base64.decode64(data)
+
+    # Spec: interactive-message images must be PNG format only. Sniff the decoded bytes for the
+    # PNG magic number rather than trusting a caller-supplied mimeType, since that's a reliable
+    # gate regardless of which upstream service produced the data.
+    @errors << "Image #{index} must be PNG format" unless png_signature?(decoded)
+
+    # Spec: each interactive-message image must be 200KB or smaller.
+    decoded_size = decoded.bytesize
+    max_size = 200 * 1024 # 200KB limit
     return unless decoded_size > max_size
 
     @errors << "Image #{index} exceeds maximum size (#{decoded_size} bytes > #{max_size} bytes)"
+  end
+
+  PNG_SIGNATURE = "\x89PNG\r\n\x1a\n".b.freeze
+
+  def png_signature?(decoded_bytes)
+    decoded_bytes.byteslice(0, PNG_SIGNATURE.bytesize) == PNG_SIGNATURE
   end
 
   def valid_base64?(string)

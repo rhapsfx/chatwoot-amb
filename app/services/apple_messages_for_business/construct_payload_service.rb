@@ -2,6 +2,7 @@
 
 class AppleMessagesForBusiness::ConstructPayloadService
   include AppleMessagesForBusiness::Concerns::Utf8Logging
+  include AppleMessagesForBusiness::Concerns::ConstructPayloadUrlDetection
 
   AMB_SERVER = 'https://mspgw.push.apple.com/v1'
 
@@ -16,7 +17,8 @@ class AppleMessagesForBusiness::ConstructPayloadService
     # Validate inputs
     validator = AppleMessagesForBusiness::ConstructPayloadValidator.new(
       url: @url,
-      store_region: @store_region
+      store_region: @store_region,
+      url_type: url_type
     )
 
     unless validator.valid?
@@ -58,13 +60,13 @@ class AppleMessagesForBusiness::ConstructPayloadService
         version: result['version']
       }
     else
-      error_message = response.code == 400 ? 'URL does not support App Clips' : "HTTP #{response.code}: #{response.body}"
+      error_message = response.code == 400 ? "URL does not resolve to supported #{url_type} content" : "HTTP #{response.code}: #{response.body}"
       log_error "❌ Construct Payload - Error: #{error_message}"
 
       {
         success: false,
         error: error_message,
-        error_code: response.code == 400 ? 'NO_APP_CLIPS_SUPPORT' : 'API_ERROR'
+        error_code: response.code == 400 ? "NO_#{url_type.to_s.upcase}_SUPPORT" : 'API_ERROR'
       }
     end
   rescue StandardError => e
@@ -79,15 +81,28 @@ class AppleMessagesForBusiness::ConstructPayloadService
 
   private
 
+  def url_type
+    return :music if apple_music_url?(@url)
+    return :maps if apple_maps_url?(@url)
+
+    :link
+  end
+
+  # NOTE: the exact request-body shape Apple's live /v1/constructPayload endpoint expects for
+  # type: music / type: maps is NOT documented in our vendored spec (construct-payload.md only
+  # shows a worked example for type: link / App Clips). The shapes below are a best guess from
+  # the doc's URL-type table and are NOT verified against Apple's real endpoint - confirm via
+  # Apple's Postman collection/MSP support, or live sandbox testing, before relying on them.
+  # TODO: verify music/maps request schema against Apple's real API before enabling in production.
   def build_request_payload
-    {
-      'type' => 'link',
-      'link' => {
-        'url' => @url,
-        'store_region' => @store_region
-      },
-      'version' => 1.0
-    }
+    case url_type
+    when :music
+      { 'type' => 'music', 'music' => { 'url' => @url }, 'version' => 1.0 }
+    when :maps
+      { 'type' => 'maps', 'maps' => { 'url' => @url }, 'version' => 1.0 }
+    else
+      { 'type' => 'link', 'link' => { 'url' => @url, 'store_region' => @store_region }, 'version' => 1.0 }
+    end
   end
 
   def call_apple_construct_payload(payload)

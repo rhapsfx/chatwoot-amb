@@ -95,6 +95,8 @@ class AppleMessagesForBusiness::ImageFetchService
 
     raw = picker_image.image.download
     encoded, = encode_for_apple(raw, picker_image.image.content_type)
+    return nil if encoded.blank?
+
     {
       identifier: identifier,
       data: encoded,
@@ -117,6 +119,8 @@ class AppleMessagesForBusiness::ImageFetchService
 
     raw = shared_image.image.download
     encoded, = encode_for_apple(raw, shared_image.image.content_type)
+    return nil if encoded.blank?
+
     {
       identifier: identifier,
       data: encoded,
@@ -127,35 +131,22 @@ class AppleMessagesForBusiness::ImageFetchService
     nil
   end
 
-  # Encode image for Apple MSP: resize to max 300×300, convert to JPEG at 72 DPI.
-  # Apple's iOS Messages app requires DPI=72 to display interactive message images.
-  # resize_to_limit only downsizes — small images are not upscaled.
-  def encode_for_apple(raw_bytes, content_type)
-    ext = content_type == 'image/jpeg' ? '.jpg' : '.png'
-    source_tmp = Tempfile.new(['amb_src', ext])
-    source_tmp.binmode
-    source_tmp.write(raw_bytes)
-    source_tmp.flush
-    source_tmp.close
+  # Encode image for Apple MSP: resize to max 300×300, convert to PNG.
+  # Apple's spec (v4.2.2) requires interactive-message images to be PNG format and 200KB or
+  # smaller. resize_to_limit only downsizes — small images are not upscaled.
+  def encode_for_apple(raw_bytes, _content_type)
+    result = AppleMessagesForBusiness::PngEncoderService.encode(raw_bytes, max_width: 300, max_height: 300)
 
-    processed = ImageProcessing::MiniMagick
-                .source(source_tmp.path)
-                .resize_to_limit(300, 300)
-                .convert('jpeg')
-                .saver(quality: 85)
-                # Flatten transparency onto white before JPEG conversion.
-                # JPEG has no alpha channel — without this, transparent pixels become black.
-                .custom { |cmd| cmd.background('white').flatten.units('PixelsPerInch').density('72x72') }
-                .call
+    if result.nil?
+      Rails.logger.error '[ImageFetch] Could not encode image under 200KB PNG limit, omitting image'
+      return [nil, nil]
+    end
 
-    result = File.binread(processed.path)
-    Rails.logger.info "[ImageFetch] Encoded: #{raw_bytes.bytesize} → #{result.bytesize} bytes (JPEG 72dpi)"
-    [Base64.strict_encode64(result), 'image/jpeg']
+    Rails.logger.info "[ImageFetch] Encoded: #{raw_bytes.bytesize} → #{result.bytesize} bytes (PNG)"
+    [Base64.strict_encode64(result), 'image/png']
   rescue StandardError => e
-    Rails.logger.error "[ImageFetch] Image processing failed, using original: #{e.message}"
-    [Base64.strict_encode64(raw_bytes), content_type]
-  ensure
-    source_tmp&.unlink
+    Rails.logger.error "[ImageFetch] Image processing failed: #{e.message}"
+    [nil, nil]
   end
 
   def fetch_from_embedded(identifier)

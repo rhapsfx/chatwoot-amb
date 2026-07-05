@@ -16,6 +16,15 @@ class AppleMessagesForBusiness::IncomingMessageService
       return
     end
 
+    # An invitation decline arrives with a phone-shaped sourceId (the customer never had, and
+    # still doesn't have, an opaque ID). Route it through the same phone-close handling used for
+    # "leave conversation" events instead of the normal contact/conversation flow below, which
+    # would otherwise wrongly persist a phone number as an opaque ContactInbox#source_id.
+    if invitation_decline?
+      process_invitation_decline
+      return
+    end
+
     Rails.logger.info '[AMB IncomingMessage] Message validation passed'
 
     # CRITICAL: Process IDR immediately if present, before any database operations
@@ -57,6 +66,37 @@ class AppleMessagesForBusiness::IncomingMessageService
 
   private
 
+  # Per spec, an invitation decline (or a leave-conversation event for a customer who never had
+  # an opaque-ID conversation) arrives with sourceId in tel:+1234567890 form.
+  def invitation_decline?
+    source_id.to_s.start_with?('tel:')
+  end
+
+  def process_invitation_decline
+    Rails.logger.info "[AMB IncomingMessage] Detected invitation decline/phone-based close for #{source_id}"
+    AppleMessagesForBusiness::ConversationCloseService.new(inbox: @inbox, params: @params, headers: @headers).perform
+  end
+
+  # Narrow v1: tag the contact so automation rules/reporting can see the invitation was accepted.
+  # We deliberately do NOT attempt to correlate this new opaque-ID contact back to the original
+  # phone-keyed campaign contact - it's unconfirmed whether Apple's accept payload round-trips a
+  # referenceId or similar correlating field; that join is deferred to a follow-up spike.
+  def tag_invitation_accepted_if_applicable
+    return unless interactive_message?
+
+    interactive_data = @params['interactiveData']
+    return unless interactive_data && interactive_data['data'].is_a?(Hash) && interactive_data['data'].key?('notification')
+
+    attrs = @contact.additional_attributes || {}
+    return if attrs['apple_invitation_accepted']
+
+    attrs['apple_invitation_accepted'] = true
+    attrs['apple_invitation_accepted_at'] = Time.current.iso8601
+    @contact.update!(additional_attributes: attrs)
+
+    Rails.logger.info "[AMB IncomingMessage] Tagged contact #{@contact.id} as apple_invitation_accepted"
+  end
+
   def valid_message?
     has_id = @params['id'].present?
     has_body = @params['body'].present?
@@ -92,6 +132,9 @@ class AppleMessagesForBusiness::IncomingMessageService
 
     # Update contact with latest capability information
     update_contact_capabilities
+
+    # Tag the contact if this message is an invitation-accept response (see method for scope notes)
+    tag_invitation_accepted_if_applicable
 
     Rails.logger.info "[AMB IncomingMessage] Contact set - ID: #{@contact.id}, Name: #{@contact.name}"
   end
@@ -346,9 +389,7 @@ class AppleMessagesForBusiness::IncomingMessageService
         content_parts = []
         content_parts << reply_data['title'] if reply_data['title'].present?
         subtitle = reply_data['subtitle']
-        if subtitle.present? && !apple_hint_pattern.match?(subtitle)
-          content_parts << subtitle
-        end
+        content_parts << subtitle if subtitle.present? && !apple_hint_pattern.match?(subtitle)
 
         if content_parts.any?
           result = content_parts.join(' - ')
@@ -503,6 +544,10 @@ class AppleMessagesForBusiness::IncomingMessageService
       interactive_data: interactive_data,
       bid: interactive_data['bid']
     }
+
+    # Invitation responses are only ever reachable here when sourceId is opaque (declines are
+    # intercepted earlier in #perform and never reach this method), so this is always 'accepted'.
+    attributes[:invitation_outcome] = 'accepted' if interactive_data['data'].is_a?(Hash) && interactive_data['data'].key?('notification')
 
     # For form responses, extract and store the detailed form data
     if interactive_data['data'] && interactive_data['data']['dynamic'] &&

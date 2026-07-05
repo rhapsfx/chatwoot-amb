@@ -198,11 +198,25 @@ class AppleMessagesForBusiness::SendMessageService
       # Store the payload that was sent to Apple MSP for debugging
       store_apple_msp_payload(payload, 'sent', message_id)
       { success: true, message_id: message_id }
+    elsif response.code == 410
+      handle_gone_response(payload, message_id)
     else
       # Store the failed payload for debugging
       store_apple_msp_payload(payload, 'failed', message_id, "HTTP #{response.code}: #{response.body}")
       { success: false, error: "HTTP #{response.code}: #{response.body}" }
     end
+  end
+
+  # A live 410 means Apple refused delivery because the user has left/opted out - this can
+  # happen even when the proactive webhook-driven block was missed (e.g. delivery failure,
+  # out-of-order events). Record the block reactively so we stop retrying against this user.
+  def handle_gone_response(payload, message_id)
+    AppleMessagesForBusiness::RecordBlockedContactService.new(
+      inbox: @channel.inbox, destination_id: @destination_id, reason: 'apple_410_gone'
+    ).perform
+
+    store_apple_msp_payload(payload, 'failed', message_id, 'HTTP 410: user has left the conversation')
+    { success: false, error: 'User has left the conversation (410 Gone)', error_code: 'USER_GONE' }
   end
 
   def send_interactive_message
@@ -243,6 +257,8 @@ class AppleMessagesForBusiness::SendMessageService
       end
 
       result
+    elsif response.code == 410
+      handle_gone_response(payload, message_id)
     else
       log_error "[AMB Send] ❌ Apple MSP rejected message - HTTP #{response.code}: #{response.body}"
       # Store the failed payload for debugging
@@ -300,7 +316,7 @@ class AppleMessagesForBusiness::SendMessageService
     unless @message.content_type == 'apple_custom_app'
       base_data[:data] = {
         version: content_attributes['version'] || '1.0',
-        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid
+        requestIdentifier: valid_or_generated_request_identifier
       }
     end
 
@@ -371,6 +387,18 @@ class AppleMessagesForBusiness::SendMessageService
     end
 
     base_data
+  end
+
+  # Apple's spec requires requestIdentifier to be a valid RFC 4122 UUID. Prefer a caller-supplied
+  # value (content_attributes['request_identifier']) but fall back to a freshly generated UUID if
+  # it's missing or malformed, rather than forwarding an invalid value to Apple.
+  def valid_or_generated_request_identifier
+    supplied = content_attributes['request_identifier']
+    return SecureRandom.uuid if supplied.blank?
+    return supplied if AppleMessagesForBusiness::UuidValidator.valid?(supplied)
+
+    Rails.logger.warn "[AMB Send] Ignoring invalid caller-supplied request_identifier: #{supplied.inspect}"
+    SecureRandom.uuid
   end
 
   # Enrich images array with base64 data using three-tier fallback
@@ -1285,22 +1313,9 @@ class AppleMessagesForBusiness::SendMessageService
   end
 
   def user_opted_out?
-    # Check if this user has opted out of receiving messages
-    # as per Apple MSP specification requirement
-
-    # Find contact by Apple Messages source ID (destination_id is the user's opaque ID)
-    contact = Contact.joins(:contact_inboxes)
-                     .where(contact_inboxes: { inbox: @channel.inbox })
-                     .where("additional_attributes->>'apple_messages_source_id' = ?", @destination_id)
-                     .where("additional_attributes->>'apple_messages_blocked' = ?", 'true')
-                     .first
-
-    if contact
-      Rails.logger.info "[AMB Send] User #{@destination_id} is blocked - opted out at #{contact.additional_attributes['apple_messages_blocked_at']}"
-      return true
-    end
-
-    false
+    # Check if this user has opted out of receiving messages, either via a conversation
+    # close/leave event or an invitation decline (as per Apple MSP specification requirement).
+    AppleMessagesForBusiness::OptOutCheckerService.new(inbox: @channel.inbox, destination_id: @destination_id).opted_out?
   end
 
   def determine_content_type(data, filename)

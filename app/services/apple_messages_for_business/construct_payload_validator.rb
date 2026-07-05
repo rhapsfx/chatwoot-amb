@@ -3,7 +3,7 @@
 class AppleMessagesForBusiness::ConstructPayloadValidator
   include ActiveModel::Validations
 
-  attr_accessor :url, :store_region
+  attr_accessor :url, :store_region, :url_type
 
   # ISO 3166 alpha-2 country codes (Apple App Store regions)
   VALID_STORE_REGIONS = %w[
@@ -14,12 +14,14 @@ class AppleMessagesForBusiness::ConstructPayloadValidator
   ].freeze
 
   validates :url, presence: true, format: { with: URI::DEFAULT_PARSER.make_regexp(%w[https]) }
-  validates :store_region, presence: true, inclusion: { in: VALID_STORE_REGIONS }
+  # store_region is an App-Clip-only concept - it doesn't gate/apply to Music or Maps URLs.
+  validates :store_region, presence: true, inclusion: { in: VALID_STORE_REGIONS }, if: -> { url_type == :link }
   validate :url_without_whitespace
 
-  def initialize(url:, store_region:)
+  def initialize(url:, store_region:, url_type: :link)
     @url = url
     @store_region = store_region&.upcase
+    @url_type = url_type
   end
 
   private
