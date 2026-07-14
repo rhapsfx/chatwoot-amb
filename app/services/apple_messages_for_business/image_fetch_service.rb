@@ -161,9 +161,13 @@ class AppleMessagesForBusiness::ImageFetchService
 
     Rails.logger.info "[ImageFetch] ✅ Found in embedded: #{identifier}"
 
+    raw = Base64.decode64(embedded_data)
+    encoded, = encode_for_apple(raw, 'image/png')
+    return nil if encoded.blank?
+
     {
       identifier: identifier,
-      data: embedded_data, # Already base64
+      data: encoded,
       description: (embedded['description'] || embedded[:description]).presence || identifier
     }
   rescue StandardError => e

@@ -28,7 +28,9 @@
       "Bash(git -c core.ignorecase=false ls-files \"app/javascript/dashboard/components-next/label/\")",
       "Bash(xargs sed -i '' 's|components-next/Label/|components-next/label/|g')",
       "Bash(git -C /Users/rhaps/LocalGit/chatwoot -c core.ignorecase=false ls-tree HEAD app/javascript/dashboard/components-next/)",
-      "Bash(git -C /Users/rhaps/LocalGit/chatwoot status --short)"
+      "Bash(git -C /Users/rhaps/LocalGit/chatwoot status --short)",
+      "mcp__safari-mcp-stp__navigate_to_url",
+      "mcp__safari-mcp-stp__get_page_content"
     ],
     "additionalDirectories": [
       "/tmp"

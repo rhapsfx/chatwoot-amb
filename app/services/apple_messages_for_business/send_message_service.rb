@@ -431,9 +431,6 @@ class AppleMessagesForBusiness::SendMessageService
           data: fetched[:data],
           description: img['description'] || fetched[:description] || identifier
         }
-      elsif img['data'].present?
-        # Not found in any tier - return as-is if it has data
-        img
       else
         Rails.logger.warn "[AMB Send] Image #{identifier} not found in any tier (inbox/shared/embedded)"
         nil

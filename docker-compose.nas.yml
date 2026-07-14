@@ -1,0 +1,254 @@
+# Docker Compose — Chatwoot NAS (Synology DS220+, linux/amd64)
+# =============================================================================
+# Images are cross-compiled on the Mac (ARM64 → AMD64) and transferred via SSH.
+# See script/deploy-nas.sh for the build/transfer/deploy workflow.
+#
+# Run from /volume1/docker/chatwoot/ on the NAS:
+#   docker compose -f docker-compose.nas.yml --env-file .env.production up -d
+#
+# Cloudflared: managed separately on the NAS (not in this stack).
+# Connect it to cloudflare_rhaps_prod_net so it can reach http://web:8080.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: chatwoot-postgres
+    restart: unless-stopped
+    platform: linux/amd64
+    networks:
+      - backend_net
+    environment:
+      POSTGRES_DB: chatwoot_production
+      POSTGRES_USER: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatwoot_user -d chatwoot_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ---------------------------------------------------------------------------
+  # Redis (Sidekiq queue + ActionCable)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: chatwoot-redis
+    restart: unless-stopped
+    platform: linux/amd64
+    networks:
+      - backend_net
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env for production compose}
+    command: sh -ec 'exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # ---------------------------------------------------------------------------
+  # Rails Web Application
+  # ---------------------------------------------------------------------------
+  web:
+    image: chatwoot:nas-web
+    container_name: chatwoot-web
+    restart: unless-stopped
+    platform: linux/amd64
+    networks:
+      - cloudflare_rhaps_prod_net
+      - backend_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: production
+      RAILS_SERVE_STATIC_FILES: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+
+      APPLE_MAPS_TEAM_ID: ${APPLE_MAPS_TEAM_ID}
+      APPLE_MAPS_KEY_ID: ${APPLE_MAPS_KEY_ID}
+      APPLE_MAPS_PRIVATE_KEY: ${APPLE_MAPS_PRIVATE_KEY}
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      FRONTEND_URL: https://msp.rhaps.net
+      FORCE_SSL: "false"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      ACTIVE_STORAGE_SERVICE: local
+
+      SMTP_DOMAIN: icloud.com
+      SMTP_ADDRESS: smtp.mail.me.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL}
+
+      APPLE_PAY_MERCHANT_DOMAIN: ${APPLE_PAY_MERCHANT_DOMAIN}
+      APPLE_PAY_MERCHANT_IDENTIFIER: ${APPLE_PAY_MERCHANT_IDENTIFIER}
+      APPLE_PAY_TEST_MODE: ${APPLE_PAY_TEST_MODE}
+
+      WALLET_PASS_TYPE_ID: ${WALLET_PASS_TYPE_ID}
+      WALLET_TEAM_ID: ${WALLET_TEAM_ID}
+      WALLET_CERT_PEM: ${WALLET_CERT_PEM}
+      WALLET_KEY_PEM: ${WALLET_KEY_PEM}
+      WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
+      WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
+
+    volumes:
+      - /volume1/docker/chatwoot/storage:/app/storage
+      - /volume1/docker/chatwoot/certs/apple_pay:/app/certs/apple_pay:ro
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        bundle exec rails db:prepare &&
+        echo 'Database ready. Starting web server...' &&
+        rm -f /app/tmp/pids/server.pid &&
+        bundle exec rails server -b 0.0.0.0 -p 8080
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  # ---------------------------------------------------------------------------
+  # Sidekiq Worker
+  # ---------------------------------------------------------------------------
+  worker:
+    image: chatwoot:nas-worker
+    container_name: chatwoot-worker
+    hostname: chatwoot-worker
+    restart: unless-stopped
+    platform: linux/amd64
+    networks:
+      - backend_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      RAILS_ENV: production
+      HOSTNAME: chatwoot-worker
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      ACTIVE_STORAGE_SERVICE: local
+
+      APPLE_MAPS_TEAM_ID: ${APPLE_MAPS_TEAM_ID}
+      APPLE_MAPS_KEY_ID: ${APPLE_MAPS_KEY_ID}
+      APPLE_MAPS_PRIVATE_KEY: ${APPLE_MAPS_PRIVATE_KEY}
+
+      FRONTEND_URL: https://msp.rhaps.net
+
+      SMTP_DOMAIN: icloud.com
+      SMTP_ADDRESS: smtp.mail.me.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL}
+
+      APPLE_PAY_MERCHANT_DOMAIN: ${APPLE_PAY_MERCHANT_DOMAIN}
+      APPLE_PAY_MERCHANT_IDENTIFIER: ${APPLE_PAY_MERCHANT_IDENTIFIER}
+      APPLE_PAY_TEST_MODE: ${APPLE_PAY_TEST_MODE}
+
+      WALLET_PASS_TYPE_ID: ${WALLET_PASS_TYPE_ID}
+      WALLET_TEAM_ID: ${WALLET_TEAM_ID}
+      WALLET_CERT_PEM: ${WALLET_CERT_PEM}
+      WALLET_KEY_PEM: ${WALLET_KEY_PEM}
+      WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
+      WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
+
+    volumes:
+      - /volume1/docker/chatwoot/storage:/app/storage
+      - /volume1/docker/chatwoot/certs/apple_pay:/app/certs/apple_pay:ro
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7433 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+# =============================================================================
+# Volumes — bind-mounted to explicit NAS paths so data survives stack recreation
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume1/docker/chatwoot/postgres-data
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume1/docker/chatwoot/redis-data
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  backend_net:
+    driver: bridge
+
+  # Shared with the cloudflared container (managed separately on the NAS).
+  # Connect cloudflared to this network so it can reach http://web:8080.
+  # One-time setup: docker network connect cloudflare_rhaps_prod_net <cloudflared-container>
+  cloudflare_rhaps_prod_net:
+    external: true
+    name: cloudflare_rhaps_prod_net

@@ -29,6 +29,10 @@ master.key
 
 # Ignore env files
 .env
+.env.production
+
+# Ignore local AMB template extraction dumps
+amb_templates_*.json
 
 public/uploads
 public/packs*

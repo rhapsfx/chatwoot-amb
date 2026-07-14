@@ -16,6 +16,8 @@ RUN apt-get update -qq && \
     libwebp-dev \
     libvips42 \
     libssl-dev \
+    libyaml-dev \
+    libffi-dev \
     curl \
     gnupg \
     ca-certificates \
@@ -90,7 +92,7 @@ COPY Gemfile Gemfile.lock ./
 RUN gem install bundler:2.5.16 && \
     bundle config set --local deployment 'true' && \
     bundle config set --local without 'development test' && \
-    bundle install --jobs=4 --retry=3
+    bundle install --jobs=1 --retry=3
 
 # ============================================
 # Stage 5: Production Image
