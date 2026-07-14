@@ -92,15 +92,14 @@ class AppleMessagesForBusiness::MerchantSessionService
     # This is the endpoint that will receive payment authorization callbacks
     payment_gateway_url = "https://#{domain}/api/v1/accounts/#{@channel.account_id}/apple_pay/payment_gateway"
 
-    # Create the merchant session request for Messages for Business
-    # Per Apple documentation: domainName field is REQUIRED for Messages for Business
-    # If omitted, token will only work for Apple Pay on Web, not Messages for Business
+    # For initiative: 'messaging' (AMB), domainName is optional per Apple's spec.
+    # Apple Business Register does not expose a domain registration for messaging,
+    # so including domainName causes a 400 "not registered for domain" error.
     session_request = {
       merchantIdentifier: merchant_identifier,
       displayName: @channel.name,
-      domainName: domain,  # REQUIRED: domain without https:// prefix
       initiative: 'messaging',
-      initiativeContext: payment_gateway_url  # REQUIRED: payment gateway with https:// prefix
+      initiativeContext: payment_gateway_url
     }
 
     Rails.logger.info '[Apple Pay] Making merchant session request for Messages for Business'
