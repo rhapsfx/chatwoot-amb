@@ -14,7 +14,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
       bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
       data: {
         mspVersion: '1.0',
-        requestIdentifier: content_attributes['request_identifier'] || SecureRandom.uuid,
+        requestIdentifier: valid_or_generated_request_identifier,
         event: build_time_picker_data
       },
       receivedMessage: build_received_message,
