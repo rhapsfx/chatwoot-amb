@@ -230,7 +230,7 @@ ssh_cmd "cat > $NAS_DATA_DIR/docker-compose.nas.yml" < "$NAS_COMPOSE_FILE"
 if [ -d "$CERTS_DIR" ]; then
   echo "=== Syncing Apple Pay certs → NAS ==="
   tar czf - -C "$CERTS_DIR" . \
-    | ssh_cmd "tar xzf - -C $NAS_DATA_DIR/certs/apple_pay && chmod 600 $NAS_DATA_DIR/certs/apple_pay/*.key 2>/dev/null || true"
+    | ssh_cmd "tar xzf - -C $NAS_DATA_DIR/certs/apple_pay && chmod 644 $NAS_DATA_DIR/certs/apple_pay/*.key 2>/dev/null || true"
 else
   echo "=== WARNING: $CERTS_DIR not found — Apple Pay certs NOT synced ==="
 fi
