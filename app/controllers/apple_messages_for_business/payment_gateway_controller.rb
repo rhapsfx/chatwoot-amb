@@ -27,7 +27,7 @@ class AppleMessagesForBusiness::PaymentGatewayController < ApplicationController
     apple_pay_service = AppleMessagesForBusiness::ApplePayService.new(@channel)
 
     begin
-      result = apple_pay_service.process_payment_authorization(payment_token, payment_data)
+      result = apple_pay_service.process_payment_authorization(payment_token, payment_data, request_identifier: params[:requestIdentifier])
 
       if result[:success]
         render json: {

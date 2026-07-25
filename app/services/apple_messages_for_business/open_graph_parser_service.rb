@@ -2,7 +2,6 @@
 
 require 'nokogiri'
 require 'open-uri'
-require 'httparty'
 require 'cgi'
 
 class AppleMessagesForBusiness::OpenGraphParserService
@@ -245,17 +244,15 @@ class AppleMessagesForBusiness::OpenGraphParserService
       'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15'
     }
 
-    # Use HTTParty to follow redirects and capture final URL
-    response = HTTParty.get(@url, headers: headers, follow_redirects: true, timeout: 15)
-
-    # Capture the final URL after following redirects
-    # This is important for Apple Maps short URLs that redirect to full URLs
-    if response.request.respond_to?(:uri)
-      @final_url = response.request.uri.to_s
-      Rails.logger.info "🔍 OpenGraph - URL redirected from #{@url} to #{@final_url}" if @final_url != @url
+    # Route through SafeFetch (backed by the ssrf_filter gem) instead of a raw
+    # HTTParty call so private/link-local/cloud-metadata hosts are rejected —
+    # this URL can come from message/template content, not just trusted input.
+    body = nil
+    SafeFetch.fetch(@url, headers: headers, validate_content_type: false, read_timeout: 15) do |result|
+      body = result.tempfile.read
     end
 
-    Nokogiri::HTML(response.body)
+    Nokogiri::HTML(body)
   end
 
   def extract_open_graph_data(doc)
@@ -449,16 +446,21 @@ class AppleMessagesForBusiness::OpenGraphParserService
 
   # Check if a favicon URL is accessible
   def favicon_exists?(favicon_url)
-    response = HTTParty.head(
+    content_type = nil
+
+    SafeFetch.fetch(
       favicon_url,
-      timeout: 5,
+      method: :head,
+      validate_content_type: false,
+      open_timeout: 5,
+      read_timeout: 5,
       headers: {
         'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15'
       }
-    )
+    ) { |result| content_type = result.content_type }
 
-    response.success? && response.headers['content-type']&.start_with?('image/')
-  rescue StandardError
+    content_type&.start_with?('image/') || false
+  rescue SafeFetch::Error, StandardError
     false
   end
 

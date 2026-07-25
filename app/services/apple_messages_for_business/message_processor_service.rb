@@ -78,7 +78,7 @@ class AppleMessagesForBusiness::MessageProcessorService
     end
 
     # Check if this message will have attachments added from a template
-    template = @message_params[:template_id].present? ? MessageTemplate.find_by(id: @message_params[:template_id]) : nil
+    template = @message_params[:template_id].present? ? find_template(@message_params[:template_id]) : nil
     has_template_attachments = template&.attachments&.attached?
 
     # Clean placeholder content if template has attachments
@@ -230,12 +230,10 @@ class AppleMessagesForBusiness::MessageProcessorService
 
   def send_regular_message
     message_params = @message_params.dup
-
-    template = nil
     has_template_attachments = false
 
     if @message_params[:template_id].present?
-      template = MessageTemplate.find_by(id: @message_params[:template_id])
+      template = find_template(@message_params[:template_id])
       has_template_attachments = template&.attachments&.attached? || false
     end
 
@@ -285,10 +283,16 @@ class AppleMessagesForBusiness::MessageProcessorService
     return stripped.gsub(/^Message\s+/i, '')
   end
 
+  # Scope template lookups to the conversation's own account to prevent
+  # cross-tenant access to another account's template attachments.
+  def find_template(template_id)
+    @conversation.account.message_templates.find_by(id: template_id)
+  end
+
   # Attach template files to the message
   # This is called when a message is created from a template with attachments
   def attach_template_files(message, template_id)
-    template = MessageTemplate.find_by(id: template_id)
+    template = find_template(template_id)
     return unless template&.attachments&.attached?
 
     Rails.logger.info "[AMB MessageProcessor] Attaching #{template.attachments.count} template files to message #{message.id}"

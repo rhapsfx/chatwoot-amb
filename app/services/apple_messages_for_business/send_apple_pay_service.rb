@@ -159,9 +159,21 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     # Fetch and encode images if image identifiers are provided
     images = fetch_images
 
+    request_identifier = @payment_data['request_identifier'] || SecureRandom.uuid
+
+    # Persist the authoritative transaction total server-side so the payment
+    # gateway callback can verify the amount it's asked to charge instead of
+    # trusting whatever total the client device sends back.
+    AppleMessagesForBusiness::ApplePayService.store_authoritative_total(
+      channel_id: @channel.id,
+      request_identifier: request_identifier,
+      amount: format_amount(@payment_data['total']['amount']),
+      currency_code: @payment_data['currency_code']
+    )
+
     # Build data object with payment and images
     data_object = {
-      requestIdentifier: @payment_data['request_identifier'] || SecureRandom.uuid,
+      requestIdentifier: request_identifier,
       mspVersion: '1.0',
       payment: payment_data
     }

@@ -1,6 +1,29 @@
 class AppleMessagesForBusiness::ApplePayService
+  TRANSACTION_TTL = 30.minutes
+
   def initialize(channel)
     @channel = channel
+  end
+
+  # Persist the authoritative total/currency for a payment request at the
+  # moment it's sent to the device, keyed by the requestIdentifier the device
+  # will echo back on payment authorization. This is the source of truth used
+  # to validate the amount actually charged, instead of trusting whatever
+  # total the client sends back in the payment authorization callback.
+  def self.store_authoritative_total(channel_id:, request_identifier:, amount:, currency_code:)
+    return if request_identifier.blank?
+
+    $alfred.with do |redis|
+      redis.setex(
+        transaction_key(channel_id, request_identifier),
+        TRANSACTION_TTL.to_i,
+        { amount: amount, currency_code: currency_code }.to_json
+      )
+    end
+  end
+
+  def self.transaction_key(channel_id, request_identifier)
+    "apple_pay_transaction:#{channel_id}:#{request_identifier}"
   end
 
   def create_payment_request(payment_data)
@@ -30,20 +53,28 @@ class AppleMessagesForBusiness::ApplePayService
     }
   end
 
-  def process_payment_authorization(payment_token, payment_data)
+  def process_payment_authorization(payment_token, payment_data, request_identifier: nil)
     # Decrypt and validate the payment token
     decrypted_token = decrypt_payment_token(payment_token)
     return { error: 'Invalid payment token' } unless decrypted_token
 
+    # Look up the amount/currency we recorded when the payment request was
+    # originally sent to the device, and charge that instead of whatever
+    # total the client echoes back — the client total is not trustworthy.
+    authoritative_total = fetch_authoritative_total(request_identifier || payment_data[:request_identifier])
+    return { error: 'Payment request not found or expired' } unless authoritative_total
+
+    verified_transaction_data = payment_data.merge(total: authoritative_total)
+
     # Process with payment gateway
-    gateway_response = process_with_gateway(decrypted_token, payment_data)
+    gateway_response = process_with_gateway(decrypted_token, verified_transaction_data)
 
     if gateway_response[:success]
       {
         success: true,
         transaction_id: gateway_response[:transaction_id],
-        amount: payment_data[:total][:amount],
-        currency: payment_data[:total][:currency_code],
+        amount: authoritative_total[:amount],
+        currency: authoritative_total[:currency_code],
         status: 'completed',
         processed_at: Time.current
       }
@@ -79,6 +110,19 @@ class AppleMessagesForBusiness::ApplePayService
   end
 
   private
+
+  def fetch_authoritative_total(request_identifier)
+    return nil if request_identifier.blank?
+
+    raw = $alfred.with { |redis| redis.get(self.class.transaction_key(@channel.id, request_identifier)) }
+    return nil unless raw
+
+    parsed = JSON.parse(raw)
+    { amount: parsed['amount'], currency_code: parsed['currency_code'] }.with_indifferent_access
+  rescue JSON::ParserError => e
+    Rails.logger.error "[Apple Pay] Failed to parse stored transaction total: #{e.message}"
+    nil
+  end
 
   def validate_payment_data(payment_data)
     required_fields = [:line_items, :total, :currency_code]
@@ -181,10 +225,13 @@ class AppleMessagesForBusiness::ApplePayService
     Rails.logger.info '[Apple Pay] Token components extracted successfully'
     Rails.logger.debug { "[Apple Pay] Header: #{header.inspect}" }
 
-    # Validate signature (optional but recommended)
+    # Validate the signature chains back to Apple's root CA. This is the only
+    # proof the token actually came from a genuine Apple device rather than
+    # being self-forged against the merchant's public certificate, so a
+    # failure here must reject the token rather than merely log a warning.
     unless validate_token_signature(token_data)
-      Rails.logger.error '[Apple Pay] Token signature validation failed'
-      # Continue anyway for now, but log the warning
+      Rails.logger.error '[Apple Pay] Token signature validation failed - rejecting payment token'
+      return nil
     end
 
     # Decrypt using ECDH and AES-256-GCM
@@ -237,12 +284,52 @@ class AppleMessagesForBusiness::ApplePayService
     nil
   end
 
-  def validate_token_signature(_token_data)
-    # Validate the token signature using Apple's root certificate
-    # This is optional but recommended for production
-    # For now, we'll return true and implement proper validation later
-    Rails.logger.info '[Apple Pay] Token signature validation skipped (to be implemented)'
-    true
+  # Verify the token's PKCS#7 signature chains back to Apple's root CA.
+  # Fails closed: with no trusted root CA configured, the token is rejected
+  # rather than accepted, since accepting it would mean any party who knows
+  # the merchant's (non-secret) public certificate could self-sign a forged
+  # payment token that decrypts and authenticates cleanly.
+  def validate_token_signature(token_data)
+    root_ca_pem = apple_root_ca_certificate
+    if root_ca_pem.blank?
+      Rails.logger.error '[Apple Pay] No Apple root CA certificate configured (set ' \
+                         'APPLE_PAY_ROOT_CA_CERTIFICATE or certs/apple_pay/AppleRootCA-G3.pem) - rejecting token'
+      return false
+    end
+
+    store = OpenSSL::X509::Store.new
+    store.add_cert(OpenSSL::X509::Certificate.new(root_ca_pem))
+
+    pkcs7 = OpenSSL::PKCS7.new(Base64.decode64(token_data['signature']))
+    pkcs7.verify([], store, signed_data_for_verification(token_data), OpenSSL::PKCS7::BINARY)
+  rescue OpenSSL::PKCS7::PKCS7Error, OpenSSL::X509::CertificateError, OpenSSL::X509::StoreError => e
+    Rails.logger.error "[Apple Pay] Token signature verification error: #{e.message}"
+    false
+  end
+
+  # Per Apple's Payment Token Format Reference, the signed payload for
+  # EC_v1/RSA_v1 tokens is the concatenation of the ephemeral public key, the
+  # encrypted data, the transaction ID, and the application data (if present).
+  def signed_data_for_verification(token_data)
+    header = token_data['header'] || {}
+
+    [
+      Base64.decode64(header['ephemeralPublicKey'].to_s),
+      Base64.decode64(token_data['data'].to_s),
+      [header['transactionId'].to_s].pack('H*'),
+      header['applicationData'].present? ? [header['applicationData']].pack('H*') : nil
+    ].compact.join
+  end
+
+  def apple_root_ca_certificate
+    @channel.payment_settings.dig('apple_pay', 'root_ca_certificate') ||
+      ENV.fetch('APPLE_PAY_ROOT_CA_CERTIFICATE', nil) ||
+      load_file_from_certs('AppleRootCA-G3.pem')
+  end
+
+  def load_file_from_certs(filename)
+    path = Rails.root.join('certs', 'apple_pay', filename)
+    File.read(path) if File.exist?(path)
   end
 
   def perform_apple_pay_decryption(encrypted_data, ephemeral_public_key, _public_key_hash, transaction_id)

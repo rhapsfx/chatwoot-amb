@@ -1,6 +1,8 @@
 'use strict';
 
 const express = require('express');
+const dns = require('dns').promises;
+const net = require('net');
 const { chromium } = require('playwright-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
@@ -9,6 +11,70 @@ chromium.use(StealthPlugin());
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const NAV_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 20_000;
+
+// This service fetches URLs supplied indirectly by end customers (rich-link
+// previews), so it must not be usable as an internal-network SSRF proxy —
+// reject loopback, link-local (including 169.254.169.254 cloud metadata),
+// and RFC1918/reserved ranges before ever connecting.
+function isPrivateIPv4(ip) {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) return true;
+  const [a, b, c] = parts;
+  if (a === 0) return true; // "this" network
+  if (a === 10) return true; // private
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 127) return true; // loopback
+  if (a === 169 && b === 254) return true; // link-local / cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true; // private
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // IETF/TEST-NET-1
+  if (a === 192 && b === 168) return true; // private
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmark
+  if (a === 198 && b === 51 && c === 100) return true; // TEST-NET-2
+  if (a === 203 && b === 0 && c === 113) return true; // TEST-NET-3
+  if (a >= 224) return true; // multicast/reserved/broadcast
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const lower = ip.toLowerCase();
+  if (lower === '::1' || lower === '::') return true; // loopback / unspecified
+  if (lower.startsWith('fe80:')) return true; // link-local
+  if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true; // unique local fc00::/7
+  if (lower.startsWith('::ffff:')) {
+    const mapped = lower.split(':').pop();
+    if (net.isIPv4(mapped)) return isPrivateIPv4(mapped);
+  }
+  return false;
+}
+
+function isUnsafeAddress(ip) {
+  if (net.isIPv4(ip)) return isPrivateIPv4(ip);
+  if (net.isIPv6(ip)) return isPrivateIPv6(ip);
+  return true; // unrecognized address format - fail closed
+}
+
+// Validates scheme + resolves the hostname, rejecting anything that resolves
+// to a private/reserved address. Note: this does not fully close DNS
+// rebinding (the connection itself isn't pinned to the resolved address),
+// but it blocks the concrete attack of pointing the scraper directly at an
+// internal hostname or IP literal.
+async function assertPublicHttpUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid URL: ${rawUrl}`);
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`Unsupported URL scheme: ${parsed.protocol}`);
+  }
+
+  const { address } = await dns.lookup(parsed.hostname);
+  if (isUnsafeAddress(address)) {
+    throw new Error(`Refusing to fetch private/reserved address ${address} for host ${parsed.hostname}`);
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -169,6 +235,12 @@ app.post('/scrape', async (req, res) => {
     return res.status(400).json({ success: false, error: 'url is required' });
   }
 
+  try {
+    await assertPublicHttpUrl(url);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
   console.log(`[scraper] Scraping: ${url}`);
   const startedAt = Date.now();
   let page = null;
@@ -184,14 +256,25 @@ app.post('/scrape', async (req, res) => {
     const b = await getBrowser();
     page = await b.newPage();
 
-    // Block images/fonts/media to speed up navigation — we only need HTML/JS
-    await page.route('**/*', (route) => {
-      const type = route.request().resourceType();
+    // Block images/fonts/media to speed up navigation — we only need HTML/JS.
+    // Also re-validate every request (including redirect hops) against the
+    // private-network blocklist, since a redirect could otherwise be used to
+    // steer the browser at an internal host after the initial check passed.
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      const type = request.resourceType();
       if (['image', 'font', 'media', 'stylesheet'].includes(type)) {
-        route.abort();
-      } else {
-        route.continue();
+        return route.abort();
       }
+
+      try {
+        await assertPublicHttpUrl(request.url());
+      } catch (err) {
+        console.warn(`[scraper] Blocking unsafe request to ${request.url()}: ${err.message}`);
+        return route.abort();
+      }
+
+      route.continue();
     });
 
     // Set a realistic viewport and UA (stealth plugin also handles UA, but belt-and-suspenders)
@@ -233,6 +316,7 @@ app.post('/scrape', async (req, res) => {
     let imageMimeType = null;
     if (meta.image_url) {
       try {
+        await assertPublicHttpUrl(meta.image_url);
         const imgRes = await page.request.get(meta.image_url, {
           timeout: 8000,
           headers: { Referer: url, Accept: 'image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5' },
@@ -291,6 +375,12 @@ app.post('/fetch-image', async (req, res) => {
   const { image_url, referer } = req.body || {};
   if (!image_url || typeof image_url !== 'string') {
     return res.status(400).json({ success: false, error: 'image_url is required' });
+  }
+
+  try {
+    await assertPublicHttpUrl(image_url);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
   }
 
   let context = null;
