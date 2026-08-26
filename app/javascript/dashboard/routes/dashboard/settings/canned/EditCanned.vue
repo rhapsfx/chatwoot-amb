@@ -89,7 +89,7 @@ export default {
 </script>
 
 <template>
-  <Modal v-model:show="show" @close="onClose">
+  <Modal v-model:show="show" :on-close="onClose">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header :header-title="pageTitle" />
       <form class="flex flex-col w-full" @submit.prevent="editCannedResponse()">
@@ -153,9 +153,5 @@ export default {
 
 :deep(.ProseMirror-woot-style) {
   @apply min-h-[12.5rem];
-
-  p {
-    @apply text-base;
-  }
 }
 </style>
