@@ -22,7 +22,10 @@ class CreateCaptainFaqSuggestions < ActiveRecord::Migration[7.1]
 
     add_index :captain_faq_suggestions, [:account_id, :assistant_id, :status, :language],
               name: 'idx_cap_faq_suggestions_on_account_assistant_status_language'
-    # add_index :captain_faq_suggestions, :embedding, using: :ivfflat, name: 'vector_idx_captain_faq_suggestions_embedding', opclass: :vector_cosine_ops  # Temporarily disabled for development
+    # Temporarily disabled for development
+    # add_index :captain_faq_suggestions, :embedding, using: :ivfflat,
+    #                                                 name: 'vector_idx_captain_faq_suggestions_embedding',
+    #                                                 opclass: :vector_cosine_ops
   end
 
   def create_faq_observations
