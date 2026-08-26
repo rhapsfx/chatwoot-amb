@@ -60,6 +60,17 @@ class Llm::SpeechToTextService < Llm::LegacyBaseOpenAiService
   private
 
   def fetch_audio_file
+    temp_file_path = download_audio_file
+    return temp_file_path unless blob.content_type == 'audio/amr' || temp_file_path.to_s.end_with?('.amr')
+
+    # Convert AMR to MP3 if needed (Apple Messages sends AMR, OpenAI Whisper doesn't support it)
+    Rails.logger.info "[AudioTranscription] Converting AMR to MP3: #{temp_file_path}"
+    converted_path = convert_amr_to_mp3(temp_file_path.to_s)
+    FileUtils.rm_f(temp_file_path)
+    converted_path
+  end
+
+  def download_audio_file
     temp_dir = Rails.root.join('tmp/uploads/audio-transcriptions')
     FileUtils.mkdir_p(temp_dir)
     temp_file_name = "#{blob.key}-#{blob.filename}"
@@ -78,6 +89,22 @@ class Llm::SpeechToTextService < Llm::LegacyBaseOpenAiService
     end
 
     temp_file_path
+  end
+
+  def convert_amr_to_mp3(amr_file_path)
+    mp3_file_path = amr_file_path.gsub(/\.amr$/, '.mp3')
+
+    command = "ffmpeg -y -i #{Shellwords.escape(amr_file_path)} -ar 16000 -ac 1 -b:a 64k #{Shellwords.escape(mp3_file_path)} 2>&1"
+
+    Rails.logger.info "[AudioTranscription] Running ffmpeg: #{command}"
+    output = `#{command}`
+
+    unless File.exist?(mp3_file_path)
+      Rails.logger.error "[AudioTranscription] ffmpeg conversion failed: #{output}"
+      raise "Failed to convert AMR to MP3: #{output}"
+    end
+
+    mp3_file_path
   end
 
   def extension_from_content_type(content_type)

@@ -20,7 +20,7 @@ module Captain::Conversation::MessageBuilder
   end
 
   def determine_role(message)
-    message.message_type == 'incoming' ? 'user' : 'assistant'
+    message.message_type.to_s == 'incoming' ? 'user' : 'assistant'
   end
 
   def prepare_multimodal_message_content(message)

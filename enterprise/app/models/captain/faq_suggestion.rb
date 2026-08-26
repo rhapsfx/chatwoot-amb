@@ -4,7 +4,7 @@
 #
 #  id           :bigint           not null, primary key
 #  answer       :text             not null
-#  embedding    :vector(1536)
+#  embedding    :text
 #  language     :string           default("en"), not null
 #  question     :string           not null
 #  source_count :integer          default(0), not null
@@ -13,6 +13,12 @@
 #  updated_at   :datetime         not null
 #  account_id   :bigint           not null
 #  assistant_id :bigint           not null
+#
+# Indexes
+#
+#  idx_cap_faq_suggestions_on_account_assistant_status_language  (account_id,assistant_id,status,language)
+#  index_captain_faq_suggestions_on_account_id                   (account_id)
+#  index_captain_faq_suggestions_on_assistant_id                 (assistant_id)
 #
 class Captain::FaqSuggestion < ApplicationRecord
   self.table_name = 'captain_faq_suggestions'
