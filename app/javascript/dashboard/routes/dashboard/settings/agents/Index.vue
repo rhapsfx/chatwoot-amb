@@ -3,7 +3,7 @@ import { useAlert } from 'dashboard/composables';
 import { computed, onMounted, ref } from 'vue';
 import Avatar from 'next/avatar/Avatar.vue';
 import { useI18n } from 'vue-i18n';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 import {
   useStoreGetters,
   useStore,
@@ -277,11 +277,11 @@ const confirmDeletion = () => {
       </div>
     </template>
 
-    <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
+    <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
       <AddAgent @close="hideAddPopup" />
     </woot-modal>
 
-    <woot-modal v-model:show="showEditPopup" @close="hideEditPopup">
+    <woot-modal v-model:show="showEditPopup" :on-close="hideEditPopup">
       <EditAgent
         v-if="showEditPopup"
         :id="currentAgent.id"
@@ -297,13 +297,13 @@ const confirmDeletion = () => {
 
     <woot-delete-modal
       v-model:show="showDeletePopup"
+      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('AGENT_MGMT.DELETE.CONFIRM.TITLE')"
       :message="$t('AGENT_MGMT.DELETE.CONFIRM.MESSAGE')"
       :message-value="deleteMessage"
       :confirm-text="deleteConfirmText"
       :reject-text="deleteRejectText"
-      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

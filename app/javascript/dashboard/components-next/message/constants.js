@@ -99,6 +99,7 @@ export const VOICE_CALL_STATUS = {
   COMPLETED: 'completed',
   NO_ANSWER: 'no-answer',
   FAILED: 'failed',
+  REJECTED: 'rejected',
 };
 
 export const VOICE_CALL_DIRECTION = {

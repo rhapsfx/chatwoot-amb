@@ -1,17 +1,19 @@
 <script setup>
 // [TODO] Use Teleport to move the modal to the end of the body
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useEventListener } from '@vueuse/core';
 import Button from 'dashboard/components-next/button/Button.vue';
 
-const { modalType, closeOnBackdropClick, containerClass } = defineProps({
-  closeOnBackdropClick: { type: Boolean, default: true },
-  showCloseButton: { type: Boolean, default: true },
-  fullWidth: { type: Boolean, default: false },
-  modalType: { type: String, default: 'centered' },
-  size: { type: String, default: '' },
-  containerClass: { type: String, default: '' },
-});
+const { modalType, closeOnBackdropClick, onClose, containerClass } =
+  defineProps({
+    closeOnBackdropClick: { type: Boolean, default: true },
+    showCloseButton: { type: Boolean, default: true },
+    onClose: { type: Function, default: null },
+    fullWidth: { type: Boolean, default: false },
+    modalType: { type: String, default: 'centered' },
+    size: { type: String, default: '' },
+    containerClass: { type: String, default: '' },
+  });
 
 const emit = defineEmits(['close']);
 const show = defineModel('show', { type: Boolean, default: false });
@@ -35,6 +37,7 @@ const handleMouseDown = () => {
 const close = () => {
   show.value = false;
   emit('close');
+  onClose?.();
 };
 
 const onMouseUp = () => {
@@ -55,6 +58,15 @@ const onKeydown = e => {
 
 useEventListener(document.body, 'mouseup', onMouseUp);
 useEventListener(document, 'keydown', onKeydown);
+
+onMounted(() => {
+  if (import.meta.env.DEV && onClose && typeof onClose === 'function') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[DEPRECATED] The 'onClose' prop is deprecated. Please use the 'close' event instead."
+    );
+  }
+});
 </script>
 
 <template>
@@ -115,6 +127,10 @@ useEventListener(document, 'keydown', onKeydown);
 
       a {
         @apply p-4;
+      }
+
+      .ProseMirror a {
+        @apply p-0;
       }
     }
 

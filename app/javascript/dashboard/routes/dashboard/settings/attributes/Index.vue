@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useToggle } from '@vueuse/core';
 import { useAlert } from 'dashboard/composables';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import AddAttribute from './AddAttribute.vue';
 import EditAttribute from './EditAttribute.vue';
@@ -227,10 +227,10 @@ const filteredAttributes = computed(() => {
     <AddAttribute
       v-if="showAddPopup"
       v-model:show="showAddPopup"
+      :on-close="hideAddPopup"
       :selected-attribute-model-tab="selectedTabIndex"
-      @close="hideAddPopup"
     />
-    <woot-modal v-model:show="showEditPopup" @close="hideEditPopup">
+    <woot-modal v-model:show="showEditPopup" :on-close="hideEditPopup">
       <EditAttribute
         :selected-attribute="selectedAttribute"
         :is-updating="uiFlags.isUpdating"

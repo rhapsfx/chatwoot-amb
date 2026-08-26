@@ -15,7 +15,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import { mapGetters } from 'vuex';
 import { convertSecondsToTimeUnit } from '@chatwoot/utils';
 import { useAlert } from 'dashboard/composables';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 
 export default {
   components: {
@@ -299,19 +299,19 @@ export default {
         </template>
       </BaseTable>
 
-      <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
+      <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
         <AddSLA @close="hideAddPopup" />
       </woot-modal>
 
       <woot-delete-modal
         v-model:show="showDeleteConfirmationPopup"
+        :on-close="closeDeletePopup"
         :on-confirm="confirmDeletion"
         :title="$t('SLA.DELETE.CONFIRM.TITLE')"
         :message="$t('SLA.DELETE.CONFIRM.MESSAGE')"
         :message-value="deleteMessage"
         :confirm-text="deleteConfirmText"
         :reject-text="deleteRejectText"
-        @close="closeDeletePopup"
       />
     </template>
   </SettingsLayout>

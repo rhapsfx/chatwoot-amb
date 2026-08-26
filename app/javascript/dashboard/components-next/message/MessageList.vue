@@ -50,7 +50,10 @@ const allMessages = computed(() => {
 
     const camelized = useCamelCase(msg, {
       deep: true,
-      stopPaths: ['content_attributes.translations'],
+      stopPaths: [
+        'content_attributes.translations',
+        'content_attributes.whatsapp_flow_response.response_json',
+      ],
     });
 
     if (originalAppleMspPayload) {

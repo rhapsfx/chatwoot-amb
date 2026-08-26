@@ -3,7 +3,7 @@ import { useAlert } from 'dashboard/composables';
 import { computed, onBeforeMount, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStoreGetters, useStore } from 'dashboard/composables/store';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 
 import AddLabel from './AddLabel.vue';
 import EditLabel from './EditLabel.vue';
@@ -189,23 +189,23 @@ onBeforeMount(() => {
       </BaseTable>
     </template>
 
-    <woot-modal v-model:show="showAddPopup" @close="hideAddPopup">
+    <woot-modal v-model:show="showAddPopup" :on-close="hideAddPopup">
       <AddLabel @close="hideAddPopup" />
     </woot-modal>
 
-    <woot-modal v-model:show="showEditPopup" @close="hideEditPopup">
+    <woot-modal v-model:show="showEditPopup" :on-close="hideEditPopup">
       <EditLabel :selected-response="selectedLabel" @close="hideEditPopup" />
     </woot-modal>
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
+      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('LABEL_MGMT.DELETE.CONFIRM.TITLE')"
       :message="$t('LABEL_MGMT.DELETE.CONFIRM.MESSAGE')"
       :message-value="deleteMessage"
       :confirm-text="$t('LABEL_MGMT.DELETE.CONFIRM.YES')"
       :reject-text="$t('LABEL_MGMT.DELETE.CONFIRM.NO')"
-      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

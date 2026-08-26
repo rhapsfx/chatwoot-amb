@@ -1,7 +1,7 @@
 <script>
 import { mapGetters } from 'vuex';
 import { useAlert } from 'dashboard/composables';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 import { BaseTable } from 'dashboard/components-next/table';
 import DashboardAppModal from './DashboardAppModal.vue';
 import DashboardAppsRow from './DashboardAppsRow.vue';
@@ -164,6 +164,7 @@ export default {
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
+      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.TITLE')"
       :message="
@@ -175,7 +176,6 @@ export default {
         $t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.CONFIRM_YES')
       "
       :reject-text="$t('INTEGRATION_SETTINGS.DASHBOARD_APPS.DELETE.CONFIRM_NO')"
-      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>

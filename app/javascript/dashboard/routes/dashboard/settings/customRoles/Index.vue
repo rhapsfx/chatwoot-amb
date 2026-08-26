@@ -9,7 +9,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 import { BaseTable } from 'dashboard/components-next/table';
 
 const store = useStore();
@@ -184,7 +184,10 @@ const confirmDeletion = () => {
       </BaseTable>
     </template>
 
-    <woot-modal v-model:show="showCustomRoleModal" @close="hideCustomRoleModal">
+    <woot-modal
+      v-model:show="showCustomRoleModal"
+      :on-close="hideCustomRoleModal"
+    >
       <CustomRoleModal
         :mode="customRoleModalMode"
         :selected-role="selectedRole"
@@ -194,13 +197,13 @@ const confirmDeletion = () => {
 
     <woot-delete-modal
       v-model:show="showDeleteConfirmationPopup"
+      :on-close="closeDeletePopup"
       :on-confirm="confirmDeletion"
       :title="$t('CUSTOM_ROLE.DELETE.CONFIRM.TITLE')"
       :message="$t('CUSTOM_ROLE.DELETE.CONFIRM.MESSAGE')"
       :message-value="deleteMessage"
       :confirm-text="deleteConfirmText"
       :reject-text="deleteRejectText"
-      @close="closeDeletePopup"
     />
   </SettingsLayout>
 </template>
