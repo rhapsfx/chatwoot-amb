@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useAppClips } from 'dashboard/composables/useAppClips';
-import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/message-templates/components/SharedImageSelector.vue';
 
 const props = defineProps({
   show: {

@@ -1,12 +1,7 @@
 import { frontendURL } from '../../../../helper/URLHelper';
-import {
-  ROLES,
-  CONVERSATION_PERMISSIONS,
-  TEMPLATE_PERMISSIONS,
-} from 'dashboard/constants/permissions.js';
+
 import SettingsWrapper from '../SettingsWrapper.vue';
-import TemplateList from './Index.vue';
-import TemplateBuilder from './TemplateBuilder.vue';
+import Index from './Index.vue';
 
 export default {
   routes: [
@@ -16,37 +11,11 @@ export default {
       children: [
         {
           path: '',
-          redirect: to => {
-            return { name: 'templates_list', params: to.params };
-          },
-        },
-        {
-          path: 'list',
-          name: 'templates_list',
+          name: 'settings_templates',
+          component: Index,
           meta: {
-            permissions: [
-              ...ROLES,
-              ...CONVERSATION_PERMISSIONS,
-              TEMPLATE_PERMISSIONS,
-            ],
+            permissions: ['administrator'],
           },
-          component: TemplateList,
-        },
-        {
-          path: 'new',
-          name: 'template_new',
-          meta: {
-            permissions: ['administrator', TEMPLATE_PERMISSIONS],
-          },
-          component: TemplateBuilder,
-        },
-        {
-          path: ':templateId/edit',
-          name: 'template_edit',
-          meta: {
-            permissions: ['administrator', TEMPLATE_PERMISSIONS],
-          },
-          component: TemplateBuilder,
         },
       ],
     },

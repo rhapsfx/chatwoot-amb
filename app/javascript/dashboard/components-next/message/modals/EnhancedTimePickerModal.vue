@@ -29,7 +29,7 @@ import {
   isSameMonth,
 } from 'date-fns';
 import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
-import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/message-templates/components/SharedImageSelector.vue';
 
 const props = defineProps({
   show: {

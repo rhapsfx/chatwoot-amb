@@ -1,734 +1,441 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { computed, onActivated, onDeactivated, ref } from 'vue';
+import { picoSearch } from '@chatwoot/pico-search';
 import { useI18n } from 'vue-i18n';
-import { useRouter, useRoute } from 'vue-router';
+import { vOnClickOutside } from '@vueuse/components';
+
 import { useAlert } from 'dashboard/composables';
-import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
+import { useMapGetter, useStore } from 'dashboard/composables/store';
+import { useAbortableRequest } from 'dashboard/composables/useAbortableRequest';
+import { INBOX_TYPES, TWILIO_CHANNEL_MEDIUM } from 'dashboard/helper/inbox';
+import InboxesAPI from 'dashboard/api/inboxes';
 import Button from 'dashboard/components-next/button/Button.vue';
-import TemplatesAPI from 'dashboard/api/templates';
-import AppleLogo from 'dashboard/assets/images/apple-logo.png';
+import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
+import Icon from 'dashboard/components-next/icon/Icon.vue';
+import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
+import SettingsLayout from '../SettingsLayout.vue';
+import TemplateCard from './TemplateCard.vue';
+import TemplatePreviewDrawer from './TemplatePreviewDrawer.vue';
+import {
+  formatTemplateDate,
+  formatTemplateLanguage,
+  groupTemplates,
+  templateTypeKey,
+} from './templateUtils';
 
+const FUZZY_SEARCH_KEYS = [
+  { name: 'name', weight: 4 },
+  'category',
+  'language',
+  'status',
+  'inboxNames',
+  'searchableContent',
+];
+
+const TEMPLATE_LEARN_MORE_URL =
+  'https://www.chatwoot.com/hc/user-guide/articles/1754940076-whatsapp-templates';
+
+const store = useStore();
 const { t } = useI18n();
-const router = useRouter();
-const route = useRoute();
 
-// State
+const inboxes = useMapGetter('inboxes/getInboxes');
 const templates = ref([]);
-const loading = ref(false);
 const searchQuery = ref('');
-const selectedCategory = ref('all');
-const selectedChannel = ref('all');
-const selectedTags = ref([]);
-const selectedSortBy = ref('name'); // Default sort by name
-const showDeleteConfirmation = ref(false);
-const templateToDelete = ref(null);
+const selectedInboxId = ref('all');
+const selectedLanguage = ref('all');
+const selectedType = ref('all');
+const selectedTemplate = ref(null);
+const openFilterMenu = ref(null);
+const previewPanelRef = ref(null);
+const templateRecordsByInboxId = new Map();
+const lastSyncAttemptsByInboxId = ref({});
+const isSyncing = ref(false);
+const {
+  run: runTemplateRequest,
+  abort: abortTemplateRequest,
+  isPending: isLoading,
+} = useAbortableRequest();
 
-const BOT_API_BADGE_LABEL = '🤖 Bot API';
-const BOT_API_ONLY_TITLE = 'Available via Bot API only';
-const botApiBanner = {
-  title: 'Bot Templates API',
-  descriptionPrefix: 'Templates marked with',
-  descriptionSuffix:
-    'are designed for programmatic use via webhooks, Dialogflow, Rasa, or custom bots.',
-  curlCommand: [
-    { prefix: 'curl', text: ' -X POST' },
-    {
-      text: ' https://your-chatwoot-domain.com/api/v1/accounts/1/bot_templates/send_message \\',
-    },
-    { prefix: '-H', text: ' "X-Api-Access-Token: YOUR_API_TOKEN" \\' },
-    { prefix: '-H', text: ' "Content-Type: application/json" \\' },
-    {
-      prefix: '-d',
-      text: ` '{"conversation_id": 15, "template_id": 4, "parameters": {}}'`,
-    },
-  ],
-  tokenLabel: 'Get your API token:',
-  tokenPath: 'Profile → Settings → Access Token',
-  docsLabel: 'Full documentation:',
-  docsPath: 'docs/api/BOT_TEMPLATES_API.md',
-  docsSuffix: 'in the project root',
-};
+const hasTemplates = computed(() => templates.value.length > 0);
 
-// Helper function for sorting templates
-const sortTemplatesList = templatesList => {
-  const sorted = [...templatesList];
+const lastSyncAttemptAt = computed(() => {
+  const timestamps = Object.values(lastSyncAttemptsByInboxId.value)
+    .filter(Boolean)
+    .map(value => new Date(value).getTime())
+    .filter(Number.isFinite);
 
-  switch (selectedSortBy.value) {
-    case 'name':
-      return sorted.sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-      );
-    case 'id':
-      return sorted.sort((a, b) => a.id - b.id);
-    case 'created_at':
-      return sorted.sort(
-        (a, b) =>
-          new Date(b.createdAt || b.created_at || 0) -
-          new Date(a.createdAt || a.created_at || 0)
-      );
-    case 'updated_at':
-      return sorted.sort(
-        (a, b) =>
-          new Date(b.updatedAt || b.updated_at || 0) -
-          new Date(a.updatedAt || a.updated_at || 0)
-      );
-    default:
-      return sorted;
-  }
-};
-
-// Computed
-const filteredTemplates = computed(() => {
-  let filtered = templates.value;
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(
-      template =>
-        template.name.toLowerCase().includes(query) ||
-        template.description?.toLowerCase().includes(query) ||
-        template.category?.toLowerCase().includes(query)
-    );
-  }
-
-  if (selectedCategory.value !== 'all') {
-    filtered = filtered.filter(
-      template => template.category === selectedCategory.value
-    );
-  }
-
-  if (selectedChannel.value !== 'all') {
-    filtered = filtered.filter(template =>
-      template.supportedChannels?.includes(selectedChannel.value)
-    );
-  }
-
-  if (selectedTags.value.length > 0) {
-    filtered = filtered.filter(template =>
-      selectedTags.value.some(tag => template.tags?.includes(tag))
-    );
-  }
-
-  // Apply sorting
-  return sortTemplatesList(filtered);
+  return timestamps.length ? new Date(Math.max(...timestamps)) : null;
 });
 
-const sortOptions = computed(() => [
-  { value: 'name', label: t('TEMPLATES.SORT.NAME') },
-  { value: 'id', label: t('TEMPLATES.SORT.ID') },
-  { value: 'created_at', label: t('TEMPLATES.SORT.CREATED_DATE') },
-  { value: 'updated_at', label: t('TEMPLATES.SORT.UPDATED_DATE') },
-]);
+const typeLabels = computed(() => ({
+  TEXT: t('WHATSAPP_TEMPLATE_MGMT.TYPES.TEXT'),
+  IMAGE: t('WHATSAPP_TEMPLATE_MGMT.TYPES.IMAGE'),
+  VIDEO: t('WHATSAPP_TEMPLATE_MGMT.TYPES.VIDEO'),
+  DOCUMENT: t('WHATSAPP_TEMPLATE_MGMT.TYPES.DOCUMENT'),
+  MEDIA: t('WHATSAPP_TEMPLATE_MGMT.TYPES.MEDIA'),
+  QUICK_REPLY: t('WHATSAPP_TEMPLATE_MGMT.TYPES.QUICK_REPLY'),
+  CALL_TO_ACTION: t('WHATSAPP_TEMPLATE_MGMT.TYPES.CALL_TO_ACTION'),
+  CATALOG: t('WHATSAPP_TEMPLATE_MGMT.TYPES.CATALOG'),
+  COPY_CODE: t('WHATSAPP_TEMPLATE_MGMT.TYPES.COPY_CODE'),
+}));
 
-const categories = computed(() => {
-  const cats = new Set(
-    templates.value.map(template => template.category).filter(Boolean)
-  );
-  return ['all', ...Array.from(cats)];
-});
+const whatsappInboxes = computed(() =>
+  inboxes.value.filter(
+    inbox =>
+      inbox.channel_type === INBOX_TYPES.WHATSAPP ||
+      (inbox.channel_type === INBOX_TYPES.TWILIO &&
+        inbox.medium === TWILIO_CHANNEL_MEDIUM.WHATSAPP)
+  )
+);
 
-const availableChannels = computed(() => [
-  { value: 'all', label: t('TEMPLATES.CHANNELS.ALL') },
+const inboxOptions = computed(() => [
   {
-    value: 'apple_messages_for_business',
-    label: t('TEMPLATES.CHANNELS.APPLE_MESSAGES'),
+    value: 'all',
+    label: t('WHATSAPP_TEMPLATE_MGMT.FILTERS.ALL_INBOXES'),
   },
-  { value: 'whatsapp', label: t('TEMPLATES.CHANNELS.WHATSAPP') },
-  { value: 'web_widget', label: t('TEMPLATES.CHANNELS.WEB_WIDGET') },
-  { value: 'sms', label: t('TEMPLATES.CHANNELS.SMS') },
-  { value: 'email', label: t('TEMPLATES.CHANNELS.EMAIL') },
+  ...whatsappInboxes.value.map(inbox => ({
+    value: String(inbox.id),
+    label: inbox.name,
+  })),
 ]);
 
-const allTags = computed(() => {
-  const tags = new Set();
-  templates.value.forEach(template => {
-    if (template.tags) {
-      template.tags.forEach(tag => tags.add(tag));
-    }
-  });
-  return Array.from(tags);
-});
+const languageOptions = computed(() => [
+  {
+    value: 'all',
+    label: t('WHATSAPP_TEMPLATE_MGMT.FILTERS.ALL_LANGUAGES'),
+  },
+  ...[...new Set(templates.value.map(template => template.language))]
+    .filter(Boolean)
+    .sort()
+    .map(language => ({
+      value: language,
+      label: formatTemplateLanguage(language),
+    })),
+]);
 
-// Methods
-const fetchTemplates = async () => {
-  loading.value = true;
-  try {
-    const response = await TemplatesAPI.get();
-    // Extract templates array from paginated response
-    templates.value = response.data.templates || response.data || [];
-  } catch (error) {
-    useAlert(t('TEMPLATES.API.FETCH_ERROR'));
-  } finally {
-    loading.value = false;
-  }
-};
+const typeOptions = computed(() => [
+  {
+    value: 'all',
+    label: t('WHATSAPP_TEMPLATE_MGMT.FILTERS.ALL_TYPES'),
+  },
+  ...[...new Set(templates.value.map(templateTypeKey))]
+    .map(type => ({
+      value: type,
+      label: typeLabels.value[type],
+    }))
+    .sort((first, second) => first.label.localeCompare(second.label)),
+]);
 
-const navigateToNewTemplate = () => {
-  router.push({ name: 'template_new' });
-};
-
-const navigateToEdit = templateId => {
-  router.push({ name: 'template_edit', params: { templateId } });
-};
-
-const openDeleteConfirmation = template => {
-  templateToDelete.value = template;
-  showDeleteConfirmation.value = true;
-};
-
-const closeDeleteConfirmation = () => {
-  templateToDelete.value = null;
-  showDeleteConfirmation.value = false;
-};
-
-const confirmDelete = async () => {
-  if (!templateToDelete.value) return;
-
-  try {
-    await TemplatesAPI.delete(templateToDelete.value.id);
-    useAlert(t('TEMPLATES.API.DELETE_SUCCESS'));
-    await fetchTemplates();
-  } catch (error) {
-    useAlert(t('TEMPLATES.API.DELETE_ERROR'));
-  } finally {
-    closeDeleteConfirmation();
-  }
-};
-
-const duplicateTemplate = async template => {
-  try {
-    // Fetch full template data including content blocks
-    const fullTemplateResponse = await TemplatesAPI.show(template.id);
-    const fullTemplate = fullTemplateResponse.data;
-
-    // Generate unique name by appending timestamp
-    const timestamp = Date.now();
-    const baseName = template.name.replace(/ \(Copy( \d+)?\)$/, ''); // Remove existing " (Copy)" suffix
-
-    // Clean content blocks - remove IDs so backend creates new ones
-    const contentBlocks = (fullTemplate.contentBlocks || []).map(block => ({
-      blockType: block.blockType,
-      properties: block.properties || {},
-      conditions: block.conditions || {},
-      orderIndex: block.orderIndex,
+const filterMenus = computed(() =>
+  [
+    {
+      key: 'inbox',
+      icon: 'i-lucide-inbox',
+      options: inboxOptions.value,
+      active: selectedInboxId.value,
+    },
+    {
+      key: 'language',
+      icon: 'i-lucide-languages',
+      options: languageOptions.value,
+      active: selectedLanguage.value,
+    },
+    {
+      key: 'type',
+      icon: 'i-lucide-layout-template',
+      options: typeOptions.value,
+      active: selectedType.value,
+    },
+  ].map(menu => {
+    const items = menu.options.map(option => ({
+      ...option,
+      action: menu.key,
+      isSelected: option.value === menu.active,
     }));
 
-    // Clean channel mappings - remove IDs so backend creates new ones
-    const channelMappings = (fullTemplate.channelMappings || []).map(
-      mapping => ({
-        channelType: mapping.channelType,
-        contentType: mapping.contentType,
-        fieldMappings: mapping.fieldMappings || {},
-      })
-    );
-
-    const duplicatedData = {
-      name: `${baseName} (Copy ${timestamp})`,
-      category: fullTemplate.category,
-      description: fullTemplate.description,
-      supportedChannels: fullTemplate.supportedChannels,
-      tags: fullTemplate.tags || [],
-      useCases: fullTemplate.useCases || [],
-      parameters: fullTemplate.parameters || {},
-      status: fullTemplate.status || 'active',
-      version: 1,
-      content: fullTemplate.content,
-      metadata: fullTemplate.metadata || {},
-      contentBlocks: contentBlocks, // ✨ Use camelCase for API
-      channelMappings: channelMappings, // ✨ Use camelCase for API
+    return {
+      ...menu,
+      items,
+      selected: items.find(item => item.isSelected) || items[0],
     };
+  })
+);
 
-    const response = await TemplatesAPI.create(duplicatedData);
-    useAlert(t('TEMPLATES.API.DUPLICATE_SUCCESS'));
-    await fetchTemplates();
-    navigateToEdit(response.data.id);
-  } catch (error) {
-    useAlert(t('TEMPLATES.API.DUPLICATE_ERROR'));
+const closeFilterMenu = () => {
+  openFilterMenu.value = null;
+};
+
+const toggleFilterMenu = key => {
+  openFilterMenu.value = openFilterMenu.value === key ? null : key;
+};
+
+const openPreview = template => {
+  selectedTemplate.value = template;
+  previewPanelRef.value?.open();
+};
+
+const handleFilterAction = ({ action, value }) => {
+  closeFilterMenu();
+  if (action === 'inbox') selectedInboxId.value = value;
+  else if (action === 'language') selectedLanguage.value = value;
+  else selectedType.value = value;
+};
+
+const filteredTemplates = computed(() => {
+  let records = templates.value;
+
+  if (selectedInboxId.value !== 'all') {
+    records = records.filter(template =>
+      template.inboxes.some(inbox => String(inbox.id) === selectedInboxId.value)
+    );
   }
-};
 
-const getUseCaseLabel = useCase => {
-  return useCase === 'bot_api_only' ? BOT_API_BADGE_LABEL : useCase;
-};
-
-const getUseCaseTitle = useCase => {
-  return useCase === 'bot_api_only' ? BOT_API_ONLY_TITLE : useCase;
-};
-
-const getCategoryLabel = category => {
-  if (!category) return t('TEMPLATES.CATEGORIES.UNCATEGORIZED');
-
-  const lowerCategory = category.toLowerCase();
-  if (lowerCategory === 'all') return t('TEMPLATES.CATEGORIES.ALL');
-  if (lowerCategory === 'general') return t('TEMPLATES.CATEGORIES.GENERAL');
-  if (lowerCategory === 'marketing') return t('TEMPLATES.CATEGORIES.MARKETING');
-  if (lowerCategory === 'support') return t('TEMPLATES.CATEGORIES.SUPPORT');
-  if (lowerCategory === 'sales') return t('TEMPLATES.CATEGORIES.SALES');
-  if (lowerCategory === 'onboarding')
-    return t('TEMPLATES.CATEGORIES.ONBOARDING');
-  if (lowerCategory === 'notification')
-    return t('TEMPLATES.CATEGORIES.NOTIFICATION');
-
-  return category.charAt(0).toUpperCase() + category.slice(1);
-};
-
-const getChannelIcon = channel => {
-  const icons = {
-    apple_messages_for_business: null, // Will use Apple logo image
-    whatsapp: 'whatsapp',
-    web_widget: 'globe',
-    sms: 'message-square',
-    email: 'mail',
-  };
-  return icons[channel] || 'message-circle';
-};
-
-const isAppleMessagesChannel = channel => {
-  return channel === 'apple_messages_for_business';
-};
-
-const getStatusBadgeClass = status => {
-  const classes = {
-    active:
-      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 font-semibold',
-    draft:
-      'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 font-semibold',
-    deprecated:
-      'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 font-semibold',
-  };
-  return classes[status] || 'bg-n-slate-3 text-n-slate-11';
-};
-
-const getStatusLabel = status => {
-  if (!status) return '';
-
-  const lowerStatus = status.toLowerCase();
-  if (lowerStatus === 'active') return t('TEMPLATES.STATUS.ACTIVE');
-  if (lowerStatus === 'draft') return t('TEMPLATES.STATUS.DRAFT');
-  if (lowerStatus === 'deprecated') return t('TEMPLATES.STATUS.DEPRECATED');
-
-  return status;
-};
-
-const toggleTag = tag => {
-  const index = selectedTags.value.indexOf(tag);
-  if (index === -1) {
-    selectedTags.value.push(tag);
-  } else {
-    selectedTags.value.splice(index, 1);
+  if (selectedLanguage.value !== 'all') {
+    records = records.filter(
+      template => template.language === selectedLanguage.value
+    );
   }
-};
 
-const clearFilters = () => {
-  searchQuery.value = '';
-  selectedCategory.value = 'all';
-  selectedChannel.value = 'all';
-  selectedTags.value = [];
-  selectedSortBy.value = 'name'; // Reset to default sort
-};
+  if (selectedType.value !== 'all') {
+    records = records.filter(
+      template => templateTypeKey(template) === selectedType.value
+    );
+  }
 
-onMounted(() => {
-  fetchTemplates();
+  const query = searchQuery.value.trim();
+  if (!query) return records;
+
+  const normalizedQuery = query.toLowerCase();
+  const contentMatches = records.filter(template =>
+    [template.name, template.searchableContent].some(value =>
+      value?.toLowerCase().includes(normalizedQuery)
+    )
+  );
+  if (contentMatches.length) return contentMatches;
+
+  return picoSearch(records, query, FUZZY_SEARCH_KEYS);
 });
 
-// Refetch templates when navigating back to this route
-watch(
-  () => route.name,
-  newName => {
-    if (newName === 'templates_list') {
-      fetchTemplates();
-    }
-  }
+const showSearch = computed(() =>
+  Boolean(filteredTemplates.value.length || searchQuery.value)
 );
+
+const fetchTemplates = async () => {
+  try {
+    await runTemplateRequest(async signal => {
+      const didFetchInboxes = await store.dispatch('inboxes/get');
+      if (!didFetchInboxes) throw new Error();
+      if (signal.aborted) return;
+
+      const inboxesToFetch = [...whatsappInboxes.value];
+      const responses = await Promise.allSettled(
+        inboxesToFetch.map(async inbox => {
+          const { data } = await InboxesAPI.getMessageTemplates(
+            inbox.id,
+            {},
+            { signal }
+          );
+
+          if (!Array.isArray(data.payload)) {
+            throw new TypeError();
+          }
+
+          return {
+            inboxId: inbox.id,
+            lastSyncAttemptAt: data.meta?.last_sync_attempt_at,
+            records: data.payload.map(template => ({
+              template,
+              inbox,
+              lastUpdatedAt: data.meta?.last_sync_attempt_at,
+            })),
+          };
+        })
+      );
+
+      if (signal.aborted) return;
+
+      const successfulResponses = responses.filter(
+        response => response.status === 'fulfilled'
+      );
+      const activeInboxIds = new Set(inboxesToFetch.map(inbox => inbox.id));
+      const nextLastSyncAttempts = {
+        ...lastSyncAttemptsByInboxId.value,
+      };
+
+      templateRecordsByInboxId.forEach((_, inboxId) => {
+        if (!activeInboxIds.has(inboxId)) {
+          templateRecordsByInboxId.delete(inboxId);
+          delete nextLastSyncAttempts[inboxId];
+        }
+      });
+      successfulResponses.forEach(({ value }) => {
+        templateRecordsByInboxId.set(value.inboxId, value.records);
+        nextLastSyncAttempts[value.inboxId] = value.lastSyncAttemptAt;
+      });
+      lastSyncAttemptsByInboxId.value = nextLastSyncAttempts;
+      templates.value = groupTemplates(
+        [...templateRecordsByInboxId.values()].flat()
+      );
+
+      if (
+        !inboxOptions.value.some(({ value }) => value === selectedInboxId.value)
+      )
+        selectedInboxId.value = 'all';
+      if (
+        !languageOptions.value.some(
+          ({ value }) => value === selectedLanguage.value
+        )
+      )
+        selectedLanguage.value = 'all';
+      if (!typeOptions.value.some(({ value }) => value === selectedType.value))
+        selectedType.value = 'all';
+
+      if (responses.some(response => response.status === 'rejected')) {
+        const errorMessage = successfulResponses.length
+          ? t('WHATSAPP_TEMPLATE_MGMT.PARTIAL_FETCH_ERROR')
+          : t('WHATSAPP_TEMPLATE_MGMT.FETCH_ERROR');
+        useAlert(errorMessage);
+      }
+    });
+  } catch {
+    useAlert(t('WHATSAPP_TEMPLATE_MGMT.FETCH_ERROR'));
+  }
+};
+
+const syncTemplates = async () => {
+  if (isSyncing.value) return;
+
+  isSyncing.value = true;
+
+  const responses = await Promise.allSettled(
+    whatsappInboxes.value.map(inbox =>
+      store.dispatch('inboxes/syncTemplates', inbox.id)
+    )
+  );
+  const failedCount = responses.filter(
+    response => response.status === 'rejected'
+  ).length;
+
+  if (!failedCount) {
+    useAlert(t('WHATSAPP_TEMPLATE_MGMT.SYNC_SUCCESS'));
+  } else if (failedCount < responses.length) {
+    useAlert(t('WHATSAPP_TEMPLATE_MGMT.PARTIAL_SYNC_ERROR'));
+  } else {
+    useAlert(t('WHATSAPP_TEMPLATE_MGMT.SYNC_ERROR'));
+  }
+
+  isSyncing.value = false;
+};
+
+onActivated(fetchTemplates);
+onDeactivated(abortTemplateRequest);
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <BaseSettingsHeader
-      :title="t('TEMPLATES.HEADER')"
-      :description="t('TEMPLATES.DESCRIPTION')"
-      :link-text="t('TEMPLATES.LEARN_MORE')"
-      feature-name="templates"
-    >
-      <template #actions>
-        <Button
-          icon="i-lucide-plus"
-          :label="t('TEMPLATES.HEADER_BTN_TXT')"
-          @click="navigateToNewTemplate"
-        />
-      </template>
-    </BaseSettingsHeader>
-
-    <!-- Bot API Information Banner -->
-    <div class="mx-4 mt-4 p-4 bg-n-blue-1 border border-n-blue-7 rounded-lg">
-      <div class="flex items-start gap-3">
-        <i class="i-lucide-info text-n-blue-9 text-xl flex-shrink-0 mt-0.5" />
-        <div class="flex-1">
-          <h4 class="text-sm font-semibold text-n-slate-12 mb-2">
-            {{ botApiBanner.title }}
-          </h4>
-          <p class="text-sm text-n-slate-11 mb-3">
-            {{ botApiBanner.descriptionPrefix }}
-            <span
-              class="px-2 py-0.5 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
-            >
-              {{ BOT_API_BADGE_LABEL }}
-            </span>
-            {{ botApiBanner.descriptionSuffix }}
-          </p>
-          <div
-            class="bg-white dark:bg-n-slate-1 p-3 rounded border border-n-slate-6 text-xs font-mono overflow-x-auto"
+  <SettingsLayout
+    :is-loading="isLoading"
+    :loading-message="$t('WHATSAPP_TEMPLATE_MGMT.LOADING')"
+    :no-records-found="!templates.length"
+    :no-records-message="$t('WHATSAPP_TEMPLATE_MGMT.EMPTY')"
+  >
+    <template #header>
+      <BaseSettingsHeader
+        v-model:search-query="searchQuery"
+        :title="$t('WHATSAPP_TEMPLATE_MGMT.TITLE')"
+        :search-placeholder="
+          showSearch ? $t('WHATSAPP_TEMPLATE_MGMT.SEARCH_PLACEHOLDER') : ''
+        "
+      >
+        <template #description>
+          {{ $t('WHATSAPP_TEMPLATE_MGMT.DESCRIPTION') }}
+          <a
+            :href="TEMPLATE_LEARN_MORE_URL"
+            class="text-sm font-medium text-n-blue-11 hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            <div class="text-n-slate-11 whitespace-pre-wrap break-all">
-              <template
-                v-for="(line, index) in botApiBanner.curlCommand"
-                :key="`${line.prefix || 'text'}-${index}`"
+            {{ $t('WHATSAPP_TEMPLATE_MGMT.KNOW_MORE') }}
+          </a>
+          <span
+            v-if="lastSyncAttemptAt"
+            class="block mt-1 text-xs text-n-slate-10"
+          >
+            {{
+              $t('WHATSAPP_TEMPLATE_MGMT.LAST_SYNC_ATTEMPT', {
+                date: formatTemplateDate(lastSyncAttemptAt),
+              })
+            }}
+          </span>
+        </template>
+        <template #tabs>
+          <div
+            v-if="hasTemplates"
+            v-on-click-outside="closeFilterMenu"
+            class="flex items-center gap-2"
+          >
+            <div v-for="menu in filterMenus" :key="menu.key" class="relative">
+              <Button
+                :icon="menu.icon"
+                color="slate"
+                size="sm"
+                :class="{ 'bg-n-slate-9/10': openFilterMenu === menu.key }"
+                @click="toggleFilterMenu(menu.key)"
               >
-                <span v-if="line.prefix" class="text-n-slate-10">
-                  {{ line.prefix }}
-                </span>
-                {{ line.text }}
-                <br v-if="index < botApiBanner.curlCommand.length - 1" />
-              </template>
+                <span class="min-w-0 truncate">{{ menu.selected.label }}</span>
+                <Icon icon="i-lucide-chevron-down" class="shrink-0 size-4" />
+              </Button>
+              <DropdownMenu
+                v-if="openFilterMenu === menu.key"
+                :menu-items="menu.items"
+                class="mt-2 min-w-52 top-full ltr:left-0 rtl:right-0"
+                @action="handleFilterAction"
+              />
             </div>
           </div>
-          <div class="mt-3 text-xs text-n-slate-11">
-            <div class="mb-1">
-              <strong class="text-n-slate-12">
-                {{ botApiBanner.tokenLabel }}
-              </strong>
-              {{ botApiBanner.tokenPath }}
-            </div>
-            <div>
-              <strong class="text-n-slate-12">
-                {{ botApiBanner.docsLabel }}
-              </strong>
-              <code
-                class="px-1 py-0.5 bg-n-slate-2 text-n-slate-12 rounded font-mono"
-              >
-                {{ botApiBanner.docsPath }}
-              </code>
-              {{ botApiBanner.docsSuffix }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters Section -->
-    <div
-      class="flex flex-col gap-4 p-4 bg-white dark:bg-n-slate-2 border-b border-n-weak"
-    >
-      <!-- Search Bar -->
-      <div class="flex gap-3">
-        <div class="flex-1">
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="t('TEMPLATES.SEARCH_PLACEHOLDER')"
-            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
+        </template>
+        <template v-if="filteredTemplates.length" #count>
+          <span class="text-body-main text-n-slate-11">
+            {{
+              $t('WHATSAPP_TEMPLATE_MGMT.COUNT', {
+                n: filteredTemplates.length,
+              })
+            }}
+          </span>
+        </template>
+        <template #actions>
+          <Button
+            :label="$t('WHATSAPP_TEMPLATE_MGMT.SYNC_TEMPLATES')"
+            icon="i-lucide-refresh-cw"
+            color="slate"
+            size="sm"
+            :is-loading="isSyncing"
+            :disabled="!whatsappInboxes.length || isSyncing"
+            @click="syncTemplates"
           />
-        </div>
-        <Button
-          v-if="
-            searchQuery ||
-            selectedCategory !== 'all' ||
-            selectedChannel !== 'all' ||
-            selectedTags.length > 0
-          "
-          slate
-          variant="outline"
-          icon="i-lucide-x"
-          @click="clearFilters"
-        >
-          {{ t('TEMPLATES.CLEAR_FILTERS') }}
-        </Button>
-      </div>
+        </template>
+      </BaseSettingsHeader>
+    </template>
 
-      <!-- Category, Channel, and Sort Filters -->
-      <div class="flex gap-3">
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-n-slate-12 mb-2">
-            {{ t('TEMPLATES.FILTER_BY_CATEGORY') }}
-          </label>
-          <select
-            v-model="selectedCategory"
-            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
-          >
-            <option
-              v-for="category in categories"
-              :key="category"
-              :value="category"
-            >
-              {{ getCategoryLabel(category) }}
-            </option>
-          </select>
-        </div>
-
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-n-slate-12 mb-2">
-            {{ t('TEMPLATES.FILTER_BY_CHANNEL') }}
-          </label>
-          <select
-            v-model="selectedChannel"
-            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
-          >
-            <option
-              v-for="channel in availableChannels"
-              :key="channel.value"
-              :value="channel.value"
-            >
-              {{ channel.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-n-slate-12 mb-2">
-            {{ t('TEMPLATES.SORT_BY') }}
-          </label>
-          <select
-            v-model="selectedSortBy"
-            class="w-full px-4 py-2 border border-n-slate-7 dark:border-n-slate-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-n-blue-7 bg-white dark:bg-n-slate-1 text-n-slate-12 dark:text-n-slate-11"
-          >
-            <option
-              v-for="option in sortOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Tag Filter -->
-      <div v-if="allTags.length > 0">
-        <label class="block text-sm font-medium text-n-slate-12 mb-2">
-          {{ t('TEMPLATES.FILTER_BY_TAGS') }}
-        </label>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="tag in allTags"
-            :key="tag"
-            class="px-3 py-2 text-sm rounded-lg border-2 transition-colors font-medium"
-            :class="[
-              selectedTags.includes(tag)
-                ? 'bg-n-blue-9 text-white border-n-blue-9'
-                : 'bg-white dark:bg-n-slate-1 text-n-slate-11 border-n-slate-7 dark:border-n-slate-6 hover:border-n-blue-7',
-            ]"
-            @click="toggleTag(tag)"
-          >
-            {{ tag }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Templates List -->
-    <div class="flex-1 overflow-auto p-4">
-      <!-- Loading State -->
-      <div v-if="loading" class="flex items-center justify-center h-64">
-        <woot-loading-state :message="t('TEMPLATES.LOADING')" />
-      </div>
-
-      <!-- Empty State -->
+    <template #body>
       <div
-        v-else-if="filteredTemplates.length === 0 && !searchQuery"
-        class="flex flex-col items-center justify-center h-64"
+        v-if="!filteredTemplates.length"
+        class="flex items-center justify-center p-8"
       >
-        <i class="i-lucide-file-text text-6xl text-n-slate-8 mb-4" />
-        <div class="text-n-slate-11 text-lg font-medium mb-2">
-          {{ t('TEMPLATES.EMPTY_STATE.TITLE') }}
-        </div>
-        <div class="text-n-slate-10 text-sm mb-6">
-          {{ t('TEMPLATES.EMPTY_STATE.MESSAGE') }}
-        </div>
-        <Button
-          icon="i-lucide-plus"
-          :label="t('TEMPLATES.CREATE_FIRST_TEMPLATE')"
-          @click="navigateToNewTemplate"
+        <span class="text-base text-n-slate-11">
+          {{ $t('WHATSAPP_TEMPLATE_MGMT.NO_RESULTS') }}
+        </span>
+      </div>
+
+      <div v-else class="border-t divide-y divide-n-weak border-n-weak">
+        <TemplateCard
+          v-for="template in filteredTemplates"
+          :key="template.key"
+          :template="template"
+          @preview="openPreview(template)"
         />
       </div>
+    </template>
 
-      <!-- No Results -->
-      <div
-        v-else-if="filteredTemplates.length === 0"
-        class="flex flex-col items-center justify-center h-64"
-      >
-        <i class="i-lucide-search-x text-6xl text-n-slate-8 mb-4" />
-        <div class="text-n-slate-11">{{ t('TEMPLATES.NO_RESULTS') }}</div>
-      </div>
-
-      <!-- Templates Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div
-          v-for="template in filteredTemplates"
-          :key="template.id"
-          class="border border-n-slate-7 dark:border-n-slate-6 rounded-lg p-5 hover:shadow-lg hover:border-n-blue-7 transition-all bg-white dark:bg-n-slate-2"
-        >
-          <!-- Header -->
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex-1">
-              <h3 class="text-base font-semibold text-n-slate-12 mb-2">
-                {{ template.name }}
-              </h3>
-              <div class="flex items-center gap-2">
-                <span
-                  class="px-2 py-1 text-xs rounded-full"
-                  :class="getStatusBadgeClass(template.status)"
-                >
-                  {{ getStatusLabel(template.status) }}
-                </span>
-                <span
-                  v-if="template.category"
-                  class="px-2 py-1 text-xs rounded-full bg-n-slate-3 text-n-slate-11 font-medium"
-                >
-                  {{ getCategoryLabel(template.category) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Description -->
-          <p
-            v-if="template.description"
-            class="text-sm text-n-slate-11 mb-3 line-clamp-2"
-          >
-            {{ template.description }}
-          </p>
-
-          <!-- Supported Channels -->
-          <div class="flex items-center gap-2 mb-3">
-            <span class="text-xs font-medium text-n-slate-10 uppercase">
-              {{ t('TEMPLATES.SUPPORTED_CHANNELS') }}
-            </span>
-            <div class="flex gap-2">
-              <span
-                v-for="channel in template.supportedChannels"
-                :key="channel"
-                class="w-6 h-6 flex items-center justify-center bg-n-slate-2 rounded"
-                :title="channel"
-              >
-                <img
-                  v-if="isAppleMessagesChannel(channel)"
-                  :src="AppleLogo"
-                  alt="Apple Messages"
-                  class="w-4 h-4"
-                />
-                <i
-                  v-else
-                  :class="`i-lucide-${getChannelIcon(channel)}`"
-                  class="w-4 h-4 text-n-slate-11"
-                />
-              </span>
-            </div>
-          </div>
-
-          <!-- Tags and Use Cases -->
-          <div
-            v-if="
-              (template.tags && template.tags.length > 0) ||
-              (template.useCases && template.useCases.length > 0)
-            "
-            class="mb-3"
-          >
-            <div class="flex flex-wrap gap-1">
-              <!-- Regular Tags -->
-              <span
-                v-for="tag in (template.tags || []).slice(0, 3)"
-                :key="tag"
-                class="px-2 py-1 text-xs rounded bg-n-slate-2 text-n-slate-11"
-              >
-                {{ tag }}
-              </span>
-              <!-- Use Cases (Bot API) -->
-              <span
-                v-for="useCase in template.useCases || []"
-                :key="useCase"
-                class="px-2 py-1 text-xs rounded bg-n-blue-2 text-n-blue-11 font-semibold border border-n-blue-7"
-                :title="getUseCaseTitle(useCase)"
-              >
-                {{ getUseCaseLabel(useCase) }}
-              </span>
-              <span
-                v-if="template.tags && template.tags.length > 3"
-                class="px-2 py-1 text-xs rounded bg-n-slate-2 text-n-slate-11 font-medium"
-              >
-                {{
-                  t('TEMPLATES.TAGS_MORE', { count: template.tags.length - 3 })
-                }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-2 pt-3 border-t border-n-weak">
-            <Button
-              icon="i-lucide-pen"
-              slate
-              xs
-              faded
-              @click="navigateToEdit(template.id)"
-            >
-              {{ t('TEMPLATES.ACTIONS.EDIT') }}
-            </Button>
-            <Button
-              icon="i-lucide-copy"
-              slate
-              xs
-              faded
-              @click="duplicateTemplate(template)"
-            >
-              {{ t('TEMPLATES.ACTIONS.DUPLICATE') }}
-            </Button>
-            <Button
-              icon="i-lucide-trash-2"
-              ruby
-              xs
-              faded
-              @click="openDeleteConfirmation(template)"
-            >
-              {{ t('TEMPLATES.ACTIONS.DELETE') }}
-            </Button>
-          </div>
-
-          <!-- Metadata -->
-          <div
-            class="flex items-center justify-between mt-3 pt-3 border-t border-n-weak"
-          >
-            <span class="text-xs text-n-slate-10">
-              {{
-                t('TEMPLATES.VERSION_LABEL', { version: template.version || 1 })
-              }}
-              <span class="text-n-slate-9 ml-1">{{
-                t('TEMPLATES.TEMPLATE_ID_LABEL', { id: template.id })
-              }}</span>
-            </span>
-            <span class="text-xs text-n-slate-10">
-              {{
-                t('TEMPLATES.UPDATED_LABEL', {
-                  date: new Date(template.updatedAt).toLocaleDateString(),
-                })
-              }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <woot-delete-modal
-      v-if="showDeleteConfirmation"
-      :show="showDeleteConfirmation"
-      :on-confirm="confirmDelete"
-      :title="t('TEMPLATES.DELETE_MODAL.TITLE')"
-      :message="
-        t('TEMPLATES.DELETE_MODAL.MESSAGE', { name: templateToDelete?.name })
-      "
-      :confirm-text="t('TEMPLATES.DELETE_MODAL.CONFIRM')"
-      :reject-text="t('TEMPLATES.DELETE_MODAL.CANCEL')"
-      @close="closeDeleteConfirmation"
-    />
-  </div>
+    <TemplatePreviewDrawer ref="previewPanelRef" :template="selectedTemplate" />
+  </SettingsLayout>
 </template>

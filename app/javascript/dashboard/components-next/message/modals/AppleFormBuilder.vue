@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
-import SharedImageSelector from 'dashboard/routes/dashboard/settings/templates/components/SharedImageSelector.vue';
+import SharedImageSelector from 'dashboard/routes/dashboard/settings/message-templates/components/SharedImageSelector.vue';
 
 const props = defineProps({
   show: {
