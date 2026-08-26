@@ -15,6 +15,10 @@ export default {
       type: Number,
       default: undefined,
     },
+    sendRenderedContent: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['onSend', 'cancel', 'update:show'],
   data() {
@@ -57,7 +61,7 @@ export default {
 </script>
 
 <template>
-  <woot-modal v-model:show="localShow" size="modal-big" @close="onClose">
+  <woot-modal v-model:show="localShow" :on-close="onClose" size="modal-big">
     <woot-modal-header
       :header-title="$t('WHATSAPP_TEMPLATES.MODAL.TITLE')"
       :header-content="modalHeaderContent"
@@ -71,6 +75,7 @@ export default {
       <WhatsAppTemplateReply
         v-else
         :template="selectedWaTemplate"
+        :send-rendered-content="sendRenderedContent"
         @reset-template="onResetTemplate"
         @send-message="onSendMessage"
       />
