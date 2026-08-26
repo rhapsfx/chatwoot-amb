@@ -176,7 +176,7 @@ onMounted(() => {
       v-model:show="show"
       full-width
       :show-close-button="false"
-      @close="onClose"
+      :on-close="onClose"
     >
       <div
         class="bg-n-background flex flex-col h-[inherit] w-[inherit] overflow-hidden select-none"
@@ -198,7 +198,7 @@ onMounted(() => {
               rounded-full
               class="flex-shrink-0"
             />
-            <div class="flex flex-col ml-2 rtl:ml-0 rtl:mr-2 overflow-hidden">
+            <div class="flex flex-col ms-2 overflow-hidden">
               <h3 class="text-base leading-5 m-0 font-medium">
                 <span
                   class="overflow-hidden text-n-slate-12 whitespace-nowrap text-ellipsis"
@@ -220,7 +220,7 @@ onMounted(() => {
             <span v-dompurify-html="fileNameFromDataUrl" class="truncate" />
           </div>
 
-          <div class="flex items-center gap-2 ml-2 shrink-0">
+          <div class="flex items-center gap-2 ms-2 shrink-0">
             <NextButton
               v-if="isImage"
               icon="i-lucide-zoom-in"

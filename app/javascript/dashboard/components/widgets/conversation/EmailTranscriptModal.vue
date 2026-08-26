@@ -100,7 +100,7 @@ export default {
 </script>
 
 <template>
-  <woot-modal v-model:show="localShow" @close="onCancel">
+  <woot-modal v-model:show="localShow" :on-close="onCancel">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="$t('EMAIL_TRANSCRIPT.TITLE')"
@@ -123,7 +123,13 @@ export default {
               $t('EMAIL_TRANSCRIPT.FORM.SEND_TO_CONTACT')
             }}</label>
           </div>
-          <div v-if="currentChat.meta.assignee" class="flex items-center gap-2">
+          <div
+            v-if="
+              currentChat.meta.assignee &&
+              currentChat.meta.assignee_type !== 'AgentBot'
+            "
+            class="flex items-center gap-2"
+          >
             <input
               id="assignee"
               v-model="selectedType"
