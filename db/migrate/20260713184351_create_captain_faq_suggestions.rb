@@ -10,7 +10,7 @@ class CreateCaptainFaqSuggestions < ActiveRecord::Migration[7.1]
     create_table :captain_faq_suggestions do |t|
       t.string :question, null: false
       t.text :answer, null: false
-      t.vector :embedding, limit: 1536
+      t.text :embedding  # Temporarily using text instead of vector for development
       t.references :assistant, null: false, index: true
       t.references :account, null: false, index: true
       t.string :language, null: false, default: 'en'
@@ -22,9 +22,7 @@ class CreateCaptainFaqSuggestions < ActiveRecord::Migration[7.1]
 
     add_index :captain_faq_suggestions, [:account_id, :assistant_id, :status, :language],
               name: 'idx_cap_faq_suggestions_on_account_assistant_status_language'
-    add_index :captain_faq_suggestions, :embedding, using: :ivfflat,
-                                                    name: 'vector_idx_captain_faq_suggestions_embedding',
-                                                    opclass: :vector_cosine_ops
+    # add_index :captain_faq_suggestions, :embedding, using: :ivfflat, name: 'vector_idx_captain_faq_suggestions_embedding', opclass: :vector_cosine_ops  # Temporarily disabled for development
   end
 
   def create_faq_observations
