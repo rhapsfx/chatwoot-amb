@@ -2594,6 +2594,7 @@ export default {
           :min-height="4"
           :disabled="isEditorDisabled"
           :enable-macros="isMacrosEnabled"
+          :enable-canned-responses="!isAnAppleMessagesForBusinessChannel"
           enable-variables
           :variables="messageVariables"
           :signature="messageSignature"
