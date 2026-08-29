@@ -886,10 +886,10 @@ const menuItems = computed(() => {
           to: accountScopedRoute('canned_list'),
         },
         {
-          name: 'Settings Message Templates',
-          label: t('SIDEBAR.TEMPLATES'),
+          name: 'Settings Apple Message Templates',
+          label: t('SIDEBAR.APPLE_TEMPLATES'),
           icon: 'i-lucide-file-text',
-          to: accountScopedRoute('message_templates_list'),
+          to: accountScopedRoute('apple_message_templates_list'),
         },
         {
           name: 'Settings Integrations',

@@ -11,18 +11,18 @@ import TemplateBuilder from './TemplateBuilder.vue';
 export default {
   routes: [
     {
-      path: frontendURL('accounts/:accountId/settings/message-templates'),
+      path: frontendURL('accounts/:accountId/settings/apple-message-templates'),
       component: SettingsWrapper,
       children: [
         {
           path: '',
           redirect: to => {
-            return { name: 'message_templates_list', params: to.params };
+            return { name: 'apple_message_templates_list', params: to.params };
           },
         },
         {
           path: 'list',
-          name: 'message_templates_list',
+          name: 'apple_message_templates_list',
           meta: {
             permissions: [
               ...ROLES,
@@ -34,7 +34,7 @@ export default {
         },
         {
           path: 'new',
-          name: 'message_template_new',
+          name: 'apple_message_template_new',
           meta: {
             permissions: ['administrator', TEMPLATE_PERMISSIONS],
           },
@@ -42,7 +42,7 @@ export default {
         },
         {
           path: ':templateId/edit',
-          name: 'message_template_edit',
+          name: 'apple_message_template_edit',
           meta: {
             permissions: ['administrator', TEMPLATE_PERMISSIONS],
           },

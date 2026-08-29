@@ -966,6 +966,7 @@
     "ALL_COMPANIES": "All Companies",
     "ALL_CONTACTS": "All Contacts",
     "ALL_CONVERSATIONS": "All Conversations",
+    "APPLE_TEMPLATES": "Apple Templates",
     "APPLICATIONS": "Applications",
     "AUDIT_LOGS": "Audit Logs",
     "AUTOMATION": "Automation",
@@ -1062,7 +1063,6 @@
     "SWITCH": "Switch",
     "TAGGED_WITH": "Tagged with",
     "TEAMS": "Teams",
-    "TEMPLATES": "Templates",
     "UNATTENDED_CONVERSATIONS": "Unattended",
     "WHATSAPP": "WhatsApp",
     "WHATSAPP_TEMPLATES": "Templates"

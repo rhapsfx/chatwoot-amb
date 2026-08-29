@@ -164,11 +164,11 @@ const fetchTemplates = async () => {
 };
 
 const navigateToNewTemplate = () => {
-  router.push({ name: 'message_template_new' });
+  router.push({ name: 'apple_message_template_new' });
 };
 
 const navigateToEdit = templateId => {
-  router.push({ name: 'message_template_edit', params: { templateId } });
+  router.push({ name: 'apple_message_template_edit', params: { templateId } });
 };
 
 const openDeleteConfirmation = template => {
@@ -335,7 +335,7 @@ onMounted(() => {
 watch(
   () => route.name,
   newName => {
-    if (newName === 'message_templates_list') {
+    if (newName === 'apple_message_templates_list') {
       fetchTemplates();
     }
   }

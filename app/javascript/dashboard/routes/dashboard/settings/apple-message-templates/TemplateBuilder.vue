@@ -197,7 +197,7 @@ const saveTemplate = async () => {
       // Redirect to edit mode for the newly created template
       // This allows user to add attachments without closing the form
       router.push({
-        name: 'message_template_edit',
+        name: 'apple_message_template_edit',
         params: { templateId: response.data.id },
       });
     }
@@ -212,7 +212,7 @@ const saveTemplate = async () => {
 };
 
 const cancel = () => {
-  router.push({ name: 'message_templates_list' });
+  router.push({ name: 'apple_message_templates_list' });
 };
 
 const toggleChannel = channel => {

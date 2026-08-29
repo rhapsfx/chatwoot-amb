@@ -28,7 +28,7 @@ import security from './security/security.routes';
 import conversationWorkflow from './conversationWorkflow/conversationWorkflow.routes';
 import captain from './captain/captain.routes';
 import data from './data/data.routes';
-import messageTemplates from './message-templates/message-templates.routes';
+import appleMessageTemplates from './apple-message-templates/apple-message-templates.routes';
 
 export default {
   routes: [
@@ -72,6 +72,6 @@ export default {
     ...security.routes,
     ...conversationWorkflow.routes,
     ...captain.routes,
-    ...messageTemplates.routes,
+    ...appleMessageTemplates.routes,
   ],
 };
