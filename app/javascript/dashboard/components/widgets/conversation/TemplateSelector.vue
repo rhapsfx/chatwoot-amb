@@ -104,10 +104,15 @@ export default {
   mounted() {
     this.fetchCannedResponses();
     this.fetchTemplates();
-    window.addEventListener('keydown', this.handleKeyDown);
+    // Capture phase: must run before the ProseMirror editor's own keymap
+    // sees the event, otherwise Enter/ArrowUp/ArrowDown are handled twice —
+    // once here (to navigate/select) and once by the editor (which, for
+    // Enter, inserts a newline into the message before this preventDefault
+    // ever runs).
+    window.addEventListener('keydown', this.handleKeyDown, true);
   },
   beforeUnmount() {
-    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keydown', this.handleKeyDown, true);
   },
   methods: {
     fetchCannedResponses() {
@@ -133,6 +138,7 @@ export default {
       switch (event.key) {
         case 'ArrowDown':
           event.preventDefault();
+          event.stopPropagation();
           this.selectedIndex = Math.min(
             this.selectedIndex + 1,
             this.items.length - 1
@@ -141,16 +147,20 @@ export default {
           break;
         case 'ArrowUp':
           event.preventDefault();
+          event.stopPropagation();
           this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
           this.scrollToSelected();
           break;
         case 'Enter':
           event.preventDefault();
+          event.stopPropagation();
           if (this.items[this.selectedIndex]) {
             this.handleSelect(this.items[this.selectedIndex]);
           }
           break;
         case 'Escape':
+          event.preventDefault();
+          event.stopPropagation();
           this.$emit('keydown', event);
           break;
         default:
