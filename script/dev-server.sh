@@ -138,7 +138,11 @@ cleanup_stale_processes() {
     fi
 
     # Kill any Vite dev server processes that might be orphaned
-    local vite_pids=$(pgrep -f "bin/vite dev" 2>/dev/null || true)
+    # Port-based (like the Rails cleanup above), not process-name matching:
+    # bin/vite execs into `pnpm exec vite --mode development`, replacing its
+    # own process image, so a "bin/vite dev" name pattern never matches the
+    # actual running process and orphans survive every cleanup pass.
+    local vite_pids=$(lsof -ti :3036 2>/dev/null || true)
     if [ -n "$vite_pids" ]; then
         print_status "Killing stale Vite dev server processes: $vite_pids"
         echo "$vite_pids" | xargs kill -9 2>/dev/null || true
