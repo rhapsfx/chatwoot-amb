@@ -111,8 +111,32 @@ class AppleMessagesForBusiness::MessageProcessorService
     @inbox.channel_type == 'Channel::AppleMessagesForBusiness'
   end
 
+  # The rich-text editor's markdown serializer emits `[displayText](href)` for a hyperlink
+  # whenever its visible text differs from its href (e.g. a clean display URL behind a
+  # UTM/gclid-tracked href), and separately backslash-escapes markdown-special characters like
+  # `_` inside the href. Left alone, this breaks URL detection two ways: the escape sequence
+  # truncates the regex match mid-URL, and the bracketed display text (itself often a duplicate,
+  # shorter URL) gets detected as a second, separate link. Unwrap to the real href first.
+  MARKDOWN_LINK_REGEX = /\[([^\]]*)\]\(([^\s)]+)\)/
+
+  def unwrap_markdown_links(text)
+    text.gsub(MARKDOWN_LINK_REGEX) do
+      link_text = Regexp.last_match(1).to_s.strip
+      href = Regexp.last_match(2)
+      unescaped_href = href.gsub(/\\([\\`*_{}\[\]()#+\-.!])/, '\1')
+
+      if link_text.blank? || unescaped_href == link_text || unescaped_href.start_with?(link_text)
+        unescaped_href
+      else
+        "#{link_text} #{unescaped_href}"
+      end
+    end
+  end
+
   def split_message_by_urls(text)
     return [{ type: 'text', content: text }] if text.blank?
+
+    text = unwrap_markdown_links(text)
 
     # Enhanced regex to match:
     # 1. URLs with protocol: http://example.com or https://example.com
@@ -153,6 +177,14 @@ class AppleMessagesForBusiness::MessageProcessorService
     urls_found.each do |url_info|
       url = url_info[:url]
       match_start = url_info[:position]
+      match_end = match_start + url.length
+
+      # Autolink-style wrapping (`<https://example.com>`) is a common rich-text-editor/markdown
+      # convention for delimiting a bare URL. The URL regexes above correctly exclude `<`/`>` from
+      # the URL itself, but without this the leftover bracket becomes its own throwaway "<" / ">"
+      # message bubble. Treat adjacent brackets as delimiters, not message text.
+      match_start -= 1 if match_start.positive? && remaining_text[match_start - 1] == '<'
+      match_end += 1 if remaining_text[match_end] == '>'
 
       # Add text before URL if exists
       if match_start > last_index
@@ -164,7 +196,7 @@ class AppleMessagesForBusiness::MessageProcessorService
       normalized_url = url_info[:has_protocol] ? url : "https://#{url}"
       parts << { type: 'url', content: normalized_url, original: url }
 
-      last_index = match_start + url.length
+      last_index = match_end
     end
 
     # Add remaining text after last URL if exists

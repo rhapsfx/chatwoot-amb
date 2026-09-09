@@ -10,6 +10,36 @@ import ParseUrlAPI from '../api/appleMessages/parseUrl';
 export const URL_REGEX =
   /(?:https?:\/\/)?(?:www\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[a-zA-Z0-9\-._~:/?#@!$&'()*+,;=%]+)?/gi;
 
+// The rich-text editor's markdown serializer emits `[displayText](href)` for a hyperlink
+// whenever its visible text differs from its href (e.g. a clean display URL behind a
+// UTM/gclid-tracked href), and separately backslash-escapes markdown-special characters like
+// `_` inside the href. Left alone, this breaks URL detection two ways: the escape sequence
+// truncates the regex match mid-URL, and the bracketed display text (itself often a duplicate,
+// shorter URL) gets detected as a second, separate link. Unwrap to the real href before
+// anything else runs.
+const MARKDOWN_LINK_REGEX = /\[([^\]]*)\]\(([^\s)]+)\)/g;
+
+export const unwrapMarkdownLinks = text => {
+  if (!text || typeof text !== 'string') return text;
+
+  return text.replace(MARKDOWN_LINK_REGEX, (match, linkText, href) => {
+    const unescapedHref = href.replace(/\\([\\`*_{}[\]()#+\-.!])/g, '$1');
+    const trimmedLinkText = linkText.trim();
+
+    // Display text is just the href (or a prefix of it) — the serializer's redundant echo,
+    // not real message content, so drop it and keep only the real URL.
+    if (
+      !trimmedLinkText ||
+      unescapedHref === trimmedLinkText ||
+      unescapedHref.startsWith(trimmedLinkText)
+    ) {
+      return unescapedHref;
+    }
+
+    return `${trimmedLinkText} ${unescapedHref}`;
+  });
+};
+
 // Preprocess text to join URLs split across lines
 // This handles cases where users copy-paste URLs that get line-wrapped
 export const preprocessTextForURLDetection = text => {
@@ -17,7 +47,7 @@ export const preprocessTextForURLDetection = text => {
 
   // Remove all line breaks and extra whitespace within URLs
   // This aggressively joins any URL fragments
-  let processed = text;
+  let processed = unwrapMarkdownLinks(text);
 
   // First pass: Join URL parts split mid-domain (e.g., "maps.apple" + ".com/path")
   // This handles cases where the TLD is separated from the domain name
@@ -116,9 +146,23 @@ export const splitMessageByURLs = text => {
   let match = urlRegex.exec(processedText);
 
   while (match !== null) {
+    let matchStart = match.index;
+    let matchEnd = match.index + match[0].length;
+
+    // Autolink-style wrapping (`<https://example.com>`) is a common rich-text-editor/markdown
+    // convention for delimiting a bare URL. URL_REGEX correctly excludes `<`/`>` from the URL
+    // itself, but without this the leftover bracket becomes its own throwaway "<" / ">" message
+    // bubble. Treat adjacent brackets as delimiters, not message text.
+    if (matchStart > 0 && processedText[matchStart - 1] === '<') {
+      matchStart -= 1;
+    }
+    if (processedText[matchEnd] === '>') {
+      matchEnd += 1;
+    }
+
     // Add text before URL if exists
-    if (match.index > lastIndex) {
-      const beforeText = processedText.slice(lastIndex, match.index).trim();
+    if (matchStart > lastIndex) {
+      const beforeText = processedText.slice(lastIndex, matchStart).trim();
       if (beforeText) {
         parts.push({ type: 'text', content: beforeText });
       }
@@ -127,7 +171,7 @@ export const splitMessageByURLs = text => {
     // Add URL as Rich Link (normalize URL first)
     parts.push({ type: 'url', content: normalizeURL(match[0]) });
 
-    lastIndex = match.index + match[0].length;
+    lastIndex = matchEnd;
     match = urlRegex.exec(processedText);
   }
 
