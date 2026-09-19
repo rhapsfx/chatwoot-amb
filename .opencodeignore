@@ -1,0 +1,19 @@
+# Rails heavy files
+/log/
+/tmp/
+/storage/
+/public/packs/
+/public/assets/
+/db/schema.rb       # Temporarily ignore if massive, pull it in manually only when editing migrations
+/db/development.sqlite3
+
+# Frontend heavy files
+/node_modules/
+/dist/
+/.vite/
+/public/vite/
+
+# System / IDE
+/.git/
+/.idea/
+/.vscode/
