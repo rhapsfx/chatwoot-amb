@@ -30,6 +30,7 @@ master.key
 # Ignore env files
 .env
 .env.production
+.env.bak
 
 # Ignore local AMB template extraction dumps
 amb_templates_*.json
