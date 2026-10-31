@@ -1,8 +1,8 @@
 # pre-build stage
-FROM node:24-alpine as node
-FROM ruby:3.4.4-alpine3.21 AS pre-builder
+FROM node:24.22.1-alpine as node
+FROM ruby:3.4.12-alpine3.23 AS pre-builder
 
-ARG NODE_VERSION="24.13.0"
+ARG NODE_VERSION="24.22.1"
 ARG PNPM_VERSION="10.2.0"
 ENV NODE_VERSION=${NODE_VERSION}
 ENV PNPM_VERSION=${PNPM_VERSION}
@@ -96,9 +96,9 @@ RUN rm -rf /gems/ruby/3.4.0/cache/*.gem \
   && rm .gitignore
 
 # final build stage
-FROM ruby:3.4.4-alpine3.21
+FROM ruby:3.4.12-alpine3.23
 
-ARG NODE_VERSION="24.13.0"
+ARG NODE_VERSION="24.22.1"
 ARG PNPM_VERSION="10.2.0"
 ENV NODE_VERSION=${NODE_VERSION}
 ENV PNPM_VERSION=${PNPM_VERSION}

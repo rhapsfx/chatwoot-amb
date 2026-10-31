@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby '3.4.4'
+ruby '3.4.12'
 
 # Required by reline; will no longer be a default gem in Ruby 3.5.0
 gem 'fiddle'
