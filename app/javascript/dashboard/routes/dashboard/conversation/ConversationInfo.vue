@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
+import { getUnixTime } from 'date-fns';
 import { getLanguageName } from 'dashboard/components/widgets/conversation/advancedFilterItems/languages';
+import { useExactTimestamp } from 'shared/composables/useExactTimestamp';
 import ContactDetailsItem from './ContactDetailsItem.vue';
 import CustomAttributes from './customAttributes/CustomAttributes.vue';
 
@@ -20,9 +22,19 @@ const referer = computed(() => {
   return value ? { value } : null;
 });
 
+const exactTimestamp = useExactTimestamp({ showTimeZone: true });
+
+// Stored as a raw string: the visitor's `Date.toString()` for widget
+// conversations and a UTC time for email ones. Re-render it in the agent's
+// own timezone and locale; fall back to the raw value when unparseable.
 const initiatedAt = computed(() => {
-  const value = props.conversationAttributes.initiated_at?.timestamp;
-  return value ? { value } : null;
+  const timestamp = props.conversationAttributes.initiated_at?.timestamp;
+  if (!timestamp) return null;
+
+  const initiatedDate = new Date(timestamp);
+  if (Number.isNaN(initiatedDate.getTime())) return { value: timestamp };
+
+  return { value: exactTimestamp(getUnixTime(initiatedDate)) };
 });
 
 const browserInfo = computed(() => props.conversationAttributes.browser);

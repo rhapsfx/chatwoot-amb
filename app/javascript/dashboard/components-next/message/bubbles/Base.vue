@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import MessageMeta from '../MessageMeta.vue';
 import ApplePayloadModal from '../modals/ApplePayloadModal.vue';
 import CaptainGenerationDetails from '../CaptainGenerationDetails.vue';
+import TranslationToggle from '../TranslationToggle.vue';
 
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
@@ -12,12 +13,7 @@ import { useMapGetter } from 'dashboard/composables/store';
 
 import MessageFormatter from 'shared/helpers/MessageFormatter.js';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
-import {
-  MESSAGE_VARIANTS,
-  MESSAGE_TYPES,
-  ORIENTATION,
-  SENDER_TYPES,
-} from '../constants';
+import { MESSAGE_VARIANTS, MESSAGE_TYPES, ORIENTATION } from '../constants';
 
 const props = defineProps({
   hideMeta: { type: Boolean, default: false },
@@ -36,14 +32,19 @@ const {
   contentAttributes,
   status,
   id,
-  sender,
-  senderType,
+  isCaptainMessage,
+  showingOriginal,
 } = useMessageContext();
 const { t } = useI18n();
 
-const isCaptainMessage = computed(
-  () =>
-    (sender.value?.type ?? senderType.value) === SENDER_TYPES.CAPTAIN_ASSISTANT
+const metaColorClass = computed(() =>
+  variant.value === MESSAGE_VARIANTS.PRIVATE
+    ? 'text-n-amber-12/50'
+    : 'text-n-slate-11'
+);
+
+const emailMetaClass = computed(() =>
+  variant.value === MESSAGE_VARIANTS.EMAIL ? 'px-3 pb-3' : ''
 );
 
 const varaintBaseMap = {
@@ -101,16 +102,6 @@ const shouldShowMeta = computed(
     !props.hideMeta &&
     !shouldGroupWithNext.value &&
     variant.value !== MESSAGE_VARIANTS.ACTIVITY
-);
-
-const metaColorClass = computed(() =>
-  variant.value === MESSAGE_VARIANTS.PRIVATE
-    ? 'text-n-amber-12/50'
-    : 'text-n-slate-11'
-);
-
-const emailMetaClass = computed(() =>
-  variant.value === MESSAGE_VARIANTS.EMAIL ? 'px-3 pb-3' : ''
 );
 
 const replyToPreview = computed(() => {
@@ -171,8 +162,16 @@ const hasApplePayloadData = computed(
     >
       <template v-if="shouldShowMeta">
         <CaptainGenerationDetails v-if="isCaptainMessage" :message-id="id">
+          <TranslationToggle
+            :icon="false"
+            :showing-original="showingOriginal"
+            @toggle="showingOriginal = !showingOriginal"
+          />
           <template #meta>
-            <MessageMeta :class="metaColorClass" />
+            <MessageMeta
+              class="shrink-0 whitespace-nowrap"
+              :class="metaColorClass"
+            />
           </template>
         </CaptainGenerationDetails>
         <MessageMeta v-else :class="metaColorClass" />

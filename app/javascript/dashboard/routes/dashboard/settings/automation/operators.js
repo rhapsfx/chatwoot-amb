@@ -139,3 +139,14 @@ export const OPERATOR_TYPES_APPLE_MESSAGES = [
     label: 'Is not present',
   },
 ];
+
+export const CAPTAIN_OPERATOR_TYPES = [
+  {
+    value: 'detects',
+    label: 'Detects',
+  },
+  {
+    value: 'does_not_detect',
+    label: 'Does not detect',
+  },
+];
