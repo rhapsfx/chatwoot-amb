@@ -98,11 +98,15 @@ GEM
       jbuilder (~> 2)
       rails (>= 4.2, < 8.0)
       selectize-rails (~> 0.6)
-    ai-agents (0.12.0)
-      ruby_llm (~> 1.14)
+    ai-agents (0.13.0)
+      ruby_llm (~> 2.0.0)
     annotaterb (4.20.0)
       activerecord (>= 6.0.0)
       activesupport (>= 6.0.0)
+    apnotic (1.8.0)
+      base64
+      connection_pool (>= 2, < 4)
+      net-http2 (>= 0.18.3, < 2)
     ast (2.4.3)
     attr_extras (7.1.0)
     audited (5.4.1)
@@ -133,6 +137,9 @@ GEM
     aws-sdk-s3 (1.208.0)
       aws-sdk-core (~> 3, >= 3.234.0)
       aws-sdk-kms (~> 1)
+      aws-sigv4 (~> 1.5)
+    aws-sdk-sesv2 (1.92.0)
+      aws-sdk-core (~> 3, >= 3.239.1)
       aws-sigv4 (~> 1.5)
     aws-sdk-sns (1.70.0)
       aws-sdk-core (~> 3, >= 3.188.0)
@@ -177,7 +184,7 @@ GEM
     crack (1.0.0)
       bigdecimal
       rexml
-    crass (1.0.7)
+    crass (1.0.8)
     cronex (0.15.0)
       tzinfo
       unicode (>= 0.4.4.5)
@@ -288,7 +295,7 @@ GEM
       railties (>= 5.0.0)
     faker (3.2.0)
       i18n (>= 1.8.11, < 2)
-    faraday (2.14.3)
+    faraday (2.14.4)
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
@@ -423,6 +430,7 @@ GEM
       logger
     html2text (0.4.0)
       nokogiri (>= 1.0, < 2.0)
+    http-2 (1.2.3)
     http (5.1.1)
       addressable (~> 2.8)
       http-cookie (~> 1.0)
@@ -458,7 +466,7 @@ GEM
       rails-dom-testing (>= 1, < 3)
       railties (>= 4.2.0)
       thor (>= 0.14, < 2.0)
-    json (2.19.9)
+    json (2.21.2)
     json_refs (0.1.8)
       hana
     json_schemer (0.2.24)
@@ -541,7 +549,7 @@ GEM
       net-imap
       net-pop
       net-smtp
-    marcel (1.1.0)
+    marcel (1.2.1)
     maxminddb (0.1.22)
     meta_request (0.8.5)
       rack-contrib (>= 1.1, < 3)
@@ -566,6 +574,8 @@ GEM
       activerecord (>= 5.2)
     net-http (0.9.1)
       uri (>= 0.11.1)
+    net-http2 (0.19.0)
+      http-2 (>= 1.0)
     net-imap (0.6.4.1)
       date
       net-protocol
@@ -660,7 +670,7 @@ GEM
     os (1.1.4)
     ostruct (0.6.3)
     parallel (1.27.0)
-    parallel_tests (5.7.0)
+    parallel_tests (5.9.0)
       parallel
     parser (3.3.8.0)
       ast (~> 2.4.1)
@@ -705,8 +715,8 @@ GEM
       base64 (>= 0.1.0)
       logger (>= 1.6.0)
       rack (>= 3.0.0, < 4)
-    rack-proxy (0.7.7)
-      rack
+    rack-proxy (1.0.3)
+      rack (>= 2.0, < 4)
     rack-session (2.1.2)
       base64 (>= 0.1.0)
       rack (>= 3.0.0)
@@ -854,21 +864,21 @@ GEM
     ruby2ruby (2.5.0)
       ruby_parser (~> 3.1)
       sexp_processor (~> 4.6)
-    ruby_llm (1.15.0)
+    ruby_llm (2.0.0)
       base64
       event_stream_parser (~> 1)
       faraday (>= 1.10.0)
       faraday-multipart (>= 1)
       faraday-net_http (>= 1)
       faraday-retry (>= 1)
-      marcel (~> 1)
-      ruby_llm-schema (~> 0)
+      json (< 3)
+      marcel (>= 1.0, < 3)
+      schematist (~> 1.1)
       zeitwerk (~> 2)
-    ruby_llm-schema (0.3.0)
     ruby_parser (3.22.0)
       racc (~> 1.5)
       sexp_processor (~> 4.16)
-    rubyzip (3.5.0)
+    rubyzip (3.7.0)
     sass (3.7.4)
       sass-listen (~> 4.0.0)
     sass-listen (4.0.0)
@@ -882,6 +892,7 @@ GEM
       sprockets (> 3.0)
       sprockets-rails
       tilt
+    schematist (1.1.0)
     scout_apm (5.3.3)
       parser
     scss_lint (0.60.0)
@@ -958,10 +969,6 @@ GEM
     sorbet-runtime (0.5.11934)
     speedshop-cloudwatch (0.2.1)
       aws-sdk-cloudwatch (>= 1.81.0)
-    spring (4.1.1)
-    spring-watcher-listen (2.1.0)
-      listen (>= 2.7, < 4.0)
-      spring (>= 4)
     sprockets (4.2.1)
       concurrent-ruby (~> 1.0)
       rack (>= 2.2.4, < 4)
@@ -983,9 +990,6 @@ GEM
       rack (>= 2.0)
       rails (>= 7.1.0)
     tilt (2.3.0)
-    time_diff (0.3.0)
-      activesupport
-      i18n
     timeout (0.6.1)
     trailblazer-option (0.1.2)
     tsort (0.2.0)
@@ -997,7 +1001,7 @@ GEM
       oauth
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
-    tzinfo-data (1.2023.3)
+    tzinfo-data (1.2026.4)
       tzinfo (>= 1.0.0)
     uber (0.1.0)
     uglifier (4.2.0)
@@ -1021,11 +1025,11 @@ GEM
     vite_rails (3.10.0)
       railties (>= 5.1, < 9)
       vite_ruby (~> 3.0, >= 3.2.2)
-    vite_ruby (3.10.2)
+    vite_ruby (3.10.6)
       dry-cli (>= 0.7, < 2)
       logger (~> 1.6)
       mutex_m
-      rack-proxy (~> 0.6, >= 0.6.1)
+      rack-proxy (>= 0.6.1)
       zeitwerk (~> 2.2)
     warden (1.2.9)
       rack (>= 2.0.9)
@@ -1049,7 +1053,7 @@ GEM
     working_hours (1.4.1)
       activesupport (>= 3.2)
       tzinfo
-    zeitwerk (2.7.5)
+    zeitwerk (2.8.3)
 
 PLATFORMS
   arm64-darwin-20
@@ -1069,12 +1073,14 @@ DEPENDENCIES
   administrate (>= 0.20.1)
   administrate-field-active_storage (>= 1.0.3)
   administrate-field-belongs_to_search (>= 0.10.0)
-  ai-agents (>= 0.12.0)
+  ai-agents (~> 0.13.0)
   annotaterb
+  apnotic (~> 1.8)
   attr_extras
   audited (~> 5.4, >= 5.4.1)
   aws-actionmailbox-ses (~> 0)
   aws-sdk-s3
+  aws-sdk-sesv2
   azure-blob
   barnes
   bootsnap
@@ -1178,8 +1184,7 @@ DEPENDENCIES
   rubocop-rails
   rubocop-rspec
   ruby-openai
-  ruby_llm (>= 1.14.1)
-  ruby_llm-schema
+  ruby_llm (~> 2.0.0)
   scout_apm
   scss_lint
   searchkick
@@ -1197,8 +1202,6 @@ DEPENDENCIES
   skooma
   slack-ruby-client (~> 2.7.0)
   speedshop-cloudwatch (~> 0.2.1)
-  spring
-  spring-watcher-listen
   squasher
   ssrf_filter (~> 1.5)
   stackprof
@@ -1206,7 +1209,6 @@ DEPENDENCIES
   telephone_number
   test-prof
   tidewave
-  time_diff
   twilio-ruby
   twitty (~> 0.1.5)
   tzinfo-data
@@ -1220,7 +1222,7 @@ DEPENDENCIES
   working_hours
 
 RUBY VERSION
-   ruby 3.4.12p0
+   ruby 3.4.12p148
 
 BUNDLED WITH
    2.5.16
