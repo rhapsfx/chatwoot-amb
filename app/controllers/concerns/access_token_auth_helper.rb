@@ -8,25 +8,40 @@ module AccessTokenAuthHelper
     'api/v1/accounts/templates' => %w[index show]
   }.freeze
 
+  def authenticate_by_access_token?
+    legacy_access_token.present? || (!bearer_access_token.nil? && !dashboard_bearer_token?)
+  end
+
   def ensure_access_token
-    # Try multiple header formats (some may be stripped by proxies)
-    token = request.headers['X-Api-Access-Token'] ||
-            request.headers['HTTP_X_API_ACCESS_TOKEN'] ||
-            request.headers[:api_access_token] ||
-            request.headers[:HTTP_API_ACCESS_TOKEN] ||
-            params[:api_access_token]
-
-    Rails.logger.info "[AccessToken] Token found: #{token.present?}"
-    Rails.logger.info "[AccessToken] Token value (first 10 chars): #{token&.first(10)}"
-
+    token = bearer_access_token || legacy_access_token
     @access_token = AccessToken.find_by(token: token) if token.present?
+  end
 
-    Rails.logger.info "[AccessToken] AccessToken record found: #{@access_token.present?}"
-    Rails.logger.info "[AccessToken] Owner type: #{@access_token&.owner&.class&.name}"
+  def legacy_access_token
+    # X-Api-Access-Token and the query param are used by bots/n8n (some proxies strip the plain api_access_token header)
+    request.headers['X-Api-Access-Token'] || request.headers[:api_access_token] || request.headers[:HTTP_API_ACCESS_TOKEN] ||
+      params[:api_access_token]
+  end
+
+  # TODO: Use request.bearer_token once we upgrade to a Rails version that provides it.
+  def bearer_access_token
+    scheme, token = request.authorization.to_s.split(' ', 2)
+    # An empty credential must not fall back to another authentication method.
+    token.to_s if scheme&.casecmp?('Bearer')
+  end
+
+  # Our dashboard UI uses DeviseTokenAuth, which can send login credentials in the Bearer header.
+  # Let DeviseTokenAuth handle those credentials instead of treating them as API tokens.
+  def dashboard_bearer_token?
+    return false unless respond_to?(:decode_bearer_token, true)
+
+    credentials = decode_bearer_token(request.authorization)
+    credentials.is_a?(Hash) && credentials.values_at('uid', 'client', 'access-token').all?(&:present?)
   end
 
   def authenticate_access_token!
     ensure_access_token
+
     render_unauthorized('Invalid Access Token') && return if @access_token.blank?
 
     # NOTE: This ensures that current_user is set and available for the rest of the controller actions

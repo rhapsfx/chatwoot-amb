@@ -20,6 +20,8 @@ class SendReplyJob < ApplicationJob
     message = Message.includes(attachments: { file_attachment: :blob }).find(message_id)
     channel_name = message.conversation.inbox.channel.class.to_s
 
+    Captain::Conversation::AgentMessageTranslationService.new(message: message).perform if message.content_attributes['translation_pending']
+
     return send_on_facebook_page(message) if channel_name == 'Channel::FacebookPage'
 
     service_class = CHANNEL_SERVICES[channel_name]
