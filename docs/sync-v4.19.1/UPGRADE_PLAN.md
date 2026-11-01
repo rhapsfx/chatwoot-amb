@@ -111,3 +111,31 @@ Production is the Synology NAS (`docker-compose.nas.yml`, see memory `project_pr
 
 ## Open questions
 - No document in the repo defines "custom UI layout" explicitly. This plan treats it as the fork's edits to `Sidebar.vue`, `_woot.scss`, `ConversationInfo.vue`, `bubbles/Base.vue`, `MessageList.vue`, `Text/Index.vue` and the inbox settings pages. If you have other layout changes (e.g. in the conversation list or app shell), name them and I'll add them to the guard script.
+
+## Execution log and learnings (branch `sync/v4.19.1`)
+
+Phases 0+1 through 6 are committed; every commit passes `script/check_amb_sync.sh`. Verification run on the merged tree: Rails migrations on a clone of the dev DB (all 28 apply), `zeitwerk:check`, production `vite build`, ESLint, ~3,900 backend specs, and `script/test_amb_bot.rb --dry-run` (31/31 triggers).
+
+### Method that worked
+- **Three-way merge per file** (`git merge-file` with base = upstream previous tag, ours = pre-sync commit, theirs = new tag), then resolve hunks by hand. For the i18n JSON files a **key-level merge** (parse, merge per leaf key, emit in upstream key order) turned ~45 line-conflicts into 1 real one and cut the diff against upstream from ~5,000 lines to the fork's actual additions.
+- **Rebuild from upstream and re-apply the fork delta** when upstream restructured the file (`Base.vue`, `apps.yml`, `access_token_auth_helper.rb`); patch conflict markers only for small hunks.
+- **Baseline against pristine upstream**: a git worktree of the upstream tag, same Ruby/gems/DB, run the same specs. It proved the 23 wide-suite failures are environmental (identical on upstream) and isolated 2 real fork regressions.
+- The `db:migrate` run triggers the annotation rake task and rewrites ~20 model files; revert them (`git checkout -- app enterprise`).
+
+### Stale fork drift found and removed (not AMB features)
+Carried over from the fork's original import and never reconciled with upstream: `belongs_to :conversation, touch: true` and `reorder('id desc')` in `message.rb`; webhook payloads using rendered `outgoing_content` instead of raw `webhook_content`; a corrupted `"_\#{message_text}_"` in the Slack service (literal text in Slack activity messages); token-prefix debug logging in `access_token_auth_helper.rb`; stale English wording for 14 i18n keys. Check `git diff v4.X efc... -- <file>` for such "fork modified an existing non-AMB line" cases on every sync.
+
+### Decisions worth knowing
+- **messages_controller#create**: the AMB `create_params` allowlist is now used only on the Apple branch; the regular branch passes raw `params` like upstream. The allowlist silently dropped `cc_emails`, `bcc_emails`, `to_emails`, `subject`, `forwarded_attachment_ids`, `template_params`, `email_html_content`.
+- **Bot API contract kept**: `X-Api-Access-Token` header and `?api_access_token=` still authenticate (documented in `docs/api/BOT_TEMPLATES_API.md`); implemented inside upstream's `legacy_access_token`.
+- **perplexity integration** kept, without the `label_suggestion` option (feature removed upstream).
+- **Quoted-reply toggle** (`toggleQuotedReply`, `setQuotedReplyFlagForInbox`) dropped in favour of upstream's remove/restore flow.
+- **Left as-is** (pre-existing, unused): `posthog-js` and `vue-virtual-scroller` in `package.json`, `toggleRichContentEditor`/`showRichContentEditor` in ReplyBox, 🔥 `console.log` debugging in `api/inbox/message.js` and `replaceText`.
+- `spec/models/message_spec.rb:152` expects upstream's `push_event_data` keys and fails on the fork's `apple_msp_payload`; left unedited to avoid re-conflicting an upstream spec every sync.
+
+### Environment gotchas
+- Ruby 3.4.12 must be built against `openssl@3` on this Mac (`RUBY_CONFIGURE_OPTS="--with-openssl-dir=$(brew --prefix openssl@3)"`); Homebrew's default OpenSSL 4 breaks the locked `openssl 3.2.0` gem.
+- Local Postgres has no `pgvector`; the fork's schema omits the `vector` extension (upstream's `schema.rb` can't load locally).
+- Node here is v26; the repo wants 24.x. 56 vitest tests fail only from that (storage/timezone/`Intl` in jsdom); none touch fork code.
+- `script/*` is gitignored; new scripts need `git add -f`.
+- The rspec wide-run failures (report builder, audit logs, SLA, agent builder) depend on test ordering/shared DB and also fail on pristine upstream; they pass in isolation.
