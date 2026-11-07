@@ -13,7 +13,7 @@ fi
 eval "$(rbenv init -)"
 
 # --- Ruby Version Check ---
-REQUIRED_RUBY_VERSION="3.4.4"
+REQUIRED_RUBY_VERSION="$(cat "$(dirname "$0")/../.ruby-version")"
 CURRENT_RUBY_VERSION=$(ruby --version | cut -d' ' -f2)
 
 if [ "$CURRENT_RUBY_VERSION" != "$REQUIRED_RUBY_VERSION" ]; then
