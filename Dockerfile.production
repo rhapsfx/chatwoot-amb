@@ -73,8 +73,12 @@ COPY public ./public
 COPY theme ./theme
 COPY vite.config.ts ./
 COPY vite.shared.ts ./
-COPY tailwind.config.js ./
+COPY tailwind.config.js tailwind.superadmin.config.js ./
 COPY postcss.config.js ./
+# Tailwind content globs scan ERB views and helpers for class names
+COPY app/views ./app/views
+COPY app/helpers ./app/helpers
+COPY enterprise/app/views ./enterprise/app/views
 
 # Build frontend assets with Vite directly (increase heap for build)
 RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --mode=production
