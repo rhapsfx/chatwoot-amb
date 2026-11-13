@@ -3,8 +3,13 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useVuelidate } from '@vuelidate/core';
 import { requiredIf } from '@vuelidate/validators';
 import { useI18n } from 'vue-i18n';
-import { extractFilenameFromUrl } from 'dashboard/helper/URLHelper';
-import { TWILIO_CONTENT_TEMPLATE_TYPES } from 'shared/constants/messages';
+import {
+  isTwilioComplete,
+  isTwilioMediaTemplate,
+  getTwilioMediaVariableKey,
+  getTwilioMediaUrl,
+  applyTwilioMediaFilename,
+} from '@chatwoot/utils';
 
 import Input from 'dashboard/components-next/input/Input.vue';
 
@@ -14,7 +19,8 @@ const props = defineProps({
     default: () => ({}),
     validator: value => {
       if (!value || typeof value !== 'object') return false;
-      if (!value.friendly_name) return false;
+      // Accept templates with either friendly_name (Twilio) or name (unified)
+      if (!value.friendly_name && !value.name) return false;
       return true;
     },
   },
@@ -28,42 +34,47 @@ const { t } = useI18n();
 
 const processedParams = ref({});
 
+const isUnifiedTemplate = computed(() => {
+  return props.template.source === 'unified';
+});
+
 const languageLabel = computed(() => {
+  if (isUnifiedTemplate.value) {
+    return `${t('CONTENT_TEMPLATES.PARSER.LANGUAGE')}: multi`;
+  }
   return `${t('CONTENT_TEMPLATES.PARSER.LANGUAGE')}: ${props.template.language || 'en'}`;
 });
 
 const categoryLabel = computed(() => {
-  return `${t('CONTENT_TEMPLATES.PARSER.CATEGORY')}: ${props.template.category || 'utility'}`;
+  const category =
+    props.template.displayCategory || props.template.category || 'utility';
+  return `${t('CONTENT_TEMPLATES.PARSER.CATEGORY')}: ${category}`;
 });
 
 const templateBody = computed(() => {
+  if (isUnifiedTemplate.value) {
+    return props.template.content || props.template.description || '';
+  }
   return props.template.body || '';
 });
 
-const hasMediaTemplate = computed(() => {
-  return props.template.template_type === TWILIO_CONTENT_TEMPLATE_TYPES.MEDIA;
-});
+// Media-template detection and variable extraction are shared with the mobile
+// app via @chatwoot/utils.
+const hasMediaTemplate = computed(() => isTwilioMediaTemplate(props.template));
 
 const hasVariables = computed(() => {
   return templateBody.value?.match(VARIABLE_PATTERN) !== null;
 });
 
-const mediaVariableKey = computed(() => {
-  if (!hasMediaTemplate.value) return null;
-  const mediaUrl = props.template?.types?.['twilio/media']?.media?.[0];
-  if (!mediaUrl) return null;
-  return mediaUrl.match(/{{(\d+)}}/)?.[1] ?? null;
-});
+const mediaVariableKey = computed(() =>
+  getTwilioMediaVariableKey(props.template)
+);
 
-const hasMediaVariable = computed(() => {
-  return hasMediaTemplate.value && mediaVariableKey.value !== null;
-});
+const hasMediaVariable = computed(() => mediaVariableKey.value !== null);
 
-const templateMediaUrl = computed(() => {
-  if (!hasMediaTemplate.value) return '';
-
-  return props.template?.types?.['twilio/media']?.media?.[0] || '';
-});
+const templateMediaUrl = computed(() =>
+  hasMediaTemplate.value ? getTwilioMediaUrl(props.template) : ''
+);
 
 const variablePattern = computed(() => {
   if (!hasVariables.value) return [];
@@ -83,25 +94,13 @@ const renderedTemplate = computed(() => {
   return rendered;
 });
 
+// Completeness validation is shared with the mobile app via @chatwoot/utils.
+// Unified templates don't go through Twilio validation — they're always
+// considered "complete" here since they have no required variable inputs.
 const isFormInvalid = computed(() => {
-  if (!hasVariables.value && !hasMediaVariable.value) return false;
+  if (isUnifiedTemplate.value) return false;
 
-  if (hasVariables.value) {
-    const hasEmptyVariable = variablePattern.value.some(
-      variable => !processedParams.value[variable]
-    );
-    if (hasEmptyVariable) return true;
-  }
-
-  if (
-    hasMediaVariable.value &&
-    mediaVariableKey.value &&
-    !processedParams.value[mediaVariableKey.value]
-  ) {
-    return true;
-  }
-
-  return false;
+  return !isTwilioComplete(props.template, processedParams.value);
 });
 
 const v$ = useVuelidate(
@@ -133,21 +132,27 @@ const sendMessage = () => {
   v$.value.$touch();
   if (v$.value.$invalid || isFormInvalid.value) return;
 
+  // For unified templates, emit the full template object
+  if (isUnifiedTemplate.value) {
+    const payload = {
+      message: renderedTemplate.value,
+      templateParams: {
+        template: props.template,
+        source: 'unified',
+      },
+    };
+    emit('sendMessage', payload);
+    return;
+  }
+
+  // For Twilio templates, use the legacy format
   const { friendly_name, language } = props.template;
 
-  // Process parameters and extract filename from media URL if needed
-  const processedParameters = { ...processedParams.value };
-
-  // For media templates, extract filename from full URL
-  if (
-    hasMediaVariable.value &&
-    mediaVariableKey.value &&
-    processedParameters[mediaVariableKey.value]
-  ) {
-    processedParameters[mediaVariableKey.value] = extractFilenameFromUrl(
-      processedParameters[mediaVariableKey.value]
-    );
-  }
+  // For media templates, reduce the media URL to a filename before sending.
+  const processedParameters = applyTwilioMediaFilename(
+    props.template,
+    processedParams.value
+  );
 
   const payload = {
     message: renderedTemplate.value,
@@ -196,7 +201,7 @@ defineExpose({
     <div class="flex flex-col gap-4 p-4 mb-4 rounded-lg bg-n-alpha-black2">
       <div class="flex justify-between items-center">
         <h3 class="text-sm font-medium text-n-slate-12">
-          {{ template.friendly_name }}
+          {{ template.displayName || template.friendly_name || template.name }}
         </h3>
         <span class="text-xs text-n-slate-11">
           {{ languageLabel }}

@@ -1,12 +1,17 @@
 {
   "REGISTER": {
     "TRY_WOOT": "Nieuw account aanmaken",
+    "GET_STARTED": "Get started with Chatwoot",
     "TITLE": "Registreren",
     "TESTIMONIAL_HEADER": "Er is maar één stap nodig om vooruit te komen",
     "TESTIMONIAL_CONTENT": "U bent één stap verwijderd van het communiceren met uw klanten, ze te behouden en nieuwe te vinden.",
     "TERMS_ACCEPT": "Door het aanmaken van een account, gaat u akkoord met onze <a href=\"https://www.chatwoot.com/terms\">T & C</a> en <a href=\"https://www.chatwoot.com/privacy-policy\">Privacy policy</a>",
     "OAUTH": {
       "GOOGLE_SIGNUP": "Registreren met Google"
+    },
+    "SHOPIFY": {
+      "TITLE": "Set up Chatwoot for your Shopify store",
+      "DESCRIPTION": "Create your account to continue to Shopify App Pricing and choose a plan."
     },
     "COMPANY_NAME": {
       "LABEL": "Bedrijfsnaam",
@@ -44,6 +49,13 @@
       "ERROR_MESSAGE": "Kan geen verbinding maken met Woot Server, probeer het later opnieuw"
     },
     "SUBMIT": "Account aanmaken",
-    "HAVE_AN_ACCOUNT": "Heeft u al een account?"
+    "HAVE_AN_ACCOUNT": "Heeft u al een account?",
+    "VERIFY_EMAIL": {
+      "TITLE": "Check your inbox",
+      "DESCRIPTION": "We sent a verification link to {email}. Click the link to verify your email and get started.",
+      "RESEND": "Resend verification email",
+      "RESEND_SUCCESS": "Verification email sent. Please check your inbox.",
+      "RESEND_ERROR": "Could not send verification email. Please try again."
+    }
   }
 }

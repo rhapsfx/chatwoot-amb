@@ -1,15 +1,21 @@
+# frozen_string_literal: true
+
 class Messages::MessageBuilder
   include ::FileTypeHelper
+  include ::EmailHelper
+  include ::DataHelper
+
   attr_reader :message
 
   def initialize(user, conversation, params)
     @params = params
-    @private = params[:private] || false
+    @private = ActiveModel::Type::Boolean.new.cast(params[:private]) || false
     @conversation = conversation
     @user = user
     @account = conversation.account
     @message_type = params[:message_type] || 'outgoing'
     @attachments = params[:attachments]
+    @is_voice_message = ActiveModel::Type::Boolean.new.cast(params[:is_voice_message])
     @automation_rule = content_attributes&.dig(:automation_rule_id)
     return unless params.instance_of?(ActionController::Parameters)
 
@@ -19,11 +25,15 @@ class Messages::MessageBuilder
 
   def perform
     @message = @conversation.messages.build(message_params)
+
+    # Skip SendReplyJob if explicitly requested (e.g., when template attachments will be added after creation)
+    @message.instance_variable_set(:@skip_send_reply_job, @params[:skip_send_reply_job].present?)
+
     process_attachments
     process_emails
     # When the message has no quoted content, it will just be rendered as a regular message
     # The frontend is equipped to handle this case
-    process_email_content if @account.feature_enabled?(:quoted_email_reply)
+    process_email_content
     @message.save!
     @message
   end
@@ -38,50 +48,69 @@ class Messages::MessageBuilder
     params = convert_to_hash(@params)
     content_attributes = params.fetch(:content_attributes, {})
 
-    return parse_json(content_attributes) if content_attributes.is_a?(String)
-    return content_attributes if content_attributes.is_a?(Hash)
+    # Early return for String - use upstream's safe_parse_json
+    return safe_parse_json(content_attributes) if content_attributes.is_a?(String)
 
-    {}
-  end
+    # Get content_attributes as hash
+    parsed_content_attributes = content_attributes.is_a?(Hash) ? content_attributes : {}
 
-  # Converts the given object to a hash.
-  # If it's an instance of ActionController::Parameters, converts it to an unsafe hash.
-  # Otherwise, returns the object as-is.
-  def convert_to_hash(obj)
-    return obj.to_unsafe_h if obj.instance_of?(ActionController::Parameters)
+    # Include images in content_attributes for Apple Messages
+    # Check both separate images parameter AND images nested in content_attributes
+    parsed_content_attributes[:images] = params[:images] if @params[:content_type]&.start_with?('apple_') && params.key?(:images)
 
-    obj
-  end
+    # Store external_created_at directly in content_attributes hash
+    parsed_content_attributes[:external_created_at] = @params[:external_created_at] if @params[:external_created_at].present?
 
-  # Attempts to parse a string as JSON.
-  # If successful, returns the parsed hash with symbolized names.
-  # If unsuccessful, returns nil.
-  def parse_json(content)
-    JSON.parse(content, symbolize_names: true)
-  rescue JSON::ParserError
-    {}
+    parsed_content_attributes
   end
 
   def process_attachments
-    return if @attachments.blank?
-
-    @attachments.each do |uploaded_attachment|
+    (Array(@attachments) + forwarded_attachments).each do |uploaded_attachment|
       attachment = @message.attachments.build(
         account_id: @message.account_id,
         file: uploaded_attachment
       )
 
-      attachment.file_type = if uploaded_attachment.is_a?(String)
-                               file_type_by_signed_id(
-                                 uploaded_attachment
-                               )
-                             else
-                               file_type(uploaded_attachment&.content_type)
-                             end
+      attachment.file_type = attachment_file_type(uploaded_attachment)
+      tag_voice_message(attachment)
     end
   end
 
+  def attachment_file_type(uploaded_attachment)
+    if uploaded_attachment.is_a?(String)
+      file_type_by_signed_id(uploaded_attachment)
+    else
+      file_type(uploaded_attachment&.content_type)
+    end
+  end
+
+  def tag_voice_message(attachment)
+    return unless @is_voice_message && attachment.file_type == 'audio'
+
+    attachment.meta = (attachment.meta || {}).merge('is_voice_message' => true)
+  end
+
+  def forwarded_message_id
+    content_attributes[:forwarded_message_id]
+  end
+
+  def forwarded_attachments
+    return [] if forwarded_message_id.blank?
+
+    forwarded_message = @conversation.messages.find(forwarded_message_id)
+    forwarded_message.attachments.where(id: @params[:forwarded_attachment_ids]).map { |attachment| attachment.file.blob }
+  end
+
+  def validate_forward
+    return if forwarded_message_id.blank?
+
+    raise StandardError, 'Forwarded emails need an email inbox' unless @conversation.inbox.email?
+    raise StandardError, 'Forwarded emails cannot be private' if @private
+    raise StandardError, 'Forwarded emails need a recipient' if process_email_string(@params[:to_emails]).empty?
+  end
+
   def process_emails
+    validate_forward
     return unless @conversation.inbox&.inbox_type == 'Email'
 
     cc_emails = process_email_string(@params[:cc_emails])
@@ -94,6 +123,7 @@ class Messages::MessageBuilder
     @message.content_attributes[:cc_emails] = cc_emails
     @message.content_attributes[:bcc_emails] = bcc_emails
     @message.content_attributes[:to_emails] = to_emails
+    @message.content_attributes[:email] = { subject: @params[:subject] } if @params[:subject].present? && !@private
   end
 
   def process_email_content
@@ -110,12 +140,6 @@ class Messages::MessageBuilder
     email_string.gsub(/\s+/, '').split(',')
   end
 
-  def validate_email_addresses(all_emails)
-    all_emails&.each do |email|
-      raise StandardError, 'Invalid email address' unless email.match?(URI::MailTo::EMAIL_REGEXP)
-    end
-  end
-
   def message_type
     if @conversation.inbox.channel_type != 'Channel::Api' && @message_type == 'incoming'
       raise StandardError, 'Incoming messages are only allowed in Api inboxes'
@@ -125,7 +149,8 @@ class Messages::MessageBuilder
   end
 
   def sender
-    message_type == 'outgoing' ? (message_sender || @user) : @conversation.contact
+    # FIX: Convert message_type to string for comparison (it's a Symbol from enum)
+    message_type.to_s == 'outgoing' ? (message_sender || @user) : @conversation.contact
   end
 
   def external_created_at
@@ -158,7 +183,8 @@ class Messages::MessageBuilder
       content: @params[:content],
       private: @private,
       sender: sender,
-      content_type: @params[:content_type],
+      content_type: @params[:content_type] || 'text',
+      content_attributes: content_attributes,
       items: @items,
       in_reply_to: @in_reply_to,
       echo_id: @params[:echo_id],
@@ -178,14 +204,17 @@ class Messages::MessageBuilder
     email_attributes = ensure_indifferent_access(@message.content_attributes[:email] || {})
     normalized_content = normalize_email_body(@message.content)
 
+    # Process liquid templates in normalized content with code block protection
+    processed_content = process_liquid_in_email_body(normalized_content)
+
     # Use custom HTML content if provided, otherwise generate from message content
     email_attributes[:html_content] = if custom_email_content_provided?
                                         build_custom_html_content
                                       else
-                                        build_html_content(normalized_content)
+                                        build_html_content(processed_content)
                                       end
 
-    email_attributes[:text_content] = build_text_content(normalized_content)
+    email_attributes[:text_content] = build_text_content(processed_content)
     email_attributes
   end
 
@@ -204,22 +233,6 @@ class Messages::MessageBuilder
     text_content
   end
 
-  def ensure_indifferent_access(hash)
-    return {} if hash.blank?
-
-    hash.respond_to?(:with_indifferent_access) ? hash.with_indifferent_access : hash
-  end
-
-  def normalize_email_body(content)
-    content.to_s.gsub("\r\n", "\n")
-  end
-
-  def render_email_html(content)
-    return '' if content.blank?
-
-    ChatwootMarkdownRenderer.new(content).render_message.to_s
-  end
-
   def custom_email_content_provided?
     @params[:email_html_content].present?
   end
@@ -232,4 +245,29 @@ class Messages::MessageBuilder
 
     html_content
   end
+
+  # Liquid processing methods for email content
+  def process_liquid_in_email_body(content)
+    return content if content.blank?
+    return content unless should_process_liquid?
+
+    # Protect code blocks from liquid processing
+    modified_content = modified_liquid_content(content)
+    template = Liquid::Template.parse(modified_content)
+    template.render(drops_with_sender)
+  rescue Liquid::Error
+    content
+  end
+
+  def should_process_liquid?
+    @message_type == 'outgoing' || @message_type == 'template'
+  end
+
+  def drops_with_sender
+    message_drops(@conversation).merge({
+                                         'agent' => UserDrop.new(sender)
+                                       })
+  end
 end
+
+Messages::MessageBuilder.prepend_mod_with('Messages::MessageBuilder')

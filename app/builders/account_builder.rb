@@ -44,7 +44,11 @@ class AccountBuilder
   end
 
   def create_account
-    @account = Account.create!(name: account_name, locale: I18n.locale)
+    @account = Account.create!(
+      name: account_name,
+      locale: I18n.locale,
+      custom_attributes: { 'onboarding_step' => 'account_details' }
+    )
     Current.account = @account
   end
 
@@ -66,12 +70,17 @@ class AccountBuilder
   end
 
   def create_user
+    @user = build_user
+    @user.save!
+  end
+
+  def build_user
     @user = User.new(email: @email,
                      password: user_password,
                      password_confirmation: user_password,
                      name: user_full_name)
     @user.type = 'SuperAdmin' if @super_admin
     @user.confirm if @confirmed
-    @user.save!
+    @user
   end
 end

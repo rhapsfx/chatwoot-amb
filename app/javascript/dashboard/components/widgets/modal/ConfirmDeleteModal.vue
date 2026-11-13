@@ -62,7 +62,7 @@ export default {
 </script>
 
 <template>
-  <Modal v-model:show="localShow" :on-close="closeModal">
+  <Modal v-model:show="localShow" @close="closeModal">
     <woot-modal-header :header-title="title" :header-content="message" />
     <form @submit.prevent="onConfirm">
       <woot-input

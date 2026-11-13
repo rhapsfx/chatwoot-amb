@@ -1,0 +1,120 @@
+/* global axios */
+
+import ApiClient from './ApiClient';
+
+class TemplatesAPI extends ApiClient {
+  constructor() {
+    super('templates', { accountScoped: true });
+  }
+
+  get({ searchKey, category, channel, tags, per_page, status } = {}) {
+    const params = new URLSearchParams();
+    if (searchKey) params.append('search', searchKey);
+    if (category) params.append('category', category);
+    if (channel) params.append('channel', channel);
+    if (tags) params.append('tags', tags);
+    if (per_page) params.append('per_page', per_page);
+    if (status) params.append('status', status);
+
+    const url = params.toString()
+      ? `${this.url}?${params.toString()}`
+      : this.url;
+    return axios.get(url);
+  }
+
+  create(templateData) {
+    // Extract content blocks and channel mappings to send as separate params
+    const { contentBlocks, channelMappings, ...templateFields } = templateData;
+
+    return axios.post(this.url, {
+      template: templateFields,
+      content_blocks: contentBlocks,
+      channel_mappings: channelMappings,
+    });
+  }
+
+  update(id, templateData) {
+    // Extract content blocks and channel mappings to send as separate params
+    const { contentBlocks, channelMappings, ...templateFields } = templateData;
+
+    return axios.patch(`${this.url}/${id}`, {
+      template: templateFields,
+      content_blocks: contentBlocks,
+      channel_mappings: channelMappings,
+    });
+  }
+
+  render(templateId, parameters, channelType) {
+    return axios.post(`${this.url}/${templateId}/render_template`, {
+      parameters,
+      channel_type: channelType,
+    });
+  }
+
+  sendMessage(conversationId, templateId, parameters) {
+    return axios.post(
+      `${this.baseUrl()}/conversations/${conversationId}/messages/from_template`,
+      {
+        template_id: templateId,
+        parameters,
+      }
+    );
+  }
+
+  testTemplate(templateId, parameters, channelType) {
+    return axios.post(`${this.url}/${templateId}/test`, {
+      parameters,
+      channel_type: channelType,
+    });
+  }
+
+  createFromAppleMessage(payload) {
+    return axios.post(`${this.url}/from_apple_message`, {
+      messageType: payload.messageType,
+      messageData: payload.messageData,
+      templateName: payload.templateName,
+      category: payload.category,
+      description: payload.description,
+      tags: payload.tags || [],
+    });
+  }
+
+  // Template Attachments API
+  uploadAttachment(templateId, file, orderIndex = 0) {
+    const formData = new FormData();
+    formData.append('attachments[]', file);
+    if (orderIndex !== undefined) {
+      formData.append('order_index', orderIndex);
+    }
+
+    return axios.post(`${this.url}/${templateId}/attach_files`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  }
+
+  getAttachments(templateId) {
+    return axios.get(`${this.url}/${templateId}`);
+  }
+
+  deleteAttachment(templateId, attachmentId) {
+    return axios.delete(
+      `${this.url}/${templateId}/attachments/${attachmentId}`
+    );
+  }
+
+  reorderAttachments(templateId, attachmentIds) {
+    return axios.put(`${this.url}/${templateId}/reorder_attachments`, {
+      attachment_ids: attachmentIds,
+    });
+  }
+
+  // Validate template images across inboxes
+  validateImages(templateId, inboxId = null) {
+    const params = inboxId ? `?inbox_id=${inboxId}` : '';
+    return axios.get(`${this.url}/${templateId}/validate_images${params}`);
+  }
+}
+
+export default new TemplatesAPI();

@@ -14,20 +14,20 @@
   },
   "THUMBNAIL": {
     "AUTHOR": {
-      "NOT_AVAILABLE": "Not available"
+      "NOT_AVAILABLE": "사용 불가"
     }
   },
   "TEAM_AVAILABILITY": {
     "ONLINE": "온라인",
     "OFFLINE": "부재중",
-    "BACK_AS_SOON_AS_POSSIBLE": "We will be back as soon as possible"
+    "BACK_AS_SOON_AS_POSSIBLE": "가능한 한 빨리 돌아오겠습니다"
   },
   "REPLY_TIME": {
     "IN_A_FEW_MINUTES": "보통 몇 분 안에 응답",
     "IN_A_FEW_HOURS": "보통 몇 시간 내에 응답",
     "IN_A_DAY": "보통 하루 안에 응답",
-    "BACK_IN_HOURS": "We will be back online in {n} hour | We will be back online in {n} hours",
-    "BACK_IN_MINUTES": "We will be back online in {time} minutes",
+    "BACK_IN_HOURS": "{n}시간 후에 서비스를 재개할 예정입니다 | {n}시간 후에 서비스를 재개할 예정입니다",
+    "BACK_IN_MINUTES": "{time}분 후에 다시 접속 가능합니다.",
     "BACK_AT_TIME": "We will be back online at {time}",
     "BACK_ON_DAY": "We will be back online on {day}",
     "BACK_TOMORROW": "We will be back online tomorrow",
@@ -59,6 +59,9 @@
   },
   "POWERED_BY": "Chatwoot 작동중",
   "EMAIL_PLACEHOLDER": "이메일을 입력해주세요.",
+  "TRANSLATING": "Translating",
+  "VIEW_ORIGINAL": "원본 보기",
+  "VIEW_TRANSLATION": "View translation",
   "CHAT_PLACEHOLDER": "메시지 입력",
   "TODAY": "오늘",
   "YESTERDAY": "어제",
@@ -105,6 +108,11 @@
     "PLACEHOLDER": "이모지 검색",
     "NOT_FOUND": "검색과 일치하는 이모지 없음",
     "ARIA_LABEL": "이모지 선택기"
+  },
+  "EMOJI_ICON_PICKER": {
+    "SEARCH_EMOJI": "Search emoji…",
+    "FREQUENTLY_USED": "Frequently used",
+    "NO_EMOJI": "검색과 일치하는 이모지가 없습니다"
   },
   "CSAT": {
     "TITLE": "대화를 평가해주세요.",

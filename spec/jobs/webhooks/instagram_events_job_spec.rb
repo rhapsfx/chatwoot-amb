@@ -7,6 +7,10 @@ describe Webhooks::InstagramEventsJob do
     stub_request(:post, /graph\.facebook\.com/)
     stub_request(:get, 'https://www.example.com/test.jpeg')
       .to_return(status: 200, body: '', headers: {})
+    stub_request(:get, 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=17949487764033669&signature=test')
+      .to_return(status: 200, body: '', headers: {})
+    stub_request(:get, 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18091626484740369&signature=test')
+      .to_return(status: 200, body: '', headers: {})
   end
 
   let!(:account) { create(:account) }
@@ -131,6 +135,52 @@ describe Webhooks::InstagramEventsJob do
         expect(attachment.push_event_data[:data_url]).to eq(attachment.external_url)
       end
 
+      it 'creates incoming message with ig_story attachment in the instagram inbox' do
+        ig_story_event = build(:instagram_ig_story_event).with_indifferent_access
+        sender_id = ig_story_event[:entry][0][:messaging][0][:sender][:id]
+
+        allow(Koala::Facebook::API).to receive(:new).and_return(fb_object)
+        allow(fb_object).to receive(:get_object).and_return(
+          return_object_for(sender_id).with_indifferent_access
+        )
+
+        instagram_webhook.perform_now(ig_story_event[:entry])
+
+        expect(instagram_messenger_inbox.messages.count).to be 1
+        expect(instagram_messenger_inbox.messages.last.attachments.count).to be 1
+
+        message = instagram_messenger_inbox.messages.last
+        attachment = message.attachments.last
+
+        expect(attachment.file_type).to eq 'ig_story'
+        expect(attachment.external_url).to include 'lookaside.fbsbx.com'
+        expect(message.content).to eq 'Shared story'
+        expect(message.content_attributes['image_type']).to eq 'ig_story'
+      end
+
+      it 'creates incoming message with ig_post attachment in the instagram inbox' do
+        ig_post_event = build(:instagram_ig_post_event).with_indifferent_access
+        sender_id = ig_post_event[:entry][0][:messaging][0][:sender][:id]
+
+        allow(Koala::Facebook::API).to receive(:new).and_return(fb_object)
+        allow(fb_object).to receive(:get_object).and_return(
+          return_object_for(sender_id).with_indifferent_access
+        )
+
+        instagram_webhook.perform_now(ig_post_event[:entry])
+
+        expect(instagram_messenger_inbox.messages.count).to be 1
+        expect(instagram_messenger_inbox.messages.last.attachments.count).to be 1
+
+        message = instagram_messenger_inbox.messages.last
+        attachment = message.attachments.last
+
+        expect(attachment.file_type).to eq 'ig_post'
+        expect(attachment.external_url).to include 'ig_messaging_cdn'
+        expect(message.content).to eq 'Shared post'
+        expect(message.content_attributes['image_type']).to eq 'ig_post'
+      end
+
       it 'does not create contact or messages when Facebook API call fails' do
         story_mention_echo_event = build(:instagram_story_mention_event_with_echo).with_indifferent_access
 
@@ -167,6 +217,23 @@ describe Webhooks::InstagramEventsJob do
         expect(instagram_messenger_inbox.conversations.count).to be 1
         expect(instagram_messenger_inbox.messages.count).to be 1
         expect(instagram_messenger_inbox.messages.last.content_attributes['is_unsupported']).to be true
+      end
+
+      it 'handles instagram postback event and creates a message with the postback title' do
+        postback_event = build(:instagram_postback_event).with_indifferent_access
+        sender_id = postback_event[:entry][0][:messaging][0][:sender][:id]
+
+        allow(Koala::Facebook::API).to receive(:new).and_return(fb_object)
+        allow(fb_object).to receive(:get_object).and_return(
+          return_object_for(sender_id).with_indifferent_access
+        )
+
+        instagram_webhook.perform_now(postback_event[:entry])
+
+        expect(instagram_messenger_inbox.contacts.count).to be 1
+        expect(instagram_messenger_inbox.conversations.count).to be 1
+        expect(instagram_messenger_inbox.messages.count).to be 1
+        expect(instagram_messenger_inbox.messages.last.content).to eq 'Buy Now'
       end
     end
 
@@ -262,6 +329,38 @@ describe Webhooks::InstagramEventsJob do
         expect(instagram_inbox.messages.last.content_attributes['is_unsupported']).to be true
       end
 
+      it 'creates incoming message with ig_story attachment in the instagram direct inbox' do
+        ig_story_event = build(:instagram_ig_story_event).with_indifferent_access
+        instagram_webhook.perform_now(ig_story_event[:entry])
+
+        expect(instagram_inbox.messages.count).to be 1
+        expect(instagram_inbox.messages.last.attachments.count).to be 1
+
+        message = instagram_inbox.messages.last
+        attachment = message.attachments.last
+
+        expect(attachment.file_type).to eq 'ig_story'
+        expect(attachment.external_url).to include 'lookaside.fbsbx.com'
+        expect(message.content).to eq 'Shared story'
+        expect(message.content_attributes['image_type']).to eq 'ig_story'
+      end
+
+      it 'creates incoming message with ig_post attachment in the instagram direct inbox' do
+        ig_post_event = build(:instagram_ig_post_event).with_indifferent_access
+        instagram_webhook.perform_now(ig_post_event[:entry])
+
+        expect(instagram_inbox.messages.count).to be 1
+        expect(instagram_inbox.messages.last.attachments.count).to be 1
+
+        message = instagram_inbox.messages.last
+        attachment = message.attachments.last
+
+        expect(attachment.file_type).to eq 'ig_post'
+        expect(attachment.external_url).to include 'ig_messaging_cdn'
+        expect(message.content).to eq 'Shared post'
+        expect(message.content_attributes['image_type']).to eq 'ig_post'
+      end
+
       it 'does not create contact or messages when Instagram API call fails' do
         story_mention_echo_event = build(:instagram_story_mention_event_with_echo).with_indifferent_access
 
@@ -299,6 +398,17 @@ describe Webhooks::InstagramEventsJob do
         expect(instagram_inbox.conversations.count).to eq 1
         expect(instagram_inbox.messages.count).to eq 1
         expect(instagram_inbox.messages.last.content_attributes['is_unsupported']).to be_nil
+      end
+
+      it 'handles instagram postback event and creates a message with the postback title' do
+        postback_event = build(:instagram_postback_event).with_indifferent_access
+
+        instagram_webhook.perform_now(postback_event[:entry])
+
+        expect(instagram_inbox.contacts.count).to be 1
+        expect(instagram_inbox.conversations.count).to be 1
+        expect(instagram_inbox.messages.count).to be 1
+        expect(instagram_inbox.messages.last.content).to eq 'Buy Now'
       end
     end
   end

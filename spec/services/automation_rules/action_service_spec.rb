@@ -12,6 +12,39 @@ RSpec.describe AutomationRules::ActionService do
                              ])
   end
 
+  describe 'attachment authorization for stored actions' do
+    before do
+      rule.files.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+    end
+
+    it 'only sends rule files when stored actions also reference another account attachment' do
+      foreign_message = create(:message, :with_attachment)
+      foreign_blob = foreign_message.attachments.first.file.blob
+      own_blob = rule.files.first.blob
+      rule.update!(actions: [{ action_name: 'send_attachment', action_params: [own_blob.id, foreign_blob.id] }])
+
+      described_class.new(rule, account, conversation).perform
+
+      expect(conversation.messages.last.attachments.map { |attachment| attachment.file.blob_id }).to eq([own_blob.id])
+    end
+
+    it 'does not send another account attachment when no requested blob belongs to the rule' do
+      foreign_message = create(:message, :with_attachment)
+      foreign_blob = foreign_message.attachments.first.file.blob
+      rule.update!(actions: [{ action_name: 'send_attachment', action_params: [foreign_blob.id] }])
+
+      expect { described_class.new(rule, account, conversation).perform }.not_to change(conversation.messages, :count)
+    end
+
+    it 'does not send files belonging to another rule in the same account' do
+      other_rule = create(:automation_rule, account: account)
+      other_rule.files.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      rule.update!(actions: [{ action_name: 'send_attachment', action_params: [other_rule.files.first.blob_id] }])
+
+      expect { described_class.new(rule, account, conversation).perform }.not_to change(conversation.messages, :count)
+    end
+  end
+
   describe '#perform' do
     context 'when actions are defined in the rule' do
       it 'will call the actions' do
@@ -88,8 +121,31 @@ RSpec.describe AutomationRules::ActionService do
       end
     end
 
+    describe '#perform with remove assignment actions' do
+      let!(:team) { create(:team, account: account) }
+
+      before do
+        conversation.update!(assignee: agent, team: team)
+        rule.actions = [
+          { action_name: 'remove_assigned_agent', action_params: [] },
+          { action_name: 'remove_assigned_team', action_params: [] }
+        ]
+        rule.save!
+      end
+
+      it 'removes assignee and team from the conversation' do
+        described_class.new(rule, account, conversation).perform
+
+        expect(conversation.reload.assignee).to be_nil
+        expect(conversation.team).to be_nil
+      end
+    end
+
     describe '#perform with send_email_transcript action' do
       before do
+        allow(account).to receive(:email_transcript_enabled?).and_return(true)
+        allow(account).to receive(:within_email_rate_limit?).and_return(true)
+        allow(account).to receive(:increment_email_sent_count).and_return(true)
         rule.actions << { action_name: 'send_email_transcript', action_params: ['contact@example.com, agent@example.com,agent1@example.com'] }
         rule.save
       end
@@ -176,6 +232,22 @@ RSpec.describe AutomationRules::ActionService do
         conversation = create(:conversation, inbox: twitter_inbox, additional_attributes: { type: 'tweet' })
         expect(message_builder).not_to receive(:perform)
         described_class.new(rule, account, conversation).perform
+      end
+    end
+
+    describe '#perform with assign_agent action' do
+      before do
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+        rule.actions << { action_name: 'assign_agent', action_params: ['last_responding_agent'] }
+      end
+
+      it 'assigns the conversation to the last responding agent' do
+        create(:message, message_type: :outgoing, account: account,
+                         inbox: conversation.inbox, conversation: conversation, sender: agent)
+
+        described_class.new(rule, account, conversation).perform
+
+        expect(conversation.reload.assignee).to eq(agent)
       end
     end
   end

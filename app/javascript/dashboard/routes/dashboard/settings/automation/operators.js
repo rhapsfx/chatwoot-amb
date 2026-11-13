@@ -111,3 +111,42 @@ export const OPERATOR_TYPES_6 = [
     label: 'Starts With',
   },
 ];
+
+// Apple Messages routing operators
+export const OPERATOR_TYPES_APPLE_MESSAGES = [
+  {
+    value: 'equal_to',
+    label: 'Equal to',
+  },
+  {
+    value: 'not_equal_to',
+    label: 'Not equal to',
+  },
+  {
+    value: 'contains',
+    label: 'Contains',
+  },
+  {
+    value: 'does_not_contain',
+    label: 'Does not contain',
+  },
+  {
+    value: 'is_present',
+    label: 'Is present',
+  },
+  {
+    value: 'is_not_present',
+    label: 'Is not present',
+  },
+];
+
+export const CAPTAIN_OPERATOR_TYPES = [
+  {
+    value: 'detects',
+    label: 'Detects',
+  },
+  {
+    value: 'does_not_detect',
+    label: 'Does not detect',
+  },
+];

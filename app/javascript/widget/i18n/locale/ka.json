@@ -14,24 +14,24 @@
   },
   "THUMBNAIL": {
     "AUTHOR": {
-      "NOT_AVAILABLE": "Not available"
+      "NOT_AVAILABLE": "მიუწვდომელია"
     }
   },
   "TEAM_AVAILABILITY": {
     "ONLINE": "We are online",
     "OFFLINE": "We are away at the moment",
-    "BACK_AS_SOON_AS_POSSIBLE": "We will be back as soon as possible"
+    "BACK_AS_SOON_AS_POSSIBLE": "ჩვენ დავბრუნდებით რაც შეიძლება მალე"
   },
   "REPLY_TIME": {
     "IN_A_FEW_MINUTES": "Typically replies in a few minutes",
     "IN_A_FEW_HOURS": "Typically replies in a few hours",
     "IN_A_DAY": "Typically replies in a day",
-    "BACK_IN_HOURS": "We will be back online in {n} hour | We will be back online in {n} hours",
-    "BACK_IN_MINUTES": "We will be back online in {time} minutes",
-    "BACK_AT_TIME": "We will be back online at {time}",
-    "BACK_ON_DAY": "We will be back online on {day}",
-    "BACK_TOMORROW": "We will be back online tomorrow",
-    "BACK_IN_SOME_TIME": "We will be back online in some time"
+    "BACK_IN_HOURS": "ჩვენ ონლაინ დავბრუნდებით {n} საათში | ჩვენ ონლაინ დავბრუნდებით {n} საათში",
+    "BACK_IN_MINUTES": "ჩვენ ონლაინ დავბრუნდებით {time} წუთში",
+    "BACK_AT_TIME": "ჩვენ ონლაინ დავბრუნდებით {time}-ზე",
+    "BACK_ON_DAY": "ჩვენ ონლაინ დავბრუნდებით {day}-ს",
+    "BACK_TOMORROW": "ჩვენ ონლაინ დავბრუნდებით ხვალ",
+    "BACK_IN_SOME_TIME": "ჩვენ მალე დავბრუნდებით ონლაინ"
   },
   "DAY_NAMES": {
     "SUNDAY": "Sunday",
@@ -59,6 +59,9 @@
   },
   "POWERED_BY": "Powered by Chatwoot",
   "EMAIL_PLACEHOLDER": "Please enter your email",
+  "TRANSLATING": "Translating",
+  "VIEW_ORIGINAL": "View original",
+  "VIEW_TRANSLATION": "View translation",
   "CHAT_PLACEHOLDER": "Type your message",
   "TODAY": "Today",
   "YESTERDAY": "Yesterday",
@@ -105,6 +108,11 @@
     "PLACEHOLDER": "Search emojis",
     "NOT_FOUND": "No emoji match your search",
     "ARIA_LABEL": "Emoji picker"
+  },
+  "EMOJI_ICON_PICKER": {
+    "SEARCH_EMOJI": "Search emoji…",
+    "FREQUENTLY_USED": "Frequently used",
+    "NO_EMOJI": "No emoji match your search"
   },
   "CSAT": {
     "TITLE": "Rate your conversation",

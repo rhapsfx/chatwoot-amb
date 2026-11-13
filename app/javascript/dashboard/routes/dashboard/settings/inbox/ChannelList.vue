@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useMapGetter } from 'dashboard/composables/store';
@@ -10,15 +10,19 @@ import ChannelItem from 'dashboard/components/widgets/ChannelItem.vue';
 
 const { t } = useI18n();
 const router = useRouter();
-const { accountId, currentAccount } = useAccount();
+const { accountId, currentAccount, isOnChatwootCloud } = useAccount();
 
 const globalConfig = useMapGetter('globalConfig/get');
 
-const enabledFeatures = ref({});
+const enabledFeatures = computed(() => currentAccount.value?.features || {});
+
+const hasTiktokConfigured = computed(() => {
+  return window.chatwootConfig?.tiktokAppId;
+});
 
 const channelList = computed(() => {
   const { apiChannelName } = globalConfig.value;
-  return [
+  const channels = [
     {
       key: 'website',
       title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.WEBSITE.TITLE'),
@@ -73,18 +77,47 @@ const channelList = computed(() => {
       description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.INSTAGRAM.DESCRIPTION'),
       icon: 'i-woot-instagram',
     },
-    {
-      key: 'voice',
-      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.TITLE'),
-      description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.DESCRIPTION'),
-      icon: 'i-ri-phone-fill',
-    },
   ];
-});
 
-const initializeEnabledFeatures = async () => {
-  enabledFeatures.value = currentAccount.value.features;
-};
+  if (hasTiktokConfigured.value) {
+    channels.push({
+      key: 'tiktok',
+      title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.TIKTOK.TITLE'),
+      description:
+        currentAccount.value &&
+        isOnChatwootCloud.value &&
+        !enabledFeatures.value.channel_tiktok
+          ? t('INBOX_MGMT.ADD.AUTH.CHANNEL.TIKTOK.ACCESS_REQUEST_DESCRIPTION')
+          : t('INBOX_MGMT.ADD.AUTH.CHANNEL.TIKTOK.DESCRIPTION'),
+      icon: 'i-woot-tiktok',
+    });
+  }
+
+  channels.push({
+    key: 'voice',
+    title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.TITLE'),
+    description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.VOICE.DESCRIPTION'),
+    icon: 'i-woot-voice',
+  });
+
+  channels.push({
+    key: 'whatsapp_call',
+    title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.WHATSAPP_CALL.TITLE'),
+    description: t('INBOX_MGMT.ADD.AUTH.CHANNEL.WHATSAPP_CALL.DESCRIPTION'),
+    icon: 'i-woot-whatsapp',
+  });
+
+  channels.push({
+    key: 'apple_messages_for_business',
+    title: t('INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.TITLE'),
+    description: t(
+      'INBOX_MGMT.ADD.AUTH.CHANNEL.APPLE_MESSAGES_FOR_BUSINESS.DESCRIPTION'
+    ),
+    icon: 'i-woot-apple-messages',
+  });
+
+  return channels;
+});
 
 const initChannelAuth = channel => {
   const params = {
@@ -93,24 +126,18 @@ const initChannelAuth = channel => {
   };
   router.push({ name: 'settings_inboxes_page_channel', params });
 };
-
-onMounted(() => {
-  initializeEnabledFeatures();
-});
 </script>
 
 <template>
-  <div class="w-full p-8 overflow-auto">
-    <div
-      class="grid max-w-3xl grid-cols-1 xs:grid-cols-2 mx-0 gap-6 sm:grid-cols-3"
-    >
-      <ChannelItem
-        v-for="channel in channelList"
-        :key="channel.key"
-        :channel="channel"
-        :enabled-features="enabledFeatures"
-        @channel-item-click="initChannelAuth"
-      />
-    </div>
+  <div
+    class="grid max-w-3xl grid-cols-1 xs:grid-cols-2 mx-0 gap-6 sm:grid-cols-3 p-8"
+  >
+    <ChannelItem
+      v-for="channel in channelList"
+      :key="channel.key"
+      :channel="channel"
+      :enabled-features="enabledFeatures"
+      @channel-item-click="initChannelAuth"
+    />
   </div>
 </template>

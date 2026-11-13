@@ -60,16 +60,32 @@ describe Whatsapp::ChannelCreationService do
         expect(inbox.name).to eq('Test Business WhatsApp')
         expect(inbox.account).to eq(account)
       end
+
+      it 'does not leave an orphan channel when inbox creation fails' do
+        allow(Inbox).to receive(:create!).and_wrap_original do |method, *args|
+          method.call(*args)
+          raise ActiveRecord::RecordInvalid, Inbox.new
+        end
+
+        expect do
+          expect { service.perform }.to raise_error(ActiveRecord::RecordInvalid)
+        end.not_to change(Channel::Whatsapp, :count)
+      end
     end
 
-    context 'when channel already exists' do
+    context 'when channel already exists for the phone number' do
+      let(:different_account) { create(:account) }
+
       before do
-        create(:channel_whatsapp, account: account, phone_number: '+1234567890',
+        create(:channel_whatsapp, account: different_account, phone_number: '+1234567890',
                                   provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
       end
 
-      it 'raises an error' do
-        expect { service.perform }.to raise_error(/Channel already exists/)
+      it 'raises an error even if the channel belongs to a different account' do
+        expect { service.perform }.to raise_error(
+          RuntimeError,
+          I18n.t('errors.whatsapp.phone_number_already_exists', phone_number: '+1234567890')
+        )
       end
     end
 

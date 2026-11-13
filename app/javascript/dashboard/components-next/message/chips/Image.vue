@@ -6,7 +6,7 @@ import { useMessageContext } from '../provider.js';
 
 import GalleryView from 'dashboard/components/widgets/conversation/components/GalleryView.vue';
 
-defineProps({
+const props = defineProps({
   attachment: {
     type: Object,
     required: true,
@@ -37,14 +37,14 @@ const handleError = () => {
     <img
       v-else
       class="object-cover w-full h-full skip-context-menu"
-      :src="attachment.dataUrl"
+      :src="props.attachment.dataUrl"
       @error="handleError"
     />
   </div>
   <GalleryView
     v-if="showGallery"
     v-model:show="showGallery"
-    :attachment="useSnakeCase(attachment)"
+    :attachment="useSnakeCase(props.attachment)"
     :all-attachments="filteredCurrentChatAttachments"
     @error="handleError"
     @close="() => (showGallery = false)"

@@ -111,7 +111,7 @@ export default {
 </script>
 
 <template>
-  <woot-modal :show="show" :on-close="closeModal">
+  <woot-modal :show="show" @close="closeModal">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header :header-title="header" />
       <form class="w-full" @submit.prevent="submit">

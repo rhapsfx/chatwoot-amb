@@ -16,8 +16,8 @@ RSpec.describe Notification do
       create(:notification)
       notification3 = create(:notification)
 
-      expect(described_class.all.first).to eq notification1
-      expect(described_class.all.last).to eq notification3
+      expect(described_class.all.first.id).to eq notification1.id
+      expect(described_class.all.last.id).to eq notification3.id
     end
   end
 
@@ -183,6 +183,11 @@ has been assigned to you"
       expect(notification.fcm_push_data[:primary_actor]).to eq({
                                                                  'id' => notification.primary_actor.display_id
                                                                })
+    end
+
+    it 'includes the account id so the mobile app can open the conversation in the right account' do
+      notification = create(:notification, notification_type: 'conversation_creation')
+      expect(notification.fcm_push_data[:account_id]).to eq(notification.account_id)
     end
   end
 

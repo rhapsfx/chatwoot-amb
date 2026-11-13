@@ -1,24 +1,26 @@
 <script>
+import { defineAsyncComponent } from 'vue';
 import { mapGetters } from 'vuex';
 
 import ChatAttachmentButton from 'widget/components/ChatAttachment.vue';
 import ChatSendButton from 'widget/components/ChatSendButton.vue';
-import configMixin from '../mixins/configMixin';
+import { useAttachments } from '../composables/useAttachments';
 import FluentIcon from 'shared/components/FluentIcon/Index.vue';
 import ResizableTextArea from 'shared/components/ResizableTextArea.vue';
 
-import EmojiInput from 'shared/components/emoji/EmojiInput.vue';
+const EmojiPicker = defineAsyncComponent(
+  () => import('shared/components/emoji/EmojiPicker.vue')
+);
 
 export default {
   name: 'ChatInputWrap',
   components: {
     ChatAttachmentButton,
     ChatSendButton,
-    EmojiInput,
+    EmojiPicker,
     FluentIcon,
     ResizableTextArea,
   },
-  mixins: [configMixin],
   props: {
     onSendMessage: {
       type: Function,
@@ -28,6 +30,18 @@ export default {
       type: Function,
       default: () => {},
     },
+  },
+  setup() {
+    const {
+      canHandleAttachments,
+      shouldShowEmojiPicker,
+      hasEmojiPickerEnabled,
+    } = useAttachments();
+    return {
+      canHandleAttachments,
+      shouldShowEmojiPicker,
+      hasEmojiPickerEnabled,
+    };
   },
   data() {
     return {
@@ -41,15 +55,10 @@ export default {
     ...mapGetters({
       widgetColor: 'appConfig/getWidgetColor',
       isWidgetOpen: 'appConfig/getIsWidgetOpen',
-      shouldShowFilePicker: 'appConfig/getShouldShowFilePicker',
       shouldShowEmojiPicker: 'appConfig/getShouldShowEmojiPicker',
     }),
     showAttachment() {
-      return (
-        this.shouldShowFilePicker &&
-        this.hasAttachmentsEnabled &&
-        this.userInput.length === 0
-      );
+      return this.canHandleAttachments && this.userInput.length === 0;
     },
     showSendButton() {
       return this.userInput.length > 0;
@@ -104,6 +113,9 @@ export default {
     emojiOnClick(emoji) {
       this.userInput = `${this.userInput}${emoji} `;
     },
+    onSelectEmoji({ value }) {
+      this.emojiOnClick(value);
+    },
     onTypingOff() {
       this.toggleTyping('off');
     },
@@ -124,7 +136,7 @@ export default {
   <div
     class="items-center flex ltr:pl-3 rtl:pr-3 ltr:pr-2 rtl:pl-2 rounded-[7px] transition-all duration-200 bg-n-background !shadow-[0_0_0_1px,0_0_2px_3px]"
     :class="{
-      '!shadow-n-brand dark:!shadow-n-brand': isFocused,
+      '!shadow-[var(--widget-color,#2781f6)]': isFocused,
       '!shadow-n-strong dark:!shadow-n-strong': !isFocused,
     }"
     @keydown.esc="hideEmojiPicker"
@@ -142,7 +154,7 @@ export default {
       @focus="onFocus"
       @blur="onBlur"
     />
-    <div class="flex items-center ltr:pl-2 rtl:pr-2">
+    <div class="relative flex items-center ltr:pl-2 rtl:pr-2">
       <ChatAttachmentButton
         v-if="showAttachment"
         class="text-n-slate-12"
@@ -163,10 +175,11 @@ export default {
           }"
         />
       </button>
-      <EmojiInput
+      <EmojiPicker
         v-if="shouldShowEmojiPicker && showEmojiPicker"
         v-on-clickaway="hideEmojiPicker"
-        :on-click="emojiOnClick"
+        class="!bottom-full end-0 mb-2 max-w-[calc(100vw-3rem)]"
+        @select="onSelectEmoji"
         @keydown.esc="hideEmojiPicker"
       />
       <ChatSendButton
@@ -179,10 +192,6 @@ export default {
 </template>
 
 <style scoped lang="scss">
-.emoji-dialog {
-  @apply max-w-full ltr:right-5 rtl:right-[unset] rtl:left-5 -top-[302px] before:ltr:right-2.5 before:rtl:right-[unset] before:rtl:left-2.5;
-}
-
 .user-message-input {
   @apply border-none outline-none w-full placeholder:text-n-slate-10 resize-none h-8 min-h-8 max-h-60 py-1 px-0 my-2 bg-n-background text-n-slate-12 transition-all duration-200;
 }

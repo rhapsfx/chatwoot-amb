@@ -1,0 +1,320 @@
+# Docker Compose — Chatwoot Production
+# =============================================================================
+# All secrets MUST be set in a .env file in this directory.
+# See .env.example for required variables. Never commit .env to version control.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: chatwoot-postgres
+    restart: unless-stopped
+    platform: linux/arm64
+    networks:
+      - backend_net           # internal only — NOT on cloudflare network
+    environment:
+      POSTGRES_DB: chatwoot_production
+      POSTGRES_USER: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No host port binding — Postgres is internal to the Docker network only.
+    # Access it for debugging via: docker exec -it chatwoot-postgres psql -U chatwoot_user chatwoot_production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatwoot_user -d chatwoot_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
+
+  # ---------------------------------------------------------------------------
+  # Redis (Sidekiq queue + ActionCable)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: chatwoot-redis
+    restart: unless-stopped
+    platform: linux/arm64
+    networks:
+      - backend_net           # internal only — NOT on cloudflare network
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env for production compose}
+    # requirepass enforces authentication on every connection
+    command: sh -ec 'exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"'
+    volumes:
+      - redis_data:/data
+    # No host port binding — Redis is internal to the Docker network only.
+    # Access it for debugging via: docker exec -it chatwoot-redis redis-cli -a $REDIS_PASSWORD
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+
+  # ---------------------------------------------------------------------------
+  # Rails Web Application
+  # ---------------------------------------------------------------------------
+  web:
+    image: chatwoot:production-web
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: chatwoot-web
+    restart: unless-stopped
+    platform: linux/arm64
+    networks:
+      - cloudflare_rhaps_prod_net   # reachable by cloudflared tunnel
+      - backend_net                 # can reach postgres + redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Rails
+      RAILS_ENV: production
+      RAILS_SERVE_STATIC_FILES: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+      # SECRET_KEY_BASE has no fallback — startup will fail fast if not set
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+
+      # Apple Maps
+      APPLE_MAPS_TEAM_ID: ${APPLE_MAPS_TEAM_ID}
+      APPLE_MAPS_KEY_ID: ${APPLE_MAPS_KEY_ID}
+      APPLE_MAPS_PRIVATE_KEY: ${APPLE_MAPS_PRIVATE_KEY}
+
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Redis — pass password separately to avoid URI encoding issues
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      # Application
+      FRONTEND_URL: https://msp.rhaps.net
+      FORCE_SSL: "false"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      ACTIVE_STORAGE_SERVICE: local
+
+      # SMTP
+      SMTP_DOMAIN: icloud.com
+      SMTP_ADDRESS: smtp.mail.me.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL}
+
+      # Apple Pay
+      APPLE_PAY_MERCHANT_DOMAIN: ${APPLE_PAY_MERCHANT_DOMAIN}
+      APPLE_PAY_MERCHANT_IDENTIFIER: ${APPLE_PAY_MERCHANT_IDENTIFIER}
+      APPLE_PAY_TEST_MODE: ${APPLE_PAY_TEST_MODE}
+
+      # Apple Wallet
+      WALLET_PASS_TYPE_ID: ${WALLET_PASS_TYPE_ID}
+      WALLET_TEAM_ID: ${WALLET_TEAM_ID}
+      WALLET_CERT_PEM: ${WALLET_CERT_PEM}
+      WALLET_KEY_PEM: ${WALLET_KEY_PEM}
+      WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
+      WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
+
+      # Playwright stealth scraper microservice
+      PLAYWRIGHT_SCRAPER_URL: http://playwright-scraper:3001
+
+    ports:
+      # Bound to localhost; cloudflared proxies public HTTPS traffic here
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - ./storage:/app/storage
+      - ./log:/app/log
+      - ./tmp:/app/tmp
+      - ./certs/apple_pay:/app/certs/apple_pay:ro
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        bundle exec rails db:prepare &&
+        echo 'Database ready. Starting web server...' &&
+        rm -f /app/tmp/pids/server.pid &&
+        bundle exec rails server -b 0.0.0.0 -p 8080
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
+
+  # ---------------------------------------------------------------------------
+  # Sidekiq Worker
+  # ---------------------------------------------------------------------------
+  worker:
+    image: chatwoot:production-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: chatwoot-worker
+    hostname: chatwoot-worker
+    restart: unless-stopped
+    platform: linux/arm64
+    networks:
+      - backend_net           # reaches postgres + redis; has internet egress for SMTP
+    # No ports exposed — Sidekiq is an internal process with no listener port.
+    # If you previously used 7433 for Sidekiq Web UI, expose it via the Rails
+    # routes (/sidekiq) behind authentication instead of a raw port.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      RAILS_ENV: production
+      HOSTNAME: chatwoot-worker
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: chatwoot_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Redis — pass password separately to avoid URI encoding issues
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      ACTIVE_STORAGE_SERVICE: local
+
+      # Apple Maps
+      APPLE_MAPS_TEAM_ID: ${APPLE_MAPS_TEAM_ID}
+      APPLE_MAPS_KEY_ID: ${APPLE_MAPS_KEY_ID}
+      APPLE_MAPS_PRIVATE_KEY: ${APPLE_MAPS_PRIVATE_KEY}
+
+      FRONTEND_URL: https://msp.rhaps.net
+
+      # SMTP
+      SMTP_DOMAIN: icloud.com
+      SMTP_ADDRESS: smtp.mail.me.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_AUTHENTICATION: login
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+      SMTP_OPENSSL_VERIFY_MODE: peer
+      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL}
+
+      # Apple Pay
+      APPLE_PAY_MERCHANT_DOMAIN: ${APPLE_PAY_MERCHANT_DOMAIN}
+      APPLE_PAY_MERCHANT_IDENTIFIER: ${APPLE_PAY_MERCHANT_IDENTIFIER}
+      APPLE_PAY_TEST_MODE: ${APPLE_PAY_TEST_MODE}
+
+      # Apple Wallet
+      WALLET_PASS_TYPE_ID: ${WALLET_PASS_TYPE_ID}
+      WALLET_TEAM_ID: ${WALLET_TEAM_ID}
+      WALLET_CERT_PEM: ${WALLET_CERT_PEM}
+      WALLET_KEY_PEM: ${WALLET_KEY_PEM}
+      WALLET_KEY_PASSWORD: ${WALLET_KEY_PASSWORD}
+      WALLET_WWDR_PEM: ${WALLET_WWDR_PEM}
+
+      # Playwright stealth scraper microservice
+      PLAYWRIGHT_SCRAPER_URL: http://playwright-scraper:3001
+
+    volumes:
+      - ./storage:/app/storage
+      - ./log:/app/log
+      - ./tmp:/app/tmp
+      - ./certs/apple_pay:/app/certs/apple_pay:ro
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    healthcheck:
+      # Use SidekiqAlive's built-in HTTP endpoint instead of relying on procps.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7433 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
+
+  # ---------------------------------------------------------------------------
+  # Playwright Stealth Scraper (Node.js microservice)
+  # Provides bot-resistant OG metadata scraping for rich links.
+  # Rails falls back to HTTParty if this service is unavailable.
+  # ---------------------------------------------------------------------------
+  playwright-scraper:
+    image: mcr.microsoft.com/playwright:v1.59.1-jammy
+    container_name: chatwoot-playwright-scraper
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./services/playwright-scraper:/app
+    command: sh -c "npm install --omit=dev && node server.js"
+    environment:
+      PORT: "3001"
+      NODE_ENV: production
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  # Internal bridge: postgres + redis + app services communicate here.
+  # Has internet egress so web/worker can reach SMTP, Apple APIs, etc.
+  # Postgres and redis are NOT attached to cloudflare_rhaps_prod_net,
+  # so they are unreachable from the cloudflared tunnel.
+  backend_net:
+    driver: bridge
+
+  # External network shared with the cloudflared tunnel container.
+  # Only the web service is attached here.
+  cloudflare_rhaps_prod_net:
+    external: true
+    name: cloudflare_rhaps_prod_net

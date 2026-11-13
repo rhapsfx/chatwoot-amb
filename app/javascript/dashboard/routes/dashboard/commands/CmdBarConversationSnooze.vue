@@ -31,6 +31,8 @@ const toggleStatus = async (status, snoozedUntil) => {
 const onCmdSnoozeConversation = snoozeType => {
   if (snoozeType === wootConstants.SNOOZE_OPTIONS.UNTIL_CUSTOM_TIME) {
     showCustomSnoozeModal.value = true;
+  } else if (typeof snoozeType === 'number') {
+    toggleStatus(wootConstants.STATUS_TYPE.SNOOZED, snoozeType);
   } else {
     toggleStatus(
       wootConstants.STATUS_TYPE.SNOOZED,
@@ -62,7 +64,7 @@ useEmitter(CMD_SNOOZE_CONVERSATION, onCmdSnoozeConversation);
 <template>
   <woot-modal
     v-model:show="showCustomSnoozeModal"
-    :on-close="hideCustomSnoozeModal"
+    @close="hideCustomSnoozeModal"
   >
     <CustomSnoozeModal
       @close="hideCustomSnoozeModal"

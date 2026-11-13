@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useStoreGetters } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
@@ -40,7 +40,7 @@ export function useAutomation(startValue = null) {
   } = useAutomationValues();
 
   const automation = ref(startValue);
-  const automationTypes = structuredClone(AUTOMATIONS);
+  const automationTypes = reactive(structuredClone(AUTOMATIONS));
   const eventName = computed(() => automation.value?.event_name);
 
   /**
@@ -55,7 +55,11 @@ export function useAutomation(startValue = null) {
    * Appends a new condition to the automation.value.
    */
   const appendNewCondition = () => {
-    const defaultCondition = getDefaultConditions(eventName.value);
+    const defaultCondition = getDefaultConditions(
+      eventName.value === 'monitor_matched'
+        ? 'conversation_created'
+        : eventName.value
+    );
     automation.value.conditions = [
       ...automation.value.conditions,
       ...defaultCondition,
@@ -75,7 +79,10 @@ export function useAutomation(startValue = null) {
    * @param {number} index - The index of the filter to remove.
    */
   const removeFilter = index => {
-    if (automation.value.conditions.length <= 1) {
+    if (
+      automation.value.conditions.length <= 1 &&
+      eventName.value !== 'monitor_matched'
+    ) {
       useAlert(t('AUTOMATION.CONDITION.DELETE_MESSAGE'));
     } else {
       automation.value.conditions = automation.value.conditions.filter(
@@ -160,14 +167,26 @@ export function useAutomation(startValue = null) {
       t('AUTOMATION.CONDITION.CONTACT_CUSTOM_ATTR_LABEL')
     );
 
+    const CUSTOM_ATTR_HEADER_KEYS = new Set([
+      'conversation_custom_attribute',
+      'contact_custom_attribute',
+    ]);
+
     [
       'message_created',
       'conversation_created',
       'conversation_updated',
       'conversation_opened',
+      'conversation_resolved',
+      'monitor_matched',
     ].forEach(eventToUpdate => {
+      const standardConditions = automationTypes[
+        eventToUpdate
+      ].conditions.filter(
+        c => !c.customAttributeType && !CUSTOM_ATTR_HEADER_KEYS.has(c.key)
+      );
       automationTypes[eventToUpdate].conditions = [
-        ...automationTypes[eventToUpdate].conditions,
+        ...standardConditions,
         ...manifestedCustomAttributes,
       ];
     });

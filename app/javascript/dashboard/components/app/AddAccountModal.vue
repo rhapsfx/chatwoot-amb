@@ -63,7 +63,7 @@ export default {
 </script>
 
 <template>
-  <woot-modal :show="show" :on-close="() => $emit('closeAccountCreateModal')">
+  <woot-modal :show="show" @close="() => $emit('closeAccountCreateModal')">
     <div class="flex flex-col h-auto overflow-auto">
       <woot-modal-header
         :header-title="$t('CREATE_ACCOUNT.NEW_ACCOUNT')"

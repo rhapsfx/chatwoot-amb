@@ -1,0 +1,6 @@
+app/javascript/dashboard/routes/dashboard/onboarding/OnboardingFormRow.vue	app/javascript/dashboard/routes/dashboard/onboarding/account-details/OnboardingFormRow.vue
+app/javascript/dashboard/routes/dashboard/onboarding/OnboardingFormSelect.vue	app/javascript/dashboard/routes/dashboard/onboarding/account-details/OnboardingFormSelect.vue
+app/javascript/dashboard/routes/dashboard/onboarding/OnboardingLayout.vue	app/javascript/dashboard/routes/dashboard/onboarding/shared/OnboardingLayout.vue
+app/javascript/dashboard/routes/dashboard/onboarding/OnboardingSection.vue	app/javascript/dashboard/routes/dashboard/onboarding/shared/OnboardingSection.vue
+app/javascript/dashboard/routes/dashboard/onboarding/constants.js	app/javascript/dashboard/routes/dashboard/onboarding/shared/constants.js
+app/javascript/dashboard/stores/companies.spec.js	app/javascript/dashboard/stores/specs/companies.spec.js

@@ -21,6 +21,14 @@ module ChatwootApp
     enterprise? && GlobalConfig.get_value('DEPLOYMENT_ENV') == 'cloud'
   end
 
+  def self.self_hosted_enterprise?
+    enterprise? && !chatwoot_cloud? && GlobalConfig.get_value('INSTALLATION_PRICING_PLAN') == 'enterprise'
+  end
+
+  def self.self_hosted_paid?
+    enterprise? && !chatwoot_cloud? && %w[premium enterprise].include?(ChatwootHub.pricing_plan)
+  end
+
   def self.custom?
     @custom ||= root.join('custom').exist?
   end
@@ -41,5 +49,12 @@ module ChatwootApp
 
   def self.advanced_search_allowed?
     enterprise? && ENV.fetch('OPENSEARCH_URL', nil).present?
+  end
+
+  def self.otel_enabled?
+    otel_provider = InstallationConfig.find_by(name: 'OTEL_PROVIDER')&.value
+    secret_key = InstallationConfig.find_by(name: 'LANGFUSE_SECRET_KEY')&.value
+
+    otel_provider.present? && secret_key.present? && otel_provider == 'langfuse'
   end
 end

@@ -1,20 +1,20 @@
 <script>
-import { defineAsyncComponent, useTemplateRef } from 'vue';
+import { defineAsyncComponent, getCurrentInstance, useTemplateRef } from 'vue';
 import { mapGetters } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useTrack } from 'dashboard/composables';
-import keyboardEventListenerMixins from 'shared/mixins/keyboardEventListenerMixins';
-import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
 
-import CannedResponse from './CannedResponse.vue';
+import TemplateSelector from './TemplateSelector.vue';
 import ReplyToMessage from './ReplyToMessage.vue';
-import ResizableTextArea from 'shared/components/ResizableTextArea.vue';
 import AttachmentPreview from 'dashboard/components/widgets/AttachmentsPreview.vue';
 import ReplyTopPanel from 'dashboard/components/widgets/WootWriter/ReplyTopPanel.vue';
 import ReplyEmailHead from './ReplyEmailHead.vue';
 import ReplyBottomPanel from 'dashboard/components/widgets/WootWriter/ReplyBottomPanel.vue';
+import CopilotReplyBottomPanel from 'dashboard/components/widgets/WootWriter/CopilotReplyBottomPanel.vue';
 import ArticleSearchPopover from 'dashboard/routes/dashboard/helpcenter/components/ArticleSearch/SearchPopover.vue';
+import CopilotEditorSection from './CopilotEditorSection.vue';
 import MessageSignatureMissingAlert from './MessageSignatureMissingAlert.vue';
 import ReplyBoxBanner from './ReplyBoxBanner.vue';
 import QuotedEmailPreview from './QuotedEmailPreview.vue';
@@ -23,86 +23,165 @@ import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vu
 import AudioRecorder from 'dashboard/components/widgets/WootWriter/AudioRecorder.vue';
 import { AUDIO_FORMATS } from 'shared/constants/messages';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
+import { CMD_AI_ASSIST } from 'dashboard/helper/commandbar/events';
 import {
-  getMessageVariables,
   getUndefinedVariablesInMessage,
   replaceVariablesInMessage,
 } from '@chatwoot/utils';
 import WhatsappTemplates from './WhatsappTemplates/Modal.vue';
 import ContentTemplates from './ContentTemplates/ContentTemplatesModal.vue';
 import { MESSAGE_MAX_LENGTH } from 'shared/helpers/MessageTypeHelper';
+import { isComposing } from 'shared/helpers/KeyboardHelpers';
 import inboxMixin, { INBOX_FEATURES } from 'shared/mixins/inboxMixin';
 import { trimContent, debounce, getRecipients } from '@chatwoot/utils';
 import wootConstants from 'dashboard/constants/globals';
 import {
   extractQuotedEmailText,
   buildQuotedEmailHeader,
-  truncatePreviewText,
   appendQuotedTextToMessage,
 } from 'dashboard/helper/quotedEmailHelper';
-import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
+import {
+  CONVERSATION_EVENTS,
+  CAPTAIN_EVENTS,
+} from '../../../helper/AnalyticsHelper/events';
 import fileUploadMixin from 'dashboard/mixins/fileUploadMixin';
 import {
   appendSignature,
   removeSignature,
   replaceSignature,
   extractTextFromMarkdown,
+  getEffectiveChannelType,
+  getReplyVariables,
 } from 'dashboard/helper/editorHelper';
+import { useCopilotReply } from 'dashboard/composables/useCopilotReply';
+import { useMacroExecution } from 'dashboard/composables/useMacroExecution';
+import ConversationResolveAttributesModal from 'dashboard/components-next/ConversationWorkflow/ConversationResolveAttributesModal.vue';
+import { useKbd } from 'dashboard/composables/utils/useKbd';
+import { isFileTypeAllowedForChannel } from 'shared/helpers/FileHelper';
+import AppleRichLinkPreview from './AppleRichLinkPreview.vue';
+import {
+  URL_REGEX,
+  detectURLsInText,
+  processMessageForAppleMessages,
+} from 'dashboard/helper/appleMessagesRichLink';
+import { isAIAssigneeType } from 'dashboard/helper/agentHelper';
+import { getLastMessage } from 'dashboard/helper/conversationHelper';
+import { CONTENT_TYPES } from 'dashboard/components-next/message/constants';
 
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
+import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import { emitter } from 'shared/helpers/mitt';
-const EmojiInput = defineAsyncComponent(
-  () => import('shared/components/emoji/EmojiInput.vue')
+const EmojiIconPicker = defineAsyncComponent(
+  () =>
+    import('dashboard/components-next/emoji-icon-picker/EmojiIconPicker.vue')
 );
 
 export default {
   components: {
+    AppleRichLinkPreview,
     ArticleSearchPopover,
     AttachmentPreview,
     AudioRecorder,
-    CannedResponse,
+    TemplateSelector,
     ReplyBoxBanner,
-    EmojiInput,
+    EmojiIconPicker,
     MessageSignatureMissingAlert,
     ReplyBottomPanel,
     ReplyEmailHead,
     ReplyToMessage,
     ReplyTopPanel,
-    ResizableTextArea,
     ContentTemplates,
     WhatsappTemplates,
     WootMessageEditor,
     QuotedEmailPreview,
+    CopilotEditorSection,
+    CopilotReplyBottomPanel,
+    ConversationResolveAttributesModal,
   },
-  mixins: [inboxMixin, fileUploadMixin, keyboardEventListenerMixins],
+  mixins: [inboxMixin, fileUploadMixin],
   props: {
     popOutReplyBox: {
       type: Boolean,
       default: false,
     },
   },
-  emits: ['update:popOutReplyBox'],
+  emits: ['toggleEditorSize', 'update:popOutReplyBox'],
   setup() {
     const {
       uiSettings,
       updateUISettings,
       isEditorHotKeyEnabled,
       fetchSignatureFlagFromUISettings,
-      setQuotedReplyFlagForInbox,
-      fetchQuotedReplyFlagFromUISettings,
     } = useUISettings();
 
-    const replyEditor = useTemplateRef('replyEditor');
+    const messageEditor = useTemplateRef('messageEditor');
+    const copilot = useCopilotReply();
+    const macroExecution = useMacroExecution();
+    const shortcutKey = useKbd(['$mod', '+', 'enter']);
+
+    // Options API state and methods live on the instance proxy
+    const { proxy } = getCurrentInstance();
+    useKeyboardEvents({
+      Escape: {
+        action: () => proxy.hideEmojiPicker(),
+        allowOnFocusedInput: true,
+      },
+      '$mod+KeyK': {
+        action: e => {
+          e.preventDefault();
+          const ninja = document.querySelector('ninja-keys');
+          ninja.open();
+        },
+        allowOnFocusedInput: true,
+      },
+      Enter: {
+        action: e => {
+          if (isComposing(e)) return;
+          if (proxy.isAValidEvent('enter')) {
+            proxy.onSendReply();
+            e.preventDefault();
+          }
+        },
+        allowOnFocusedInput: true,
+      },
+      '$mod+Enter': {
+        action: e => {
+          if (isComposing(e)) return;
+          if (copilot.isActive.value && proxy.isFocused) {
+            proxy.onSubmitCopilotReply();
+          } else if (proxy.isAValidEvent('cmd_enter')) {
+            proxy.onSendReply();
+          }
+        },
+        allowOnFocusedInput: true,
+      },
+      '$mod+KeyZ': {
+        action: e => {
+          // The editor prevents default only when its own history undid a
+          // step; inputs keep their native undo. Shift means redo.
+          if (e.defaultPrevented || e.shiftKey) return;
+          if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) return;
+          // Only act inside the composer, or with nothing focused (right
+          // after clicking remove); never hijack another editor's undo.
+          const inComposer =
+            e.target instanceof Element && !!e.target.closest('.reply-box');
+          if (!inComposer && e.target !== document.body) return;
+          if (proxy.restoreQuotedEmail()) e.preventDefault();
+        },
+        allowOnFocusedInput: true,
+      },
+    });
 
     return {
       uiSettings,
       updateUISettings,
       isEditorHotKeyEnabled,
       fetchSignatureFlagFromUISettings,
-      setQuotedReplyFlagForInbox,
-      fetchQuotedReplyFlagFromUISettings,
-      replyEditor,
+      messageEditor,
+      copilot,
+      shortcutKey,
+      macroExecution,
     };
   },
   data() {
@@ -119,11 +198,15 @@ export default {
       replyType: REPLY_EDITOR_MODES.REPLY,
       mentionSearchKey: '',
       hasSlashCommand: false,
+      draftConversationId: null,
+      draftReplyMode: null,
       bccEmails: '',
       ccEmails: '',
       toEmails: '',
+      subject: '',
       doAutoSaveDraft: () => {},
       showWhatsAppTemplatesModal: false,
+      requestContactInfoTemplatesOnly: false,
       showContentTemplatesModal: false,
       updateEditorSelectionWith: '',
       undefinedVariableMessage: '',
@@ -131,9 +214,17 @@ export default {
       showUserMentions: false,
       showCannedMenu: false,
       showVariablesMenu: false,
+      showMacrosMenu: false,
       newConversationModalActive: false,
       showArticleSearchPopover: false,
       hasRecordedAudio: false,
+      copilotAcceptedMessages: {},
+      // Rich Link preview
+      richLinkPreviewUrl: '',
+      showRichLinkPreview: false,
+      richLinkDetectionTimeout: null,
+      richLinkCachedData: null,
+      isQuoteRemoved: false,
     };
   },
   computed: {
@@ -143,20 +234,28 @@ export default {
       currentUser: 'getCurrentUser',
       lastEmail: 'getLastEmailInSelectedChat',
       globalConfig: 'globalConfig/get',
+      isMetaMessageSendingDisabled: 'globalConfig/isMetaMessageSendingDisabled',
       accountId: 'getCurrentAccountId',
       isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
     }),
-    currentContact() {
-      return this.$store.getters['contacts/getContact'](
-        this.currentChat.meta.sender.id
+    isMacrosEnabled() {
+      return this.isFeatureEnabledonAccount(
+        this.accountId,
+        FEATURE_FLAGS.MACROS
       );
+    },
+    currentContact() {
+      const senderId = this.currentChat?.meta?.sender?.id;
+      if (!senderId) return {};
+      return this.$store.getters['contacts/getContact'](senderId);
     },
     shouldShowReplyToMessage() {
       return (
         this.inReplyTo?.id &&
         !this.isPrivate &&
         this.inboxHasFeature(INBOX_FEATURES.REPLY_TO) &&
-        !this.is360DialogWhatsAppChannel
+        !this.is360DialogWhatsAppChannel &&
+        !this.copilot.isActive.value
       );
     },
     showRichContentEditor() {
@@ -174,19 +273,81 @@ export default {
       return false;
     },
     showWhatsappTemplates() {
-      return this.isAWhatsAppCloudChannel && !this.isPrivate;
+      // We support templates for API channels if someone updates templates manually via API
+      // That's why we don't explicitly check for channel type here
+      const templates = this.$store.getters['inboxes/getWhatsAppTemplates'](
+        this.inboxId
+      );
+      return !!(templates && templates.length) && !this.isPrivate;
     },
     showContentTemplates() {
+      // Only show for Twilio WhatsApp, not for Apple Messages
+      // Apple Messages uses the / command (TemplateSelector)
       return this.isATwilioWhatsAppChannel && !this.isPrivate;
     },
-    isPrivate() {
-      if (this.currentChat.can_reply || this.isAWhatsAppChannel) {
-        return this.isOnPrivateNote;
-      }
-      return true;
+    isWithinMessagingWindow() {
+      return !!(
+        this.currentChat?.can_reply ||
+        this.isAWhatsAppChannel ||
+        this.isAPIInbox
+      );
     },
-    isReplyRestricted() {
-      return !this.currentChat?.can_reply && !this.isAWhatsAppChannel;
+    canSendPublicReply() {
+      return (
+        this.isWithinMessagingWindow &&
+        !this.isAIOwnedPendingConversation &&
+        !this.isInstagramReplyRestricted
+      );
+    },
+    isVoiceCallConversation() {
+      if (!this.currentChat.messages) return false;
+      return (
+        getLastMessage(this.currentChat)?.content_type ===
+        CONTENT_TYPES.VOICE_CALL
+      );
+    },
+    isInstagramReplyRestricted() {
+      return this.isMetaMessageSendingDisabled && this.isAnInstagramChannel;
+    },
+    isPrivate() {
+      return (
+        !this.canSendPublicReply || this.replyType === REPLY_EDITOR_MODES.NOTE
+      );
+    },
+    isOnPrivateNote() {
+      if (this.isInstagramReplyRestricted) {
+        return true;
+      }
+
+      return this.isAIOwnedPendingConversation
+        ? this.isPrivate
+        : this.replyType === REPLY_EDITOR_MODES.NOTE;
+    },
+    effectiveReplyMode() {
+      return this.isOnPrivateNote
+        ? REPLY_EDITOR_MODES.NOTE
+        : REPLY_EDITOR_MODES.REPLY;
+    },
+    hasMeaningfulEditorContent() {
+      const body = this.message || '';
+      // Only strip the signature when it's actually being auto-appended.
+      // If the toggle is off, the agent's text might happen to match their
+      // saved signature and we'd incorrectly treat it as empty.
+      const shouldStripSignature =
+        !this.isPrivate && this.sendWithSignature && !!this.messageSignature;
+      if (!shouldStripSignature) return !!body.trim();
+      const stripped = removeSignature(
+        body,
+        this.messageSignature,
+        getEffectiveChannelType(this.channelType, this.inbox?.medium || '')
+      );
+      return !!stripped.trim();
+    },
+    isAIOwnedPendingConversation() {
+      return (
+        this.currentChat?.status === wootConstants.STATUS_TYPE.PENDING &&
+        isAIAssigneeType(this.currentChat?.meta?.assignee_type)
+      );
     },
     inboxId() {
       return this.currentChat.inbox_id;
@@ -194,7 +355,19 @@ export default {
     inbox() {
       return this.$store.getters['inboxes/getInbox'](this.inboxId);
     },
+    isAppleMessagesConversation() {
+      return this.inbox?.channel_type === 'Channel::AppleMessagesForBusiness';
+    },
     messagePlaceHolder() {
+      if (this.isEditorDisabled) {
+        if (this.isAWhatsAppChannel) {
+          return this.$t('CONVERSATION.FOOTER.MESSAGING_RESTRICTED_WHATSAPP');
+        }
+        if (this.isAPIInbox) {
+          return this.$t('CONVERSATION.FOOTER.MESSAGING_RESTRICTED_API');
+        }
+        return this.$t('CONVERSATION.FOOTER.MESSAGING_RESTRICTED');
+      }
       return this.isPrivate
         ? this.$t('CONVERSATION.FOOTER.PRIVATE_MSG_INPUT')
         : this.$t('CONVERSATION.FOOTER.MSG_INPUT');
@@ -206,6 +379,7 @@ export default {
       return this.maxLength - this.message.length;
     },
     isReplyButtonDisabled() {
+      if (this.isEditorDisabled) return true;
       if (this.isATwitterInbox) return true;
       if (this.hasAttachments || this.hasRecordedAudio) return false;
 
@@ -236,6 +410,12 @@ export default {
       if (this.isAnInstagramChannel) {
         return MESSAGE_MAX_LENGTH.INSTAGRAM;
       }
+      if (this.isATelegramChannel) {
+        return MESSAGE_MAX_LENGTH.TELEGRAM;
+      }
+      if (this.isATiktokChannel) {
+        return MESSAGE_MAX_LENGTH.TIKTOK;
+      }
       if (this.isATwilioWhatsAppChannel) {
         return MESSAGE_MAX_LENGTH.TWILIO_WHATSAPP;
       }
@@ -257,6 +437,10 @@ export default {
       return MESSAGE_MAX_LENGTH.GENERAL;
     },
     showFileUpload() {
+      const { image_send: imageSend } =
+        this.currentChat?.additional_attributes?.tiktok_capabilities ?? {};
+      const tiktokAttachmentSupported = imageSend ?? true;
+
       return (
         this.isAWebWidgetInbox ||
         this.isAFacebookInbox ||
@@ -266,7 +450,9 @@ export default {
         this.isASmsInbox ||
         this.isATelegramChannel ||
         this.isALineChannel ||
-        this.isAnInstagramChannel
+        this.isAnInstagramChannel ||
+        (this.isATiktokChannel && tiktokAttachmentSupported) ||
+        this.isAnAppleMessagesForBusinessChannel
       );
     },
     replyButtonLabel() {
@@ -275,7 +461,7 @@ export default {
         sendMessageText = this.$t('CONVERSATION.REPLYBOX.CREATE');
       }
       const keyLabel = this.isEditorHotKeyEnabled('cmd_enter')
-        ? '(⌘ + ↵)'
+        ? `(${this.shortcutKey})`
         : '(↵)';
       return `${sendMessageText} ${keyLabel}`;
     },
@@ -296,9 +482,6 @@ export default {
     },
     showAudioRecorderEditor() {
       return this.showAudioRecorder && this.isRecordingAudio;
-    },
-    isOnPrivateNote() {
-      return this.replyType === REPLY_EDITOR_MODES.NOTE;
     },
     isOnExpandedLayout() {
       const {
@@ -330,7 +513,7 @@ export default {
       return !this.isPrivate && this.sendWithSignature;
     },
     isSignatureAvailable() {
-      return !!this.signatureToApply;
+      return !!this.messageSignature;
     },
     sendWithSignature() {
       return this.fetchSignatureFlagFromUISettings(this.channelType);
@@ -352,9 +535,12 @@ export default {
       return this.conversationId;
     },
     editorStateId() {
-      return `draft-${this.conversationIdByRoute}-${this.replyType}`;
+      return `draft-${this.conversationIdByRoute}-${this.effectiveReplyMode}`;
     },
     audioRecordFormat() {
+      if (this.isAWhatsAppCloudChannel) {
+        return AUDIO_FORMATS.OGG;
+      }
       if (this.isAWhatsAppChannel || this.isATelegramChannel) {
         return AUDIO_FORMATS.MP3;
       }
@@ -364,12 +550,12 @@ export default {
       return AUDIO_FORMATS.WAV;
     },
     messageVariables() {
-      const variables = getMessageVariables({
+      return getReplyVariables({
         conversation: this.currentChat,
         contact: this.currentContact,
         inbox: this.inbox,
+        user: this.currentUser,
       });
-      return variables;
     },
     // ensure that the signature is plain text depending on `showRichContentEditor`
     signatureToApply() {
@@ -381,19 +567,6 @@ export default {
       const { help_center: portal = {} } = this.inbox;
       const { slug = '' } = portal;
       return slug;
-    },
-    isQuotedEmailReplyEnabled() {
-      return this.isFeatureEnabledonAccount(
-        this.accountId,
-        FEATURE_FLAGS.QUOTED_EMAIL_REPLY
-      );
-    },
-    quotedReplyPreference() {
-      if (!this.isAnEmailChannel || !this.isQuotedEmailReplyEnabled) {
-        return false;
-      }
-
-      return !!this.fetchQuotedReplyFlagFromUISettings(this.channelType);
     },
     lastEmailWithQuotedContent() {
       if (!this.isAnEmailChannel) {
@@ -410,43 +583,61 @@ export default {
     quotedEmailText() {
       return extractQuotedEmailText(this.lastEmailWithQuotedContent);
     },
-    quotedEmailPreviewText() {
-      return truncatePreviewText(this.quotedEmailText, 80);
+    quotedEmailHeader() {
+      return buildQuotedEmailHeader(
+        this.lastEmailWithQuotedContent,
+        this.currentContact,
+        this.inbox
+      );
     },
-    shouldShowQuotedReplyToggle() {
+    shouldIncludeQuotedEmail() {
       return (
         this.isAnEmailChannel &&
         !this.isOnPrivateNote &&
-        this.isQuotedEmailReplyEnabled
+        !this.isQuoteRemoved &&
+        !!this.quotedEmailText
       );
     },
-    shouldShowQuotedPreview() {
+    isDefaultEditorMode() {
+      return !this.showAudioRecorderEditor && !this.copilot.isActive.value;
+    },
+    isEditorDisabled() {
       return (
-        this.shouldShowQuotedReplyToggle &&
-        this.quotedReplyPreference &&
-        !!this.quotedEmailText
+        (this.isAWhatsAppChannel || this.isAPIInbox) &&
+        !this.isOnPrivateNote &&
+        !this.currentChat.can_reply
       );
     },
   },
   watch: {
     currentChat(conversation, oldConversation) {
-      const { can_reply: canReply } = conversation;
       if (oldConversation && oldConversation.id !== conversation.id) {
         // Only update email fields when switching to a completely different conversation (by ID)
         // This prevents overwriting user input (e.g., CC/BCC fields) when performing actions
         // like self-assign or other updates that do not actually change the conversation context
         this.setCCAndToEmailsFromLastChat();
+        this.subject = '';
+        // Reset Copilot editor state (includes cancelling ongoing generation)
+        this.copilot.reset();
+        // Default to a note on calls so a reply is not sent as SMS by accident.
+        // Only on open, so an agent who switches to reply keeps it.
+        if (this.isVoiceCallConversation) {
+          this.replyType = REPLY_EDITOR_MODES.NOTE;
+        }
+      }
+
+      if (this.isInstagramReplyRestricted) {
+        this.replyType = REPLY_EDITOR_MODES.NOTE;
+        return;
       }
 
       if (this.isOnPrivateNote) {
         return;
       }
 
-      if (canReply || this.isAWhatsAppChannel) {
-        this.replyType = REPLY_EDITOR_MODES.REPLY;
-      } else {
-        this.replyType = REPLY_EDITOR_MODES.NOTE;
-      }
+      this.replyType = this.isWithinMessagingWindow
+        ? REPLY_EDITOR_MODES.REPLY
+        : REPLY_EDITOR_MODES.NOTE;
 
       this.fetchAndSetReplyTo();
     },
@@ -464,9 +655,9 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
-        this.setToDraft(oldConversationId, this.replyType);
-        this.getFromDraft();
+        this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
+        this.isQuoteRemoved = false;
       }
     },
     message(updatedMessage) {
@@ -488,32 +679,52 @@ export default {
         ? bodyWithoutSignature.substring(1)
         : '';
 
+      // Check for URLs in Apple Messages conversations
+      this.checkForURLsInMessage(updatedMessage);
+
       // Autosave the current message draft.
       this.doAutoSaveDraft();
     },
-    replyType(updatedReplyType, oldReplyType) {
-      this.setToDraft(this.conversationIdByRoute, oldReplyType);
-      this.getFromDraft();
+    showWhatsappTemplates(isAvailable) {
+      if (!isAvailable) this.hideWhatsappTemplatesModal();
+    },
+    showContentTemplates(isAvailable) {
+      if (!isAvailable) this.hideContentTemplatesModal();
+    },
+    effectiveReplyMode(updatedReplyType) {
+      this.$store.dispatch('draftMessages/setReplyEditorMode', {
+        mode: updatedReplyType,
+      });
+      this.switchDraftContext(this.conversationIdByRoute, updatedReplyType);
     },
   },
 
   mounted() {
-    this.getFromDraft();
-    // Don't use the keyboard listener mixin here as the events here are supposed to be
-    // working even if input/textarea is focussed.
+    if (this.isInstagramReplyRestricted || this.isVoiceCallConversation) {
+      this.replyType = REPLY_EDITOR_MODES.NOTE;
+    }
+
+    this.$store.dispatch('draftMessages/setReplyEditorMode', {
+      mode: this.effectiveReplyMode,
+    });
+    this.switchDraftContext(
+      this.conversationIdByRoute,
+      this.effectiveReplyMode
+    );
+    // Bound directly rather than through useKeyboardEvents, because this has to
+    // keep working even while the editor is focussed.
     document.addEventListener('paste', this.onPaste);
-    document.addEventListener('keydown', this.handleKeyEvents);
     this.setCCAndToEmailsFromLastChat();
     this.doAutoSaveDraft = debounce(
       () => {
-        this.saveDraft(this.conversationIdByRoute, this.replyType);
+        this.saveDraft(this.conversationIdByRoute, this.effectiveReplyMode);
       },
       500,
       true
     );
 
     this.fetchAndSetReplyTo();
-    emitter.on(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.fetchAndSetReplyTo);
+    emitter.on(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
 
     // A hacky fix to solve the drag and drop
     // Is showing on top of new conversation modal drag and drop
@@ -522,19 +733,43 @@ export default {
       BUS_EVENTS.NEW_CONVERSATION_MODAL,
       this.onNewConversationModalActive
     );
-    emitter.on(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
+    emitter.on(CMD_AI_ASSIST, this.executeCopilotAction);
   },
   unmounted() {
     document.removeEventListener('paste', this.onPaste);
-    document.removeEventListener('keydown', this.handleKeyEvents);
-    emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.fetchAndSetReplyTo);
-    emitter.off(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
+    emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
     emitter.off(
       BUS_EVENTS.NEW_CONVERSATION_MODAL,
       this.onNewConversationModalActive
     );
+    emitter.off(CMD_AI_ASSIST, this.executeCopilotAction);
   },
   methods: {
+    openContactInfoTemplateModal() {
+      this.requestContactInfoTemplatesOnly = true;
+      this.showWhatsAppTemplatesModal = true;
+    },
+    getDraftKey(
+      conversationId = this.conversationIdByRoute,
+      replyType = this.effectiveReplyMode
+    ) {
+      return `draft-${conversationId}-${replyType}`;
+    },
+    getCopilotAcceptedMessage(replyType = this.effectiveReplyMode) {
+      const key = this.getDraftKey(this.conversationIdByRoute, replyType);
+      return this.copilotAcceptedMessages[key] || '';
+    },
+    setCopilotAcceptedMessage(message, replyType = this.effectiveReplyMode) {
+      const key = this.getDraftKey(this.conversationIdByRoute, replyType);
+      this.copilotAcceptedMessages[key] = trimContent(
+        message || '',
+        this.maxLength
+      );
+    },
+    clearCopilotAcceptedMessage(replyType = this.effectiveReplyMode) {
+      const key = this.getDraftKey(this.conversationIdByRoute, replyType);
+      delete this.copilotAcceptedMessages[key];
+    },
     handleInsert(article) {
       const { url, title } = article;
       if (this.isRichEditorEnabled) {
@@ -576,35 +811,26 @@ export default {
         );
       }
     },
-    toggleQuotedReply() {
-      if (!this.isAnEmailChannel) {
-        return;
-      }
-
-      const nextValue = !this.quotedReplyPreference;
-      this.setQuotedReplyFlagForInbox(this.channelType, nextValue);
+    removeQuotedEmail() {
+      this.isQuoteRemoved = true;
     },
-    shouldIncludeQuotedEmail() {
-      return (
-        this.isQuotedEmailReplyEnabled &&
-        this.quotedReplyPreference &&
-        this.shouldShowQuotedReplyToggle &&
-        !!this.quotedEmailText
-      );
+    restoreQuotedEmail() {
+      if (!this.isQuoteRemoved) {
+        return false;
+      }
+      this.isQuoteRemoved = false;
+      return true;
     },
     getMessageWithQuotedEmailText(message) {
-      if (!this.shouldIncludeQuotedEmail()) {
+      if (!this.shouldIncludeQuotedEmail) {
         return message;
       }
 
-      const quotedText = this.quotedEmailText || '';
-      const header = buildQuotedEmailHeader(
-        this.lastEmailWithQuotedContent,
-        this.currentContact,
-        this.inbox
+      return appendQuotedTextToMessage(
+        message,
+        this.quotedEmailText,
+        this.quotedEmailHeader
       );
-
-      return appendQuotedTextToMessage(message, quotedText, header);
     },
     resetRecorderAndClearAttachments() {
       // Reset audio recorder UI state
@@ -614,8 +840,8 @@ export default {
     },
     saveDraft(conversationId, replyType) {
       if (this.message || this.message === '') {
-        const key = `draft-${conversationId}-${replyType}`;
-        const draftToSave = trimContent(this.message || '');
+        const key = this.getDraftKey(conversationId, replyType);
+        const draftToSave = trimContent(this.message || '', this.maxLength);
 
         this.$store.dispatch('draftMessages/set', {
           key,
@@ -627,9 +853,25 @@ export default {
       this.saveDraft(conversationId, replyType);
       this.message = '';
     },
+    switchDraftContext(conversationId, replyMode) {
+      if (
+        this.draftConversationId === conversationId &&
+        this.draftReplyMode === replyMode
+      ) {
+        return;
+      }
+
+      if (this.draftConversationId) {
+        this.setToDraft(this.draftConversationId, this.draftReplyMode);
+      }
+
+      this.draftConversationId = conversationId;
+      this.draftReplyMode = replyMode;
+      this.getFromDraft();
+    },
     getFromDraft() {
       if (this.conversationIdByRoute) {
-        const key = `draft-${this.conversationIdByRoute}-${this.replyType}`;
+        const key = this.getDraftKey();
         const messageFromStore =
           this.$store.getters['draftMessages/get'](key) || '';
 
@@ -642,54 +884,26 @@ export default {
         return message;
       }
 
+      // Even when editor is disabled (e.g. WhatsApp/API can't reply), we must
+      // still normalize stale signatures out of drafts when signature is off.
+      if (this.isEditorDisabled && this.sendWithSignature) {
+        return message;
+      }
+
+      const effectiveChannelType = getEffectiveChannelType(
+        this.channelType,
+        this.inbox?.medium || ''
+      );
+
       return this.sendWithSignature
-        ? appendSignature(message, this.signatureToApply)
-        : removeSignature(message, this.signatureToApply);
+        ? appendSignature(message, this.messageSignature, effectiveChannelType)
+        : removeSignature(message, this.messageSignature, effectiveChannelType);
     },
     removeFromDraft() {
       if (this.conversationIdByRoute) {
-        const key = `draft-${this.conversationIdByRoute}-${this.replyType}`;
+        const key = this.getDraftKey();
         this.$store.dispatch('draftMessages/delete', { key });
       }
-    },
-    getElementToBind() {
-      return this.replyEditor;
-    },
-    getKeyboardEvents() {
-      return {
-        Escape: {
-          action: () => {
-            this.hideEmojiPicker();
-            this.hideMentions();
-          },
-          allowOnFocusedInput: true,
-        },
-        '$mod+KeyK': {
-          action: e => {
-            e.preventDefault();
-            const ninja = document.querySelector('ninja-keys');
-            ninja.open();
-          },
-          allowOnFocusedInput: true,
-        },
-        Enter: {
-          action: e => {
-            if (this.isAValidEvent('enter')) {
-              this.onSendReply();
-              e.preventDefault();
-            }
-          },
-          allowOnFocusedInput: true,
-        },
-        '$mod+Enter': {
-          action: () => {
-            if (this.isAValidEvent('cmd_enter')) {
-              this.onSendReply();
-            }
-          },
-          allowOnFocusedInput: true,
-        },
-      };
     },
     isAValidEvent(selectedKey) {
       return (
@@ -697,22 +911,45 @@ export default {
         !this.showMentions &&
         !this.showCannedMenu &&
         !this.showVariablesMenu &&
+        !this.showMacrosMenu &&
         this.isFocused &&
         this.isEditorHotKeyEnabled(selectedKey)
       );
     },
     onPaste(e) {
-      const data = e.clipboardData.files;
-      if (!this.showRichContentEditor && data.length !== 0) {
-        this.$refs.messageInput.$el.blur();
-      }
-      if (!data.length || !data[0]) {
-        return;
-      }
-      data.forEach(file => {
-        const { name, type, size } = file;
-        this.onFileUpload({ name, type, size, file: file });
-      });
+      // Don't handle paste if compose new conversation modal is open
+      if (this.newConversationModalActive) return;
+
+      // Don't handle paste if editor is disabled
+      if (this.isEditorDisabled) return;
+      if (!this.showFileUpload && !this.isOnPrivateNote) return;
+
+      // Filter valid files (non-zero size)
+      Array.from(e.clipboardData.files)
+        .filter(file => file.size > 0)
+        .filter(file => {
+          const isAllowed = isFileTypeAllowedForChannel(file, {
+            channelType: this.channelType || this.inbox?.channel_type,
+            medium: this.inbox?.medium,
+            conversationType: this.conversationType,
+            isInstagramChannel: this.isAnInstagramChannel,
+            isOnPrivateNote: this.isOnPrivateNote,
+          });
+
+          if (!isAllowed) {
+            useAlert(
+              this.$t('CONVERSATION.FILE_TYPE_NOT_SUPPORTED', {
+                fileName: file.name,
+              })
+            );
+          }
+
+          return isAllowed;
+        })
+        .forEach(file => {
+          const { name, type, size } = file;
+          this.onFileUpload({ name, type, size, file });
+        });
     },
     toggleUserMention(currentMentionState) {
       this.showUserMentions = currentMentionState;
@@ -723,11 +960,25 @@ export default {
     toggleVariablesMenu(value) {
       this.showVariablesMenu = value;
     },
+    toggleMacrosMenu(value) {
+      this.showMacrosMenu = value;
+    },
+    onExecuteMacro(macro) {
+      const pending = this.macroExecution.execute(macro, this.currentChat.id);
+      if (pending) {
+        this.$refs.resolveAttributesModal?.open(
+          pending.missing,
+          pending.customAttributes
+        );
+      }
+    },
     openWhatsappTemplateModal() {
+      this.requestContactInfoTemplatesOnly = false;
       this.showWhatsAppTemplatesModal = true;
     },
     hideWhatsappTemplatesModal() {
       this.showWhatsAppTemplatesModal = false;
+      this.requestContactInfoTemplatesOnly = false;
     },
     openContentTemplateModal() {
       this.showContentTemplatesModal = true;
@@ -735,42 +986,159 @@ export default {
     hideContentTemplatesModal() {
       this.showContentTemplatesModal = false;
     },
-    confirmOnSendReply() {
+    async confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
         return;
       }
       if (!this.showMentions) {
+        const copilotAcceptedMessage = this.getCopilotAcceptedMessage();
         const isOnWhatsApp =
           this.isATwilioWhatsAppChannel ||
           this.isAWhatsAppCloudChannel ||
           this.is360DialogWhatsAppChannel;
-        // When users send messages containing both text and attachments on Instagram, Instagram treats them as separate messages.
-        // Although Chatwoot combines these into a single message, Instagram sends separate echo events for each component.
-        // This can create duplicate messages in Chatwoot. To prevent this issue, we'll handle text and attachments as separate messages.
+        // Instagram and TikTok do not support sending text and attachments in the same message.
+        // For Instagram, combining them causes duplicate messages due to separate echo events per component.
+        // For TikTok, the API rejects messages that mix text and media.
+        // To handle both cases, text and attachments are always sent as separate messages.
         const isOnInstagram = this.isAnInstagramChannel;
-        if ((isOnWhatsApp || isOnInstagram) && !this.isPrivate) {
-          this.sendMessageAsMultipleMessages(this.message);
+        const isOnTiktok = this.isATiktokChannel;
+
+        // ✅ NEW: Auto-convert URLs to Rich Links for Apple Messages conversations
+        if (
+          this.isAppleMessagesConversation &&
+          !this.isPrivate &&
+          !this.hasAttachments
+        ) {
+          const detectedURLs = detectURLsInText(this.message);
+          if (detectedURLs.length > 0) {
+            // Process message to convert URLs to rich links
+            try {
+              // Add inbox to conversation object for App Clips detection
+              const conversationWithInbox = {
+                ...this.currentChat,
+                inbox: this.inbox,
+                inbox_id: this.inboxId,
+              };
+
+              const processedMessages = await processMessageForAppleMessages(
+                this.message,
+                conversationWithInbox,
+                this.richLinkCachedData
+              );
+
+              // Clear the input immediately — messages are queued and send in background
+              if (!this.isPrivate) {
+                this.clearEmailField();
+              }
+              this.clearMessage();
+              this.hideEmojiPicker();
+              this.hideRichLinkPreview();
+              this.$emit('update:popOutReplyBox', false);
+
+              // Send processed messages (may be multiple: text + rich link)
+              /* eslint-disable no-await-in-loop */
+              for (let i = 0; i < processedMessages.length; i += 1) {
+                const messagePart = processedMessages[i];
+                const messagePayload = {
+                  conversationId: this.currentChat.id,
+                  message: messagePart.content,
+                  private: false,
+                  content_type: messagePart.content_type,
+                  content_attributes: messagePart.content_attributes || {},
+                };
+
+                await this.$store.dispatch(
+                  'createPendingMessageAndSend',
+                  messagePayload
+                );
+
+                // Brief delay between messages (per Apple MSP docs)
+                if (i < processedMessages.length - 1) {
+                  await new Promise(resolve => {
+                    setTimeout(resolve, 1500);
+                  });
+                }
+              }
+              /* eslint-enable no-await-in-loop */
+              return;
+            } catch (error) {
+              // If URL processing fails, fall through to normal send
+            }
+          }
+        }
+
+        // Normal send flow (WhatsApp, Instagram, TikTok, or Apple Messages without URLs)
+        if ((isOnWhatsApp || isOnInstagram || isOnTiktok) && !this.isPrivate) {
+          this.sendMessageAsMultipleMessages(
+            this.message,
+            copilotAcceptedMessage
+          );
         } else {
           const messagePayload = this.getMessagePayload(this.message);
-          this.sendMessage(messagePayload);
+          this.sendMessage(
+            messagePayload,
+            this.message,
+            copilotAcceptedMessage
+          );
         }
 
         if (!this.isPrivate) {
           this.clearEmailField();
+          this.isQuoteRemoved = false;
         }
+        this.$emit('update:popOutReplyBox', false);
 
         this.clearMessage();
         this.hideEmojiPicker();
-        this.$emit('update:popOutReplyBox', false);
       }
     },
-    sendMessageAsMultipleMessages(message) {
+    sendMessageAsMultipleMessages(message, copilotAcceptedMessage = '') {
       const messages = this.getMultipleMessagesPayload(message);
       messages.forEach(messagePayload => {
-        this.sendMessage(messagePayload);
+        this.sendMessage(
+          messagePayload,
+          messagePayload.message || '',
+          copilotAcceptedMessage
+        );
       });
     },
-    sendMessageAnalyticsData(isPrivate) {
+    sendMessageAnalyticsData(
+      isPrivate,
+      { editorMessage = '', copilotAcceptedMessage = '' } = {}
+    ) {
+      const normalizeForComparison = message => {
+        let normalizedMessage = message || '';
+
+        if (this.sendWithSignature && this.messageSignature && !isPrivate) {
+          const effectiveChannelType = getEffectiveChannelType(
+            this.channelType,
+            this.inbox?.medium || ''
+          );
+          normalizedMessage = removeSignature(
+            normalizedMessage,
+            this.messageSignature,
+            effectiveChannelType
+          );
+        }
+
+        return trimContent(normalizedMessage);
+      };
+
+      const normalizedAcceptedMessage = normalizeForComparison(
+        copilotAcceptedMessage
+      );
+      const normalizedEditorMessage = normalizeForComparison(editorMessage);
+
+      if (normalizedAcceptedMessage && normalizedEditorMessage) {
+        useTrack(CAPTAIN_EVENTS.AI_ASSISTED_MESSAGE_SENT, {
+          conversationId: this.conversationIdByRoute,
+          channelType: this.channelType,
+          editedBeforeSend:
+            normalizedAcceptedMessage !== normalizedEditorMessage,
+          isPrivate,
+        });
+      }
+
       // Analytics data for message signature is enabled or not in channels
       return isPrivate
         ? useTrack(CONVERSATION_EVENTS.SENT_PRIVATE_NOTE)
@@ -804,7 +1172,11 @@ export default {
         this.confirmOnSendReply();
       }
     },
-    async sendMessage(messagePayload) {
+    async sendMessage(
+      messagePayload,
+      editorMessage = '',
+      copilotAcceptedMessage = ''
+    ) {
       try {
         await this.$store.dispatch(
           'createPendingMessageAndSend',
@@ -813,7 +1185,10 @@ export default {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
         emitter.emit(BUS_EVENTS.MESSAGE_SENT);
         this.removeFromDraft();
-        this.sendMessageAnalyticsData(messagePayload.private);
+        this.sendMessageAnalyticsData(messagePayload.private, {
+          editorMessage,
+          copilotAcceptedMessage,
+        });
       } catch (error) {
         const errorMessage =
           error?.response?.data?.error || this.$t('CONVERSATION.MESSAGE_ERROR');
@@ -821,6 +1196,16 @@ export default {
       }
     },
     async onSendWhatsAppReply(messagePayload) {
+      // Check if this is a unified template - if so, use handleUnifiedTemplate
+      if (messagePayload.templateParams?.source === 'unified') {
+        this.hideContentTemplatesModal();
+        await this.handleUnifiedTemplate(
+          messagePayload.templateParams.template
+        );
+        return;
+      }
+
+      // For Twilio templates, use the standard send flow
       this.sendMessage({
         conversationId: this.currentChat.id,
         ...messagePayload,
@@ -835,6 +1220,9 @@ export default {
       this.hideContentTemplatesModal();
     },
     replaceText(message) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Called with message:', message);
+
       if (this.sendWithSignature && !this.private) {
         // if signature is enabled, append it to the message
         // appendSignature ensures that the signature is not duplicated
@@ -847,55 +1235,778 @@ export default {
         variables: this.messageVariables,
       });
 
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG replaceText] Updated message:', updatedMessage);
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG replaceText] Current this.message before update:',
+        this.message
+      );
+
       setTimeout(() => {
         useTrack(CONVERSATION_EVENTS.INSERTED_A_CANNED_RESPONSE);
         this.message = updatedMessage;
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG replaceText] this.message after update:',
+          this.message
+        );
+
+        // Hide the slash command menu after inserting text
+        this.hideMentions();
       }, 100);
+    },
+    handleTemplateSelect(item) {
+      if (item.type === 'canned') {
+        // Handle canned response - just replace text
+        this.replaceText(item.content);
+      } else if (item.type === 'template') {
+        // Clear the editor text before the async send so that the message watcher
+        // (which runs next-tick in Vue 3) sees an empty message and does not
+        // re-show the dropdown after hideMentions() has closed it.
+        this.clearMessage();
+        this.handleUnifiedTemplate(item.template);
+      }
+
+      // Hide the mentions menu immediately when a template is selected
+      this.hideMentions();
+    },
+    async handleUnifiedTemplate(template) {
+      try {
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Starting with template:',
+          template
+        );
+
+        // Always fetch full template data to see content blocks
+        const fullTemplate = await this.$store.dispatch(
+          'messageTemplates/show',
+          {
+            id: template.id,
+          }
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] Full template fetched:',
+          fullTemplate
+        );
+
+        // FIRST: Check if template has attachments
+        // Templates with attachments should be sent as messages, not inserted as text
+        const hasAttachments =
+          fullTemplate.attachmentsSummary &&
+          fullTemplate.attachmentsSummary.length > 0;
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] hasAttachments:',
+          hasAttachments
+        );
+
+        if (hasAttachments) {
+          const messageData = {
+            content: '', // Empty content - backend will handle placeholder text
+            content_type: 'text',
+            content_attributes: {},
+            template_id: fullTemplate.id,
+          };
+
+          await this.sendAppleMessage(messageData);
+          return;
+        }
+
+        // Check if this is an Apple Messages interactive template
+        // Interactive templates have specific content structures:
+        // - type field (explicit type like 'list_picker', 'time_picker', 'form', etc.)
+        // - OR specific structure patterns (images/replies for quick reply, etc.)
+        // - OR content_attributes with the structure inside
+        const content = fullTemplate.content;
+        const contentAttrs =
+          content?.content_attributes || content?.contentAttributes;
+
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG handleUnifiedTemplate] content:', content);
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] contentAttrs:',
+          contentAttrs
+        );
+
+        // Check if content is an array (multi-block template)
+        const isArrayContent = Array.isArray(content);
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isArrayContent:',
+          isArrayContent
+        );
+
+        // For array content, check if any block is interactive
+        let hasInteractiveBlock = false;
+        if (isArrayContent) {
+          hasInteractiveBlock = content.some(
+            block =>
+              block.type === 'quick_reply' ||
+              block.type === 'interactive' ||
+              block.type === 'list_picker' ||
+              block.type === 'time_picker' ||
+              block.type === 'form' ||
+              block.items ||
+              block.replies ||
+              block.sections ||
+              block.timeslots
+          );
+        }
+
+        const isAppleInteractive = !!(
+          (
+            fullTemplate.supportedChannels?.includes(
+              'apple_messages_for_business'
+            ) &&
+            ((isArrayContent && hasInteractiveBlock) || // Array with interactive blocks
+              (content &&
+                (content.type || // Explicit type field
+                  content.content_type || // Explicit content_type field
+                  content.items || // Quick reply structure (new format)
+                  content.replies || // Quick reply structure (legacy format)
+                  content.list_picker || // List picker structure (nested)
+                  content.time_picker || // Time picker structure (nested)
+                  content.event || // Time picker structure (with event object)
+                  content.form || // Form structure (legacy nested format)
+                  content.pages || // Form structure (new block editor format)
+                  content.apple_pay || // Apple Pay structure
+                  // AMB UPGRADE NOTE: Do NOT require `images` here. MetadataStrategy#load_data
+                  // calls .except('images') so images are never present in build_content output.
+                  // Sections alone is the correct discriminator for list_pickers.
+                  content.sections || // List picker structure (direct)
+                  (content.timeslots && content.timeslots.length > 0) || // Time picker structure (direct)
+                  contentAttrs?.sections || // List picker in content_attributes
+                  (contentAttrs?.timeslots &&
+                    contentAttrs.timeslots.length > 0) || // Time picker in content_attributes
+                  contentAttrs?.event || // Time picker with event in content_attributes
+                  contentAttrs?.pages || // Forms with pages in content_attributes
+                  contentAttrs?.form || // Forms with form in content_attributes
+                  contentAttrs?.replies || // Quick reply in content_attributes
+                  contentAttrs?.items)))
+          ) // Quick reply items in content_attributes
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] isAppleInteractive:',
+          isAppleInteractive
+        );
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] this.isAppleMessagesConversation:',
+          this.isAppleMessagesConversation
+        );
+
+        if (isAppleInteractive && this.isAppleMessagesConversation) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] SENDING as Apple Interactive template'
+          );
+          // This is an Apple Messages interactive template - send it directly
+
+          // Check if this is an array-based template (content is an array of blocks)
+          if (isArrayContent) {
+            // Process each block in sequence
+            /* eslint-disable no-await-in-loop */
+            for (let i = 0; i < content.length; i += 1) {
+              const block = content[i];
+
+              // Show typing indicator before sending (except for first block)
+              if (i > 0) {
+                this.$store.dispatch('conversationTypingStatus/toggleTyping', {
+                  conversationId: this.currentChat.id,
+                  status: 'on',
+                  isPrivate: false,
+                });
+
+                // Wait 3500ms with typing indicator visible
+                await new Promise(resolve => {
+                  setTimeout(resolve, 3500);
+                });
+
+                // Turn off typing indicator
+                this.$store.dispatch('conversationTypingStatus/toggleTyping', {
+                  conversationId: this.currentChat.id,
+                  status: 'off',
+                  isPrivate: false,
+                });
+
+                // Small pause after turning off typing
+                await new Promise(resolve => {
+                  setTimeout(resolve, 200);
+                });
+              }
+
+              // Text block - just has content property
+              if (
+                block.content &&
+                !block.type &&
+                !block.items &&
+                !block.replies
+              ) {
+                // Send text block as a regular message
+                const textPayload = {
+                  conversationId: this.currentChat.id,
+                  message: block.content,
+                  private: false,
+                };
+                await this.sendMessage(textPayload);
+
+                // Longer delay after text message to let it render and be read
+                // Only add delay if this isn't the last block
+                if (i < content.length - 1) {
+                  await new Promise(resolve => {
+                    setTimeout(resolve, 1000);
+                  });
+                }
+              } else if (
+                block.items ||
+                block.replies ||
+                block.type === 'quick_reply'
+              ) {
+                // Quick reply block
+                const items = block.items || block.replies || [];
+                const messageData = {
+                  type: 'quick_reply',
+                  content_type: 'apple_quick_reply',
+                  content_attributes: {
+                    summary_text: block.summary_text || block.summaryText || '',
+                    items: items.map((item, index) => ({
+                      title: item.title,
+                      identifier: item.identifier || `reply_${index}`,
+                    })),
+                    received_title:
+                      block.received_title ||
+                      block.receivedTitle ||
+                      'Please select an option',
+                    received_subtitle:
+                      block.received_subtitle || block.receivedSubtitle || '',
+                    reply_title: block.reply_title || block.replyTitle || '',
+                    reply_subtitle:
+                      block.reply_subtitle || block.replySubtitle || '',
+                  },
+                };
+                await this.sendAppleMessage(messageData);
+              } else if (block.type === 'list_picker' || block.sections) {
+                // List picker block
+                const messageData = {
+                  type: 'list_picker',
+                  content_type: 'apple_list_picker',
+                  content_attributes: block,
+                };
+                await this.sendAppleMessage(messageData);
+              } else if (block.type === 'time_picker' || block.timeslots) {
+                // Time picker block
+                const messageData = {
+                  type: 'time_picker',
+                  content_type: 'apple_time_picker',
+                  content_attributes: block,
+                };
+                await this.sendAppleMessage(messageData);
+              }
+            }
+            /* eslint-enable no-await-in-loop */
+            return;
+          }
+
+          // Single interactive message - detect the message type and wrap the content appropriately
+
+          let messageData;
+          if (
+            (content.content_type || content.contentType) &&
+            (content.content_attributes || content.contentAttributes)
+          ) {
+            // Content already has content_type and content_attributes
+            // Check if this is a template type that needs render API for image loading
+            const contentType = content.content_type || content.contentType;
+            const needsRenderAPI =
+              contentType === 'apple_list_picker' ||
+              contentType === 'apple_time_picker' ||
+              contentType === 'apple_form';
+
+            if (needsRenderAPI) {
+              // Call render API to fetch images and ensure proper format
+              const rendered = await this.$store.dispatch(
+                'messageTemplates/render',
+                {
+                  templateId: fullTemplate.id,
+                  parameters: {}, // No dynamic parameters for these templates
+                  channelType:
+                    this.currentChat?.inbox?.channel_type ||
+                    'apple_messages_for_business',
+                }
+              );
+
+              const renderedData = rendered.data || rendered;
+
+              if (renderedData?.content_attributes) {
+                messageData = {
+                  content_type: renderedData.content_type || contentType,
+                  content_attributes: renderedData.content_attributes,
+                  type: content.type,
+                  template_id: fullTemplate.id,
+                };
+              } else {
+                // Fallback to direct content if render fails
+                messageData = {
+                  content_type: contentType,
+                  content_attributes:
+                    content.content_attributes || content.contentAttributes,
+                  type: content.type,
+                };
+              }
+            } else {
+              // Use content directly for non-template types
+              messageData = {
+                content_type: contentType,
+                content_attributes:
+                  content.content_attributes || content.contentAttributes,
+                type: content.type,
+              };
+            }
+          } else if (content.type) {
+            // Content has explicit type - use it directly
+            messageData = content;
+          } else if (
+            content.items ||
+            content.replies ||
+            contentAttrs?.items ||
+            contentAttrs?.replies
+          ) {
+            // Quick reply structure - normalize to the format backend expects
+            // Check both top-level and content_attributes for items/replies
+            const items =
+              content.items ||
+              content.replies ||
+              contentAttrs?.items ||
+              contentAttrs?.replies ||
+              [];
+            const summaryText =
+              content.summaryText ||
+              content.summary_text ||
+              contentAttrs?.text ||
+              '';
+
+            messageData = {
+              type: 'quick_reply',
+              content_type: 'apple_quick_reply',
+              content_attributes: {
+                summary_text: summaryText,
+                items: items.map((item, index) => ({
+                  title: item.title,
+                  identifier: item.identifier || `reply_${index}`,
+                })),
+                received_title: summaryText || 'Please select an option',
+                received_subtitle: '',
+                reply_title: '',
+                reply_subtitle: '',
+              },
+            };
+          } else if (
+            // AMB UPGRADE NOTE: sections alone identifies a list_picker.
+            // MetadataStrategy#load_data strips images (.except('images')), so
+            // (sections && images) would never match metadata-stored templates.
+            content.list_picker ||
+            content.listPicker ||
+            content.sections ||
+            contentAttrs?.sections
+          ) {
+            // List picker structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for list pickers
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              const listPickerData =
+                content.list_picker ||
+                content.listPicker ||
+                contentAttrs ||
+                content;
+
+              messageData = {
+                type: 'list_picker',
+                content_type: 'apple_list_picker',
+                content_attributes: {
+                  sections: listPickerData.sections || [],
+                  images: listPickerData.images || [],
+                  received_title:
+                    listPickerData.received_title ||
+                    listPickerData.receivedTitle ||
+                    'Please select an option',
+                  received_subtitle:
+                    listPickerData.received_subtitle ||
+                    listPickerData.receivedSubtitle ||
+                    '',
+                  received_image_identifier:
+                    listPickerData.received_image_identifier ||
+                    listPickerData.receivedImageIdentifier ||
+                    '',
+                  received_style:
+                    listPickerData.received_style ||
+                    listPickerData.receivedStyle ||
+                    'icon',
+                  reply_title:
+                    listPickerData.reply_title ||
+                    listPickerData.replyTitle ||
+                    'Selection Made',
+                  reply_subtitle:
+                    listPickerData.reply_subtitle ||
+                    listPickerData.replySubtitle ||
+                    '',
+                  reply_style:
+                    listPickerData.reply_style ||
+                    listPickerData.replyStyle ||
+                    'icon',
+                  reply_image_title:
+                    listPickerData.reply_image_title ||
+                    listPickerData.replyImageTitle ||
+                    '',
+                  reply_image_subtitle:
+                    listPickerData.reply_image_subtitle ||
+                    listPickerData.replyImageSubtitle ||
+                    '',
+                  reply_secondary_subtitle:
+                    listPickerData.reply_secondary_subtitle ||
+                    listPickerData.replySecondarySubtitle ||
+                    '',
+                  reply_tertiary_subtitle:
+                    listPickerData.reply_tertiary_subtitle ||
+                    listPickerData.replyTertiarySubtitle ||
+                    '',
+                },
+              };
+            }
+          } else if (
+            content.time_picker ||
+            content.timePicker ||
+            content.event || // Time picker with event object
+            (content.timeslots && content.timeslots.length > 0) ||
+            (contentAttrs?.timeslots && contentAttrs.timeslots.length > 0) ||
+            contentAttrs?.event // Time picker with event in content_attributes
+          ) {
+            // ALWAYS use render API for time pickers to ensure proper formatting
+            // The adapter's format_timeslots method handles identifier → start_time conversion
+            // and ensures the payload matches Apple MSP requirements
+
+            // Get parameters for rendering
+            let parameters = {};
+
+            // If template has saved timeslots in content_blocks, extract them as available_slots
+            const savedTimeslots =
+              content.event?.timeslots ||
+              content.timeslots ||
+              contentAttrs?.event?.timeslots ||
+              contentAttrs?.timeslots;
+
+            if (savedTimeslots && savedTimeslots.length > 0) {
+              // Convert saved timeslots to available_slots parameter format
+              parameters.available_slots = savedTimeslots;
+            } else {
+              // No saved timeslots - use default dynamic slots
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              tomorrow.setHours(9, 0, 0, 0);
+
+              parameters = {
+                available_slots: [
+                  new Date(tomorrow.getTime()).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 2 * 60 * 60 * 1000
+                  ).toISOString(),
+                  new Date(
+                    tomorrow.getTime() + 4 * 60 * 60 * 1000
+                  ).toISOString(),
+                ],
+              };
+            }
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters,
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to stored content if rendering fails
+              const timePickerData =
+                content.time_picker ||
+                content.timePicker ||
+                contentAttrs ||
+                content;
+
+              const normalizeKeys = obj => {
+                if (!obj || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(normalizeKeys);
+
+                const normalized = {};
+                Object.keys(obj).forEach(key => {
+                  const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+                  normalized[snakeKey] = normalizeKeys(obj[key]);
+                });
+                return normalized;
+              };
+
+              const normalizedAttrs = normalizeKeys(timePickerData);
+              delete normalizedAttrs.images;
+
+              messageData = {
+                type: 'time_picker',
+                content_type: 'apple_time_picker',
+                content_attributes: normalizedAttrs,
+              };
+            }
+          } else if (
+            content.form ||
+            (content.pages &&
+              (content.received_message || content.receivedMessage)) ||
+            contentAttrs?.form ||
+            (contentAttrs?.pages &&
+              (contentAttrs?.received_message || contentAttrs?.receivedMessage))
+          ) {
+            // Form structure - use render API to fetch images from database
+            // This ensures images are base64-encoded and properly formatted
+
+            const rendered = await this.$store.dispatch(
+              'messageTemplates/render',
+              {
+                templateId: fullTemplate.id,
+                parameters: {}, // No dynamic parameters for forms
+                channelType:
+                  this.currentChat?.inbox?.channel_type ||
+                  'apple_messages_for_business',
+              }
+            );
+
+            const renderedData = rendered.data || rendered;
+
+            if (renderedData?.content_attributes) {
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: renderedData.content_attributes,
+                // Include template_id so backend can attach template files
+                template_id: fullTemplate.id,
+              };
+            } else {
+              // Fallback to direct content if rendering fails
+              messageData = {
+                type: 'form',
+                content_type: 'apple_form',
+                content_attributes: content,
+              };
+            }
+          } else if (content.apple_pay || content.applePay) {
+            // Apple Pay structure
+            messageData = {
+              type: 'apple_pay',
+              content_type: 'apple_pay',
+              content_attributes: content,
+            };
+          } else {
+            // Unknown structure - use as-is
+            messageData = content;
+          }
+
+          // Clean up images array - remove base64 data and preview, keep only identifiers
+          if (messageData.content_attributes?.images) {
+            // Check if images is an object (dictionary) or array
+            const imagesData = messageData.content_attributes.images;
+
+            if (Array.isArray(imagesData)) {
+              // Array format - map over items
+              messageData.content_attributes.images = imagesData.map(img => ({
+                identifier: img.identifier,
+                description: img.description || '',
+                data: img.data,
+              }));
+            } else if (typeof imagesData === 'object') {
+              // Object/dictionary format (keys are identifiers, values are base64 strings)
+              // Convert to array format expected by backend
+
+              messageData.content_attributes.images = Object.entries(
+                imagesData
+              ).map(([identifier, data]) => ({
+                identifier: identifier,
+                description: '',
+                data: data,
+              }));
+            }
+          }
+
+          // Include template_id so backend can attach template files if present
+          messageData.template_id = fullTemplate.id;
+
+          // For time pickers, remove images from content_attributes
+          // Images are loaded by backend via template_id attachments
+          // Time picker validator doesn't allow images in content_attributes
+          if (
+            messageData.type === 'time_picker' &&
+            messageData.content_attributes?.images
+          ) {
+            delete messageData.content_attributes.images;
+          }
+
+          await this.sendAppleMessage(messageData);
+          return;
+        }
+
+        // eslint-disable-next-line no-console
+        console.log(
+          '[DEBUG handleUnifiedTemplate] NOT sending as interactive - will render and insert as text'
+        );
+
+        // For templates without parameters, render and insert
+        const hasParameters =
+          fullTemplate.parameters &&
+          Object.keys(fullTemplate.parameters).length > 0;
+
+        // Check if all parameters have default values
+        const allParametersHaveDefaults = hasParameters
+          ? Object.values(fullTemplate.parameters).every(
+              param => param.default !== undefined
+            )
+          : false;
+
+        // Build default parameters object
+        const defaultParameters = {};
+        if (hasParameters) {
+          Object.entries(fullTemplate.parameters).forEach(([key, config]) => {
+            if (config.default !== undefined) {
+              defaultParameters[key] = config.default;
+            }
+          });
+        }
+
+        if (!hasParameters || allParametersHaveDefaults) {
+          // Simple template without parameters OR all parameters have defaults
+          // Render and insert as text
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Rendering template for text insertion'
+          );
+
+          const response = await this.$store.dispatch(
+            'messageTemplates/render',
+            {
+              templateId: fullTemplate.id,
+              parameters: defaultParameters,
+              channelType: this.channelType,
+            }
+          );
+
+          // eslint-disable-next-line no-console
+          console.log(
+            '[DEBUG handleUnifiedTemplate] Render response:',
+            response
+          );
+
+          if (response.data.content) {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] Calling replaceText with:',
+              response.data.content
+            );
+            this.replaceText(response.data.content);
+          } else {
+            // eslint-disable-next-line no-console
+            console.log(
+              '[DEBUG handleUnifiedTemplate] NO CONTENT in response.data.content'
+            );
+          }
+        } else {
+          // Template with parameters that need user input
+          this.$store.dispatch('alerts/show', {
+            message: this.$t('CONVERSATION.TEMPLATE_REQUIRES_PARAMETERS', {
+              name: fullTemplate.name,
+            }),
+            type: 'info',
+          });
+          // TODO: Open a modal to collect parameters
+        }
+      } catch (error) {
+        this.$store.dispatch('alerts/show', {
+          message: error?.message || 'Failed to load template',
+          type: 'error',
+        });
+      }
     },
     setReplyMode(mode = REPLY_EDITOR_MODES.REPLY) {
       // Clear attachments when switching between private note and reply modes
       // This is to prevent from breaking the upload rules
       if (this.attachedFiles.length > 0) this.attachedFiles = [];
 
-      const { can_reply: canReply } = this.currentChat;
-      this.$store.dispatch('draftMessages/setReplyEditorMode', {
-        mode,
-      });
-      if (canReply || this.isAWhatsAppChannel) this.replyType = mode;
-      if (this.showRichContentEditor) {
-        if (this.isRecordingAudio) {
-          this.toggleAudioRecorder();
-        }
-        return;
+      this.$store.dispatch('draftMessages/setReplyEditorMode', { mode });
+      if (this.canSendPublicReply) this.replyType = mode;
+      if (this.isRecordingAudio) {
+        this.toggleAudioRecorder();
       }
-      this.$nextTick(() => this.$refs.messageInput.focus());
     },
     clearEditorSelection() {
       this.updateEditorSelectionWith = '';
     },
-    insertIntoTextEditor(text, selectionStart, selectionEnd) {
-      const { message } = this;
-      const newMessage =
-        message.slice(0, selectionStart) +
-        text +
-        message.slice(selectionEnd, message.length);
-      this.message = newMessage;
-    },
     addIntoEditor(content) {
-      if (this.showRichContentEditor) {
-        this.updateEditorSelectionWith = content;
-        this.onFocus();
-      }
-      if (!this.showRichContentEditor) {
-        const { selectionStart, selectionEnd } = this.$refs.messageInput.$el;
-        this.insertIntoTextEditor(content, selectionStart, selectionEnd);
-      }
+      this.updateEditorSelectionWith = content;
+      this.onFocus();
+    },
+    executeCopilotAction(action, data) {
+      this.copilot.execute(action, data);
     },
     clearMessage() {
       this.message = '';
+      this.clearCopilotAcceptedMessage();
       if (this.sendWithSignature && !this.isPrivate) {
         // if signature is enabled, append it to the message
-        this.message = appendSignature(this.message, this.signatureToApply);
+        const effectiveChannelType = getEffectiveChannelType(
+          this.channelType,
+          this.inbox?.medium || ''
+        );
+        this.message = appendSignature(
+          this.message,
+          this.messageSignature,
+          effectiveChannelType
+        );
       }
       this.attachedFiles = [];
       this.isRecordingAudio = false;
@@ -924,6 +2035,7 @@ export default {
       }
       if (!this.isRecorderAudioStopped) {
         this.isRecorderAudioStopped = true;
+        if (!this.$refs.audioRecorderInput) return;
         this.$refs.audioRecorderInput.stopRecording();
       } else if (this.isRecorderAudioStopped) {
         this.$refs.audioRecorderInput.playPause();
@@ -945,7 +2057,7 @@ export default {
     },
     onBlur() {
       this.isFocused = false;
-      this.saveDraft(this.conversationIdByRoute, this.replyType);
+      this.saveDraft(this.conversationIdByRoute, this.effectiveReplyMode);
     },
     onFocus() {
       this.isFocused = true;
@@ -956,13 +2068,17 @@ export default {
     onFinishRecorder(file) {
       this.recordingAudioState = 'stopped';
       this.hasRecordedAudio = true;
-      // Added a new key isRecordedAudio to the file to find it's and recorded audio
+      // Added a new key isVoiceMessage to the file to identify recorded audio
       // Because to filter and show only non recorded audio and other attachments
       const autoRecordedFile = {
         ...file,
-        isRecordedAudio: true,
+        isVoiceMessage: true,
       };
       return file && this.onFileUpload(autoRecordedFile);
+    },
+    onRecordError() {
+      this.toggleAudioRecorder();
+      useAlert(this.$t('CONVERSATION.REPLYBOX.AUDIO_CONVERSION_FAILED'));
     },
     toggleTyping(status) {
       const conversationId = this.currentChat.id;
@@ -979,6 +2095,8 @@ export default {
       });
     },
     attachFile({ blob, file }) {
+      if (!this.showFileUpload && !this.isOnPrivateNote) return;
+
       const reader = new FileReader();
       reader.readAsDataURL(file.file);
       reader.onloadend = () => {
@@ -988,7 +2106,7 @@ export default {
           isPrivate: this.isPrivate,
           thumb: reader.result,
           blobSignedId: blob ? blob.signed_id : undefined,
-          isRecordedAudio: file?.isRecordedAudio || false,
+          isVoiceMessage: file?.isVoiceMessage || false,
         });
       };
     },
@@ -1012,7 +2130,8 @@ export default {
       const multipleMessagePayload = [];
 
       if (this.attachedFiles && this.attachedFiles.length) {
-        let caption = this.isAnInstagramChannel ? '' : message;
+        let caption =
+          this.isAnInstagramChannel || this.isATiktokChannel ? '' : message;
         this.attachedFiles.forEach(attachment => {
           const attachedFile = this.globalConfig.directUploadsEnabled
             ? attachment.blobSignedId
@@ -1023,6 +2142,7 @@ export default {
             private: false,
             message: caption,
             sender: this.sender,
+            isVoiceMessage: attachment.isVoiceMessage || false,
           };
 
           attachmentPayload = this.setReplyToInPayload(attachmentPayload);
@@ -1034,11 +2154,13 @@ export default {
 
       const hasNoAttachments =
         !this.attachedFiles || !this.attachedFiles.length;
-      // For Instagram, we need a separate text message
-      // For WhatsApp, we only need a text message if there are no attachments
+      // For Instagram and TikTok, text must always be sent as a separate message (no captions on attachments).
+      // For WhatsApp, we only need a text message if there are no attachments.
       if (
-        (this.isAnInstagramChannel && this.message) ||
-        (!this.isAnInstagramChannel && hasNoAttachments)
+        ((this.isAnInstagramChannel || this.isATiktokChannel) &&
+          this.message) ||
+        (!(this.isAnInstagramChannel || this.isATiktokChannel) &&
+          hasNoAttachments)
       ) {
         let messagePayload = {
           conversationId: this.currentChat.id,
@@ -1055,7 +2177,27 @@ export default {
       return multipleMessagePayload;
     },
     getMessagePayload(message) {
-      const messageWithQuote = this.getMessageWithQuotedEmailText(message);
+      // Normalize URLs in message for Apple Messages conversations
+      let processedMessage = message;
+      if (this.isAppleMessagesConversation) {
+        const detectedURLs = detectURLsInText(message);
+        if (detectedURLs.length > 0) {
+          // Replace URLs in the message with normalized versions
+          const originalUrls = message.match(URL_REGEX) || [];
+          detectedURLs.forEach((normalizedUrl, index) => {
+            if (originalUrls[index]) {
+              processedMessage = processedMessage.replace(
+                originalUrls[index],
+                normalizedUrl
+              );
+            }
+          });
+        }
+      }
+
+      // Apply quoted email text for email channels
+      const messageWithQuote =
+        this.getMessageWithQuotedEmailText(processedMessage);
 
       let messagePayload = {
         conversationId: this.currentChat.id,
@@ -1070,6 +2212,9 @@ export default {
         this.attachedFiles.forEach(attachment => {
           if (this.globalConfig.directUploadsEnabled) {
             messagePayload.files.push(attachment.blobSignedId);
+            if (attachment.isVoiceMessage) {
+              messagePayload.isVoiceMessage = true;
+            }
           } else {
             messagePayload.files.push(attachment.resource.file);
           }
@@ -1086,6 +2231,10 @@ export default {
 
       if (this.toEmails && !this.isOnPrivateNote) {
         messagePayload.toEmails = this.toEmails;
+      }
+
+      if (this.subject && !this.isOnPrivateNote) {
+        messagePayload.subject = this.subject;
       }
       return messagePayload;
     },
@@ -1123,6 +2272,15 @@ export default {
         return false;
       });
     },
+    onReplyToMessage() {
+      this.fetchAndSetReplyTo();
+      if (this.inReplyTo) {
+        this.$nextTick(() => {
+          const pos = this.isSignatureEnabledForInbox ? 'start' : 'end';
+          this.messageEditor?.focusEditorInputField(pos);
+        });
+      }
+    },
     resetReplyToMessage() {
       const replyStorageKey = LOCAL_STORAGE_KEYS.MESSAGE_REPLY_TO;
       LocalStorage.deleteFromJsonStore(replyStorageKey, this.conversationId);
@@ -1149,11 +2307,197 @@ export default {
       this.hasRecordedAudio = false;
       // Only clear the recorded audio when we click toggle button.
       this.attachedFiles = this.attachedFiles.filter(
-        file => !file?.isRecordedAudio
+        file => !file?.isVoiceMessage
       );
+    },
+    toggleEditorSize() {
+      this.$emit('toggleEditorSize');
+      this.$nextTick(() => this.messageEditor?.focusEditorInputField());
     },
     togglePopout() {
       this.$emit('update:popOutReplyBox', !this.popOutReplyBox);
+    },
+    onSubmitCopilotReply() {
+      const acceptedMessage = this.copilot.accept();
+      this.message = acceptedMessage;
+      this.setCopilotAcceptedMessage(acceptedMessage);
+    },
+    async sendAppleMessage(messageData) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DEBUG ReplyBox] Received messageData:',
+        JSON.parse(JSON.stringify(messageData))
+      );
+      try {
+        // Handle content: allow empty string for attachment-only messages
+        let messageContent = 'Apple Message'; // default fallback
+        if (messageData.content !== undefined && messageData.content !== null) {
+          messageContent = messageData.content; // Use provided content (even if empty string)
+        } else if (messageData.summary_text) {
+          messageContent = messageData.summary_text;
+        }
+
+        const messagePayload = {
+          conversationId: this.currentChat.id,
+          message: messageContent,
+          content_type: messageData.content_type,
+          content_attributes: messageData.content_attributes,
+          private: false,
+        };
+
+        // Include template_id if present (for template attachments)
+        if (messageData.template_id) {
+          messagePayload.template_id = messageData.template_id;
+        }
+
+        // Use createPendingMessageAndSend directly to ensure proper message creation
+        await this.$store.dispatch(
+          'createPendingMessageAndSend',
+          messagePayload
+        );
+
+        this.clearMessage();
+        this.hideEmojiPicker();
+
+        // Note: Tracking removed to avoid $track dependency issues
+      } catch (error) {
+        const errorMessage =
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error?.message ||
+          this.$t('CONVERSATION.MESSAGE_ERROR');
+        this.$store.dispatch('alerts/show', {
+          message: errorMessage,
+          type: 'error',
+        });
+      }
+    },
+
+    // Rich Link URL detection methods
+    checkForURLsInMessage(message) {
+      if (!this.isAppleMessagesConversation || !message) {
+        this.hideRichLinkPreview();
+        return;
+      }
+
+      // Clear existing timeout
+      if (this.richLinkDetectionTimeout) {
+        clearTimeout(this.richLinkDetectionTimeout);
+      }
+
+      // Debounce URL detection
+      this.richLinkDetectionTimeout = setTimeout(() => {
+        // Use the enhanced URL detection from appleMessagesRichLink helper
+        const detectedURLs = detectURLsInText(message);
+
+        if (detectedURLs.length > 0) {
+          const url = detectedURLs[0]; // Use first detected URL (already normalized)
+          // Check if URL should trigger Rich Link preview
+          const urlRatio = url.length / message.length;
+          if (urlRatio > 0.3) {
+            // Show preview if URL is significant part of message
+            this.showRichLinkPreviewForUrl(url);
+          } else {
+            this.hideRichLinkPreview();
+          }
+        } else {
+          this.hideRichLinkPreview();
+        }
+      }, 500);
+    },
+
+    showRichLinkPreviewForUrl(url) {
+      this.richLinkPreviewUrl = url;
+      this.showRichLinkPreview = true;
+    },
+
+    hideRichLinkPreview() {
+      this.showRichLinkPreview = false;
+      this.richLinkPreviewUrl = '';
+      this.richLinkCachedData = null;
+    },
+
+    onRichLinkSendAsText(message) {
+      // Send as regular text message
+      this.message = message;
+      this.onSendReply();
+    },
+
+    async onRichLinkSendAsRichLink(data) {
+      try {
+        // ✅ FIX: Process the message to split text and URLs properly
+        const messageContent = data.originalMessage;
+        const conversation = this.currentChat;
+
+        // Use the processMessageForAppleMessages function to split the message
+        const processedMessages = await processMessageForAppleMessages(
+          messageContent,
+          conversation
+        );
+
+        // Process messages sequentially with delay per Apple MSP docs
+
+        if (processedMessages.length === 1) {
+          // Single message (likely combined rich link) - send directly
+          const messagePayload = {
+            conversationId: this.currentChat.id,
+            message: processedMessages[0].content,
+            private: false,
+            content_type: processedMessages[0].content_type,
+            content_attributes: processedMessages[0].content_attributes || {},
+          };
+
+          // Send single combined message
+
+          await this.$store.dispatch(
+            'createPendingMessageAndSend',
+            messagePayload
+          );
+        } else {
+          // Multiple messages - send sequentially with delays
+          /* eslint-disable no-await-in-loop */
+          for (let i = 0; i < processedMessages.length; i += 1) {
+            const messagePart = processedMessages[i];
+            const messagePayload = {
+              conversationId: this.currentChat.id,
+              message: messagePart.content,
+              private: false,
+              content_type: messagePart.content_type,
+              content_attributes: messagePart.content_attributes || {},
+            };
+
+            // Send message part
+            await this.$store.dispatch(
+              'createPendingMessageAndSend',
+              messagePayload
+            );
+
+            // Brief delay between messages (per Apple MSP docs)
+            if (i < processedMessages.length - 1) {
+              /* eslint-disable no-promise-executor-return */
+              await new Promise(resolve => {
+                setTimeout(resolve, 1500);
+              });
+              /* eslint-enable no-promise-executor-return */
+            }
+          }
+          /* eslint-enable no-await-in-loop */
+        }
+
+        this.clearMessage();
+        this.hideRichLinkPreview();
+      } catch (error) {
+        const errorMessage =
+          error?.message || this.$t('CONVERSATION.MESSAGE_ERROR');
+        this.$store.dispatch('alerts/show', {
+          message: errorMessage,
+          type: 'error',
+        });
+      }
+    },
+
+    onRichLinkDismiss() {
+      this.hideRichLinkPreview();
     },
   },
 };
@@ -1161,14 +2505,25 @@ export default {
 
 <template>
   <ReplyBoxBanner :message="message" :is-on-private-note="isOnPrivateNote" />
-  <div ref="replyEditor" class="reply-box" :class="replyBoxClass">
+  <div class="reply-box" :class="replyBoxClass">
     <ReplyTopPanel
       :mode="replyType"
-      :is-reply-restricted="isReplyRestricted"
+      :conversation-id="conversationId"
+      :is-reply-restricted="!canSendPublicReply"
+      :disabled="
+        (copilot.isActive.value && copilot.isButtonDisabled.value) ||
+        showAudioRecorderEditor
+      "
+      :is-editor-disabled="isEditorDisabled"
       :is-message-length-reaching-threshold="isMessageLengthReachingThreshold"
       :characters-remaining="charactersRemaining"
+      :editor-content="message"
+      :has-content="hasMeaningfulEditorContent"
       :popout-reply-box="popOutReplyBox"
       @set-reply-mode="setReplyMode"
+      @toggle-editor-size="toggleEditorSize"
+      @toggle-copilot="copilot.toggleEditor"
+      @execute-copilot-action="executeCopilotAction"
       @toggle-popout="togglePopout"
     />
     <ArticleSearchPopover
@@ -1177,139 +2532,203 @@ export default {
       @insert="handleInsert"
       @close="onSearchPopoverClose"
     />
-    <div class="reply-box__top">
-      <ReplyToMessage
-        v-if="shouldShowReplyToMessage"
-        :message="inReplyTo"
-        @dismiss="resetReplyToMessage"
-      />
-      <CannedResponse
-        v-if="showMentions && hasSlashCommand"
-        v-on-clickaway="hideMentions"
-        class="normal-editor__canned-box"
-        :search-key="mentionSearchKey"
-        @replace="replaceText"
-      />
-      <EmojiInput
-        v-if="showEmojiPicker"
-        v-on-clickaway="hideEmojiPicker"
-        :class="{
-          'emoji-dialog--expanded': isOnExpandedLayout || popOutReplyBox,
-        }"
-        :on-click="addIntoEditor"
-      />
-      <ReplyEmailHead
-        v-if="showReplyHead"
-        v-model:cc-emails="ccEmails"
-        v-model:bcc-emails="bccEmails"
-        v-model:to-emails="toEmails"
-      />
-      <AudioRecorder
-        v-if="showAudioRecorderEditor"
-        ref="audioRecorderInput"
-        :audio-record-format="audioRecordFormat"
-        @recorder-progress-changed="onRecordProgressChanged"
-        @finish-record="onFinishRecorder"
-        @play="recordingAudioState = 'playing'"
-        @pause="recordingAudioState = 'paused'"
-      />
-      <ResizableTextArea
-        v-else-if="!showRichContentEditor"
-        ref="messageInput"
-        v-model="message"
-        class="rounded-none input"
-        :placeholder="messagePlaceHolder"
-        :min-height="4"
-        :signature="signatureToApply"
-        allow-signature
-        :send-with-signature="sendWithSignature"
-        @typing-off="onTypingOff"
-        @typing-on="onTypingOn"
-        @focus="onFocus"
-        @blur="onBlur"
-      />
-      <WootMessageEditor
-        v-else
-        v-model="message"
-        :editor-id="editorStateId"
-        class="input"
-        :is-private="isOnPrivateNote"
-        :placeholder="messagePlaceHolder"
-        :update-selection-with="updateEditorSelectionWith"
-        :min-height="4"
-        enable-variables
-        :variables="messageVariables"
-        :signature="signatureToApply"
-        allow-signature
-        :channel-type="channelType"
-        @typing-off="onTypingOff"
-        @typing-on="onTypingOn"
-        @focus="onFocus"
-        @blur="onBlur"
-        @toggle-user-mention="toggleUserMention"
-        @toggle-canned-menu="toggleCannedMenu"
-        @toggle-variables-menu="toggleVariablesMenu"
-        @clear-selection="clearEditorSelection"
-      />
-      <QuotedEmailPreview
-        v-if="shouldShowQuotedPreview"
-        :quoted-email-text="quotedEmailText"
-        :preview-text="quotedEmailPreviewText"
-        @toggle="toggleQuotedReply"
-      />
-    </div>
-    <div
-      v-if="hasAttachments && !showAudioRecorderEditor"
-      class="attachment-preview-box"
-      @paste="onPaste"
+    <Transition
+      mode="out-in"
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="opacity-0 translate-y-2 scale-[0.98]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
     >
-      <AttachmentPreview
-        class="flex-col mt-4"
-        :attachments="attachedFiles"
-        @remove-attachment="removeAttachment"
+      <div :key="copilot.editorTransitionKey.value" class="reply-box__top">
+        <ReplyToMessage
+          v-if="shouldShowReplyToMessage"
+          :message="inReplyTo"
+          @dismiss="resetReplyToMessage"
+        />
+        <AppleRichLinkPreview
+          v-if="showRichLinkPreview"
+          :url="richLinkPreviewUrl"
+          :conversation="currentChat"
+          :original-message="message"
+          @send-as-text="onRichLinkSendAsText"
+          @send-as-rich-link="onRichLinkSendAsRichLink"
+          @dismiss="onRichLinkDismiss"
+          @preview-loaded="richLinkCachedData = $event"
+        />
+        <TemplateSelector
+          v-if="showMentions && hasSlashCommand"
+          v-on-clickaway="hideMentions"
+          class="normal-editor__template-box"
+          :search-key="mentionSearchKey"
+          @select="handleTemplateSelect"
+        />
+        <EmojiIconPicker
+          v-if="showEmojiPicker"
+          v-on-clickaway="hideEmojiPicker"
+          mode="emoji"
+          class="emoji-dialog"
+          :class="{
+            'emoji-dialog--expanded': isOnExpandedLayout,
+          }"
+          @select="addIntoEditor($event.value)"
+        />
+        <ReplyEmailHead
+          v-if="showReplyHead && isDefaultEditorMode"
+          :key="currentChat.id"
+          v-model:cc-emails="ccEmails"
+          v-model:bcc-emails="bccEmails"
+          v-model:to-emails="toEmails"
+          v-model:subject="subject"
+        />
+        <AudioRecorder
+          v-if="showAudioRecorderEditor"
+          ref="audioRecorderInput"
+          :audio-record-format="audioRecordFormat"
+          @recorder-progress-changed="onRecordProgressChanged"
+          @finish-record="onFinishRecorder"
+          @record-error="onRecordError"
+          @play="recordingAudioState = 'playing'"
+          @pause="recordingAudioState = 'paused'"
+        />
+        <CopilotEditorSection
+          v-if="copilot.isActive.value && !showAudioRecorderEditor"
+          :show-copilot-editor="copilot.showEditor.value"
+          :is-generating-content="copilot.isGenerating.value"
+          :generated-content="copilot.generatedContent.value"
+          :placeholder="$t('CONVERSATION.FOOTER.COPILOT_MSG_INPUT')"
+          @focus="onFocus"
+          @blur="onBlur"
+          @clear-selection="clearEditorSelection"
+          @close="copilot.showEditor.value = false"
+          @content-ready="copilot.setContentReady"
+          @send="copilot.sendFollowUp"
+        />
+        <WootMessageEditor
+          v-else-if="!showAudioRecorderEditor"
+          ref="messageEditor"
+          v-model="message"
+          :conversation-id="conversationId"
+          :editor-id="editorStateId"
+          class="input popover-prosemirror-menu resizable-editor-split"
+          :is-private="isOnPrivateNote"
+          :placeholder="messagePlaceHolder"
+          :update-selection-with="updateEditorSelectionWith"
+          :min-height="4"
+          :disabled="isEditorDisabled"
+          enable-insert-events
+          :enable-macros="isMacrosEnabled"
+          :enable-canned-responses="!isAnAppleMessagesForBusinessChannel"
+          enable-variables
+          :variables="messageVariables"
+          :signature="messageSignature"
+          allow-signature
+          :channel-type="channelType"
+          :medium="inbox.medium"
+          @typing-off="onTypingOff"
+          @typing-on="onTypingOn"
+          @focus="onFocus"
+          @blur="onBlur"
+          @toggle-user-mention="toggleUserMention"
+          @toggle-canned-menu="toggleCannedMenu"
+          @toggle-variables-menu="toggleVariablesMenu"
+          @toggle-macros-menu="toggleMacrosMenu"
+          @execute-macro="onExecuteMacro"
+          @clear-selection="clearEditorSelection"
+          @execute-copilot-action="executeCopilotAction"
+        >
+          <template #footer>
+            <QuotedEmailPreview
+              v-if="shouldIncludeQuotedEmail"
+              :key="conversationId"
+              :quoted-email-text="quotedEmailText"
+              :header="quotedEmailHeader"
+              @remove="removeQuotedEmail"
+            />
+          </template>
+        </WootMessageEditor>
+
+        <div
+          v-if="hasAttachments && isDefaultEditorMode"
+          class="bg-transparent py-0 mb-2"
+          @paste="onPaste"
+        >
+          <AttachmentPreview
+            class="mt-2"
+            :attachments="attachedFiles"
+            @remove-attachment="removeAttachment"
+          />
+        </div>
+        <MessageSignatureMissingAlert
+          v-if="
+            isSignatureEnabledForInbox &&
+            !isSignatureAvailable &&
+            isDefaultEditorMode
+          "
+          class="mb-2"
+        />
+      </div>
+    </Transition>
+
+    <Transition
+      mode="out-in"
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="opacity-0 translate-y-2 scale-[0.98]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
+    >
+      <CopilotReplyBottomPanel
+        v-if="copilot.isActive.value"
+        key="copilot-bottom-panel"
+        :is-generating-content="copilot.isButtonDisabled.value"
+        @submit="onSubmitCopilotReply"
+        @cancel="copilot.reset"
       />
-    </div>
-    <MessageSignatureMissingAlert
-      v-if="isSignatureEnabledForInbox && !isSignatureAvailable"
-    />
-    <ReplyBottomPanel
-      :conversation-id="conversationId"
-      :enable-multiple-file-upload="enableMultipleFileUpload"
-      :enable-whats-app-templates="showWhatsappTemplates"
-      :enable-content-templates="showContentTemplates"
-      :inbox="inbox"
-      :is-on-private-note="isOnPrivateNote"
-      :is-recording-audio="isRecordingAudio"
-      :is-send-disabled="isReplyButtonDisabled"
-      :is-note="isPrivate"
-      :on-file-upload="onFileUpload"
-      :on-send="onSendReply"
-      :conversation-type="conversationType"
-      :recording-audio-duration-text="recordingAudioDurationText"
-      :recording-audio-state="recordingAudioState"
-      :send-button-text="replyButtonLabel"
-      :show-audio-recorder="showAudioRecorder"
-      :show-editor-toggle="isAPIInbox && !isOnPrivateNote"
-      :show-emoji-picker="showEmojiPicker"
-      :show-file-upload="showFileUpload"
-      :show-quoted-reply-toggle="shouldShowQuotedReplyToggle"
-      :quoted-reply-enabled="quotedReplyPreference"
-      :toggle-audio-recorder-play-pause="toggleAudioRecorderPlayPause"
-      :toggle-audio-recorder="toggleAudioRecorder"
-      :toggle-emoji-picker="toggleEmojiPicker"
-      :message="message"
-      :portal-slug="connectedPortalSlug"
-      :new-conversation-modal-active="newConversationModalActive"
-      @select-whatsapp-template="openWhatsappTemplateModal"
-      @select-content-template="openContentTemplateModal"
-      @toggle-editor="toggleRichContentEditor"
-      @replace-text="replaceText"
-      @toggle-insert-article="toggleInsertArticle"
-      @toggle-quoted-reply="toggleQuotedReply"
-    />
+      <ReplyBottomPanel
+        v-else
+        key="reply-bottom-panel"
+        :conversation-id="conversationId"
+        :enable-multiple-file-upload="enableMultipleFileUpload"
+        :enable-whats-app-templates="showWhatsappTemplates"
+        :enable-content-templates="showContentTemplates"
+        :inbox="inbox"
+        :is-on-private-note="isOnPrivateNote"
+        :is-recording-audio="isRecordingAudio"
+        :is-send-disabled="isReplyButtonDisabled"
+        :is-note="isPrivate"
+        :is-editor-disabled="isEditorDisabled"
+        :on-file-upload="onFileUpload"
+        :on-send="onSendReply"
+        :conversation-type="conversationType"
+        :recording-audio-duration-text="recordingAudioDurationText"
+        :recording-audio-state="recordingAudioState"
+        :send-button-text="replyButtonLabel"
+        :show-audio-recorder="showAudioRecorder"
+        :show-emoji-picker="showEmojiPicker"
+        :show-file-upload="showFileUpload"
+        :toggle-audio-recorder-play-pause="toggleAudioRecorderPlayPause"
+        :toggle-audio-recorder="toggleAudioRecorder"
+        :toggle-emoji-picker="toggleEmojiPicker"
+        :message="message"
+        :portal-slug="connectedPortalSlug"
+        :new-conversation-modal-active="newConversationModalActive"
+        @select-whatsapp-template="openWhatsappTemplateModal"
+        @select-content-template="openContentTemplateModal"
+        @toggle-insert-article="toggleInsertArticle"
+        @send-apple-message="sendAppleMessage"
+        @replace-text="replaceText"
+        @request-contact-info-template="openContactInfoTemplateModal"
+      />
+    </Transition>
+
     <WhatsappTemplates
       :inbox-id="inbox.id"
       :show="showWhatsAppTemplatesModal"
+      :send-rendered-content="isAPIInbox"
+      :request-contact-info-only="requestContactInfoTemplatesOnly"
       @close="hideWhatsappTemplatesModal"
       @on-send="onSendWhatsAppReply"
       @cancel="hideWhatsappTemplatesModal"
@@ -1321,6 +2740,12 @@ export default {
       @close="hideContentTemplatesModal"
       @on-send="onSendContentTemplateReply"
       @cancel="hideContentTemplatesModal"
+    />
+
+    <ConversationResolveAttributesModal
+      ref="resolveAttributesModal"
+      @submit="macroExecution.submitPendingAttributes"
+      @close="macroExecution.dismissPendingAttributes"
     />
 
     <woot-confirm-modal
@@ -1336,13 +2761,7 @@ export default {
   @apply mb-0;
 }
 
-.attachment-preview-box {
-  @apply bg-transparent py-0 px-4;
-}
-
 .reply-box {
-  transition: height 2s cubic-bezier(0.37, 0, 0.63, 1);
-
   @apply relative mb-2 mx-2 border border-n-weak rounded-xl bg-n-solid-1;
 
   &.is-private {
@@ -1355,11 +2774,7 @@ export default {
 }
 
 .reply-box__top {
-  @apply relative py-0 px-4 -mt-px;
-
-  textarea {
-    @apply shadow-none outline-none border-transparent bg-transparent m-0 max-h-60 min-h-[3rem] pt-4 pb-0 px-0 resize-none;
-  }
+  @apply relative py-0 px-3 -mt-px;
 }
 
 .emoji-dialog {
@@ -1380,8 +2795,18 @@ export default {
   }
 }
 
-.normal-editor__canned-box {
+.normal-editor__template-box {
   width: calc(100% - 2 * 1rem);
   left: 1rem;
+  position: absolute;
+  bottom: 100%;
+  z-index: 100;
+  @apply bg-white dark:bg-n-slate-1;
+  @apply border border-n-slate-4 dark:border-n-slate-6;
+  border-radius: 8px;
+  @apply shadow-lg dark:shadow-2xl;
+  margin-bottom: 8px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 </style>

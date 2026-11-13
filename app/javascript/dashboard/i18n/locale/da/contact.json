@@ -3,6 +3,7 @@
     "NOT_AVAILABLE": "Ikke Tilgængelig",
     "EMAIL_ADDRESS": "E-Mail Adresse",
     "PHONE_NUMBER": "Telefonnummer",
+    "WHATSAPP_USERNAME": "WhatsApp brugernavn",
     "IDENTIFIER": "Identifier",
     "COPY_SUCCESSFUL": "Kopiering til udklipsholder lykkedes",
     "COMPANY": "Virksomhed",
@@ -18,13 +19,18 @@
     "CREATED_AT_LABEL": "Created",
     "NEW_MESSAGE": "Ny besked",
     "CALL": "Call",
-    "CALL_UNDER_DEVELOPMENT": "Calling is under development",
+    "CALL_INITIATED": "Calling the contact…",
+    "CALL_FAILED": "Unable to start the call. Please try again.",
+    "WHATSAPP_CALL_PERMISSION_REQUESTED": "Sendte en anmodning om opkaldstilladelse til kontakten. Prøv igen, når de accepterer.",
+    "WHATSAPP_CALL_PERMISSION_PENDING": "Anmodning om opkaldstilladelse er allerede sendt for nylig. Prøv igen, når kontakten accepterer.",
+    "CLICK_TO_EDIT": "Click to edit",
     "VOICE_INBOX_PICKER": {
       "TITLE": "Choose a voice inbox"
     },
     "CONVERSATIONS": {
       "NO_RECORDS_FOUND": "Der er ingen tidligere samtaler tilknyttet denne kontakt.",
-      "TITLE": "Tidligere Samtaler"
+      "TITLE": "Tidligere Samtaler",
+      "VIEW_ALL": "Se alle samtaler"
     },
     "LABELS": {
       "CONTACT": {
@@ -384,6 +390,7 @@
       "IDENTIFIER": "Identifier",
       "COUNTRY": "Land",
       "CITY": "By",
+      "COMPANY": "Virksomhed",
       "CREATED_AT": "Oprettet den",
       "LAST_ACTIVITY": "Last activity",
       "REFERER_LINK": "Refererer link",
@@ -456,6 +463,15 @@
           "INSTAGRAM": {
             "PLACEHOLDER": "Add Instagram"
           },
+          "WHATSAPP": {
+            "PLACEHOLDER": "Tilføj WhatsApp"
+          },
+          "TELEGRAM": {
+            "PLACEHOLDER": "Add Telegram"
+          },
+          "TIKTOK": {
+            "PLACEHOLDER": "Add TikTok"
+          },
           "LINKEDIN": {
             "PLACEHOLDER": "Add LinkedIn"
           },
@@ -499,6 +515,7 @@
         "ATTRIBUTES": "Attributes",
         "HISTORY": "History",
         "NOTES": "Noter",
+        "MEDIA": "Media",
         "MERGE": "Merge"
       },
       "HISTORY": {
@@ -569,11 +586,39 @@
       "SEARCH_EMPTY_STATE_TITLE": "Ingen kontakter matcher din søgning 🔍",
       "LIST_EMPTY_STATE_TITLE": "No contacts available in this view 📋",
       "ACTIVE_EMPTY_STATE_TITLE": "No contacts are active at the moment 🌙"
+    },
+    "LOAD_MORE": "Load more"
+  },
+  "CONTACTS_BULK_ACTIONS": {
+    "ASSIGN_LABELS": "Tildel Etiketter",
+    "REMOVE_LABELS": "Fjern Etiketter",
+    "ASSIGN_LABELS_SUCCESS": "Etiketter tildelt med succes.",
+    "ASSIGN_LABELS_FAILED": "Failed to assign labels",
+    "REMOVE_LABELS_SUCCESS": "Etiketter blev fjernet.",
+    "REMOVE_LABELS_FAILED": "Kunne ikke fjerne etiketter",
+    "DESCRIPTION": "Select the labels you want to add to the selected contacts.",
+    "NO_LABELS_FOUND": "No labels available yet.",
+    "SELECTED_COUNT": "{count} selected",
+    "CLEAR_SELECTION": "Clear selection",
+    "SELECT_ALL": "Select all ({count})",
+    "DELETE_CONTACTS": "Slet",
+    "DELETE_SUCCESS": "Contacts deleted successfully.",
+    "DELETE_FAILED": "Failed to delete contacts.",
+    "DELETE_DIALOG": {
+      "TITLE": "Delete selected contacts",
+      "SINGULAR_TITLE": "Delete selected contact",
+      "DESCRIPTION": "This will permanently delete {count} selected contacts. This action cannot be undone.",
+      "SINGULAR_DESCRIPTION": "This will permanently delete the selected contact. This action cannot be undone.",
+      "CONFIRM_MULTIPLE": "Delete contacts",
+      "CONFIRM_SINGLE": "Slet kontakt"
     }
   },
   "COMPOSE_NEW_CONVERSATION": {
     "CONTACT_SEARCH": {
       "ERROR_MESSAGE": "We couldn’t complete the search. Please try again."
+    },
+    "CONTACT_CREATE": {
+      "ERROR_MESSAGE": "Vi kunne ikke oprette kontakten. Prøv venligst igen."
     },
     "FORM": {
       "GO_TO_CONVERSATION": "Vis",
@@ -582,7 +627,7 @@
       "NO_INBOX_ALERT": "There are no available inboxes to start a conversation with this contact.",
       "CONTACT_SELECTOR": {
         "LABEL": "Til:",
-        "TAG_INPUT_PLACEHOLDER": "Search for a contact with name, email or phone number",
+        "TAG_INPUT_PLACEHOLDER": "Enter at least 2 characters to search by name, email, or phone number",
         "CONTACT_CREATING": "Creating contact..."
       },
       "INBOX_SELECTOR": {
@@ -593,9 +638,9 @@
         "SUBJECT_LABEL": "Emne :",
         "SUBJECT_PLACEHOLDER": "Enter your email subject here",
         "CC_LABEL": "Cc:",
-        "CC_PLACEHOLDER": "Search for a contact with their email address",
+        "CC_PLACEHOLDER": "Enter at least 2 characters to search by email",
         "BCC_LABEL": "Bcc:",
-        "BCC_PLACEHOLDER": "Search for a contact with their email address",
+        "BCC_PLACEHOLDER": "Enter at least 2 characters to search by email",
         "BCC_BUTTON": "Bcc"
       },
       "MESSAGE_EDITOR": {

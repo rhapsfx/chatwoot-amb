@@ -1,27 +1,33 @@
 class SendReplyJob < ApplicationJob
   queue_as :high
 
+  CHANNEL_SERVICES = {
+    'Channel::TwitterProfile' => ::Twitter::SendOnTwitterService,
+    'Channel::TwilioSms' => ::Twilio::SendOnTwilioService,
+    'Channel::Line' => ::Line::SendOnLineService,
+    'Channel::Telegram' => ::Telegram::SendOnTelegramService,
+    'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
+    'Channel::Sms' => ::Sms::SendOnSmsService,
+    'Channel::Instagram' => ::Instagram::SendOnInstagramService,
+    'Channel::Tiktok' => ::Tiktok::SendOnTiktokService,
+    'Channel::Email' => ::Email::SendOnEmailService,
+    'Channel::WebWidget' => ::Messages::SendEmailNotificationService,
+    'Channel::Api' => ::Messages::SendEmailNotificationService,
+    'Channel::AppleMessagesForBusiness' => ::AppleMessagesForBusiness::SendOnAppleMessagesForBusinessService
+  }.freeze
+
   def perform(message_id)
-    message = Message.find(message_id)
-    conversation = message.conversation
-    channel_name = conversation.inbox.channel.class.to_s
+    message = Message.includes(attachments: { file_attachment: :blob }).find(message_id)
+    channel_name = message.conversation.inbox.channel.class.to_s
 
-    services = {
-      'Channel::TwitterProfile' => ::Twitter::SendOnTwitterService,
-      'Channel::TwilioSms' => ::Twilio::SendOnTwilioService,
-      'Channel::Line' => ::Line::SendOnLineService,
-      'Channel::Telegram' => ::Telegram::SendOnTelegramService,
-      'Channel::Whatsapp' => ::Whatsapp::SendOnWhatsappService,
-      'Channel::Sms' => ::Sms::SendOnSmsService,
-      'Channel::Instagram' => ::Instagram::SendOnInstagramService
-    }
+    Captain::Conversation::AgentMessageTranslationService.new(message: message).perform if message.content_attributes['translation_pending']
 
-    case channel_name
-    when 'Channel::FacebookPage'
-      send_on_facebook_page(message)
-    else
-      services[channel_name].new(message: message).perform if services[channel_name].present?
-    end
+    return send_on_facebook_page(message) if channel_name == 'Channel::FacebookPage'
+
+    service_class = CHANNEL_SERVICES[channel_name]
+    return unless service_class
+
+    service_class.new(message: message).perform
   end
 
   private

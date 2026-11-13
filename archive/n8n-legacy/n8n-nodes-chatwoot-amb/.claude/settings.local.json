@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/rhaps/LocalGit/chatwoot/_apple/Acoustic-House-Bot-origin/**)",
+      "Bash(tree:*)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/app/models/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/app/services/templates/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/scripts/**)",
+      "Read(//Users/rhaps/LocalGit/chatwoot/**)",
+      "Bash(ruby scripts/migrate_apple_bot.rb:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

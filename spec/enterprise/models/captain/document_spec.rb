@@ -4,6 +4,49 @@ RSpec.describe Captain::Document, type: :model do
   let(:account) { create(:account) }
   let(:assistant) { create(:captain_assistant, account: account) }
 
+  describe 'URL normalization' do
+    it 'removes a trailing slash before validation' do
+      document = create(:captain_document,
+                        assistant: assistant,
+                        account: account,
+                        external_link: 'https://example.com/path/')
+
+      expect(document.external_link).to eq('https://example.com/path')
+    end
+  end
+
+  describe '#customer_visible_source_url' do
+    let(:document) do
+      build(:captain_document, assistant: assistant, account: account, external_link: 'https://example.com/runbooks')
+    end
+
+    it 'returns URLs that resolve only to public addresses' do
+      allow(Resolv).to receive(:getaddresses).with('example.com').and_return(['93.184.216.34'])
+
+      expect(document.customer_visible_source_url).to eq('https://example.com/runbooks')
+    end
+
+    it 'rejects URLs that resolve to private, loopback, or link-local addresses' do
+      ['10.0.0.5', '127.0.0.1', '169.254.1.1', 'fc00::1', 'fe80::1'].each do |address|
+        allow(Resolv).to receive(:getaddresses).with('example.com').and_return([address])
+
+        expect(document.customer_visible_source_url).to be_nil
+      end
+    end
+
+    it 'rejects URLs with mixed public and private addresses' do
+      allow(Resolv).to receive(:getaddresses).with('example.com').and_return(['93.184.216.34', '10.0.0.5'])
+
+      expect(document.customer_visible_source_url).to be_nil
+    end
+
+    it 'rejects URLs with unresolved hosts' do
+      allow(Resolv).to receive(:getaddresses).with('example.com').and_return([])
+
+      expect(document.customer_visible_source_url).to be_nil
+    end
+  end
+
   describe 'PDF support' do
     let(:pdf_document) do
       doc = build(:captain_document, assistant: assistant, account: account)
@@ -44,6 +87,11 @@ RSpec.describe Captain::Document, type: :model do
         expect(doc.pdf_document?).to be true
       end
 
+      it 'returns true for PDF:-prefixed external links even when the blob is missing' do
+        doc = build(:captain_document, external_link: 'PDF: report_20250101120000')
+        expect(doc.pdf_document?).to be true
+      end
+
       it 'returns false for non-PDF documents' do
         doc = build(:captain_document, external_link: 'https://example.com')
         expect(doc.pdf_document?).to be false
@@ -80,6 +128,239 @@ RSpec.describe Captain::Document, type: :model do
 
         expect(pdf_document.external_link).to start_with('PDF: test_')
       end
+    end
+  end
+
+  describe 'Markdown support' do
+    let(:markdown_content) { "# Refund policy\n\nRefunds are processed within five business days." }
+    let(:markdown_document) do
+      build(
+        :captain_document,
+        assistant: assistant,
+        account: account,
+        external_link: nil,
+        name: 'playground-knowledge.md',
+        markdown_content: markdown_content
+      )
+    end
+
+    it 'stores the uploaded file as an available document' do
+      markdown_document.save!
+
+      expect(markdown_document).to be_available
+      expect(markdown_document).to be_markdown_document
+      expect(markdown_document).not_to be_syncable
+      expect(markdown_document.content).to eq(markdown_content)
+      expect(markdown_document.external_link).to start_with('MARKDOWN: playground-knowledge_')
+    end
+
+    it 'attaches the content as a Markdown file' do
+      markdown_document.save!
+
+      expect(markdown_document.markdown_file.filename.to_s).to eq('playground-knowledge.md')
+      expect(markdown_document.markdown_file.content_type).to eq('text/markdown')
+      expect(markdown_document.markdown_file.download).to eq(markdown_content)
+    end
+
+    it 'uses the Markdown filename when a name is not provided' do
+      markdown_document.name = nil
+      markdown_document.save!
+
+      expect(markdown_document.name).to eq('playground-knowledge.md')
+    end
+
+    it 'rejects Markdown content longer than the playground limit' do
+      markdown_document.markdown_content = 'a' * 10_001
+
+      expect(markdown_document).not_to be_valid
+      expect(markdown_document.errors[:markdown_file]).to include(I18n.t('captain.documents.markdown_size_error'))
+    end
+
+    it 'rejects non-Markdown attachments' do
+      invalid_document = build(
+        :captain_document,
+        assistant: assistant,
+        account: account,
+        external_link: nil,
+        content: 'not markdown',
+        status: :available
+      )
+      invalid_document.markdown_file.attach(
+        io: StringIO.new('not markdown'),
+        filename: 'knowledge.txt',
+        content_type: 'text/plain'
+      )
+
+      expect(invalid_document).not_to be_valid
+      expect(invalid_document.errors[:markdown_file]).to include(I18n.t('captain.documents.markdown_format_error'))
+    end
+
+    it 'rejects a document with both PDF and Markdown attachments' do
+      markdown_document.pdf_file.attach(
+        io: StringIO.new('PDF content'),
+        filename: 'refund-policy.pdf',
+        content_type: 'application/pdf'
+      )
+
+      expect(markdown_document).not_to be_valid
+      expect(markdown_document.errors[:base]).to include(I18n.t('captain.documents.multiple_files_error'))
+    end
+  end
+
+  describe 'response builder job callback' do
+    before { clear_enqueued_jobs }
+
+    describe 'non-PDF documents' do
+      it 'enqueues when created with available status and content' do
+        expect do
+          create(:captain_document, assistant: assistant, account: account, status: :available)
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue when created available without content' do
+        expect do
+          create(:captain_document, assistant: assistant, account: account, status: :available, content: nil)
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'enqueues when status transitions to available with existing content' do
+        document = create(:captain_document, assistant: assistant, account: account, status: :in_progress)
+
+        expect do
+          document.update!(status: :available)
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue when status transitions to available without content' do
+        document = create(
+          :captain_document,
+          assistant: assistant,
+          account: account,
+          status: :in_progress,
+          content: nil
+        )
+
+        expect do
+          document.update!(status: :available)
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'enqueues when content is populated on an available document' do
+        document = create(
+          :captain_document,
+          assistant: assistant,
+          account: account,
+          status: :available,
+          content: nil
+        )
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(content: 'Fresh content from crawl')
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'enqueues when content changes on an available document' do
+        document = create(
+          :captain_document,
+          assistant: assistant,
+          account: account,
+          status: :available,
+          content: 'Initial content'
+        )
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(content: 'Updated crawl content')
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue when content is cleared on an available document' do
+        document = create(
+          :captain_document,
+          assistant: assistant,
+          account: account,
+          status: :available,
+          content: 'Initial content'
+        )
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(content: nil)
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue for metadata-only updates' do
+        document = create(:captain_document, assistant: assistant, account: account, status: :available)
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(metadata: { 'title' => 'Updated Again' })
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue while document remains in progress' do
+        document = create(:captain_document, assistant: assistant, account: account, status: :in_progress)
+
+        expect do
+          document.update!(metadata: { 'title' => 'Updated' })
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+    end
+
+    describe 'PDF documents' do
+      def build_pdf_document(status:, content:)
+        build(
+          :captain_document,
+          assistant: assistant,
+          account: account,
+          status: status,
+          content: content
+        ).tap do |doc|
+          doc.pdf_file.attach(
+            io: StringIO.new('PDF content'),
+            filename: 'sample.pdf',
+            content_type: 'application/pdf'
+          )
+        end
+      end
+
+      it 'enqueues when created available without content' do
+        document = build_pdf_document(status: :available, content: nil)
+
+        expect do
+          document.save!
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'enqueues when status transitions to available' do
+        document = build_pdf_document(status: :in_progress, content: nil)
+        document.save!
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(status: :available)
+        end.to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+
+      it 'does not enqueue when content updates without status change' do
+        document = build_pdf_document(status: :available, content: nil)
+        document.save!
+        clear_enqueued_jobs
+
+        expect do
+          document.update!(content: 'Extracted PDF text')
+        end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
+      end
+    end
+
+    it 'does not enqueue when the document is destroyed' do
+      document = create(:captain_document, assistant: assistant, account: account, status: :available)
+      clear_enqueued_jobs
+
+      expect do
+        document.destroy!
+      end.not_to have_enqueued_job(Captain::Documents::ResponseBuilderJob)
     end
   end
 end

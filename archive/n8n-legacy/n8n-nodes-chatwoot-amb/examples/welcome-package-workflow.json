@@ -1,0 +1,84 @@
+{
+  "name": "Welcome Package - Template Message",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chatwoot-welcome",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - New Customer",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "chatwoot-welcome-trigger"
+    },
+    {
+      "parameters": {
+        "accountId": 1,
+        "conversationId": "={{$json.conversation_id}}",
+        "templateSelection": "id",
+        "templateId": 123,
+        "parameters": {
+          "parameter": [
+            {
+              "key": "business_name",
+              "value": "={{$json.business_name}}"
+            },
+            {
+              "key": "customer_name",
+              "value": "={{$json.customer_name}}"
+            }
+          ]
+        },
+        "additionalOptions": {
+          "returnTemplateInfo": false,
+          "validateTemplate": false
+        }
+      },
+      "id": "template-message-1",
+      "name": "Send Welcome Package",
+      "type": "n8n-nodes-chatwoot-amb.chatwootAMBFileAttachment",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "chatwootBotApi": {
+          "id": "1",
+          "name": "Chatwoot Bot API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - New Customer": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "instanceId": "chatwoot-template-example"
+  },
+  "tags": [
+    {
+      "name": "chatwoot"
+    },
+    {
+      "name": "template"
+    },
+    {
+      "name": "welcome"
+    }
+  ]
+}

@@ -5,7 +5,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   sort_on :phone_number, type: :string
   sort_on :last_activity_at, internal_name: :order_on_last_activity_at, type: :scope, scope_params: [:direction]
   sort_on :created_at, internal_name: :order_on_created_at, type: :scope, scope_params: [:direction]
-  sort_on :company, internal_name: :order_on_company_name, type: :scope, scope_params: [:direction]
+  sort_on :company_name, internal_name: :order_on_company_name, type: :scope, scope_params: [:direction]
   sort_on :city, internal_name: :order_on_city, type: :scope, scope_params: [:direction]
   sort_on :country, internal_name: :order_on_country_name, type: :scope, scope_params: [:direction]
 
@@ -24,13 +24,11 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def search
     render json: { error: 'Specify search string with parameter q' }, status: :unprocessable_entity if params[:q].blank? && return
 
-    contacts = resolved_contacts.where(
-      'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search
-        OR contacts.additional_attributes->>\'company_name\' ILIKE :search',
+    contacts = Current.account.contacts.where(
+      'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search',
       search: "%#{params[:q].strip}%"
     )
-    @contacts = fetch_contacts(contacts)
-    @contacts_count = @contacts.total_count
+    @contacts = fetch_contacts_with_has_more(contacts)
   end
 
   def import
@@ -86,7 +84,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
 
   def create
     ActiveRecord::Base.transaction do
-      @contact = Current.account.contacts.new(permitted_params.except(:avatar_url))
+      @contact = Current.account.contacts.new(permitted_params.except(:avatar_url).merge(contact_type: :lead))
       @contact.save!
       @contact_inbox = build_contact_inbox
       process_avatar_from_url
@@ -94,8 +92,11 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @contact.assign_attributes(contact_update_params)
-    @contact.save!
+    ActiveRecord::Base.transaction do
+      @contact.assign_attributes(contact_update_params)
+      Contacts::CompanyAssociationService.new.associate_company_from_name(@contact) if params[:resolve_legacy_company].to_s == 'true'
+      @contact.save!
+    end
     process_avatar_from_url
   end
 
@@ -143,6 +144,24 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
       .per(RESULTS_PER_PAGE)
   end
 
+  def fetch_contacts_with_has_more(contacts)
+    includes_hash = { avatar_attachment: [:blob] }
+    includes_hash[:contact_inboxes] = { inbox: :channel } if @include_contact_inboxes
+
+    # Calculate offset manually to fetch one extra record for has_more check
+    offset = (@current_page.to_i - 1) * RESULTS_PER_PAGE
+    results = filtrate(contacts)
+              .includes(includes_hash)
+              .offset(offset)
+              .limit(RESULTS_PER_PAGE + 1)
+              .to_a
+
+    @has_more = results.size > RESULTS_PER_PAGE
+    results = results.first(RESULTS_PER_PAGE) if @has_more
+    @contacts_count = results.size
+    results
+  end
+
   def build_contact_inbox
     return if params[:inbox_id].blank?
 
@@ -155,7 +174,12 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   end
 
   def permitted_params
-    params.permit(:name, :identifier, :email, :phone_number, :avatar, :blocked, :avatar_url, additional_attributes: {}, custom_attributes: {})
+    permitted_params = params.permit(:name, :identifier, :email, :phone_number, :avatar, :avatar_url, :blocked,
+                                     additional_attributes: {}, custom_attributes: {})
+    return permitted_params unless Current.account.feature_enabled?('companies') && params.key?(:company_id)
+
+    company_id = params[:company_id]
+    permitted_params.merge(company_id: company_id.present? ? Current.account.companies.find(company_id).id : nil)
   end
 
   def contact_custom_attributes
@@ -185,7 +209,9 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   end
 
   def fetch_contact
-    @contact = Current.account.contacts.includes(contact_inboxes: [:inbox]).find(params[:id])
+    contact_scope = Current.account.contacts
+    contact_scope = contact_scope.includes(contact_inboxes: [:inbox]) if @include_contact_inboxes
+    @contact = contact_scope.find(params[:id])
   end
 
   def process_avatar_from_url
@@ -196,3 +222,5 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     render json: error, status: error_status
   end
 end
+
+Api::V1::Accounts::ContactsController.prepend_mod_with('Api::V1::Accounts::ContactsController')

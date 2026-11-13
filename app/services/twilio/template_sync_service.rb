@@ -2,9 +2,9 @@ class Twilio::TemplateSyncService
   pattr_initialize [:channel!]
 
   def call
+    mark_templates_updated
     fetch_templates_from_twilio
     update_channel_templates
-    mark_templates_updated
   rescue Twilio::REST::TwilioError => e
     Rails.logger.error("Twilio template sync failed: #{e.message}")
     false
@@ -13,16 +13,13 @@ class Twilio::TemplateSyncService
   private
 
   def fetch_templates_from_twilio
-    @templates = client.content.v1.contents.list(limit: 1000)
+    @templates = client.content.v1.content_and_approvals.list(limit: 1000)
   end
 
   def update_channel_templates
     formatted_templates = @templates.map { |template| format_template(template) }
 
-    channel.update!(
-      content_templates: { templates: formatted_templates },
-      content_templates_last_updated: Time.current
-    )
+    channel.update!(content_templates: { templates: formatted_templates })
   end
 
   def format_template(template)
@@ -50,10 +47,8 @@ class Twilio::TemplateSyncService
     @client ||= channel.send(:client)
   end
 
-  def derive_status(_template)
-    # For now, assume all fetched templates are approved
-    # In the future, this could check approval status from Twilio
-    'approved'
+  def derive_status(template)
+    template.approval_requests&.dig('status')&.downcase || 'unsubmitted'
   end
 
   def derive_template_type(template)
@@ -63,6 +58,8 @@ class Twilio::TemplateSyncService
       'media'
     elsif template_types.include?('twilio/quick-reply')
       'quick_reply'
+    elsif template_types.include?('twilio/call-to-action')
+      'call_to_action'
     elsif template_types.include?('twilio/catalog')
       'catalog'
     else
@@ -107,6 +104,8 @@ class Twilio::TemplateSyncService
       template_types['twilio/media']['body']
     elsif template_types['twilio/quick-reply']
       template_types['twilio/quick-reply']['body']
+    elsif template_types['twilio/call-to-action']
+      template_types['twilio/call-to-action']['body']
     elsif template_types['twilio/catalog']
       template_types['twilio/catalog']['body']
     else

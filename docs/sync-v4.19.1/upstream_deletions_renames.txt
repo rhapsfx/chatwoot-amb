@@ -1,0 +1,119 @@
+D	app/assets/javascripts/secretField.js
+D	app/assets/stylesheets/administrate/base/_forms.scss
+D	app/assets/stylesheets/administrate/base/_layout.scss
+D	app/assets/stylesheets/administrate/base/_lists.scss
+D	app/assets/stylesheets/administrate/base/_tables.scss
+D	app/assets/stylesheets/administrate/base/_typography.scss
+D	app/assets/stylesheets/administrate/components/_app-container.scss
+D	app/assets/stylesheets/administrate/components/_attributes.scss
+D	app/assets/stylesheets/administrate/components/_buttons.scss
+D	app/assets/stylesheets/administrate/components/_cells.scss
+D	app/assets/stylesheets/administrate/components/_field-unit.scss
+D	app/assets/stylesheets/administrate/components/_flashes.scss
+D	app/assets/stylesheets/administrate/components/_form-actions.scss
+D	app/assets/stylesheets/administrate/components/_main-content.scss
+D	app/assets/stylesheets/administrate/components/_pagination.scss
+D	app/assets/stylesheets/administrate/components/_reports.scss
+D	app/assets/stylesheets/administrate/components/_search.scss
+D	app/assets/stylesheets/administrate/custom_styles.scss
+D	app/assets/stylesheets/administrate/library/_clearfix.scss
+D	app/assets/stylesheets/administrate/library/_data-label.scss
+D	app/assets/stylesheets/administrate/library/_variables.scss
+D	app/assets/stylesheets/administrate/reset/_normalize.scss
+D	app/assets/stylesheets/administrate/utilities/_text-color.scss
+D	app/assets/stylesheets/administrate/utilities/_variables.scss
+R094	enterprise/app/controllers/api/v1/accounts/companies/base_controller.rb	app/controllers/api/v1/accounts/companies/base_controller.rb
+R088	enterprise/app/controllers/api/v1/accounts/companies/contacts_controller.rb	app/controllers/api/v1/accounts/companies/contacts_controller.rb
+R086	enterprise/app/controllers/api/v1/accounts/companies_controller.rb	app/controllers/api/v1/accounts/companies_controller.rb
+R072	app/controllers/api/v1/accounts/concerns/whatsapp_health_management.rb	app/controllers/api/v1/accounts/concerns/inbox_health_management.rb
+D	app/controllers/super_admin/push_diagnostics_controller.rb
+D	app/javascript/dashboard/components-next/Campaigns/Pages/CampaignPage/WhatsAppCampaign/WhatsAppCampaignDialog.vue
+D	app/javascript/dashboard/components-next/Campaigns/Pages/CampaignPage/WhatsAppCampaign/WhatsAppCampaignForm.vue
+D	app/javascript/dashboard/components-next/Companies/CompaniesDetailsLayout.vue
+R057	app/javascript/dashboard/components-next/Companies/CompanyDetail/CompanyContactsSidebar.vue	app/javascript/dashboard/components-next/Companies/CompanyDetail/CompanyAddContact.vue
+D	app/javascript/dashboard/components-next/Companies/CompanyDetail/CompanyHistorySidebar.vue
+D	app/javascript/dashboard/components-next/Companies/CompanyDetail/CompanyNotesSidebar.vue
+D	app/javascript/dashboard/components-next/Companies/CompanyDetail/CompanyProfileCard.vue
+D	app/javascript/dashboard/components/widgets/conversation/conversation/LabelSuggestion.vue
+D	app/javascript/dashboard/composables/useLabelSuggestions.js
+D	app/javascript/dashboard/routes/dashboard/captain/assistants/overview/Index.vue
+D	app/javascript/dashboard/routes/dashboard/conversation/contact/SocialIcons.vue
+R070	app/javascript/sdk/sdk.js	app/javascript/sdk/sdk.css
+D	app/javascript/shared/mixins/keyboardEventListenerMixins.js
+D	app/javascript/superadmin_pages/components/playground/BotMessage.vue
+D	app/javascript/superadmin_pages/components/playground/Header.vue
+D	app/javascript/superadmin_pages/components/playground/TypingIndicator.vue
+D	app/javascript/superadmin_pages/components/playground/UserMessage.vue
+D	app/javascript/superadmin_pages/components/playground/assets/typing.gif
+D	app/javascript/superadmin_pages/views/playground/Index.vue
+R100	enterprise/app/jobs/companies/delete_job.rb	app/jobs/companies/delete_job.rb
+R100	enterprise/app/jobs/companies/sync_contact_names_job.rb	app/jobs/companies/sync_contact_names_job.rb
+R100	enterprise/app/jobs/migration/company_account_batch_job.rb	app/jobs/migration/company_account_batch_job.rb
+R100	enterprise/app/jobs/migration/company_backfill_job.rb	app/jobs/migration/company_backfill_job.rb
+R098	enterprise/app/models/company.rb	app/models/company.rb
+R087	enterprise/app/policies/company_policy.rb	app/policies/company_policy.rb
+R100	enterprise/app/services/companies/business_email_detector_service.rb	app/services/companies/business_email_detector_service.rb
+R100	enterprise/app/services/companies/contact_membership_service.rb	app/services/companies/contact_membership_service.rb
+R077	enterprise/app/services/contacts/company_association_service.rb	app/services/contacts/company_association_service.rb
+R100	enterprise/app/views/api/v1/accounts/companies/avatar.json.jbuilder	app/views/api/v1/accounts/companies/avatar.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/contacts/_contact.json.jbuilder	app/views/api/v1/accounts/companies/contacts/_contact.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/contacts/create.json.jbuilder	app/views/api/v1/accounts/companies/contacts/create.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/contacts/index.json.jbuilder	app/views/api/v1/accounts/companies/contacts/index.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/contacts/search.json.jbuilder	app/views/api/v1/accounts/companies/contacts/search.json.jbuilder
+R053	enterprise/app/views/api/v1/accounts/companies/conversations/index.json.jbuilder	app/views/api/v1/accounts/companies/conversations/index.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/create.json.jbuilder	app/views/api/v1/accounts/companies/create.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/destroy_custom_attributes.json.jbuilder	app/views/api/v1/accounts/companies/destroy_custom_attributes.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/index.json.jbuilder	app/views/api/v1/accounts/companies/index.json.jbuilder
+R073	enterprise/app/views/api/v1/accounts/companies/notes/index.json.jbuilder	app/views/api/v1/accounts/companies/notes/index.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/search.json.jbuilder	app/views/api/v1/accounts/companies/search.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/show.json.jbuilder	app/views/api/v1/accounts/companies/show.json.jbuilder
+R100	enterprise/app/views/api/v1/accounts/companies/update.json.jbuilder	app/views/api/v1/accounts/companies/update.json.jbuilder
+R089	enterprise/app/views/api/v1/models/_company.json.jbuilder	app/views/api/v1/models/_company.json.jbuilder
+D	app/views/fields/polymorphic/_form.html.erb
+D	app/views/super_admin/accounts/edit.html.erb
+D	app/views/super_admin/application/_icons.html.erb
+D	app/views/super_admin/application/_settings_menu.html.erb
+D	app/views/super_admin/push_diagnostics/show.html.erb
+D	app/views/super_admin/users/_collection.html.erb
+D	app/views/super_admin/users/_impersonate.erb
+D	bin/spring
+D	config/spring.rb
+D	enterprise/app/controllers/api/v1/accounts/companies/conversations_controller.rb
+D	enterprise/app/controllers/api/v1/accounts/companies/notes_controller.rb
+D	enterprise/app/controllers/enterprise/api/v1/accounts/contacts_controller.rb
+D	enterprise/app/controllers/super_admin/enterprise_base_controller.rb
+D	enterprise/app/controllers/super_admin/response_documents_controller.rb
+D	enterprise/app/controllers/super_admin/responses_controller.rb
+D	enterprise/app/jobs/captain/conversation/v1_action_classifier.rb
+D	enterprise/app/jobs/captain/conversation/v1_false_promise_handler.rb
+D	enterprise/app/services/captain/llm/assistant_action_classifier_service.rb
+D	enterprise/app/services/captain/llm/assistant_chat_service.rb
+D	enterprise/app/services/captain/llm/assistant_false_promise_service.rb
+D	enterprise/app/services/captain/llm/assistant_response_inspection_helpers.rb
+D	enterprise/app/services/captain/tools/custom_http_tool.rb
+D	lib/captain/label_suggestion_service.rb
+D	lib/integrations/openai/openai_prompts/label_suggestion.liquid
+R100	enterprise/lib/tasks/companies.rake	lib/tasks/companies.rake
+R074	lib/tasks/ruby_llm.rake	lib/tasks/llm_models.rake
+D	public/integrations/slack/bot.png
+D	public/integrations/slack/contact.png
+D	public/integrations/slack/system.png
+D	public/robots.txt
+R100	spec/enterprise/controllers/api/v1/accounts/companies/contacts_controller_spec.rb	spec/controllers/api/v1/accounts/companies/contacts_controller_spec.rb
+R097	spec/enterprise/controllers/api/v1/accounts/companies_controller_spec.rb	spec/controllers/api/v1/accounts/companies_controller_spec.rb
+R092	spec/enterprise/controllers/api/v1/accounts/contacts_controller_spec.rb	spec/controllers/api/v1/accounts/contacts_company_spec.rb
+D	spec/enterprise/services/captain/llm/assistant_action_classifier_service_spec.rb
+D	spec/enterprise/services/captain/llm/assistant_chat_service_spec.rb
+D	spec/enterprise/services/captain/llm/assistant_false_promise_service_spec.rb
+R100	spec/enterprise/jobs/companies/delete_job_spec.rb	spec/jobs/companies/delete_job_spec.rb
+R100	spec/enterprise/jobs/companies/fetch_avatars_job_spec.rb	spec/jobs/companies/fetch_avatars_job_spec.rb
+R100	spec/enterprise/jobs/companies/sync_contact_names_job_spec.rb	spec/jobs/companies/sync_contact_names_job_spec.rb
+R100	spec/enterprise/jobs/migration/company_account_batch_job_spec.rb	spec/jobs/migration/company_account_batch_job_spec.rb
+R100	spec/enterprise/jobs/migration/company_backfill_job_spec.rb	spec/jobs/migration/company_backfill_job_spec.rb
+D	spec/lib/captain/label_suggestion_service_spec.rb
+R100	spec/enterprise/models/company_spec.rb	spec/models/company_spec.rb
+R100	spec/enterprise/models/contact_company_association_spec.rb	spec/models/contact_company_association_spec.rb
+R100	spec/enterprise/policies/company_policy_spec.rb	spec/policies/company_policy_spec.rb
+R100	spec/enterprise/services/companies/business_email_detector_service_spec.rb	spec/services/companies/business_email_detector_service_spec.rb
+R100	spec/enterprise/services/contacts/company_association_service_spec.rb	spec/services/contacts/company_association_service_spec.rb
+D	swagger/parameters/portal_id.yml

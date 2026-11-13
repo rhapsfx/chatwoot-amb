@@ -3,11 +3,23 @@ import {
   OPERATOR_TYPES_2,
   OPERATOR_TYPES_3,
   OPERATOR_TYPES_6,
+  CAPTAIN_OPERATOR_TYPES,
 } from './operators';
+
+// Free-text condition judged by Captain when the rule runs; offered on every event.
+export const CAPTAIN_CONDITION = {
+  key: 'captain_condition',
+  name: 'CAPTAIN',
+  inputType: 'long_text',
+  placeholder: 'CAPTAIN',
+  maxLength: 500,
+  filterOperators: CAPTAIN_OPERATOR_TYPES,
+};
 
 export const AUTOMATIONS = {
   message_created: {
     conditions: [
+      CAPTAIN_CONDITION,
       {
         key: 'message_type',
         name: 'MESSAGE_TYPE',
@@ -15,9 +27,15 @@ export const AUTOMATIONS = {
         filterOperators: OPERATOR_TYPES_1,
       },
       {
+        key: 'private_note',
+        name: 'PRIVATE_NOTE',
+        inputType: 'search_select',
+        filterOperators: OPERATOR_TYPES_1,
+      },
+      {
         key: 'content',
         name: 'MESSAGE_CONTAINS',
-        inputType: 'comma_separated_plain_text',
+        inputType: 'multi_text',
         filterOperators: OPERATOR_TYPES_2,
       },
       {
@@ -69,6 +87,12 @@ export const AUTOMATIONS = {
         filterOperators: OPERATOR_TYPES_6,
       },
       {
+        key: 'company_name',
+        name: 'COMPANY_NAME',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_2,
+      },
+      {
         key: 'labels',
         name: 'LABELS',
         inputType: 'multi_select',
@@ -83,6 +107,14 @@ export const AUTOMATIONS = {
       {
         key: 'assign_team',
         name: 'ASSIGN_TEAM',
+      },
+      {
+        key: 'remove_assigned_agent',
+        name: 'REMOVE_ASSIGNED_AGENT',
+      },
+      {
+        key: 'remove_assigned_team',
+        name: 'REMOVE_ASSIGNED_TEAM',
       },
       {
         key: 'add_label',
@@ -117,6 +149,10 @@ export const AUTOMATIONS = {
         name: 'OPEN_CONVERSATION',
       },
       {
+        key: 'pending_conversation',
+        name: 'PENDING_CONVERSATION',
+      },
+      {
         key: 'resolve_conversation',
         name: 'RESOLVE_CONVERSATION',
       },
@@ -132,6 +168,7 @@ export const AUTOMATIONS = {
   },
   conversation_created: {
     conditions: [
+      CAPTAIN_CONDITION,
       {
         key: 'status',
         name: 'STATUS',
@@ -161,6 +198,12 @@ export const AUTOMATIONS = {
         name: 'PHONE_NUMBER',
         inputType: 'plain_text',
         filterOperators: OPERATOR_TYPES_6,
+      },
+      {
+        key: 'company_name',
+        name: 'COMPANY_NAME',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_2,
       },
       {
         key: 'referer',
@@ -198,6 +241,18 @@ export const AUTOMATIONS = {
         inputType: 'multi_select',
         filterOperators: OPERATOR_TYPES_3,
       },
+      {
+        key: 'apple_messages_group',
+        name: 'APPLE_MESSAGES_GROUP',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_3,
+      },
+      {
+        key: 'apple_messages_intent',
+        name: 'APPLE_MESSAGES_INTENT',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_3,
+      },
     ],
     actions: [
       {
@@ -207,6 +262,14 @@ export const AUTOMATIONS = {
       {
         key: 'assign_team',
         name: 'ASSIGN_TEAM',
+      },
+      {
+        key: 'remove_assigned_agent',
+        name: 'REMOVE_ASSIGNED_AGENT',
+      },
+      {
+        key: 'remove_assigned_team',
+        name: 'REMOVE_ASSIGNED_TEAM',
       },
       {
         key: 'assign_agent',
@@ -231,6 +294,10 @@ export const AUTOMATIONS = {
       {
         key: 'snooze_conversation',
         name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'pending_conversation',
+        name: 'PENDING_CONVERSATION',
       },
       {
         key: 'resolve_conversation',
@@ -248,6 +315,7 @@ export const AUTOMATIONS = {
   },
   conversation_updated: {
     conditions: [
+      CAPTAIN_CONDITION,
       {
         key: 'status',
         name: 'STATUS',
@@ -285,6 +353,12 @@ export const AUTOMATIONS = {
         filterOperators: OPERATOR_TYPES_6,
       },
       {
+        key: 'company_name',
+        name: 'COMPANY_NAME',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_2,
+      },
+      {
         key: 'assignee_id',
         name: 'ASSIGNEE_NAME',
         inputType: 'search_select',
@@ -337,6 +411,14 @@ export const AUTOMATIONS = {
         name: 'ASSIGN_TEAM',
       },
       {
+        key: 'remove_assigned_agent',
+        name: 'REMOVE_ASSIGNED_AGENT',
+      },
+      {
+        key: 'remove_assigned_team',
+        name: 'REMOVE_ASSIGNED_TEAM',
+      },
+      {
         key: 'assign_agent',
         name: 'ASSIGN_AGENT',
       },
@@ -359,6 +441,10 @@ export const AUTOMATIONS = {
       {
         key: 'snooze_conversation',
         name: 'SNOOZE_CONVERSATION',
+      },
+      {
+        key: 'pending_conversation',
+        name: 'PENDING_CONVERSATION',
       },
       {
         key: 'resolve_conversation',
@@ -376,6 +462,7 @@ export const AUTOMATIONS = {
   },
   conversation_opened: {
     conditions: [
+      CAPTAIN_CONDITION,
       {
         key: 'browser_language',
         name: 'BROWSER_LANGUAGE',
@@ -417,6 +504,12 @@ export const AUTOMATIONS = {
         name: 'PHONE_NUMBER',
         inputType: 'plain_text',
         filterOperators: OPERATOR_TYPES_6,
+      },
+      {
+        key: 'company_name',
+        name: 'COMPANY_NAME',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_2,
       },
       {
         key: 'team_id',
@@ -459,6 +552,14 @@ export const AUTOMATIONS = {
         name: 'ASSIGN_TEAM',
       },
       {
+        key: 'remove_assigned_agent',
+        name: 'REMOVE_ASSIGNED_AGENT',
+      },
+      {
+        key: 'remove_assigned_team',
+        name: 'REMOVE_ASSIGNED_TEAM',
+      },
+      {
         key: 'assign_agent',
         name: 'ASSIGN_AGENT',
       },
@@ -483,6 +584,10 @@ export const AUTOMATIONS = {
         name: 'SNOOZE_CONVERSATION',
       },
       {
+        key: 'pending_conversation',
+        name: 'PENDING_CONVERSATION',
+      },
+      {
         key: 'send_webhook_event',
         name: 'SEND_WEBHOOK_EVENT',
       },
@@ -494,6 +599,7 @@ export const AUTOMATIONS = {
   },
   conversation_resolved: {
     conditions: [
+      CAPTAIN_CONDITION,
       {
         key: 'browser_language',
         name: 'BROWSER_LANGUAGE',
@@ -537,6 +643,12 @@ export const AUTOMATIONS = {
         filterOperators: OPERATOR_TYPES_6,
       },
       {
+        key: 'company_name',
+        name: 'COMPANY_NAME',
+        inputType: 'plain_text',
+        filterOperators: OPERATOR_TYPES_2,
+      },
+      {
         key: 'team_id',
         name: 'TEAM_NAME',
         inputType: 'search_select',
@@ -569,6 +681,14 @@ export const AUTOMATIONS = {
       {
         key: 'assign_team',
         name: 'ASSIGN_TEAM',
+      },
+      {
+        key: 'remove_assigned_agent',
+        name: 'REMOVE_ASSIGNED_AGENT',
+      },
+      {
+        key: 'remove_assigned_team',
+        name: 'REMOVE_ASSIGNED_TEAM',
       },
       {
         key: 'send_email_to_team',
@@ -594,7 +714,18 @@ export const AUTOMATIONS = {
   },
 };
 
+// A monitor match is a conversation event. Additional conditions filter the
+// conversation at delivery time; the monitor itself supplies the trigger.
+AUTOMATIONS.monitor_matched = {
+  conditions: structuredClone(AUTOMATIONS.conversation_updated.conditions),
+  actions: structuredClone(AUTOMATIONS.conversation_updated.actions),
+};
+
 export const AUTOMATION_RULE_EVENTS = [
+  {
+    key: 'monitor_matched',
+    value: 'MONITOR_MATCHED',
+  },
   {
     key: 'conversation_created',
     value: 'CONVERSATION_CREATED',
@@ -627,6 +758,16 @@ export const AUTOMATION_ACTION_TYPES = [
     key: 'assign_team',
     label: 'ASSIGN_TEAM',
     inputType: 'search_select',
+  },
+  {
+    key: 'remove_assigned_agent',
+    label: 'REMOVE_ASSIGNED_AGENT',
+    inputType: null,
+  },
+  {
+    key: 'remove_assigned_team',
+    label: 'REMOVE_ASSIGNED_TEAM',
+    inputType: null,
   },
   {
     key: 'add_label',
@@ -669,6 +810,11 @@ export const AUTOMATION_ACTION_TYPES = [
     inputType: null,
   },
   {
+    key: 'pending_conversation',
+    label: 'PENDING_CONVERSATION',
+    inputType: null,
+  },
+  {
     key: 'send_webhook_event',
     label: 'SEND_WEBHOOK_EVENT',
     inputType: 'url',
@@ -699,3 +845,27 @@ export const AUTOMATION_ACTION_TYPES = [
     inputType: 'search_select',
   },
 ];
+
+export const DEFAULT_DELAY_MINUTES = 240; // 4 hours
+export const MIN_DELAY_MINUTES = 10;
+export const MAX_DELAY_MINUTES = 43200; // 30 days
+export const DEFAULT_TRIGGER_STATUS = 'pending';
+
+// A delayed rule is expressed as one meaningful trigger instead of a raw event + conditions. Each
+// trigger maps to the automation's event_name plus a preset condition: message_type for the two
+// unresponsive cases (reply-chase / awaiting-agent), or a chosen status for conversation_updated.
+export const DELAYED_TRIGGERS = [
+  { key: 'conversation_status', eventName: 'conversation_updated' },
+  {
+    key: 'customer_unresponsive',
+    eventName: 'message_created',
+    messageType: 'outgoing',
+  },
+  {
+    key: 'agent_unresponsive',
+    eventName: 'message_created',
+    messageType: 'incoming',
+  },
+];
+
+export const DEFAULT_TRIGGER = DELAYED_TRIGGERS[0].key;

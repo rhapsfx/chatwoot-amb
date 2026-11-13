@@ -7,6 +7,7 @@ import { useStore, useStoreGetters } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useUISettings } from 'dashboard/composables/useUISettings';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import CustomAttribute from 'dashboard/components/CustomAttribute.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -21,10 +22,6 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  emptyStateMessage: {
-    type: String,
-    default: '',
-  },
   // Combine static elements with custom attributes components
   // To allow for custom ordering
   staticElements: {
@@ -38,6 +35,7 @@ const getters = useStoreGetters();
 const route = useRoute();
 const { t } = useI18n();
 const { uiSettings, updateUISettings } = useUISettings();
+const { isAdmin } = useAdmin();
 
 const dragging = ref(false);
 
@@ -76,10 +74,7 @@ const toggleButtonText = computed(() =>
 const filteredCustomAttributes = computed(() =>
   attributes.value.map(attribute => {
     // Check if the attribute key exists in customAttributes
-    const hasValue = Object.hasOwnProperty.call(
-      customAttributes.value,
-      attribute.attribute_key
-    );
+    const hasValue = attribute.attribute_key in customAttributes.value;
 
     return {
       ...attribute,
@@ -254,8 +249,8 @@ onMounted(() => {
 });
 
 const evenClass = [
-  '[&>*:nth-child(odd)]:!bg-n-background [&>*:nth-child(even)]:!bg-n-slate-2',
-  'dark:[&>*:nth-child(odd)]:!bg-n-background dark:[&>*:nth-child(even)]:!bg-n-solid-1',
+  '[&>*:nth-child(odd)]:!bg-n-surface-1 [&>*:nth-child(even)]:!bg-n-slate-1',
+  'dark:[&>*:nth-child(odd)]:!bg-n-surface-2 dark:[&>*:nth-child(even)]:!bg-n-surface-1',
 ];
 </script>
 
@@ -308,12 +303,20 @@ const evenClass = [
       </template>
     </Draggable>
 
-    <p
-      v-if="!displayedElements.length && emptyStateMessage"
-      class="p-3 text-center"
-    >
-      {{ emptyStateMessage }}
-    </p>
+    <div v-if="!displayedElements.length" class="p-3">
+      <p class="text-center">
+        {{ t('CONVERSATION_CUSTOM_ATTRIBUTES.NO_RECORDS_FOUND') }}
+      </p>
+      <router-link v-if="isAdmin" :to="{ name: 'attributes_list' }">
+        <NextButton
+          faded
+          xs
+          icon="i-lucide-plus"
+          class="mt-1"
+          :label="t('CONVERSATION_CUSTOM_ATTRIBUTES.ADD_BUTTON_TEXT')"
+        />
+      </router-link>
+    </div>
     <!-- Show more and show less buttons show it if the combinedElements length is greater than 5 -->
     <div v-if="combinedElements.length > 5" class="flex items-center px-2 py-2">
       <NextButton

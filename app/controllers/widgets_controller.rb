@@ -5,6 +5,7 @@ class WidgetsController < ActionController::Base
   before_action :set_global_config
   before_action :set_web_widget
   before_action :ensure_account_is_active
+  before_action :skip_crawler_requests
   before_action :ensure_location_is_supported
   before_action :set_token
   before_action :set_contact
@@ -14,7 +15,14 @@ class WidgetsController < ActionController::Base
   private
 
   def set_global_config
-    @global_config = GlobalConfig.get('LOGO_THUMBNAIL', 'BRAND_NAME', 'WIDGET_BRAND_URL', 'DIRECT_UPLOADS_ENABLED', 'INSTALLATION_NAME')
+    @global_config = GlobalConfig.get(
+      'LOGO_THUMBNAIL',
+      'BRAND_NAME',
+      'WIDGET_BRAND_URL',
+      'DIRECT_UPLOADS_ENABLED',
+      'MAXIMUM_FILE_UPLOAD_SIZE',
+      'INSTALLATION_NAME'
+    )
   end
 
   def set_web_widget
@@ -55,6 +63,14 @@ class WidgetsController < ActionController::Base
     render json: { error: 'Account is suspended' }, status: :unauthorized unless @web_widget.inbox.account.active?
   end
 
+  def skip_crawler_requests
+    # A missing user agent alone does not identify a crawler.
+    return unless request.user_agent.present? && browser.bot?
+
+    response.headers['X-Robots-Tag'] = 'noindex'
+    head :no_content
+  end
+
   def ensure_location_is_supported; end
 
   def additional_attributes
@@ -70,12 +86,22 @@ class WidgetsController < ActionController::Base
   end
 
   def allow_iframe_requests
-    if @web_widget.allowed_domains.blank?
+    if @web_widget.allowed_domains.blank? || embedded_from_non_web_origin?
       response.headers.delete('X-Frame-Options')
     else
       domains = @web_widget.allowed_domains.split(',').map(&:strip).join(' ')
       response.headers['Content-Security-Policy'] = "frame-ancestors #{domains}"
     end
+  end
+
+  # Mobile WebViews (iOS/Android) load content from file:// or null origins,
+  # which cannot match any domain in frame-ancestors. When the per-inbox flag
+  # is enabled, skip frame-ancestors for these requests.
+  def embedded_from_non_web_origin?
+    return false unless @web_widget.allow_mobile_webview?
+
+    origin = request.headers['Origin']
+    origin.blank? || origin == 'null' || origin&.start_with?('file://')
   end
 end
 

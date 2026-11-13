@@ -3,27 +3,55 @@ import { useAlert } from 'dashboard/composables';
 import { checkFileSizeLimit } from 'shared/helpers/FileHelper';
 import { getMaxUploadSizeByChannel } from '@chatwoot/utils';
 import { DirectUpload } from 'activestorage';
-import { MAXIMUM_FILE_UPLOAD_SIZE } from 'shared/constants/messages';
+import { setDirectUploadAuthHeaders } from 'dashboard/helper/directUploadsHelper';
+import {
+  DEFAULT_MAXIMUM_FILE_UPLOAD_SIZE,
+  resolveMaximumFileUploadSize,
+} from 'shared/helpers/FileHelper';
+import { INBOX_TYPES } from 'dashboard/helper/inbox';
 
 export default {
   computed: {
     ...mapGetters({
       accountId: 'getCurrentAccountId',
     }),
+    installationLimit() {
+      return resolveMaximumFileUploadSize(
+        this.globalConfig.maximumFileUploadSize
+      );
+    },
   },
 
   methods: {
     maxSizeFor(mime) {
-      // Use default file size limit for private notes
+      // Use default/installation limit for private notes
       if (this.isOnPrivateNote) {
-        return MAXIMUM_FILE_UPLOAD_SIZE;
+        return this.installationLimit;
       }
 
-      return getMaxUploadSizeByChannel({
-        channelType: this.inbox?.channel_type,
+      const channelType = this.inbox?.channel_type;
+
+      // Apple Messages for Business supports 100 MB file uploads
+      // Per Apple MSP REST API v4.1.5 specification
+      if (channelType === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS) {
+        return 100; // 100 MB
+      }
+
+      if (!channelType || channelType === INBOX_TYPES.WEB) {
+        return this.installationLimit;
+      }
+
+      const channelLimit = getMaxUploadSizeByChannel({
+        channelType,
         medium: this.inbox?.medium, // e.g. 'sms' | 'whatsapp'
         mime, // e.g. 'image/png'
       });
+
+      if (channelLimit === DEFAULT_MAXIMUM_FILE_UPLOAD_SIZE) {
+        return this.installationLimit;
+      }
+
+      return Math.min(channelLimit, this.installationLimit);
     },
     alertOverLimit(maxSizeMB) {
       useAlert(
@@ -56,10 +84,7 @@ export default {
         `/api/v1/accounts/${this.accountId}/conversations/${this.currentChat.id}/direct_uploads`,
         {
           directUploadWillCreateBlobWithXHR: xhr => {
-            xhr.setRequestHeader(
-              'api_access_token',
-              this.currentUser.access_token
-            );
+            setDirectUploadAuthHeaders(xhr);
           },
         }
       );

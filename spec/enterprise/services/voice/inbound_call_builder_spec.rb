@@ -4,54 +4,281 @@ require 'rails_helper'
 
 RSpec.describe Voice::InboundCallBuilder do
   let(:account) { create(:account) }
-  let(:channel) { create(:channel_voice, account: account, phone_number: '+15551230001') }
+  let(:channel) { create(:channel_twilio_sms, :with_voice, account: account, phone_number: '+15551239999') }
   let(:inbox) { channel.inbox }
-
   let(:from_number) { '+15550001111' }
-  let(:to_number) { channel.phone_number }
   let(:call_sid) { 'CA1234567890abcdef' }
 
   before do
     allow(Twilio::VoiceWebhookSetupService).to receive(:new)
-      .and_return(instance_double(Twilio::VoiceWebhookSetupService, perform: "AP#{SecureRandom.hex(16)}"))
+      .and_return(instance_double(Twilio::VoiceWebhookSetupService, perform: "AP#{SecureRandom.hex(8)}"))
   end
 
-  def build_and_perform
-    described_class.new(
-      account: account,
+  def perform_builder
+    described_class.perform!(
       inbox: inbox,
-      from_number: from_number,
-      to_number: to_number,
-      call_sid: call_sid
-    ).perform
+      call_sid: call_sid,
+      caller: { source_ids: [from_number], contact_attributes: { name: from_number, phone_number: from_number } }
+    )
   end
 
-  it 'creates a new conversation with inbound ringing attributes' do
-    builder = build_and_perform
-    conversation = builder.conversation
-    expect(conversation).to be_present
-    expect(conversation.account_id).to eq(account.id)
-    expect(conversation.inbox_id).to eq(inbox.id)
-    expect(conversation.identifier).to eq(call_sid)
-    expect(conversation.additional_attributes['call_direction']).to eq('inbound')
-    expect(conversation.additional_attributes['call_status']).to eq('ringing')
+  context 'when no existing call matches call_sid' do
+    it 'creates a new conversation and Call with ringing status' do
+      call = nil
+      expect { call = perform_builder }.to change(account.conversations, :count).by(1).and change(Call, :count).by(1)
+
+      aggregate_failures do
+        expect(call).to be_a(Call)
+        expect(call.provider_call_id).to eq(call_sid)
+        expect(call.provider).to eq('twilio')
+        expect(call.direction).to eq('incoming')
+        expect(call.status).to eq('ringing')
+        expect(call.conference_sid).to eq("conf_account_#{account.id}_call_#{call.id}")
+        expect(call.meta['initiated_at']).to be_present
+        expect(call.contact.phone_number).to eq(from_number)
+      end
+    end
+
+    it 'creates a voice_call message matched to the call and linked via message_id' do
+      call = perform_builder
+      voice_message = call.conversation.messages.voice_calls.last
+
+      aggregate_failures do
+        expect(voice_message).to be_present
+        expect(voice_message.message_type).to eq('incoming')
+        expect(call.message_id).to eq(voice_message.id)
+        expect(voice_message.call).to eq(call)
+      end
+    end
+
+    it 'sets the contact name to the phone number for new callers' do
+      call = perform_builder
+
+      expect(call.contact.name).to eq(from_number)
+    end
+
+    it 'does not set conversation.identifier or write call state to additional_attributes' do
+      call = perform_builder
+      conversation = call.conversation
+
+      expect(conversation.identifier).to be_nil
+      expect(conversation.additional_attributes).not_to include('call_status', 'call_direction', 'conference_sid')
+    end
   end
 
-  it 'creates a voice_call message with ringing status' do
-    builder = build_and_perform
-    conversation = builder.conversation
-    msg = conversation.messages.voice_calls.last
-    expect(msg).to be_present
-    expect(msg.message_type).to eq('incoming')
-    expect(msg.content_type).to eq('voice_call')
-    expect(msg.content_attributes.dig('data', 'call_sid')).to eq(call_sid)
-    expect(msg.content_attributes.dig('data', 'status')).to eq('ringing')
+  context 'when ringing phones' do
+    it 'enqueues the ring push once the call is committed, when the account has both voice features' do
+      account.enable_features!('channel_voice', 'mobile_voice_push')
+
+      call = nil
+      expect { call = perform_builder }.to have_enqueued_job(Voice::VoipPushJob).with(kind_of(Integer), 'ring')
+      expect(call).to be_ringing
+    end
+
+    it 'records the agents it rings as the ring starts' do
+      account.enable_features!('channel_voice', 'mobile_voice_push')
+      agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, inbox: inbox, user: agent)
+
+      call = perform_builder
+
+      expect(call.reload.ring_state['ring_recipient_ids']).to include(agent.id)
+    end
+
+    it 'records the agents it rings in the transaction that creates the call' do
+      account.enable_features!('channel_voice', 'mobile_voice_push')
+      outer = ActiveRecord::Base.connection.open_transactions
+      recorded_inside = nil
+      allow(Voice::VoipPushService).to receive(:recipients_for).and_wrap_original do |original, call|
+        recorded_inside = ActiveRecord::Base.connection.open_transactions > outer
+        original.call(call)
+      end
+
+      perform_builder
+
+      expect(recorded_inside).to be(true)
+    end
+
+    it 'queues the ring from inside the transaction that records the agents it rings' do
+      account.enable_features!('channel_voice', 'mobile_voice_push')
+      outer = ActiveRecord::Base.connection.open_transactions
+      registered_inside = nil
+      allow(ActiveRecord).to receive(:after_all_transactions_commit).and_wrap_original do |original, &block|
+        registered_inside = ActiveRecord::Base.connection.open_transactions > outer
+        original.call(&block)
+      end
+
+      expect { perform_builder }.to have_enqueued_job(Voice::VoipPushJob)
+      expect(registered_inside).to be(true)
+    end
+
+    it 'does not ring phones without the feature' do
+      expect { perform_builder }.not_to have_enqueued_job(Voice::VoipPushJob)
+    end
+
+    it 'does not ring phones when the voice channel feature is off' do
+      account.enable_features!('mobile_voice_push')
+      account.disable_features!('channel_voice')
+
+      expect { perform_builder }.not_to have_enqueued_job(Voice::VoipPushJob)
+    end
   end
 
-  it 'returns TwiML that informs the caller we are connecting' do
-    builder = build_and_perform
-    xml = builder.twiml_response
-    expect(xml).to include('Please wait while we connect you to an agent')
-    expect(xml).to include('<Say')
+  context 'when a Call already exists for the call_sid' do
+    let(:existing_call) do
+      conversation = create(:conversation, account: account, inbox: inbox)
+      create(
+        :call,
+        account: account,
+        inbox: inbox,
+        conversation: conversation,
+        contact: conversation.contact,
+        provider_call_id: call_sid
+      )
+    end
+
+    it 'returns the existing call without creating a duplicate' do
+      existing_call
+      expect { perform_builder }.not_to change(Call, :count)
+      expect(perform_builder).to eq(existing_call)
+    end
+
+    it 'queues the ring again when the call recorded who it rings but never rang them' do
+      existing_call.update!(status: 'ringing', ring_state: { 'ring_recipient_ids' => [1] })
+
+      expect { perform_builder }.to have_enqueued_job(Voice::VoipPushJob).with(existing_call.id, 'ring')
+    end
+
+    it 'queues the ring again when its job stopped before recording an outcome' do
+      existing_call.update!(status: 'ringing', ring_state: { 'ring_recipient_ids' => [1], 'rung_user_ids' => [1] })
+
+      expect { perform_builder }.to have_enqueued_job(Voice::VoipPushJob).with(existing_call.id, 'ring')
+    end
+
+    it 'does not queue another ring once the ring has an outcome' do
+      existing_call.update!(status: 'ringing', ring_state: { 'ring_recipient_ids' => [1], 'rung_user_ids' => [1], 'unreached_user_ids' => [] })
+
+      expect { perform_builder }.not_to have_enqueued_job(Voice::VoipPushJob)
+    end
+  end
+
+  context 'when a ContactInbox already exists for the source_id (different contact)' do
+    let!(:original_contact) { create(:contact, account: account, phone_number: '+15550009999') }
+    let!(:original_contact_inbox) do
+      create(:contact_inbox, contact: original_contact, inbox: inbox, source_id: from_number)
+    end
+
+    it 'reuses the existing ContactInbox instead of raising RecordNotUnique' do
+      call = perform_builder
+
+      expect(call.contact).to eq(original_contact)
+      expect(call.conversation.contact_inbox).to eq(original_contact_inbox)
+    end
+  end
+
+  context 'when a WhatsApp call shares a BSUID with an existing ContactInbox' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud',
+                                provider_config: { 'phone_number_id' => '123', 'source' => 'embedded_signup', 'calling_enabled' => true },
+                                validate_provider_config: false, sync_templates: false)
+    end
+    let(:whatsapp_inbox) { whatsapp_channel.inbox }
+    let!(:stored_contact) { create(:contact, account: account) }
+    let!(:stored_contact_inbox) do
+      create(:contact_inbox, contact: stored_contact, inbox: whatsapp_inbox, source_id: 'IN.2081978709342942')
+    end
+
+    before { account.enable_features!('channel_voice') }
+
+    # A dashboard merge leaves unrelated identities on one contact, so reuse has to be scoped to
+    # the resolved ContactInbox. A contact-wide lookup would answer this call through the other
+    # identity's source_id.
+    it 'does not reuse a conversation that belongs to another identity on the same contact' do
+      other_contact_inbox = create(:contact_inbox, contact: stored_contact, inbox: whatsapp_inbox, source_id: '5541977776666')
+      foreign = create(:conversation, account: account, inbox: whatsapp_inbox, contact: stored_contact,
+                                      contact_inbox: other_contact_inbox, status: :open)
+
+      call = described_class.perform!(
+        inbox: whatsapp_inbox,
+        call_sid: 'wacall_bsuid_merge',
+        provider: :whatsapp,
+        caller: { source_ids: ['IN.2081978709342942'], contact_attributes: { name: 'Ada Lovelace' } }
+      )
+
+      expect(call.conversation).not_to eq(foreign)
+      expect(call.conversation.contact_inbox).to eq(stored_contact_inbox)
+    end
+
+    it 'leaves the phone conversation untouched instead of repointing it' do
+      phone_contact_inbox = create(:contact_inbox, contact: stored_contact, inbox: whatsapp_inbox, source_id: '5541988887777')
+      phone_conversation = create(:conversation, account: account, inbox: whatsapp_inbox, contact: stored_contact,
+                                                 contact_inbox: phone_contact_inbox, status: :open)
+
+      described_class.perform!(
+        inbox: whatsapp_inbox,
+        call_sid: 'wacall_bsuid_no_repoint',
+        provider: :whatsapp,
+        caller: { source_ids: ['IN.2081978709342942'], contact_attributes: { name: 'Ada Lovelace' } }
+      )
+
+      expect(phone_conversation.reload.contact_inbox_id).to eq(phone_contact_inbox.id)
+    end
+
+    # The lower-level builder honors the leading source_id it is given. The WhatsApp-specific
+    # identity builder decides whether that should be the phone or BSUID for a real webhook.
+    it 'creates the preferred contact inbox when the caller only had a secondary alias' do
+      legacy_contact = create(:contact, account: account)
+      create(:contact_inbox, contact: legacy_contact, inbox: whatsapp_inbox, source_id: '5541966665555')
+
+      call = described_class.perform!(
+        inbox: whatsapp_inbox,
+        call_sid: 'wacall_bsuid_adopt',
+        provider: :whatsapp,
+        caller: { source_ids: ['IN.3092089810453053', '5541966665555'],
+                  contact_attributes: { name: 'Grace Hopper', phone_number: '+5541966665555' } }
+      )
+
+      expect(call.contact).to eq(legacy_contact)
+      expect(call.conversation.contact_inbox.source_id).to eq('IN.3092089810453053')
+    end
+
+    # Closes the gap: the contact was keyed by BSUID, but the call also carries a phone.
+    # Matching across every source_id reuses the contact instead of forking on the phone.
+    #
+    # The order matters and is the caller's contract: the builder trusts the leading source_id as
+    # the identity to land on.
+    it 'reuses the contact by matching any source_id, not just the first' do
+      call = described_class.perform!(
+        inbox: whatsapp_inbox,
+        call_sid: 'wacall_bsuid_1',
+        provider: :whatsapp,
+        caller: { source_ids: ['IN.2081978709342942', '5541988887777'],
+                  contact_attributes: { name: 'Ada Lovelace', phone_number: '+5541988887777' } }
+      )
+
+      expect(call.contact).to eq(stored_contact)
+      expect(call.conversation.contact_inbox).to eq(stored_contact_inbox)
+    end
+  end
+
+  context 'when the inbox has lock_to_single_conversation enabled' do
+    let!(:contact) { create(:contact, account: account, phone_number: from_number) }
+    let!(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: inbox, source_id: from_number) }
+    let!(:existing_open_conversation) do
+      create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox, status: :open)
+    end
+
+    before { inbox.update!(lock_to_single_conversation: true) }
+
+    it 'reuses the most recent non-resolved conversation' do
+      call = nil
+      expect { call = perform_builder }.not_to change(account.conversations, :count)
+      expect(call.conversation).to eq(existing_open_conversation)
+    end
+
+    it 'still creates a new Call and voice_call message on the reused conversation' do
+      expect { perform_builder }.to change(Call, :count).by(1)
+                                                        .and change { existing_open_conversation.reload.messages.voice_calls.count }.by(1)
+    end
   end
 end

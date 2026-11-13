@@ -11,6 +11,7 @@ RSpec.describe LlmFormatter::ConversationLlmFormatter do
         expected_output = [
           "Conversation ID: ##{conversation.display_id}",
           "Channel: #{conversation.inbox.channel.name}",
+          "Created At: #{conversation.created_at}",
           'Message History:',
           'No messages in this conversation'
         ].join("\n")
@@ -30,6 +31,14 @@ RSpec.describe LlmFormatter::ConversationLlmFormatter do
 
         create(
           :message,
+          :bot_message,
+          conversation: conversation,
+          message_type: 'outgoing',
+          content: 'Thanks for reaching out, an agent will reach out to you soon'
+        )
+
+        create(
+          :message,
           conversation: conversation,
           message_type: 'outgoing',
           content: 'How can I assist you today?'
@@ -38,9 +47,11 @@ RSpec.describe LlmFormatter::ConversationLlmFormatter do
         expected_output = [
           "Conversation ID: ##{conversation.display_id}",
           "Channel: #{conversation.inbox.channel.name}",
+          "Created At: #{conversation.created_at}",
           'Message History:',
           'User: Hello, I need help',
-          'Support agent: How can I assist you today?',
+          'Bot: Thanks for reaching out, an agent will reach out to you soon',
+          'Support Agent: How can I assist you today?',
           ''
         ].join("\n")
 
@@ -53,6 +64,7 @@ RSpec.describe LlmFormatter::ConversationLlmFormatter do
         expected_output = [
           "Conversation ID: ##{conversation.display_id}",
           "Channel: #{conversation.inbox.channel.name}",
+          "Created At: #{conversation.created_at}",
           'Message History:',
           'No messages in this conversation',
           "Contact Details: #{conversation.contact.to_llm_text}"
@@ -77,6 +89,7 @@ RSpec.describe LlmFormatter::ConversationLlmFormatter do
         expected_output = [
           "Conversation ID: ##{conversation.display_id}",
           "Channel: #{conversation.inbox.channel.name}",
+          "Created At: #{conversation.created_at}",
           'Message History:',
           'No messages in this conversation',
           'Conversation Attributes:',

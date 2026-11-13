@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useToggle } from '@vueuse/core';
 import { useI18n } from 'vue-i18n';
 import { dynamicTime } from 'shared/helpers/timeHelper';
+import { useExactTimestamp } from 'shared/composables/useExactTimestamp';
 import { usePolicy } from 'dashboard/composables/usePolicy';
 
 import CardLayout from 'dashboard/components-next/CardLayout.vue';
@@ -29,6 +30,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['action']);
+
+const exactTimestamp = useExactTimestamp();
+
 const { checkPermissions } = usePolicy();
 
 const { t } = useI18n();
@@ -76,12 +80,11 @@ const handleAction = ({ action, value }) => {
 <template>
   <CardLayout>
     <div class="flex justify-between w-full gap-1">
-      <router-link
-        :to="{ name: 'captain_assistants_edit', params: { assistantId: id } }"
-        class="text-base text-n-slate-12 line-clamp-1 hover:underline transition-colors"
+      <h6
+        class="text-base font-normal text-n-slate-12 line-clamp-1 hover:underline transition-colors"
       >
         {{ name }}
-      </router-link>
+      </h6>
       <div class="flex items-center gap-2">
         <div
           v-on-clickaway="() => toggleDropdown(false)"
@@ -107,7 +110,13 @@ const handleAction = ({ action, value }) => {
       <span class="text-sm truncate text-n-slate-11">
         {{ description || 'Description not available' }}
       </span>
-      <span class="text-sm text-n-slate-11 line-clamp-1 shrink-0">
+      <span
+        v-tooltip.top="{
+          content: exactTimestamp(updatedAt),
+          delay: { show: 500, hide: 0 },
+        }"
+        class="text-sm text-n-slate-11 line-clamp-1 shrink-0"
+      >
         {{ lastUpdatedAt }}
       </span>
     </div>

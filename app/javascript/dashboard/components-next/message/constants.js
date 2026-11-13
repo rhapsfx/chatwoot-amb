@@ -49,6 +49,10 @@ export const ATTACHMENT_TYPES = {
   STORY_MENTION: 'story_mention',
   CONTACT: 'contact',
   IG_REEL: 'ig_reel',
+  EMBED: 'embed',
+  IG_POST: 'ig_post',
+  IG_STORY: 'ig_story',
+  IG_STORY_REPLY: 'ig_story_reply',
 };
 
 export const CONTENT_TYPES = {
@@ -65,6 +69,15 @@ export const CONTENT_TYPES = {
   INTEGRATIONS: 'integrations',
   STICKER: 'sticker',
   VOICE_CALL: 'voice_call',
+  APPLE_LIST_PICKER: 'apple_list_picker',
+  APPLE_TIME_PICKER: 'apple_time_picker',
+  APPLE_QUICK_REPLY: 'apple_quick_reply',
+  APPLE_FORM: 'apple_form',
+  APPLE_PAY: 'apple_pay',
+  APPLE_RICH_LINK: 'apple_rich_link',
+  APPLE_FORM_RESPONSE: 'apple_form_response',
+  APPLE_CUSTOM_APP: 'apple_custom_app',
+  APPLE_INVITATION: 'apple_invitation',
 };
 
 export const MEDIA_TYPES = [
@@ -73,3 +86,37 @@ export const MEDIA_TYPES = [
   ATTACHMENT_TYPES.AUDIO,
   ATTACHMENT_TYPES.IG_REEL,
 ];
+
+export const NON_FILE_TYPES = [
+  ATTACHMENT_TYPES.LOCATION,
+  ATTACHMENT_TYPES.FALLBACK,
+  ATTACHMENT_TYPES.CONTACT,
+];
+
+export const VOICE_CALL_STATUS = {
+  IN_PROGRESS: 'in-progress',
+  RINGING: 'ringing',
+  COMPLETED: 'completed',
+  NO_ANSWER: 'no-answer',
+  FAILED: 'failed',
+  REJECTED: 'rejected',
+};
+
+export const VOICE_CALL_DIRECTION = {
+  INBOUND: 'inbound',
+  INCOMING: 'incoming',
+  OUTGOING: 'outgoing',
+  ONGOING: 'ongoing',
+  OUTBOUND: 'outbound',
+};
+
+export const VOICE_CALL_OUTBOUND_INIT_STATUS = {
+  LOCKED: 'locked',
+  PERMISSION_REQUESTED: 'permission_requested',
+  PERMISSION_PENDING: 'permission_pending',
+};
+
+export const VOICE_CALL_END_REASON = {
+  AGENT_REJECTED: 'agent_rejected',
+  OUTSIDE_WORKING_HOURS: 'outside_working_hours',
+};

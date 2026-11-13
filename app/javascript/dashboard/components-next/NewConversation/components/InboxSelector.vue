@@ -6,6 +6,7 @@ import { generateLabelForContactableInboxesList } from 'dashboard/components-nex
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
+import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const props = defineProps({
   targetInbox: {
@@ -27,6 +28,14 @@ const props = defineProps({
   hasErrors: {
     type: Boolean,
     default: false,
+  },
+  isFetchingInboxes: {
+    type: Boolean,
+    default: false,
+  },
+  removable: {
+    type: Boolean,
+    default: true,
   },
 });
 
@@ -52,12 +61,14 @@ const targetInboxLabel = computed(() => {
     </label>
     <div
       v-if="targetInbox"
-      class="flex items-center gap-1.5 rounded-md bg-n-alpha-2 truncate ltr:pl-3 rtl:pr-3 ltr:pr-1 rtl:pl-1 h-7 min-w-0"
+      class="flex items-center gap-1.5 rounded-md bg-n-alpha-2 truncate h-7 min-w-0"
+      :class="removable ? 'ltr:pl-3 rtl:pr-3 ltr:pr-1 rtl:pl-1' : 'px-3'"
     >
       <span class="text-sm truncate text-n-slate-12">
         {{ targetInboxLabel }}
       </span>
       <Button
+        v-if="removable"
         variant="ghost"
         icon="i-lucide-x"
         color="slate"
@@ -71,7 +82,9 @@ const targetInboxLabel = computed(() => {
       v-on-click-outside="() => emit('toggleDropdown', false)"
       class="relative flex items-center h-7"
     >
+      <Spinner v-if="isFetchingInboxes" :size="16" />
       <Button
+        v-else
         :label="t('COMPOSE_NEW_CONVERSATION.FORM.INBOX_SELECTOR.BUTTON')"
         variant="link"
         size="sm"
@@ -83,7 +96,7 @@ const targetInboxLabel = computed(() => {
       <DropdownMenu
         v-if="contactableInboxesList?.length > 0 && showInboxesDropdown"
         :menu-items="contactableInboxesList"
-        class="ltr:left-0 rtl:right-0 z-[100] top-8 overflow-y-auto max-h-60 w-fit max-w-sm dark:!outline-n-slate-5"
+        class="ltr:left-0 rtl:right-0 z-[100] top-8 max-h-56 w-fit max-w-sm dark:!outline-n-slate-5"
         @action="emit('handleInboxAction', $event)"
       />
     </div>

@@ -1,25 +1,41 @@
 <script>
 export default {
+  props: {
+    ssoAccountId: { type: String, default: '' },
+    redirectUrl: {
+      type: String,
+      default: '',
+    },
+  },
   methods: {
     getGoogleAuthUrl() {
       // Ideally a request to /auth/google_oauth2 should be made
       // Creating the URL manually because the devise-token-auth with
       // omniauth has a standing issue on redirecting the post request
       // https://github.com/lynndylanhurley/devise_token_auth/issues/1466
-      const baseUrl =
-        'https://accounts.google.com/o/oauth2/auth/oauthchooseaccount';
+      const baseUrl = 'https://accounts.google.com/o/oauth2/auth';
       const clientId = window.chatwootConfig.googleOAuthClientId;
       const redirectUri = window.chatwootConfig.googleOAuthCallbackUrl;
       const responseType = 'code';
       const scope = 'email profile';
 
       // Build the query string
-      const queryString = new URLSearchParams({
+      const query = {
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: responseType,
         scope: scope,
-      }).toString();
+      };
+      if (this.redirectUrl) {
+        query.state = this.redirectUrl;
+      }
+      if (this.ssoAccountId) {
+        query.state = JSON.stringify({
+          redirect_url: this.redirectUrl,
+          sso_account_id: this.ssoAccountId,
+        });
+      }
+      const queryString = new URLSearchParams(query).toString();
 
       // Construct the full URL
       return `${baseUrl}?${queryString}`;
