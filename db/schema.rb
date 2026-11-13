@@ -1006,9 +1006,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_19_143116) do
     t.string "error_code"
     t.datetime "matched_at"
     t.datetime "evaluated_at"
-    t.datetime "first_matched_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "first_matched_at"
     t.index ["account_id"], name: "index_conversation_monitor_evaluations_on_account_id"
     t.index ["conversation_id"], name: "index_conversation_monitor_evaluations_on_conversation_id"
     t.index ["monitor_id", "conversation_id"], name: "index_monitor_evaluations_unique", unique: true
@@ -1045,10 +1045,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_19_143116) do
     t.string "error_code"
     t.datetime "requested_at"
     t.datetime "activity_at"
-    t.bigint "live_activity_revision", default: 0, null: false
-    t.datetime "live_activity_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "live_activity_revision", default: 0, null: false
+    t.datetime "live_activity_at"
     t.index ["account_id"], name: "index_conversation_monitor_work_items_on_account_id"
     t.index ["conversation_id"], name: "index_conversation_monitor_work_items_on_conversation_id", unique: true
     t.index ["due_at"], name: "index_monitor_work_due", where: "(due_at IS NOT NULL)"
@@ -1146,8 +1146,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_19_143116) do
     t.datetime "waiting_since"
     t.text "cached_label_list"
     t.bigint "assignee_agent_bot_id"
-    t.string "ai_assignee_type"
     t.datetime "status_changed_at"
+    t.string "ai_assignee_type"
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"
     t.index ["account_id", "inbox_id", "status", "assignee_id"], name: "conv_acid_inbid_stat_asgnid_idx"

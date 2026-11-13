@@ -30,10 +30,18 @@
       "Bash(git -C /Users/rhaps/LocalGit/chatwoot -c core.ignorecase=false ls-tree HEAD app/javascript/dashboard/components-next/)",
       "Bash(git -C /Users/rhaps/LocalGit/chatwoot status --short)",
       "mcp__safari-mcp-stp__navigate_to_url",
-      "mcp__safari-mcp-stp__get_page_content"
+      "mcp__safari-mcp-stp__get_page_content",
+      "Bash(git filter-repo *)",
+      "Bash(pnpm audit *)",
+      "Bash(docker info *)",
+      "Bash(sed -i '' 's/\"axios\": \"^1.15.0\"/\"axios\": \"^1.20.0\"/; s/\"dompurify\": \"3.4.13\"/\"dompurify\": \"3.4.17\"/; s/\"js-cookie\": \"^3.0.5\"/\"js-cookie\": \"^3.0.7\"/; s/\"markdown-it\": \"^14.1.1\"/\"markdown-it\": \"^14.3.3\"/; s/\"vue\": \"^3.5.12\"/\"vue\": \"^3.5.42\"/; s/\"vite\": \"6.4.2\"/\"vite\": \"6.4.4\"/' package.json)",
+      "Bash(python3 -)",
+      "Bash(pnpm install *)",
+      "Bash(sed -i *)"
     ],
     "additionalDirectories": [
-      "/tmp"
+      "/tmp",
+      "/Users/rhaps/LocalGit/chatwoot"
     ]
   }
 }

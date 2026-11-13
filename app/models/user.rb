@@ -11,6 +11,7 @@
 #  current_sign_in_at     :datetime
 #  current_sign_in_ip     :string
 #  custom_attributes      :jsonb
+#  device_trust_version   :integer          default(0), not null
 #  display_name           :string
 #  email                  :string
 #  encrypted_password     :string           default(""), not null

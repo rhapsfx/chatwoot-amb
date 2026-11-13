@@ -4,6 +4,7 @@
 #
 #  id                :integer          not null, primary key
 #  page_access_token :string           not null
+#  provider_name     :string
 #  user_access_token :string           not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null

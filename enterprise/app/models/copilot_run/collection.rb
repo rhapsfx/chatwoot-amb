@@ -24,6 +24,8 @@
 #
 # Indexes
 #
+#  index_copilot_runs_awaiting_approval        (status) WHERE ((status)::text = 'awaiting_approval'::text)
+#  index_copilot_runs_claimable                (status) WHERE ((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))
 #  index_copilot_runs_on_account_id            (account_id)
 #  index_copilot_runs_on_copilot_message_id    (copilot_message_id) UNIQUE
 #  index_copilot_runs_on_copilot_thread_id     (copilot_thread_id)

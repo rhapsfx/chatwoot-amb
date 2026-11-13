@@ -7,7 +7,10 @@
 #  associated_type :string
 #  auditable_type  :string
 #  audited_changes :jsonb
+#  city            :string
 #  comment         :string
+#  country         :string
+#  country_code    :string
 #  remote_address  :string
 #  request_uuid    :string
 #  user_type       :string

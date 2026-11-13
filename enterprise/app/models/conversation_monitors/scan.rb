@@ -1,3 +1,28 @@
+# == Schema Information
+#
+# Table name: conversation_monitor_scans
+#
+#  id                 :bigint           not null, primary key
+#  cancelled_at       :datetime
+#  collection_version :bigint           not null
+#  cursor             :bigint           default(0), not null
+#  ended_at           :datetime         not null
+#  enumerated_at      :datetime
+#  kind               :string           not null
+#  started_at         :datetime         not null
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  monitor_id         :bigint           not null
+#
+# Indexes
+#
+#  index_monitor_scans_initial       (monitor_id) UNIQUE WHERE ((kind)::text = 'initial'::text)
+#  index_monitor_scans_version_kind  (monitor_id,collection_version,kind) UNIQUE
+#
+# Foreign Keys
+#
+#  fk_rails_...  (monitor_id => conversation_monitors.id) ON DELETE => cascade
+#
 class ConversationMonitors::Scan < ApplicationRecord
   self.table_name = 'conversation_monitor_scans'
 

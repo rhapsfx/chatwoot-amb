@@ -1,3 +1,23 @@
+# == Schema Information
+#
+# Table name: conversation_monitor_daily_usages
+#
+#  id               :bigint           not null, primary key
+#  calls_count      :integer          default(0), not null
+#  limit_reached_at :datetime
+#  usage_date       :date             not null
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  account_id       :bigint           not null
+#
+# Indexes
+#
+#  index_monitor_daily_usage_unique  (account_id,usage_date) UNIQUE
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id) ON DELETE => cascade
+#
 class ConversationMonitors::DailyUsage < ApplicationRecord
   self.table_name = 'conversation_monitor_daily_usages'
 

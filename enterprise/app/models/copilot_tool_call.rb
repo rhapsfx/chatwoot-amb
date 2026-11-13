@@ -17,6 +17,7 @@
 # Indexes
 #
 #  index_copilot_tool_calls_on_copilot_run_id_and_call_id  (copilot_run_id,call_id) UNIQUE
+#  index_copilot_tool_calls_running                        (status) WHERE ((status)::text = 'running'::text)
 #
 class CopilotToolCall < ApplicationRecord
   belongs_to :copilot_run

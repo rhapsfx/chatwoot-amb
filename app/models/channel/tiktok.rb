@@ -5,6 +5,7 @@
 #  id                       :bigint           not null, primary key
 #  access_token             :string           not null
 #  expires_at               :datetime         not null
+#  provider_name            :string
 #  refresh_token            :string           not null
 #  refresh_token_expires_at :datetime         not null
 #  created_at               :datetime         not null
