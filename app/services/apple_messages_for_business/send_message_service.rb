@@ -397,6 +397,8 @@ class AppleMessagesForBusiness::SendMessageService
 
     base_data[:receivedMessage] = without_unbacked_image(base_data[:receivedMessage], identifiers)
     base_data[:replyMessage] = without_unbacked_image(base_data[:replyMessage], identifiers)
+    strip_unbacked_reference_images(base_data, identifiers)
+
     base_data
   end
 
@@ -408,6 +410,25 @@ class AppleMessagesForBusiness::SendMessageService
 
     Rails.logger.warn "[AMB Send] Dropping imageIdentifier #{identifier.inspect} - image not in data.images"
     message.except(:imageIdentifier, 'imageIdentifier')
+  end
+
+  # List picker items and time picker events carry their own imageIdentifier.
+  def strip_unbacked_reference_images(base_data, identifiers)
+    targets = Array(base_data.dig(:data, :event)).dup
+    targets.concat(Array(base_data.dig(:data, :listPicker, :sections)).flat_map { |section| Array(section[:items] || section['items']) })
+
+    targets.each { |target| strip_unbacked_image!(target, identifiers) }
+  end
+
+  def strip_unbacked_image!(target, identifiers)
+    return unless target.is_a?(Hash)
+
+    identifier = target[:imageIdentifier] || target['imageIdentifier']
+    return if identifier.blank? || identifiers.include?(identifier)
+
+    Rails.logger.warn "[AMB Send] Dropping imageIdentifier #{identifier.inspect} - image not in data.images"
+    target.delete(:imageIdentifier)
+    target.delete('imageIdentifier')
   end
 
   # Apple's spec requires requestIdentifier to be a valid RFC 4122 UUID. Prefer a caller-supplied

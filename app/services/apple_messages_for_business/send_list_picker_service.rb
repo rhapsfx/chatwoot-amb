@@ -59,18 +59,14 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
   def build_interactive_data
     base_data = super
 
-    # Replace the raw images with properly formatted ones (base64 data)
-    if content_attributes['images'].present?
-      base_data[:data][:images] = build_images_array
-      Rails.logger.info "[AMB ListPicker] Added #{base_data[:data][:images].length} formatted images to payload"
-      # Debug: log image identifiers being sent
-      Rails.logger.info "[AMB ListPicker] Image identifiers: #{base_data[:data][:images].pluck(:identifier).join(', ')}"
-      # Debug: log first 100 chars of first image data
-      if base_data[:data][:images].first
-        first_img = base_data[:data][:images].first
-        Rails.logger.info "[AMB ListPicker] First image data present: #{first_img[:data].present?}, length: #{first_img[:data]&.length}"
-      end
-    end
+    # Resolve every image the message references (received/reply and list items).
+    # Templates usually carry identifiers only - the artwork lives in
+    # AppleListPickerImage for the inbox - so this must not depend on an embedded
+    # images array in content_attributes.
+    images = build_images_array
+    base_data[:data][:images] = images if images.present?
+
+    Rails.logger.info "[AMB ListPicker] Attached #{images.length} image(s) to payload"
 
     drop_unbacked_image_identifiers(base_data)
   end
