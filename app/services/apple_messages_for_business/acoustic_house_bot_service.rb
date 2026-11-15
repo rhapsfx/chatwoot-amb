@@ -452,7 +452,14 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       when 'AHA3'
         handle_form_or_name_prompt
       when 'AHB1'
-        handle_form_response
+        # The form may never arrive (device that can't render it, or a rejected
+        # send): accept a typed name instead of waiting for a form response.
+        if @message.content_attributes.dig('form_response', 'selections').blank? && @message.content.present?
+          update_bot_state('AHB1_2')
+          handle_text_name_input
+        else
+          handle_form_response
+        end
       when 'AHB1_2'
         handle_text_name_input
       when 'AHB2'
