@@ -74,9 +74,8 @@ class AppleMessagesForBusiness::AuthenticationCompleteJob < ApplicationJob
 
   def create_activity_message(conversation, user_data, provider)
     # Create an activity message showing authentication success
-    content = "✅ Authenticated via #{provider.capitalize}\n" \
-              "Name: #{user_data['name']}\n" \
-              "Email: #{user_data['email']}"
+    content = "✅ Authenticated via #{provider.to_s.capitalize}\n" \
+              "Connected as: #{identity_label(user_data)}"
 
     Message.create!(
       conversation: conversation,
@@ -95,13 +94,20 @@ class AppleMessagesForBusiness::AuthenticationCompleteJob < ApplicationJob
     Rails.logger.info "[AMB Auth] Created activity message for conversation #{conversation.id}"
   end
 
-  def send_confirmation_message(channel, destination_id, user_data, provider, conversation)
-    Rails.logger.info "[AMB Auth] Preparing to send confirmation message to #{user_data['name']}"
+  # "Name (email)", whichever parts the provider returned.
+  def identity_label(user_data)
+    name = user_data['name'].presence
+    email = user_data['email'].presence
 
-    # Send a confirmation message to the user via Apple Messages
-    message_content = "✅ Authentication Successful!\n\n" \
-                      "Welcome, #{user_data['name']}!\n" \
-                      "You've successfully authenticated with #{provider.capitalize}."
+    return "#{name} (#{email})" if name && email
+
+    name || email || 'your account'
+  end
+
+  def send_confirmation_message(channel, destination_id, user_data, provider, conversation)
+    # Tell the user which identity is now linked, not just that it worked.
+    message_content = "✅ Authentication successful\n\n" \
+                      "You're now connected with #{provider.to_s.capitalize} as #{identity_label(user_data)}."
 
     # Create outgoing message in conversation
     message = Message.create!(
@@ -122,8 +128,6 @@ class AppleMessagesForBusiness::AuthenticationCompleteJob < ApplicationJob
       message: message
     )
     result = send_service.perform
-    Rails.logger.info "[AMB Auth] SendMessageService result: #{result.inspect}"
-
-    Rails.logger.info '[AMB Auth] Sent confirmation message to user via Apple Messages'
+    Rails.logger.info "[AMB Auth] Confirmation message sent: #{result.inspect}"
   end
 end
