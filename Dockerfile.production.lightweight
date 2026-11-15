@@ -17,10 +17,25 @@ RUN apt-get update -qq && \
     ca-certificates \
     tzdata \
     shared-mime-info \
+    xz-utils \
     git && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Node.js pinned to an exact patched release (package.json engines.node
+# is "24.x"). Was the EOL Node 20 line, which no longer receives security fixes.
+ARG NODE_VERSION=24.22.3
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in \
+      amd64) node_arch="x64" ;; \
+      arm64) node_arch="arm64" ;; \
+      *) echo "Unsupported architecture for Node.js: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f /tmp/node.tar.xz; \
+    node --version; \
+    npm --version
 
 # Set production environment
 ENV RAILS_ENV=production \

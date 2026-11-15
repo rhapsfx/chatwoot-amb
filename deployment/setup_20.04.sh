@@ -900,7 +900,7 @@ function upgrade_redis() {
 #   None
 ##############################################################################
 function upgrade_node() {
-  local minimum_node_version="24.22.1"
+  local minimum_node_version="24.22.3"
 
   echo "Checking Node.js version..."
 
