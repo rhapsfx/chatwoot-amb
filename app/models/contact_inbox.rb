@@ -9,7 +9,7 @@
 #  updated_at    :datetime         not null
 #  contact_id    :bigint
 #  inbox_id      :bigint
-#  source_id     :string           not null
+#  source_id     :text             not null
 #
 # Indexes
 #
@@ -51,6 +51,10 @@ class ContactInbox < ApplicationRecord
     }
   end
 
+  def anonymous_caller?
+    false
+  end
+
   def current_conversation
     conversations.last
   end
@@ -77,3 +81,5 @@ class ContactInbox < ApplicationRecord
     validate_whatsapp_source_id if inbox.channel_type == 'Channel::Whatsapp'
   end
 end
+
+ContactInbox.prepend_mod_with('ContactInbox')

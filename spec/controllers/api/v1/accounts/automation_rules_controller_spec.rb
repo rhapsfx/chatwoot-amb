@@ -69,6 +69,12 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
               'action_params': [1]
             },
             {
+              'action_name': :remove_assigned_agent
+            },
+            {
+              'action_name': :remove_assigned_team
+            },
+            {
               'action_name': :add_label,
               'action_params': %w[support priority_customer]
             }
@@ -141,20 +147,13 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
       end
 
       it 'Saves file in the automation actions to send an attachments' do
-        file = fixture_file_upload(Rails.root.join('spec/assets/avatar.png'), 'image/png')
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
 
         expect(account.automation_rules.count).to eq(0)
-
-        post "/api/v1/accounts/#{account.id}/upload/",
-             headers: administrator.create_new_auth_token,
-             params: { attachment: file }
-
-        expect(response).to have_http_status(:success)
-
-        blob = response.parsed_body
-
-        expect(blob['blob_key']).to be_present
-        expect(blob['blob_id']).to be_present
 
         params[:actions] = [
           {
@@ -163,7 +162,7 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
           },
           {
             'action_name': :send_attachment,
-            'action_params': [blob['blob_id']]
+            'action_params': [blob.signed_id]
           }
         ]
 
@@ -177,29 +176,25 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
       end
 
       it 'Saves files in the automation actions to send multiple attachments' do
-        file_1 = fixture_file_upload(Rails.root.join('spec/assets/avatar.png'), 'image/png')
-        file_2 = fixture_file_upload(Rails.root.join('spec/assets/sample.png'), 'image/png')
-
-        post "/api/v1/accounts/#{account.id}/upload/",
-             headers: administrator.create_new_auth_token,
-             params: { attachment: file_1 }
-
-        blob_1 = response.parsed_body
-
-        post "/api/v1/accounts/#{account.id}/upload/",
-             headers: administrator.create_new_auth_token,
-             params: { attachment: file_2 }
-
-        blob_2 = response.parsed_body
+        blob_1 = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+        blob_2 = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/sample.png').open,
+          filename: 'sample.png',
+          content_type: 'image/png'
+        )
 
         params[:actions] = [
           {
             'action_name': :send_attachment,
-            'action_params': [blob_1['blob_id']]
+            'action_params': [blob_1.signed_id]
           },
           {
             'action_name': :send_attachment,
-            'action_params': [blob_2['blob_id']]
+            'action_params': [blob_2.signed_id]
           }
         ]
 
@@ -209,6 +204,46 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
 
         automation_rule = account.automation_rules.first
         expect(automation_rule.files.count).to eq(2)
+      end
+
+      it 'returns error for invalid attachment blob_id' do
+        params[:actions] = [
+          {
+            'action_name': :send_attachment,
+            'action_params': ['invalid_blob_id']
+          }
+        ]
+
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: params
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq(I18n.t('errors.attachments.invalid'))
+      end
+
+      it 'stores the original blob_id in action_params after create' do
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+
+        params[:actions] = [
+          {
+            'action_name': :send_attachment,
+            'action_params': [blob.signed_id]
+          }
+        ]
+
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: params
+
+        automation_rule = account.automation_rules.first
+        attachment_action = automation_rule.actions.find { |a| a['action_name'] == 'send_attachment' }
+        expect(attachment_action['action_params'].first).to be_a(Integer)
+        expect(attachment_action['action_params'].first).to eq(automation_rule.files.first.blob_id)
       end
     end
   end
@@ -328,6 +363,113 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
         expect(body[:payload][:active]).to be(false)
         expect(automation_rule.reload.active).to be(false)
       end
+
+      it 'allows update with existing blob_id' do
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+
+        automation_rule.update!(actions: [{ 'action_name' => 'send_attachment', 'action_params' => [blob.id] }])
+        automation_rule.files.attach(blob)
+
+        update_params[:actions] = [
+          {
+            'action_name': :send_attachment,
+            'action_params': [blob.id]
+          }
+        ]
+
+        patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+              headers: administrator.create_new_auth_token,
+              params: update_params
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'returns error for invalid blob_id on update' do
+        update_params[:actions] = [
+          {
+            'action_name': :send_attachment,
+            'action_params': [999_999]
+          }
+        ]
+
+        patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+              headers: administrator.create_new_auth_token,
+              params: update_params
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq(I18n.t('errors.attachments.invalid'))
+      end
+
+      it 'allows adding new attachment on update with signed blob_id' do
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: Rails.root.join('spec/assets/avatar.png').open,
+          filename: 'avatar.png',
+          content_type: 'image/png'
+        )
+
+        update_params[:actions] = [
+          {
+            'action_name': :send_attachment,
+            'action_params': [blob.signed_id]
+          }
+        ]
+
+        patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+              headers: administrator.create_new_auth_token,
+              params: update_params
+
+        expect(response).to have_http_status(:success)
+        expect(automation_rule.reload.files.count).to eq(1)
+      end
+    end
+  end
+
+  describe 'attachment authorization' do
+    let(:blob) { get_blob_for('spec/assets/avatar.png', 'image/png') }
+    let(:new_blob) { get_blob_for('spec/assets/avatar.png', 'image/png') }
+    let(:foreign_message) { create(:message, :with_attachment) }
+    let(:foreign_blob) { foreign_message.attachments.first.file.blob }
+    let(:automation_rule) do
+      create(:automation_rule, account: account, actions: [{ action_name: 'send_attachment', action_params: [blob.id] }])
+    end
+
+    before { automation_rule.files.attach(blob) }
+
+    it 'rejects a foreign raw blob id after an existing attachment without changing the rule' do
+      patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+            params: { actions: [{ action_name: 'send_attachment', action_params: [blob.id, foreign_blob.id] }] },
+            headers: administrator.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to eq(I18n.t('errors.attachments.invalid'))
+      expect(automation_rule.reload.actions.first['action_params']).to eq([blob.id])
+      expect(automation_rule.files.blobs.pluck(:id)).to eq([blob.id])
+    end
+
+    it 'rejects a foreign raw blob id after a signed upload when creating a rule' do
+      expect do
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             params: { name: 'Attachments', event_name: 'conversation_created', conditions: [],
+                       actions: [{ action_name: 'send_attachment', action_params: [new_blob.signed_id, foreign_blob.id] }] },
+             headers: administrator.create_new_auth_token, as: :json
+      end.not_to change(AutomationRule, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to eq(I18n.t('errors.attachments.invalid'))
+    end
+
+    it 'retains existing attachments and attaches every signed upload in an action' do
+      patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+            params: { actions: [{ action_name: 'send_attachment', action_params: [blob.id, new_blob.signed_id] }] },
+            headers: administrator.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(automation_rule.reload.actions.first['action_params']).to eq([blob.id, new_blob.id])
+      expect(automation_rule.files.blobs.pluck(:id)).to contain_exactly(blob.id, new_blob.id)
     end
   end
 
@@ -351,6 +493,138 @@ RSpec.describe 'Api::V1::Accounts::AutomationRulesController', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(account.automation_rules.count).to eq(0)
+      end
+    end
+  end
+
+  describe 'execution_delay handling' do
+    let(:delayed_rule_params) do
+      {
+        name: 'Delayed rule',
+        event_name: 'conversation_updated',
+        execution_delay: 240,
+        conditions: [{ attribute_key: 'status', filter_operator: 'equal_to', values: ['pending'], query_operator: nil }],
+        actions: [{ action_name: 'add_label', action_params: ['stale'] }]
+      }
+    end
+
+    context 'when the delayed_automations feature is enabled' do
+      before { account.enable_features!('delayed_automations') }
+
+      it 'persists and serializes execution_delay' do
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: delayed_rule_params
+
+        expect(response).to have_http_status(:success)
+        body = JSON.parse(response.body, symbolize_names: true)
+        expect(body[:execution_delay]).to eq(240)
+        expect(account.automation_rules.last.execution_delay).to eq(240)
+      end
+
+      it 'persists and serializes a delayed customer follow-up with a pending status condition' do
+        conditions = [
+          { attribute_key: 'message_type', filter_operator: 'equal_to', values: ['outgoing'], query_operator: 'and' },
+          { attribute_key: 'private_note', filter_operator: 'equal_to', values: [false], query_operator: 'and' },
+          { attribute_key: 'inbox_id', filter_operator: 'equal_to', values: [inbox.id], query_operator: 'and' },
+          { attribute_key: 'status', filter_operator: 'equal_to', values: ['pending'], query_operator: nil }
+        ]
+
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: delayed_rule_params.merge(event_name: 'message_created', conditions: conditions),
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        body = JSON.parse(response.body, symbolize_names: true)
+        expect(body[:conditions]).to eq(conditions)
+        expect(account.automation_rules.last.conditions.map(&:deep_symbolize_keys)).to eq(conditions)
+      end
+
+      it 'persists a delayed message rule with label conditions' do
+        conditions = [
+          { attribute_key: 'message_type', filter_operator: 'equal_to', values: ['outgoing'], query_operator: 'and' },
+          { attribute_key: 'labels', filter_operator: 'equal_to', values: ['feature'], query_operator: nil }
+        ]
+
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: delayed_rule_params.merge(event_name: 'message_created', conditions: conditions),
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(account.automation_rules.last.conditions.map(&:deep_symbolize_keys)).to eq(conditions)
+      end
+
+      it 'can deactivate an existing delayed message rule with label conditions' do
+        automation_rule = create(
+          :automation_rule,
+          account: account,
+          event_name: 'message_created',
+          execution_delay: 240,
+          conditions: [
+            { 'attribute_key' => 'message_type', 'filter_operator' => 'equal_to', 'values' => ['outgoing'],
+              'query_operator' => 'and' },
+            { 'attribute_key' => 'labels', 'filter_operator' => 'equal_to', 'values' => ['feature'], 'query_operator' => nil }
+          ]
+        )
+
+        patch "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}",
+              headers: administrator.create_new_auth_token,
+              params: { active: false }
+
+        expect(response).to have_http_status(:success)
+        expect(automation_rule.reload).not_to be_active
+      end
+
+      it 'copies execution_delay on clone' do
+        automation_rule = create(:automation_rule, account: account, execution_delay: 240)
+
+        post "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}/clone",
+             headers: administrator.create_new_auth_token
+
+        expect(response).to have_http_status(:success)
+        expect(account.automation_rules.last.execution_delay).to eq(240)
+      end
+    end
+
+    context 'when the delayed_automations feature is disabled' do
+      it 'rejects a payload carrying execution_delay with 422' do
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: delayed_rule_params
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(account.automation_rules.count).to eq(0)
+      end
+
+      it 'still accepts payloads without execution_delay' do
+        post "/api/v1/accounts/#{account.id}/automation_rules",
+             headers: administrator.create_new_auth_token,
+             params: delayed_rule_params.except(:execution_delay)
+
+        expect(response).to have_http_status(:success)
+        expect(account.automation_rules.last.execution_delay).to be_nil
+      end
+
+      it 'rejects cloning an existing delayed rule instead of turning it into an instant one' do
+        automation_rule = create(:automation_rule, account: account, execution_delay: 240)
+
+        post "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}/clone",
+             headers: administrator.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(account.automation_rules.count).to eq(1)
+      end
+
+      it 'still clones a rule that carries no delay' do
+        automation_rule = create(:automation_rule, account: account)
+
+        post "/api/v1/accounts/#{account.id}/automation_rules/#{automation_rule.id}/clone",
+             headers: administrator.create_new_auth_token
+
+        expect(response).to have_http_status(:success)
+        expect(account.automation_rules.count).to eq(2)
       end
     end
   end

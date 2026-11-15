@@ -1,12 +1,17 @@
 import { ref, unref } from 'vue';
 import { useStore } from 'vuex';
-import { useAlert } from 'dashboard/composables';
+import { useAlert, useTrack } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store.js';
+import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
+import { resolvesConversation } from 'dashboard/composables/useMacroExecution';
+import { CONVERSATION_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
+import wootConstants from 'dashboard/constants/globals';
 
 export function useBulkActions() {
   const store = useStore();
   const { t } = useI18n();
+  const { checkMissingAttributes } = useConversationRequiredAttributes();
 
   const selectedConversations = useMapGetter(
     'bulkActions/getSelectedConversationIds'
@@ -20,9 +25,15 @@ export function useBulkActions() {
 
   function deSelectConversation(conversationId, inboxId) {
     store.dispatch('bulkActions/removeSelectedConversationIds', conversationId);
-    selectedInboxes.value = selectedInboxes.value.filter(
-      item => item !== inboxId
-    );
+    // Only remove one instance of the inboxId, not all
+    // This handles the case where multiple conversations from the same inbox are selected
+    const index = selectedInboxes.value.indexOf(inboxId);
+    if (index > -1) {
+      selectedInboxes.value = [
+        ...selectedInboxes.value.slice(0, index),
+        ...selectedInboxes.value.slice(index + 1),
+      ];
+    }
   }
 
   function resetBulkActions() {
@@ -99,6 +110,38 @@ export function useBulkActions() {
     }
   }
 
+  // Used by both context menu and bulk action bar.
+  async function onRemoveLabels(labelsToRemove, conversationId = null) {
+    try {
+      await store.dispatch('bulkActions/process', {
+        type: 'Conversation',
+        ids: conversationId || selectedConversations.value,
+        labels: {
+          remove: labelsToRemove,
+        },
+      });
+
+      // Context-menu remove should not disturb an existing bulk selection.
+      if (conversationId) {
+        useAlert(
+          t('CONVERSATION.CARD_CONTEXT_MENU.API.LABEL_REMOVAL.SUCCESFUL', {
+            labelName: labelsToRemove[0],
+            conversationId,
+          })
+        );
+      } else {
+        store.dispatch('bulkActions/clearSelectedConversationIds');
+        useAlert(t('BULK_ACTION.LABELS.REMOVE_SUCCESFUL'));
+      }
+    } catch (err) {
+      useAlert(
+        conversationId
+          ? t('CONVERSATION.CARD_CONTEXT_MENU.API.LABEL_REMOVAL.FAILED')
+          : t('BULK_ACTION.LABELS.REMOVE_FAILED')
+      );
+    }
+  }
+
   async function onAssignTeamsForBulk(team) {
     try {
       await store.dispatch('bulkActions/process', {
@@ -116,19 +159,99 @@ export function useBulkActions() {
   }
 
   async function onUpdateConversations(status, snoozedUntil) {
-    try {
-      await store.dispatch('bulkActions/process', {
-        type: 'Conversation',
-        ids: selectedConversations.value,
-        fields: {
-          status,
+    if (selectedConversations.value.length === 0) return;
+
+    let conversationIds = selectedConversations.value;
+    let skippedCount = 0;
+
+    // If resolving, check for required attributes
+    if (status === wootConstants.STATUS_TYPE.RESOLVED) {
+      const { validIds, skippedIds } = selectedConversations.value.reduce(
+        (acc, id) => {
+          const conversation = store.getters.getConversationById(id);
+          const currentCustomAttributes = conversation?.custom_attributes || {};
+          const { hasMissing } = checkMissingAttributes(
+            currentCustomAttributes
+          );
+
+          if (!hasMissing) {
+            acc.validIds.push(id);
+          } else {
+            acc.skippedIds.push(id);
+          }
+          return acc;
         },
-        snoozed_until: snoozedUntil,
-      });
+        { validIds: [], skippedIds: [] }
+      );
+
+      conversationIds = validIds;
+      skippedCount = skippedIds.length;
+
+      if (skippedCount > 0 && validIds.length === 0) {
+        // All conversations have missing attributes
+        useAlert(
+          t('BULK_ACTION.RESOLVE.ALL_MISSING_ATTRIBUTES') ||
+            'Cannot resolve conversations due to missing required attributes'
+        );
+        return;
+      }
+    }
+
+    try {
+      if (conversationIds.length > 0) {
+        await store.dispatch('bulkActions/process', {
+          type: 'Conversation',
+          ids: conversationIds,
+          fields: {
+            status,
+          },
+          snoozed_until: snoozedUntil,
+        });
+      }
+
       store.dispatch('bulkActions/clearSelectedConversationIds');
-      useAlert(t('BULK_ACTION.UPDATE.UPDATE_SUCCESFUL'));
+
+      if (skippedCount > 0) {
+        useAlert(t('BULK_ACTION.RESOLVE.PARTIAL_SUCCESS'));
+      } else {
+        useAlert(t('BULK_ACTION.UPDATE.UPDATE_SUCCESFUL'));
+      }
     } catch (err) {
       useAlert(t('BULK_ACTION.UPDATE.UPDATE_FAILED'));
+    }
+  }
+
+  async function onExecuteMacro(macro) {
+    const conversationIds = selectedConversations.value;
+    const count = conversationIds.length;
+    const hasMissingRequiredAttributes =
+      resolvesConversation(macro) &&
+      conversationIds.some(id => {
+        const conversation = store.getters.getConversationById(id);
+        return conversation
+          ? checkMissingAttributes(conversation.custom_attributes || {})
+              .hasMissing
+          : false;
+      });
+
+    try {
+      await store.dispatch('macros/execute', {
+        macroId: macro.id,
+        conversationIds,
+      });
+      useTrack(CONVERSATION_EVENTS.EXECUTED_A_MACRO);
+      store.dispatch('bulkActions/clearSelectedConversationIds');
+      useAlert(
+        hasMissingRequiredAttributes
+          ? t(
+              'BULK_ACTION.MACROS.QUEUED_WITH_MISSING_ATTRIBUTES',
+              { count },
+              count
+            )
+          : t('BULK_ACTION.MACROS.QUEUED', { count }, count)
+      );
+    } catch (err) {
+      useAlert(t('MACROS.ERROR'));
     }
   }
 
@@ -142,7 +265,9 @@ export function useBulkActions() {
     isConversationSelected,
     onAssignAgent,
     onAssignLabels,
+    onRemoveLabels,
     onAssignTeamsForBulk,
     onUpdateConversations,
+    onExecuteMacro,
   };
 }

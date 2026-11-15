@@ -1,0 +1,34 @@
+name: Docs Link Check
+
+# Guards docs/ against link rot. The internal docs index had drifted to 54%
+# broken relative links before the 2026-11 restructure; known-dead links live in
+# script/docs-links-baseline.txt, so this only fails on NEW breakage.
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'script/check-docs-links.sh'
+      - 'script/docs-links-baseline.txt'
+  push:
+    branches:
+      - develop
+    paths:
+      - 'docs/**'
+      - 'script/check-docs-links.sh'
+      - 'script/docs-links-baseline.txt'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check relative links in docs/
+        run: ./script/check-docs-links.sh

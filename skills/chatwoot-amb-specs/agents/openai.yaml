@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chatwoot AMB Specs"
+  short_description: "Write and maintain Chatwoot AMB specs"
+  default_prompt: "Use $chatwoot-amb-specs to add or update RSpec coverage for Apple Messages for Business services in this Chatwoot fork."

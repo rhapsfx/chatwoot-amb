@@ -5,6 +5,9 @@
     "LOADING": "Загрузка категорий",
     "DESCRIPTION": "Категории помогают вам классифицировать и приоритизировать разговоры и лидеров. Вы можете назначить категорию для разговора или контакта с помощью боковой панели.",
     "LEARN_MORE": "Узнать больше о категориях",
+    "COUNT": "{n} label | {n} labels",
+    "SEARCH_PLACEHOLDER": "Поиск меток...",
+    "NO_RESULTS": "No labels found matching your search",
     "SEARCH_404": "Нет категорий, соответствующих запросу",
     "LIST": {
       "404": "У вас нет категорий.",
@@ -13,7 +16,8 @@
       "TABLE_HEADER": {
         "NAME": "Имя",
         "DESCRIPTION": "Описание",
-        "COLOR": "Цвет"
+        "COLOR": "Цвет",
+        "ACTION": "Действия"
       }
     },
     "FORM": {
@@ -38,20 +42,6 @@
       "CREATE": "Создать",
       "DELETE": "Удалить",
       "CANCEL": "Отменить"
-    },
-    "SUGGESTIONS": {
-      "TOOLTIP": {
-        "SINGLE_SUGGESTION": "Добавить метку в разговор",
-        "MULTIPLE_SUGGESTION": "Выбрать метку",
-        "DESELECT": "Отменить выбор метки",
-        "DISMISS": "Отменить предложение"
-      },
-      "POWERED_BY": "Chatwoot AI",
-      "DISMISS": "Отклонить",
-      "ADD_SELECTED_LABELS": "Добавить выбранные метки",
-      "ADD_SELECTED_LABEL": "Добавить метку",
-      "ADD_ALL_LABELS": "Добавить все метки",
-      "SUGGESTED_LABELS": "Предложенные категории"
     },
     "ADD": {
       "TITLE": "Добавить категорию",

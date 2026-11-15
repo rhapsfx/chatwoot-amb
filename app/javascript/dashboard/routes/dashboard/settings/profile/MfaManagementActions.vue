@@ -13,6 +13,10 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
+  mfaEnforced: {
+    type: Boolean,
+    default: false,
+  },
   backupCodes: {
     type: Array,
     default: () => [],
@@ -31,6 +35,8 @@ const backupCodesDialogRef = ref(null);
 // Form values
 const disablePassword = ref('');
 const disableOtpCode = ref('');
+const disableBackupCode = ref('');
+const useBackupCodeToDisable = ref(false);
 const regenerateOtpCode = ref('');
 
 // Utility functions
@@ -54,8 +60,15 @@ const downloadBackupCodes = () => {
 const handleDisableMfa = async () => {
   emit('disableMfa', {
     password: disablePassword.value,
-    otpCode: disableOtpCode.value,
+    otpCode: useBackupCodeToDisable.value ? '' : disableOtpCode.value,
+    backupCode: useBackupCodeToDisable.value ? disableBackupCode.value : '',
   });
+};
+
+const toggleDisableMethod = () => {
+  useBackupCodeToDisable.value = !useBackupCodeToDisable.value;
+  disableOtpCode.value = '';
+  disableBackupCode.value = '';
 };
 
 const handleRegenerateBackupCodes = async () => {
@@ -68,6 +81,8 @@ const handleRegenerateBackupCodes = async () => {
 const resetDisableForm = () => {
   disablePassword.value = '';
   disableOtpCode.value = '';
+  disableBackupCode.value = '';
+  useBackupCodeToDisable.value = false;
   disableDialogRef.value?.close();
 };
 
@@ -115,8 +130,11 @@ defineExpose({
         </div>
       </div>
 
-      <!-- Disable MFA -->
-      <div class="bg-n-solid-1 rounded-xl outline-1 outline-n-weak outline p-5">
+      <!-- Disable MFA (hidden while the account enforces MFA) -->
+      <div
+        v-if="!mfaEnforced"
+        class="bg-n-solid-1 rounded-xl outline-1 outline-n-weak outline p-5"
+      >
         <div class="flex-1 flex flex-col gap-2">
           <div class="flex items-center gap-2">
             <Icon
@@ -138,6 +156,25 @@ defineExpose({
           />
         </div>
       </div>
+      <div
+        v-else
+        class="bg-n-solid-1 rounded-xl outline-1 outline-n-weak outline p-5"
+      >
+        <div class="flex-1 flex flex-col gap-2">
+          <div class="flex items-center gap-2">
+            <Icon
+              icon="i-lucide-lock-keyhole"
+              class="size-4 flex-shrink-0 text-n-slate-11"
+            />
+            <h4 class="font-medium text-n-slate-12">
+              {{ $t('MFA_SETTINGS.MANAGEMENT.ENFORCED_TITLE') }}
+            </h4>
+          </div>
+          <p class="text-sm text-n-slate-11">
+            {{ $t('MFA_SETTINGS.MANAGEMENT.ENFORCED_NOTE') }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Disable MFA Dialog -->
@@ -157,11 +194,31 @@ defineExpose({
           :label="$t('MFA_SETTINGS.DISABLE.PASSWORD')"
         />
         <Input
+          v-if="!useBackupCodeToDisable"
           v-model="disableOtpCode"
           type="text"
           maxlength="6"
           :label="$t('MFA_SETTINGS.DISABLE.OTP_CODE')"
           :placeholder="$t('MFA_SETTINGS.DISABLE.OTP_CODE_PLACEHOLDER')"
+        />
+        <Input
+          v-else
+          v-model="disableBackupCode"
+          type="text"
+          maxlength="8"
+          :label="$t('MFA_SETTINGS.DISABLE.BACKUP_CODE')"
+          :placeholder="$t('MFA_SETTINGS.DISABLE.BACKUP_CODE_PLACEHOLDER')"
+        />
+        <Button
+          link
+          sm
+          type="button"
+          :label="
+            useBackupCodeToDisable
+              ? $t('MFA_SETTINGS.DISABLE.USE_OTP_CODE')
+              : $t('MFA_SETTINGS.DISABLE.USE_BACKUP_CODE')
+          "
+          @click="toggleDisableMethod"
         />
       </div>
     </Dialog>

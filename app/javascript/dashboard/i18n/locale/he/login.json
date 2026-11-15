@@ -17,24 +17,25 @@
     },
     "OAUTH": {
       "GOOGLE_LOGIN": "התחבר עם גוגל",
-      "BUSINESS_ACCOUNTS_ONLY": "אנא השתמש בכתובת הדוא\"ל של החברה שלך כדי להתחבר",
-      "NO_ACCOUNT_FOUND": "לא מצאנו חשבון עבור כתובת הדוא\"ל שלך."
+      "BUSINESS_ACCOUNTS_ONLY": "You can't create a new account with a personal email address. Please sign up using your work email.",
+      "NO_ACCOUNT_FOUND": "לא מצאנו חשבון עבור כתובת הדוא\"ל שלך.",
+      "SHOPIFY_INSTALLATION_FAILED": "We couldn't complete your Shopify installation. Please restart installation from Shopify."
     },
     "FORGOT_PASSWORD": "שכחת את הסיסמה?",
     "CREATE_NEW_ACCOUNT": "צור חשבון",
     "SUBMIT": "התחבר",
     "SAML": {
-      "LABEL": "Login via SSO",
+      "LABEL": "התחבר באמצעות SSO",
       "TITLE": "Initiate Single Sign-on (SSO)",
-      "SUBTITLE": "Enter your work email to access your organization",
-      "BACK_TO_LOGIN": "Login via Password",
+      "SUBTITLE": "הזן את הדוא\"ל הארגוני שלך כדי לגשת לארגון שלך",
+      "BACK_TO_LOGIN": "התחבר באמצעות סיסמה",
       "WORK_EMAIL": {
-        "LABEL": "Work Email",
-        "PLACEHOLDER": "Enter your work email"
+        "LABEL": "דוא\"ל ארגוני",
+        "PLACEHOLDER": "הזן את הדוא\"ל הארגוני שלך"
       },
-      "SUBMIT": "Continue with SSO",
+      "SUBMIT": "המשך עם SSO",
       "API": {
-        "ERROR_MESSAGE": "SSO authentication failed. Please check your credentials and try again."
+        "ERROR_MESSAGE": "אימות SSO נכשל. אנא בדוק את פרטי הכניסה שלך ונסה שוב."
       }
     }
   }

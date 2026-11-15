@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n';
 import { ref, watch, nextTick } from 'vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import PlaygroundRunDetails from './PlaygroundRunDetails.vue';
 
 const props = defineProps({
   messages: {
@@ -33,10 +34,15 @@ const getAvatarName = sender =>
     ? t('CAPTAIN.PLAYGROUND.USER')
     : t('CAPTAIN.PLAYGROUND.ASSISTANT');
 
-const getMessageStyle = sender =>
-  isUserMessage(sender)
-    ? 'bg-n-strong text-n-white'
-    : 'bg-n-solid-iris text-n-slate-12';
+const messageStyle = message => {
+  if (message.isError) {
+    return 'bg-n-ruby-3 text-n-ruby-11 rounded-es-sm rounded-ee-xl rounded-t-xl';
+  }
+
+  return isUserMessage(message.sender)
+    ? 'bg-n-solid-blue text-n-slate-12 rounded-ee-sm rounded-es-xl rounded-t-xl'
+    : 'bg-n-solid-iris text-n-slate-12 rounded-es-sm rounded-ee-xl rounded-t-xl';
+};
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -49,7 +55,10 @@ watch(() => props.messages.length, scrollToBottom);
 </script>
 
 <template>
-  <div ref="messageContainer" class="flex-1 overflow-y-auto mb-4 space-y-2">
+  <div
+    ref="messageContainer"
+    class="flex-1 overflow-y-auto mb-4 px-6 space-y-6"
+  >
     <div
       v-for="(message, index) in messages"
       :key="index"
@@ -57,15 +66,25 @@ watch(() => props.messages.length, scrollToBottom);
       :class="getMessageAlignment(message.sender)"
     >
       <div
-        class="flex items-start gap-1.5"
+        class="flex max-w-[90%] items-end gap-1.5 md:max-w-[75%]"
         :class="getMessageDirection(message.sender)"
       >
-        <Avatar :name="getAvatarName(message.sender)" rounded-full :size="24" />
+        <Avatar
+          :name="getAvatarName(message.sender)"
+          rounded-full
+          :size="24"
+          class="shrink-0"
+        />
         <div
-          class="max-w-[80%] rounded-lg p-3 text-sm"
-          :class="getMessageStyle(message.sender)"
+          class="px-4 py-3 text-sm [overflow-wrap:break-word]"
+          :class="messageStyle(message)"
         >
-          <div class="break-words" v-html="formatMessage(message.content)" />
+          <div v-dompurify-html="formatMessage(message.content)" />
+          <PlaygroundRunDetails
+            v-if="message.runDetails && message.setupSummary"
+            :run-details="message.runDetails"
+            :setup-summary="message.setupSummary"
+          />
         </div>
       </div>
     </div>

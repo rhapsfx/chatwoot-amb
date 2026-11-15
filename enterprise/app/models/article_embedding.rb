@@ -3,7 +3,7 @@
 # Table name: article_embeddings
 #
 #  id         :bigint           not null, primary key
-#  embedding  :vector(1536)
+#  embedding  :text
 #  term       :text             not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
@@ -11,13 +11,14 @@
 #
 # Indexes
 #
-#  index_article_embeddings_on_embedding  (embedding) USING ivfflat
 #
 class ArticleEmbedding < ApplicationRecord
   belongs_to :article
   has_neighbors :embedding, normalize: true
 
   after_commit :update_response_embedding
+
+  delegate :account_id, to: :article
 
   private
 

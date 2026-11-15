@@ -1,0 +1,113 @@
+# Chatwoot Production Dockerfile - LIGHTWEIGHT VERSION
+# Skips asset compilation - expects pre-built assets in public/vite
+
+FROM ruby:3.4.12-slim AS base
+
+# Install essential system packages INCLUDING Node.js
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    imagemagick \
+    libvips42 \
+    libssl-dev \
+    curl \
+    gnupg \
+    ca-certificates \
+    tzdata \
+    shared-mime-info \
+    xz-utils \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Node.js pinned to an exact patched release (package.json engines.node
+# is "24.x"). Was the EOL Node 20 line, which no longer receives security fixes.
+ARG NODE_VERSION=24.22.3
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in \
+      amd64) node_arch="x64" ;; \
+      arm64) node_arch="arm64" ;; \
+      *) echo "Unsupported architecture for Node.js: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f /tmp/node.tar.xz; \
+    node --version; \
+    npm --version
+
+# Set production environment
+ENV RAILS_ENV=production \
+    NODE_ENV=production \
+    RACK_ENV=production \
+    RAILS_SERVE_STATIC_FILES=true \
+    RAILS_LOG_TO_STDOUT=true
+
+# Create app directory
+RUN mkdir -p /app
+WORKDIR /app
+
+# ============================================
+# Ruby Dependencies
+# ============================================
+FROM base AS ruby-builder
+
+# Copy Gemfile
+COPY Gemfile Gemfile.lock ./
+
+# Install Ruby gems and create binstubs
+RUN gem install bundler:2.5.23 && \
+    bundle config set --local deployment 'true' && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3 && \
+    bundle binstubs --all
+
+# ============================================
+# Production Image
+# ============================================
+FROM base AS production
+
+# Copy installed gems and binstubs from ruby-builder
+COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
+
+# Copy application code
+COPY . .
+
+# Install bundler and ensure git-based gems are checked out
+RUN gem install bundler:2.5.23 && \
+    bundle config set --local deployment 'true' && \
+    bundle config set --local without 'development test' && \
+    bundle install
+
+# Create required directories
+RUN mkdir -p /app/tmp/pids \
+    /app/tmp/cache \
+    /app/log \
+    /app/storage \
+    /app/public/packs && \
+    chmod -R 755 /app/tmp /app/log /app/storage /app/public
+
+# Precompile Rails assets (lightweight, skips Vite)
+RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile || true
+
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash chatwoot && \
+    chown -R chatwoot:chatwoot /app
+
+# Switch to non-root user
+USER chatwoot
+
+# Add /app/bin to PATH so binstubs work
+ENV PATH="/app/bin:${PATH}"
+
+# Expose port for Cloud Run
+ENV PORT=8080
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# Default command
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]

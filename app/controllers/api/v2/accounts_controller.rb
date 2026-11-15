@@ -1,11 +1,14 @@
 class Api::V2::AccountsController < Api::BaseController
   include AuthHelper
+  include MfaEnforcementGuard
 
   skip_before_action :authenticate_user!, :set_current_user, :handle_with_exception,
                      only: [:create], raise: false
   before_action :check_signup_enabled, only: [:create]
   before_action :validate_captcha, only: [:create]
+  before_action :check_user_mfa_enforcement, if: :authenticate_by_access_token?, only: [:create]
   before_action :fetch_account, except: [:create]
+  before_action :check_account_mfa_enforcement, if: :authenticate_by_access_token?, except: [:create]
   before_action :check_authorization, except: [:create]
 
   rescue_from CustomExceptions::Account::InvalidEmail,
@@ -58,7 +61,7 @@ class Api::V2::AccountsController < Api::BaseController
   end
 
   def check_signup_enabled
-    raise ActionController::RoutingError, 'Not Found' if GlobalConfigService.load('ENABLE_ACCOUNT_SIGNUP', 'false') == 'false'
+    raise ActionController::RoutingError, 'Not Found' unless GlobalConfigService.account_signup_enabled?
   end
 
   def validate_captcha

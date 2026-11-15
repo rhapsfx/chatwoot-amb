@@ -1,22 +1,25 @@
-require 'openai'
-
-class Captain::Copilot::ChatService < Llm::BaseOpenAiService
+class Captain::Copilot::ChatService < Llm::BaseAiService
   include Captain::ChatHelper
+  include Captain::Copilot::ConversationAccess
 
   attr_reader :assistant, :account, :user, :copilot_thread, :previous_history, :messages
 
   def initialize(assistant, config)
-    super()
+    super(feature: 'copilot', account: assistant.account, fallback_model: Llm::Models.default_model_for('copilot'))
 
     @assistant = assistant
     @account = assistant.account
     @user = nil
     @copilot_thread = nil
     @previous_history = []
+    @conversation = nil
+    @conversation_id = nil
+
     setup_user(config)
+    setup_conversation(config)
     setup_message_history(config)
-    register_tools
-    @messages = build_messages(config)
+    @tools = build_tools
+    @messages = build_messages
   end
 
   def generate_response(input)
@@ -38,11 +41,18 @@ class Captain::Copilot::ChatService < Llm::BaseOpenAiService
     @user = @account.users.find_by(id: config[:user_id]) if config[:user_id].present?
   end
 
-  def build_messages(config)
-    messages= [system_message]
+  def setup_conversation(config)
+    return if @user.blank? || config[:conversation_id].blank?
+
+    @conversation = accessible_conversation(account: @account, user: @user, display_id: config[:conversation_id])
+    @conversation_id = @conversation&.display_id
+  end
+
+  def build_messages
+    messages = [system_message]
     messages << account_id_context
     messages += @previous_history if @previous_history.present?
-    messages += current_viewing_history(config[:conversation_id]) if config[:conversation_id].present?
+    messages += current_viewing_history
     messages
   end
 
@@ -59,16 +69,19 @@ class Captain::Copilot::ChatService < Llm::BaseOpenAiService
                         end
   end
 
-  def register_tools
-    @tool_registry = Captain::ToolRegistryService.new(@assistant, user: @user)
-    @tool_registry.register_tool(Captain::Tools::SearchDocumentationService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::GetArticleService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::GetContactService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::GetConversationService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::SearchArticlesService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::SearchContactsService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::SearchConversationsService)
-    @tool_registry.register_tool(Captain::Tools::Copilot::SearchLinearIssuesService)
+  def build_tools
+    tools = []
+
+    tools << Captain::Tools::SearchDocumentationService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::GetConversationService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::SearchConversationsService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::GetContactService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::GetArticleService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::SearchArticlesService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::SearchContactsService.new(@assistant, user: @user)
+    tools << Captain::Tools::Copilot::SearchLinearIssuesService.new(@assistant, user: @user)
+
+    tools.select(&:active?)
   end
 
   def system_message
@@ -76,10 +89,14 @@ class Captain::Copilot::ChatService < Llm::BaseOpenAiService
       role: 'system',
       content: Captain::Llm::SystemPromptsService.copilot_response_generator(
         @assistant.config['product_name'],
-        @tool_registry.tools_summary,
+        tools_summary,
         @assistant.config
       )
     }
+  end
+
+  def tools_summary
+    @tools.map { |tool| "- #{tool.class.name}: #{tool.class.description}" }.join("\n")
   end
 
   def account_id_context
@@ -89,18 +106,16 @@ class Captain::Copilot::ChatService < Llm::BaseOpenAiService
     }
   end
 
-  def current_viewing_history(conversation_id)
-    conversation = @account.conversations.find_by(display_id: conversation_id)
-    return [] unless conversation
+  def current_viewing_history
+    return [] if @conversation.blank?
 
-    Rails.logger.info("#{self.class.name} Assistant: #{@assistant.id}, Setting viewing history for conversation_id=#{conversation_id}")
-    contact_id = conversation.contact_id
+    Rails.logger.info("#{self.class.name} Assistant: #{@assistant.id}, Setting viewing history for conversation_id=#{@conversation_id}")
     [{
       role: 'system',
       content: <<~HISTORY.strip
         You are currently viewing the conversation with the following details:
-        Conversation ID: #{conversation_id}
-        Contact ID: #{contact_id}
+        Conversation ID: #{@conversation_id}
+        Contact ID: #{@conversation.contact_id}
       HISTORY
     }]
   end
@@ -112,5 +127,9 @@ class Captain::Copilot::ChatService < Llm::BaseOpenAiService
       message: message,
       message_type: message_type
     )
+  end
+
+  def feature_name
+    'copilot'
   end
 end

@@ -1,0 +1,6 @@
+index.md
+add.md
+remove.md
+list.md
+dry-run.md
+troubleshooting.md

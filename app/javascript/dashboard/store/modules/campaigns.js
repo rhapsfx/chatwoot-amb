@@ -10,6 +10,7 @@ export const state = {
   records: [],
   uiFlags: {
     isFetching: false,
+    hasFetched: false,
     isCreating: false,
   },
 };
@@ -44,6 +45,10 @@ export const getters = {
     const whatsappChannelTypes = [INBOX_TYPES.WHATSAPP];
     return _getters.getCampaigns(CAMPAIGN_TYPES.ONE_OFF, whatsappChannelTypes);
   },
+  getAppleMessagesCampaigns: (_state, _getters) => {
+    const appleChannelTypes = [INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS];
+    return _getters.getCampaigns(CAMPAIGN_TYPES.ONE_OFF, appleChannelTypes);
+  },
   getLiveChatCampaigns: (_state, _getters) => {
     const liveChatChannelTypes = [INBOX_TYPES.WEB];
     return _getters.getCampaigns(CAMPAIGN_TYPES.ONGOING, liveChatChannelTypes);
@@ -62,7 +67,10 @@ export const actions = {
     } catch (error) {
       // Ignore error
     } finally {
-      commit(types.SET_CAMPAIGN_UI_FLAG, { isFetching: false });
+      commit(types.SET_CAMPAIGN_UI_FLAG, {
+        isFetching: false,
+        hasFetched: true,
+      });
     }
   },
   create: async function createCampaign({ commit }, campaignObj) {

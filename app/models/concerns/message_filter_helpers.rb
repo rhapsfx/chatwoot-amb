@@ -14,11 +14,11 @@ module MessageFilterHelpers
   end
 
   def notifiable?
-    incoming? || outgoing?
+    (incoming? || outgoing?) && !private?
   end
 
   def conversation_transcriptable?
-    incoming? || outgoing?
+    (incoming? || outgoing?) && !forwarded?
   end
 
   def email_reply_summarizable?

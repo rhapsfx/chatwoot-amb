@@ -1,36 +1,19 @@
-class Captain::Tools::Copilot::GetConversationService < Captain::Tools::BaseService
-  def name
+class Captain::Tools::Copilot::GetConversationService < Captain::Tools::BaseTool
+  include Captain::Copilot::ConversationAccess
+
+  def self.name
     'get_conversation'
   end
+  description 'Get details of a conversation including messages and contact information'
 
-  def description
-    'Get details of a conversation including messages and contact information'
-  end
+  parameter :conversation_id, type: :integer, description: 'ID of the conversation to retrieve', required: true
 
-  def parameters
-    {
-      type: 'object',
-      properties: {
-        conversation_id: {
-          type: 'number',
-          description: 'The ID of the conversation to retrieve'
-        }
-      },
-      required: %w[conversation_id]
-    }
-  end
-
-  def execute(arguments)
-    conversation_id = arguments['conversation_id']
-
-    Rails.logger.info "#{self.class.name}: Conversation ID: #{conversation_id}"
-
-    return 'Missing required parameters' if conversation_id.blank?
-
-    conversation = Conversation.find_by(display_id: conversation_id, account_id: @assistant.account_id)
+  def execute(conversation_id:)
+    conversation = accessible_conversation(account: @assistant.account, user: @user, display_id: conversation_id)
     return 'Conversation not found' if conversation.blank?
 
-    conversation.to_llm_text(include_private_messages: true)
+    # Only the ID: contact details stay behind get_contact and its contact_manage permission.
+    "#{conversation.to_llm_text(include_private_messages: true)}\nContact ID: ##{conversation.contact_id}"
   end
 
   def active?

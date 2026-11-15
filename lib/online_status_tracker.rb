@@ -1,6 +1,8 @@
 class OnlineStatusTracker
   # NOTE: You can customise the environment variable to keep your agents/contacts as online for longer
   PRESENCE_DURATION = ENV.fetch('PRESENCE_DURATION', 20).to_i.seconds
+  # Widget pings every 60s, so contacts need a longer presence window
+  CONTACT_PRESENCE_DURATION = ENV.fetch('CONTACT_PRESENCE_DURATION', 90).to_i.seconds
 
   # presence : sorted set with timestamp as the score & object id as value
 
@@ -11,7 +13,8 @@ class OnlineStatusTracker
 
   def self.get_presence(account_id, obj_type, obj_id)
     connected_time = ::Redis::Alfred.zscore(presence_key(account_id, obj_type), obj_id)
-    connected_time && connected_time > (Time.zone.now - PRESENCE_DURATION).to_i
+    duration = obj_type == 'Contact' ? CONTACT_PRESENCE_DURATION : PRESENCE_DURATION
+    connected_time && connected_time > (Time.zone.now - duration).to_i
   end
 
   def self.presence_key(account_id, type)
@@ -39,7 +42,7 @@ class OnlineStatusTracker
   end
 
   def self.get_available_contact_ids(account_id)
-    range_start = (Time.zone.now - PRESENCE_DURATION).to_i
+    range_start = (Time.zone.now - CONTACT_PRESENCE_DURATION).to_i
     # exclusive minimum score is specified by prefixing (
     # we are clearing old records because this could clogg up the sorted set
     ::Redis::Alfred.zremrangebyscore(presence_key(account_id, 'Contact'), '-inf', "(#{range_start}")
@@ -61,17 +64,16 @@ class OnlineStatusTracker
   end
 
   def self.get_availability_from_db(account_id, user_id)
-    availability = Account.find(account_id).account_users.find_by(user_id: user_id).availability
+    availability = AccountUser.find_by(account_id: account_id, user_id: user_id).availability
     set_status(account_id, user_id, availability)
     availability
   end
 
   def self.get_available_user_ids(account_id)
-    account = Account.find(account_id)
     range_start = (Time.zone.now - PRESENCE_DURATION).to_i
     user_ids = ::Redis::Alfred.zrangebyscore(presence_key(account_id, 'User'), range_start, '+inf')
     # since we are dealing with redis items as string, casting to string
-    user_ids += account.account_users.where(auto_offline: false)&.map(&:user_id)&.map(&:to_s)
+    user_ids += AccountUser.where(account_id: account_id, auto_offline: false).pluck(:user_id).map(&:to_s)
     user_ids.uniq
   end
 end

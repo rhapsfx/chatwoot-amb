@@ -1,5 +1,35 @@
 class DashboardController < ActionController::Base
   include SwitchLocale
+  include PortalHomeData
+
+  GLOBAL_CONFIG_KEYS = %w[
+    LOGO
+    LOGO_DARK
+    LOGO_THUMBNAIL
+    INSTALLATION_NAME
+    WIDGET_BRAND_URL
+    TERMS_URL
+    BRAND_URL
+    BRAND_NAME
+    PRIVACY_URL
+    DISPLAY_MANIFEST
+    CREATE_NEW_ACCOUNT_FROM_DASHBOARD
+    CHATWOOT_INBOX_TOKEN
+    API_CHANNEL_NAME
+    API_CHANNEL_THUMBNAIL
+    CLOUD_ANALYTICS_TOKEN
+    DIRECT_UPLOADS_ENABLED
+    MAXIMUM_FILE_UPLOAD_SIZE
+    HCAPTCHA_SITE_KEY
+    LOGOUT_REDIRECT_LINK
+    DISABLE_USER_PROFILE_UPDATE
+    DISABLE_META_INBOX_CREATION
+    DISABLE_META_MESSAGE_SENDING
+    DEPLOYMENT_ENV
+    INSTALLATION_PRICING_PLAN
+    CAPTAIN_TOOLS_MANIFEST_ENABLED
+    CAPTAIN_TOOLS_CATALOG_URL
+  ].freeze
 
   before_action :set_application_pack
   before_action :set_global_config
@@ -19,25 +49,7 @@ class DashboardController < ActionController::Base
   end
 
   def set_global_config
-    @global_config = GlobalConfig.get(
-      'LOGO', 'LOGO_DARK', 'LOGO_THUMBNAIL',
-      'INSTALLATION_NAME',
-      'WIDGET_BRAND_URL', 'TERMS_URL',
-      'BRAND_URL', 'BRAND_NAME',
-      'PRIVACY_URL',
-      'DISPLAY_MANIFEST',
-      'CREATE_NEW_ACCOUNT_FROM_DASHBOARD',
-      'CHATWOOT_INBOX_TOKEN',
-      'API_CHANNEL_NAME',
-      'API_CHANNEL_THUMBNAIL',
-      'ANALYTICS_TOKEN',
-      'DIRECT_UPLOADS_ENABLED',
-      'HCAPTCHA_SITE_KEY',
-      'LOGOUT_REDIRECT_LINK',
-      'DISABLE_USER_PROFILE_UPDATE',
-      'DEPLOYMENT_ENV',
-      'INSTALLATION_PRICING_PLAN'
-    ).merge(app_config)
+    @global_config = GlobalConfig.get(*GLOBAL_CONFIG_KEYS).merge(app_config)
   end
 
   def set_dashboard_scripts
@@ -56,6 +68,8 @@ class DashboardController < ActionController::Base
     return unless @portal
 
     @locale = @portal.default_locale
+    request.variant = :documentation if @portal.layout == 'documentation'
+    load_home_data
     render 'public/api/v1/portals/show', layout: 'portal', portal: @portal and return
   end
 
@@ -66,13 +80,37 @@ class DashboardController < ActionController::Base
       ENABLE_ACCOUNT_SIGNUP: GlobalConfigService.load('ENABLE_ACCOUNT_SIGNUP', 'false'),
       FB_APP_ID: GlobalConfigService.load('FB_APP_ID', ''),
       INSTAGRAM_APP_ID: GlobalConfigService.load('INSTAGRAM_APP_ID', ''),
+      TIKTOK_APP_ID: GlobalConfigService.load('TIKTOK_APP_ID', ''),
       FACEBOOK_API_VERSION: GlobalConfigService.load('FACEBOOK_API_VERSION', 'v18.0'),
       WHATSAPP_APP_ID: GlobalConfigService.load('WHATSAPP_APP_ID', ''),
       WHATSAPP_CONFIGURATION_ID: GlobalConfigService.load('WHATSAPP_CONFIGURATION_ID', ''),
       IS_ENTERPRISE: ChatwootApp.enterprise?,
+      IS_COMPANY_ENRICHMENT_ENABLED: ChatwootApp.enterprise? && GlobalConfigService.load('CONTEXT_DEV_API_KEY', nil).present?,
       AZURE_APP_ID: GlobalConfigService.load('AZURE_APP_ID', ''),
-      GIT_SHA: GIT_HASH
+      GIT_SHA: GIT_HASH,
+      ALLOWED_LOGIN_METHODS: allowed_login_methods,
+      ACTIVE_PLATFORM_BANNERS: active_platform_banners,
+      ACTIVE_FEATURE_ANNOUNCEMENTS: active_feature_announcements
     }
+  end
+
+  def active_platform_banners
+    return [] unless ChatwootApp.chatwoot_cloud?
+
+    PlatformBanner.active.not_feature_announcement.order(created_at: :desc).as_json(only: %i[id banner_message banner_type updated_at])
+  end
+
+  def active_feature_announcements
+    return [] unless ChatwootApp.chatwoot_cloud?
+
+    PlatformBanner.active.feature_announcement.order(created_at: :desc).as_json(only: %i[id title banner_message video_url updated_at])
+  end
+
+  def allowed_login_methods
+    methods = ['email']
+    methods << 'google_oauth' if GlobalConfigService.load('ENABLE_GOOGLE_OAUTH_LOGIN', 'true').to_s != 'false'
+    methods << 'saml' if ChatwootHub.pricing_plan != 'community' && GlobalConfigService.load('ENABLE_SAML_SSO_LOGIN', 'true').to_s != 'false'
+    methods
   end
 
   def set_application_pack

@@ -16,6 +16,13 @@ RSpec.describe Contact do
 
   describe 'concerns' do
     it_behaves_like 'avatarable'
+
+    it 'accepts webp avatars' do
+      contact = build(:contact, account: create(:account))
+      contact.avatar.attach(get_blob_for(Rails.root.join('spec/assets/avatar.png'), 'image/webp'))
+
+      expect(contact).to be_valid
+    end
   end
 
   context 'when prepare contact attributes before validation' do
@@ -56,6 +63,11 @@ RSpec.describe Contact do
     it 'will throw error for existing invalid phone number' do
       contact = create(:contact)
       expect { contact.update!(phone_number: '123456789') }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it 'will throw error when text is prefixed to a valid phone number' do
+      contact = create(:contact)
+      expect { contact.update!(phone_number: 'abc+12312312321') }.to raise_error(ActiveRecord::RecordInvalid)
     end
 
     it 'updates phone number when adding valid phone number' do
@@ -100,6 +112,15 @@ RSpec.describe Contact do
     it 'has contact type "lead" when contacted through a social channel' do
       contact = create(:contact, additional_attributes: { social_facebook_user_id: '123' })
       expect(contact.contact_type).to eq 'lead'
+    end
+  end
+
+  describe '#webhook_data and #push_event_data' do
+    it 'carry the contact type, so a changed contact_type can be read from the event itself' do
+      contact = create(:contact, email: 'lead@example.com')
+
+      expect(contact.webhook_data[:contact_type]).to eq('lead')
+      expect(contact.push_event_data[:contact_type]).to eq('lead')
     end
   end
 

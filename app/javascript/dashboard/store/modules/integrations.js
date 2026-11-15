@@ -121,7 +121,7 @@ export const actions = {
       commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isCreatingHook: false });
     } catch (error) {
       commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isCreatingHook: false });
-      throw new Error(error);
+      throw error;
     }
   },
   deleteHook: async ({ commit }, { appId, hookId }) => {
@@ -149,6 +149,7 @@ export const mutations = {
       if (record.id === data.app_id) {
         return {
           ...record,
+          enabled: true,
           hooks: [...record.hooks, data],
         };
       }
@@ -158,10 +159,8 @@ export const mutations = {
   [types.default.DELETE_INTEGRATION_HOOKS]: ($state, { appId, hookId }) => {
     $state.records = $state.records.map(record => {
       if (record.id === appId) {
-        return {
-          ...record,
-          hooks: record.hooks.filter(hook => hook.id !== hookId),
-        };
+        const hooks = record.hooks.filter(hook => hook.id !== hookId);
+        return { ...record, enabled: hooks.length > 0, hooks };
       }
       return record;
     });

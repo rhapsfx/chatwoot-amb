@@ -39,7 +39,23 @@ const modalHeaderContent = computed(() => {
     : t('CONTENT_TEMPLATES.MODAL.SUBTITLE');
 });
 
-const pickTemplate = template => {
+const pickTemplate = async template => {
+  // Check if this is a unified template (not Twilio)
+  if (template.source === 'unified') {
+    // Let the parent component (ReplyBox) handle unified templates
+    // It has the full handleUnifiedTemplate logic for Apple Messages
+    emit('onSend', {
+      message: template.description || template.name,
+      templateParams: {
+        template: template,
+        source: 'unified',
+      },
+    });
+    emit('cancel'); // Close the modal
+    return;
+  }
+
+  // For Twilio templates, show the parser
   selectedContentTemplate.value = template;
 };
 
@@ -57,7 +73,7 @@ const onClose = () => {
 </script>
 
 <template>
-  <woot-modal v-model:show="localShow" :on-close="onClose" size="modal-big">
+  <woot-modal v-model:show="localShow" size="modal-big" @close="onClose">
     <woot-modal-header
       :header-title="$t('CONTENT_TEMPLATES.MODAL.TITLE')"
       :header-content="modalHeaderContent"

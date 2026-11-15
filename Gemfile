@@ -1,10 +1,15 @@
 source 'https://rubygems.org'
 
-ruby '3.4.4'
+ruby '3.4.12'
+
+# Required by reline; will no longer be a default gem in Ruby 3.5.0
+gem 'fiddle'
 
 ##-- base gems for rails --##
+
 gem 'rack-cors', '2.0.0', require: 'rack/cors'
-gem 'rails', '~> 7.1'
+gem 'rails', '7.2.3.1'
+
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', require: false
 
@@ -18,9 +23,10 @@ gem 'kaminari'
 gem 'responders', '>= 3.1.1'
 gem 'rest-client'
 gem 'telephone_number'
-gem 'time_diff'
 gem 'tzinfo-data'
 gem 'valid_email2'
+gem 'email-provider-info'
+gem 'gemoji'
 # compress javascript config.assets.js_compressor
 gem 'uglifier'
 ##-- used for single column multiple binary flags in notification settings/feature flagging --##
@@ -39,6 +45,8 @@ gem 'json_refs'
 gem 'rack-attack', '>= 6.7.0'
 # a utility tool for streaming, flexible and safe downloading of remote files
 gem 'down'
+# SSRF-safe URL fetching
+gem 'ssrf_filter', '~> 1.5'
 # authentication type to fetch and send mail over oauth2.0
 gem 'gmail_xoauth'
 # Lock net-smtp to 0.3.4 to avoid issues with gmail_xoauth2
@@ -48,11 +56,13 @@ gem 'csv-safe'
 
 ##-- for active storage --##
 gem 'aws-sdk-s3', require: false
-# original gem isn't maintained actively
-# we wanted updated version of faraday which is a dependency for slack-ruby-client
-gem 'azure-storage-blob', git: 'https://github.com/chatwoot/azure-storage-ruby', branch: 'chatwoot', require: false
+gem 'aws-sdk-sesv2', require: false
+gem 'azure-blob', require: false
 gem 'google-cloud-storage', '>= 1.48.0', require: false
 gem 'image_processing'
+
+##-- for actionmailbox --##
+gem 'aws-actionmailbox-ses', '~> 0'
 
 ##-- gems for database --#
 gem 'groupdate'
@@ -69,25 +79,27 @@ gem 'faraday_middleware-aws-sigv4'
 ##--- gems for server & infra configuration ---##
 gem 'dotenv-rails', '>= 3.0.0'
 gem 'foreman'
-gem 'puma'
+gem 'puma', '~> 7.2', '>= 7.2.1'
 gem 'vite_rails'
 # metrics on heroku
 gem 'barnes'
 
 ##--- gems for authentication & authorization ---##
 gem 'devise', '>= 4.9.4'
-gem 'devise-secure_password', git: 'https://github.com/chatwoot/devise-secure_password', branch: 'chatwoot'
+# 2.2.3 requires Devise 5; Chatwoot remains on Devise 4 for this upgrade stack.
+gem 'devise-secure_password', '2.2.1'
 gem 'devise_token_auth', '>= 1.2.3'
+gem 'rails-i18n', '~> 7.0'
 # two-factor authentication
 gem 'devise-two-factor', '>= 5.0.0'
 # authorization
-gem 'jwt'
+gem 'jwt', '~> 2.10', '>= 2.10.3'
 gem 'pundit'
 
 # super admin
 gem 'administrate', '>= 0.20.1'
 gem 'administrate-field-active_storage', '>= 1.0.3'
-gem 'administrate-field-belongs_to_search', '>= 0.9.0'
+gem 'administrate-field-belongs_to_search', '>= 0.10.0'
 
 ##--- gems for pubsub service ---##
 # https://karolgalanciak.com/blog/2019/11/30/from-activerecord-callbacks-to-publish-slash-subscribe-pattern-and-event-driven-design/
@@ -125,14 +137,18 @@ gem 'sentry-ruby', require: false
 gem 'sentry-sidekiq', '>= 5.19.0', require: false
 
 ##-- background job processing --##
-gem 'sidekiq', '>= 7.3.1'
+gem 'sidekiq', '~> 7.3.10'
 # We want cron jobs
-gem 'sidekiq-cron', '>= 1.12.0'
+gem 'sidekiq-cron', '>= 2.4.0'
 # for sidekiq healthcheck
 gem 'sidekiq_alive'
+# publishes Sidekiq queue metrics to CloudWatch for autoscaling (opt-in via ENABLE_SIDEKIQ_CLOUDWATCH)
+gem 'speedshop-cloudwatch', '~> 0.2.1', require: false
 
 ##-- Push notification service --##
 gem 'fcm'
+# APNs VoIP pushes that ring iPhones through CallKit
+gem 'apnotic', '~> 1.8'
 gem 'web-push', '>= 3.0.1'
 
 ##-- geocoding / parse location from ip --##
@@ -158,7 +174,7 @@ gem 'working_hours'
 gem 'pg_search'
 
 # Subscriptions, Billing
-gem 'stripe'
+gem 'stripe', '~> 18.0'
 
 ## - helper gems --##
 ## to populate db with sample data
@@ -187,12 +203,22 @@ gem 'reverse_markdown'
 
 gem 'iso-639'
 gem 'ruby-openai'
-gem 'ai-agents', '>= 0.4.3'
+gem 'ai-agents', '~> 0.13.0'
 
-# TODO: Move this gem as a dependency of ai-agents
-gem 'ruby_llm-schema'
+gem 'ruby_llm', '~> 2.0.0'
+
+gem 'cld3', '~> 3.7'
+
+# OpenTelemetry for LLM observability
+gem 'opentelemetry-sdk'
+gem 'opentelemetry-exporter-otlp'
 
 gem 'shopify_api'
+
+gem 'firecrawl-sdk', '~> 1.0', require: 'firecrawl'
+
+# Apple Wallet pass generation (.pkpass files)
+gem 'passbook2'
 
 ### Gems required only in specific deployment environments ###
 ##############################################################
@@ -206,7 +232,7 @@ group :production do
 end
 
 group :development do
-  gem 'annotate'
+  gem 'annotaterb'
   gem 'bullet'
   gem 'letter_opener'
   gem 'scss_lint', require: false
@@ -232,6 +258,8 @@ group :test do
   # test profiling
   gem 'test-prof'
   gem 'simplecov_json_formatter', require: false
+  # parallel test execution
+  gem 'parallel_tests'
 end
 
 group :development, :test do
@@ -257,6 +285,5 @@ group :development, :test do
   gem 'seed_dump'
   gem 'shoulda-matchers'
   gem 'simplecov', '>= 0.21', require: false
-  gem 'spring'
-  gem 'spring-watcher-listen'
+  gem 'skooma'
 end

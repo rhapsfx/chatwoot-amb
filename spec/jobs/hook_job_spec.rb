@@ -60,10 +60,56 @@ RSpec.describe HookJob do
     end
 
     it 'calls Conversations::DetectLanguageJob when its a google_translate intergation' do
+      allow(Integrations::GoogleTranslate::CredentialsValidator).to receive(:valid?).and_return(true)
       hook = create(:integrations_hook, :google_translate, account: account)
       allow(Integrations::GoogleTranslate::DetectLanguageService).to receive(:new).and_return(process_service)
       expect(Integrations::GoogleTranslate::DetectLanguageService).to receive(:new).with(hook: hook, message: event_data[:message])
       described_class.perform_now(hook, event_name, event_data)
+    end
+
+    it "calls Integrations::Linear::AutoLinkService when it's a linear hook" do
+      hook = create(:integrations_hook, :linear, account: account)
+      allow(Integrations::Linear::AutoLinkService).to receive(:new).and_return(process_service)
+      expect(Integrations::Linear::AutoLinkService).to receive(:new).with(account: account, message: event_data[:message])
+      described_class.perform_now(hook, event_name, event_data)
+    end
+  end
+
+  context 'when handleable events like message.updated for slack' do
+    let(:process_service) { double }
+
+    before do
+      allow(process_service).to receive(:perform)
+    end
+
+    it 'calls UpdateSlackMessageJob when content_attributes changed' do
+      message = create(:message, account: account, content: 'Pick one', message_type: :outgoing,
+                                 content_type: :input_select, content_attributes: { items: [{ title: 'A', value: 'a' }] })
+      hook = create(:integrations_hook, app_id: 'slack', account: account)
+      event_data = { message: message, previous_changes: { 'content_attributes' => [{}, { 'submitted_values' => [{ 'title' => 'A' }] }] } }
+
+      allow(UpdateSlackMessageJob).to receive(:perform_later).and_return(process_service)
+      expect(UpdateSlackMessageJob).to receive(:perform_later).with(message, hook)
+      described_class.perform_now(hook, 'message.updated', event_data)
+    end
+
+    it 'does not call UpdateSlackMessageJob when content_attributes did not change' do
+      message = create(:message, account: account, content: 'Pick one', message_type: :outgoing,
+                                 content_type: :input_select, content_attributes: { items: [{ title: 'A', value: 'a' }] })
+      hook = create(:integrations_hook, app_id: 'slack', account: account)
+      event_data = { message: message, previous_changes: { 'status' => %w[sent delivered] } }
+
+      expect(UpdateSlackMessageJob).not_to receive(:perform_later)
+      described_class.perform_now(hook, 'message.updated', event_data)
+    end
+
+    it 'does not call UpdateSlackMessageJob for unsupported content types' do
+      message = create(:message, account: account, content: 'Hello', message_type: :outgoing, content_type: :text)
+      hook = create(:integrations_hook, app_id: 'slack', account: account)
+      event_data = { message: message, previous_changes: { 'content_attributes' => [{}, {}] } }
+
+      expect(UpdateSlackMessageJob).not_to receive(:perform_later)
+      described_class.perform_now(hook, 'message.updated', event_data)
     end
   end
 

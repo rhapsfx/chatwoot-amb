@@ -1,5 +1,5 @@
 import CaptainCustomTools from 'dashboard/api/captain/customTools';
-import { createStore } from './storeFactory';
+import { createStore } from '../storeFactory';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
 
 export default createStore({
@@ -19,10 +19,10 @@ export default createStore({
       }
     },
 
-    delete: async ({ commit }, id) => {
+    delete: async ({ commit }, { id, assistantId }) => {
       commit(mutations.SET_UI_FLAG, { deletingItem: true });
       try {
-        await CaptainCustomTools.delete(id);
+        await CaptainCustomTools.delete({ id, assistantId });
         commit(mutations.DELETE, id);
         commit(mutations.SET_UI_FLAG, { deletingItem: false });
         return id;

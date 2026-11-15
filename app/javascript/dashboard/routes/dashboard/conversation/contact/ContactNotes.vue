@@ -136,9 +136,9 @@ watch(
 
     <woot-modal
       v-model:show="shouldShowCreateModal"
-      :on-close="closeCreateModal"
       :close-on-backdrop-click="false"
       class="!items-start [&>div]:!top-12 [&>div]:sticky"
+      @close="closeCreateModal"
     >
       <div class="flex w-full flex-col gap-6 px-6 py-6">
         <h3 class="text-lg font-semibold text-n-slate-12">

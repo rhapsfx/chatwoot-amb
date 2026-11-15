@@ -1,12 +1,17 @@
 {
   "REGISTER": {
     "TRY_WOOT": "Fiók létrehozása",
+    "GET_STARTED": "Get started with Chatwoot",
     "TITLE": "Regisztrálás",
     "TESTIMONIAL_HEADER": "Már csak egy lépés van hátra",
     "TESTIMONIAL_CONTENT": "Már csak egy lépésre vagy!",
     "TERMS_ACCEPT": "A fiók létrehozásával elfogadod az <a href=\"https://www.chatwoot.com/terms\">ÁSZF</a> és az <a href=\"https://www.chatwoot.com/privacy-policy\">Adatkezelési nyilatkozat</a> tartalmát",
     "OAUTH": {
       "GOOGLE_SIGNUP": "Regisztráció Google-el"
+    },
+    "SHOPIFY": {
+      "TITLE": "Állítsa be a Chatwootot Shopify áruházához",
+      "DESCRIPTION": "A folytatáshoz hozza létre fiókját, majd válasszon csomagot a Shopify alkalmazás díjszabási oldalán."
     },
     "COMPANY_NAME": {
       "LABEL": "Cég neve",
@@ -44,6 +49,13 @@
       "ERROR_MESSAGE": "Nem sikerült csatlakozni a Woot szerverhez, kérjük próbáld később"
     },
     "SUBMIT": "Fiók létrehozása",
-    "HAVE_AN_ACCOUNT": "Már van fiókod?"
+    "HAVE_AN_ACCOUNT": "Már van fiókod?",
+    "VERIFY_EMAIL": {
+      "TITLE": "Check your inbox",
+      "DESCRIPTION": "We sent a verification link to {email}. Click the link to verify your email and get started.",
+      "RESEND": "Resend verification email",
+      "RESEND_SUCCESS": "Verification email sent. Please check your inbox.",
+      "RESEND_ERROR": "Could not send verification email. Please try again."
+    }
   }
 }

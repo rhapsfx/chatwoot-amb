@@ -4,43 +4,47 @@ require 'rails_helper'
 
 RSpec.describe Voice::StatusUpdateService do
   let(:account) { create(:account) }
-  let!(:contact) { create(:contact, account: account, phone_number: from_number) }
-  let(:contact_inbox) { ContactInbox.create!(contact: contact, inbox: inbox, source_id: from_number) }
+  let(:channel) { create(:channel_twilio_sms, :with_voice, account: account, phone_number: '+15551230002') }
+  let(:inbox) { channel.inbox }
+  let(:from_number) { '+15550002222' }
+  let(:call_sid) { 'CATESTSTATUS123' }
+  let(:contact) { create(:contact, account: account, phone_number: from_number) }
+  let(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: inbox, source_id: from_number) }
   let(:conversation) do
-    Conversation.create!(
-      account_id: account.id,
-      inbox_id: inbox.id,
-      contact_id: contact.id,
-      contact_inbox_id: contact_inbox.id,
-      identifier: call_sid,
-      additional_attributes: { 'call_direction' => 'inbound', 'call_status' => 'ringing' }
+    create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+  end
+  let!(:call) do
+    create(
+      :call,
+      account: account,
+      inbox: inbox,
+      conversation: conversation,
+      contact: contact,
+      provider_call_id: call_sid
     )
   end
-  let(:message) do
-    conversation.messages.create!(
+  let!(:message) do
+    msg = conversation.messages.create!(
       account_id: account.id,
       inbox_id: inbox.id,
       message_type: :incoming,
       sender: contact,
       content: 'Voice Call',
       content_type: 'voice_call',
-      content_attributes: { data: { call_sid: call_sid, status: 'ringing' } }
+      content_attributes: { 'data' => { 'call_sid' => call_sid, 'status' => 'ringing' } }
     )
+    call.update!(message_id: msg.id)
+    msg
   end
-  let(:channel) { create(:channel_voice, account: account, phone_number: '+15551230002') }
-  let(:inbox) { channel.inbox }
-  let(:from_number) { '+15550002222' }
-  let(:call_sid) { 'CATESTSTATUS123' }
 
   before do
     allow(Twilio::VoiceWebhookSetupService).to receive(:new)
       .and_return(instance_double(Twilio::VoiceWebhookSetupService, perform: "AP#{SecureRandom.hex(16)}"))
   end
 
-  it 'updates conversation and last voice message with call status' do
-    # Ensure records are created after stub setup
-    conversation
-    message
+  it 'updates the Call and touches the linked message on status transition' do
+    previous_updated_at = message.updated_at
+    travel 1.second
 
     described_class.new(
       account: account,
@@ -48,16 +52,97 @@ RSpec.describe Voice::StatusUpdateService do
       call_status: 'completed'
     ).perform
 
-    conversation.reload
+    call.reload
     message.reload
 
-    expect(conversation.additional_attributes['call_status']).to eq('completed')
-    expect(message.content_attributes.dig('data', 'status')).to eq('completed')
+    expect(call.status).to eq('completed')
+    expect(message.updated_at).to be > previous_updated_at
   end
 
-  it 'no-ops when conversation not found' do
+  it 'normalizes busy to no_answer on the Call' do
+    described_class.new(
+      account: account,
+      call_sid: call_sid,
+      call_status: 'busy'
+    ).perform
+
+    expect(call.reload.status).to eq('no_answer')
+  end
+
+  it 'keeps the provider status beside the call status and rebroadcasts the message when only that changes' do
+    described_class.new(account: account, call_sid: call_sid, call_status: 'initiated').perform
+    touched_at = message.reload.updated_at
+    travel_to(1.second.from_now) do
+      described_class.new(account: account, call_sid: call_sid, call_status: 'ringing').perform
+    end
+
+    expect(call.reload.status).to eq('ringing')
+    expect(call.provider_status).to eq('ringing')
+    expect(call.push_event_data[:provider_status]).to eq('ringing')
+    expect(message.reload.updated_at).to be > touched_at
+  end
+
+  it 'sends one message update when a callback changes both the provider status and the call status' do
+    call.update!(status: 'ringing', provider_status: 'ringing')
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+
+    described_class.new(account: account, call_sid: call_sid, call_status: 'answered').perform
+
+    expect(call.reload.status).to eq('in_progress')
+    expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(Events::Types::MESSAGE_UPDATED, any_args).once
+  end
+
+  it 'keeps the provider status when another webhook saves the conference sid from an earlier copy of the call' do
+    earlier_copy = Call.find(call.id)
+
+    described_class.new(account: account, call_sid: call_sid, call_status: 'ringing').perform
+    earlier_copy.merge_meta!('twilio_conference_sid' => 'CF123')
+
+    expect(call.reload).to have_attributes(provider_status: 'ringing', twilio_conference_sid: 'CF123')
+  end
+
+  it 'ignores a delayed callback for an earlier stage' do
+    described_class.new(account: account, call_sid: call_sid, call_status: 'ringing').perform
+    described_class.new(account: account, call_sid: call_sid, call_status: 'initiated').perform
+
+    expect(call.reload.provider_status).to eq('ringing')
+  end
+
+  it 'ranks the in-progress aliases with in-progress' do
+    described_class.new(account: account, call_sid: call_sid, call_status: 'answered').perform
+    described_class.new(account: account, call_sid: call_sid, call_status: 'ringing').perform
+
+    expect(call.reload.provider_status).to eq('answered')
+  end
+
+  it 'does not let a delayed live callback follow a terminal one' do
+    described_class.new(account: account, call_sid: call_sid, call_status: 'completed').perform
+    Call.where(id: call.id).update_all(status: 'in_progress') # rubocop:disable Rails/SkipsModelValidations
+    described_class.new(account: account, call_sid: call_sid, call_status: 'ringing').perform
+
+    expect(call.reload.provider_status).to eq('completed')
+  end
+
+  it 'leaves the provider status alone once the call has ended' do
+    call.update!(status: 'completed')
+
+    described_class.new(account: account, call_sid: call_sid, call_status: 'completed').perform
+
+    expect(call.reload.provider_status).to be_nil
+  end
+
+  it 'no-ops when no Call matches the provided call_sid' do
     expect do
       described_class.new(account: account, call_sid: 'UNKNOWN', call_status: 'busy').perform
     end.not_to raise_error
+  end
+
+  it 'records the answered status Twilio reports after a failed join ended the call unanswered' do
+    call.update!(status: 'no_answer', direction: :outgoing,
+                 meta: call.meta.merge('unanswered_by_failed_join' => true, 'provider_status' => 'ringing'))
+
+    described_class.new(account: account, call_sid: call_sid, call_status: 'in-progress', payload: { 'Timestamp' => Time.zone.now.iso8601 }).perform
+
+    expect(call.reload).to have_attributes(status: 'failed', provider_status: 'in-progress')
   end
 end

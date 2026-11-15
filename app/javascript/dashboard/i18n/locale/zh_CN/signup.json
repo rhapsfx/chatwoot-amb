@@ -1,12 +1,17 @@
 {
   "REGISTER": {
     "TRY_WOOT": "创建新账户",
+    "GET_STARTED": "开始使用Chatwoot",
     "TITLE": "注册",
     "TESTIMONIAL_HEADER": "只差最后一步就可以了",
     "TESTIMONIAL_CONTENT": "您离吸引客户、留住客户和寻找新客户仅一步之遥。",
     "TERMS_ACCEPT": "通过创建账户, 你将同意我们的 <a href=\"https://www.chatwoot.com/terms\">T & C</a> 以及 <a href=\"https://www.chatwoot.com/privacy-policy\">隐私政策</a>",
     "OAUTH": {
       "GOOGLE_SIGNUP": "使用 Google 注册"
+    },
+    "SHOPIFY": {
+      "TITLE": "Set up Chatwoot for your Shopify store",
+      "DESCRIPTION": "Create your account to continue to Shopify App Pricing and choose a plan."
     },
     "COMPANY_NAME": {
       "LABEL": "公司名称",
@@ -44,6 +49,13 @@
       "ERROR_MESSAGE": "无法与 Woot 服务器建立连接。请重试。"
     },
     "SUBMIT": "创建新账户",
-    "HAVE_AN_ACCOUNT": "已经有帐号？"
+    "HAVE_AN_ACCOUNT": "已经有帐号？",
+    "VERIFY_EMAIL": {
+      "TITLE": "Check your inbox",
+      "DESCRIPTION": "We sent a verification link to {email}. Click the link to verify your email and get started.",
+      "RESEND": "重新发送验证邮件",
+      "RESEND_SUCCESS": "Verification email sent. Please check your inbox.",
+      "RESEND_ERROR": "Could not send verification email. Please try again."
+    }
   }
 }

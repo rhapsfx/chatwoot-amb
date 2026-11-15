@@ -1,8 +1,8 @@
 <script setup>
-import { computed, h, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
-import { picoSearch } from '@scmmishra/pico-search';
+import { picoSearch } from '@chatwoot/pico-search';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useUISettings } from 'dashboard/composables/useUISettings';
@@ -10,7 +10,7 @@ import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 
-import SettingsPageLayout from 'dashboard/components-next/captain/SettingsPageLayout.vue';
+import PageLayout from 'dashboard/components-next/captain/PageLayout.vue';
 import SettingsHeader from 'dashboard/components-next/captain/pageComponents/settings/SettingsHeader.vue';
 import SuggestedScenarios from 'dashboard/components-next/captain/assistant/SuggestedRules.vue';
 import ScenariosCard from 'dashboard/components-next/captain/assistant/ScenariosCard.vue';
@@ -22,36 +22,16 @@ const route = useRoute();
 const store = useStore();
 const { uiSettings, updateUISettings } = useUISettings();
 const { formatMessage } = useMessageFormatter();
-const assistantId = route.params.assistantId;
+const assistantId = computed(() => Number(route.params.assistantId));
 
 const uiFlags = useMapGetter('captainScenarios/getUIFlags');
 const isFetching = computed(() => uiFlags.value.fetchingList);
-const assistant = computed(() =>
-  store.getters['captainAssistants/getRecord'](Number(assistantId))
-);
 const scenarios = useMapGetter('captainScenarios/getRecords');
 
 const searchQuery = ref('');
 
-const breadcrumbItems = computed(() => {
-  return [
-    {
-      label: t('CAPTAIN.ASSISTANTS.SETTINGS.BREADCRUMB.ASSISTANT'),
-      routeName: 'captain_assistants_index',
-    },
-    { label: assistant.value?.name, routeName: 'captain_assistants_edit' },
-    { label: t('CAPTAIN.ASSISTANTS.SCENARIOS.BREADCRUMB.TITLE') },
-  ];
-});
-
 const LINK_INSTRUCTION_CLASS =
   '[&_a[href^="tool://"]]:text-n-iris-11 [&_a:not([href^="tool://"])]:text-n-slate-12 [&_a]:pointer-events-none [&_a]:cursor-default';
-
-const renderInstruction = instruction => () =>
-  h('span', {
-    class: `text-sm text-n-slate-12 py-4 prose prose-sm min-w-0 break-words ${LINK_INSTRUCTION_CLASS}`,
-    innerHTML: instruction,
-  });
 
 // Suggested example scenarios for quick add
 const scenariosExample = [
@@ -84,6 +64,17 @@ const closeSuggestedRules = () => {
 // Bulk selection & hover state
 const bulkSelectedIds = ref(new Set());
 const hoveredCard = ref(null);
+const pendingToggleIds = ref(new Set());
+
+const setTogglePending = (id, isPending) => {
+  const pendingIds = new Set(pendingToggleIds.value);
+  if (isPending) {
+    pendingIds.add(id);
+  } else {
+    pendingIds.delete(id);
+  }
+  pendingToggleIds.value = pendingIds;
+};
 
 const handleRuleSelect = id => {
   const selected = new Set(bulkSelectedIds.value);
@@ -119,7 +110,7 @@ const updateScenario = async scenario => {
   try {
     await store.dispatch('captainScenarios/update', {
       id: scenario.id,
-      assistantId: route.params.assistantId,
+      assistantId: assistantId.value,
       ...scenario,
       tools: getToolsFromInstruction(scenario.instruction),
     });
@@ -132,11 +123,32 @@ const updateScenario = async scenario => {
   }
 };
 
+const toggleScenario = async ({ id, enabled }) => {
+  if (pendingToggleIds.value.has(id)) return;
+
+  setTogglePending(id, true);
+  try {
+    await store.dispatch('captainScenarios/update', {
+      id,
+      assistantId: assistantId.value,
+      enabled,
+    });
+    const successMessage = enabled
+      ? t('CAPTAIN.ASSISTANTS.SCENARIOS.API.TOGGLE.ENABLED')
+      : t('CAPTAIN.ASSISTANTS.SCENARIOS.API.TOGGLE.DISABLED');
+    useAlert(successMessage);
+  } catch {
+    useAlert(t('CAPTAIN.ASSISTANTS.SCENARIOS.API.TOGGLE.ERROR'));
+  } finally {
+    setTogglePending(id, false);
+  }
+};
+
 const deleteScenario = async id => {
   try {
     await store.dispatch('captainScenarios/delete', {
       id,
-      assistantId: route.params.assistantId,
+      assistantId: assistantId.value,
     });
     useAlert(t('CAPTAIN.ASSISTANTS.SCENARIOS.API.DELETE.SUCCESS'));
   } catch (error) {
@@ -154,7 +166,7 @@ const bulkDeleteScenarios = async ids => {
     idsArray.map(id =>
       store.dispatch('captainScenarios/delete', {
         id,
-        assistantId: route.params.assistantId,
+        assistantId: assistantId.value,
       })
     )
   );
@@ -165,7 +177,7 @@ const bulkDeleteScenarios = async ids => {
 const addScenario = async scenario => {
   try {
     await store.dispatch('captainScenarios/create', {
-      assistantId: route.params.assistantId,
+      assistantId: assistantId.value,
       ...scenario,
       tools: getToolsFromInstruction(scenario.instruction),
     });
@@ -182,7 +194,7 @@ const addAllExampleScenarios = async () => {
   try {
     scenariosExample.forEach(async scenario => {
       await store.dispatch('captainScenarios/create', {
-        assistantId: route.params.assistantId,
+        assistantId: assistantId.value,
         ...scenario,
       });
     });
@@ -197,16 +209,27 @@ const addAllExampleScenarios = async () => {
 
 onMounted(() => {
   store.dispatch('captainScenarios/get', {
-    assistantId: assistantId,
+    assistantId: assistantId.value,
   });
-  store.dispatch('captainTools/getTools');
 });
+
+watch(
+  assistantId,
+  id => {
+    store.dispatch('captainTools/getTools', {
+      assistantId: id,
+    });
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <SettingsPageLayout
-    :breadcrumb-items="breadcrumbItems"
+  <PageLayout
+    :header-title="$t('CAPTAIN.ASSISTANTS.SCENARIOS.TITLE')"
     :is-fetching="isFetching"
+    :show-know-more="false"
+    :show-pagination-footer="false"
   >
     <template #body>
       <SettingsHeader
@@ -240,8 +263,12 @@ onMounted(() => {
               <span class="text-sm text-n-slate-11 mt-2">
                 {{ item.description }}
               </span>
-              <component
-                :is="renderInstruction(formatMessage(item.instruction, false))"
+              <span
+                v-dompurify-html:toolLinks="
+                  formatMessage(item.instruction, false)
+                "
+                class="text-sm text-n-slate-12 py-4 prose prose-sm min-w-0 break-words"
+                :class="LINK_INSTRUCTION_CLASS"
               />
               <span class="text-sm text-n-slate-11 font-medium mb-1">
                 {{ t('CAPTAIN.ASSISTANTS.SCENARIOS.ADD.SUGGESTED.TOOLS_USED') }}
@@ -298,6 +325,8 @@ onMounted(() => {
             :description="scenario.description"
             :instruction="scenario.instruction"
             :tools="scenario.tools"
+            :enabled="scenario.enabled"
+            :is-updating="pendingToggleIds.has(scenario.id)"
             :is-selected="bulkSelectedIds.has(scenario.id)"
             :selectable="
               hoveredCard === scenario.id || bulkSelectedIds.size > 0
@@ -305,10 +334,11 @@ onMounted(() => {
             @select="handleRuleSelect"
             @delete="deleteScenario(scenario.id)"
             @update="updateScenario"
+            @toggle="toggleScenario"
             @hover="isHovered => handleRuleHover(isHovered, scenario.id)"
           />
         </div>
       </div>
     </template>
-  </SettingsPageLayout>
+  </PageLayout>
 </template>

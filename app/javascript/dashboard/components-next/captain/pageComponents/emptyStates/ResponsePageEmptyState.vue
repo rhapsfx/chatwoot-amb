@@ -1,5 +1,6 @@
 <script setup>
 import { useAccount } from 'dashboard/composables/useAccount';
+import { useBranding } from 'shared/composables/useBranding';
 import EmptyStateLayout from 'dashboard/components-next/EmptyStateLayout.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import ResponseCard from 'dashboard/components-next/captain/assistant/ResponseCard.vue';
@@ -7,7 +8,9 @@ import FeatureSpotlight from 'dashboard/components-next/feature-spotlight/Featur
 import { responsesList } from 'dashboard/components-next/captain/pageComponents/emptyStates/captainEmptyStateContent.js';
 
 const emit = defineEmits(['click']);
+
 const { isOnChatwootCloud } = useAccount();
+const { replaceInstallationName } = useBranding();
 
 const onClick = () => {
   emit('click');
@@ -28,6 +31,7 @@ const onClick = () => {
     :title="$t('CAPTAIN.RESPONSES.EMPTY_STATE.TITLE')"
     :subtitle="$t('CAPTAIN.RESPONSES.EMPTY_STATE.SUBTITLE')"
     :action-perms="['administrator']"
+    show-backdrop
   >
     <template #empty-state-item>
       <div class="grid grid-cols-1 gap-4 p-px overflow-hidden">
@@ -35,8 +39,8 @@ const onClick = () => {
           v-for="(response, index) in responsesList.slice(0, 5)"
           :id="response.id"
           :key="`response-${index}`"
-          :question="response.question"
-          :answer="response.answer"
+          :question="replaceInstallationName(response.question)"
+          :answer="replaceInstallationName(response.answer)"
           :status="response.status"
           :assistant="response.assistant"
           :created-at="response.created_at"
@@ -45,11 +49,13 @@ const onClick = () => {
       </div>
     </template>
     <template #actions>
-      <Button
-        :label="$t('CAPTAIN.RESPONSES.ADD_NEW')"
-        icon="i-lucide-plus"
-        @click="onClick"
-      />
+      <div class="flex flex-col items-center gap-3">
+        <Button
+          :label="$t('CAPTAIN.RESPONSES.ADD_NEW')"
+          icon="i-lucide-plus"
+          @click="onClick"
+        />
+      </div>
     </template>
   </EmptyStateLayout>
 </template>

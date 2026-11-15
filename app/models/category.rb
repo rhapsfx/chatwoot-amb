@@ -5,6 +5,7 @@
 #  id                     :bigint           not null, primary key
 #  description            :text
 #  icon                   :string           default("")
+#  icon_color             :string           default("")
 #  locale                 :string           default("en")
 #  name                   :string
 #  position               :integer
@@ -73,6 +74,23 @@ class Category < ApplicationRecord
     params[:page] || 1
   end
 
+  def translation_family
+    root_id = associated_category_id || id
+    categories = portal.categories
+
+    categories.where(id: root_id).or(categories.where(associated_category_id: root_id))
+  end
+
+  def self.update_positions(portal:, positions_hash:)
+    return if positions_hash.blank?
+
+    transaction do
+      positions_hash.each do |category_id, new_position|
+        portal.categories.find(category_id).update!(position: new_position)
+      end
+    end
+  end
+
   private
 
   def ensure_account_id
@@ -82,7 +100,7 @@ class Category < ApplicationRecord
   def allowed_locales
     return if portal.blank?
 
-    allowed_locales = portal.config['allowed_locales']
+    allowed_locales = portal.allowed_locale_codes
 
     return true if allowed_locales.include?(locale)
 

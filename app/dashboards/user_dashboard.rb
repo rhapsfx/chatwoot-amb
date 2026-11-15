@@ -25,7 +25,7 @@ class UserDashboard < Administrate::BaseDashboard
     current_sign_in_ip: Field::String,
     last_sign_in_ip: Field::String,
     confirmation_token: Field::String,
-    confirmed_at: Field::DateTime,
+    confirmed_at: ConfirmedAtField,
     confirmation_sent_at: Field::DateTime,
     unconfirmed_email: Field::String,
     name: Field::String.with_options(searchable: true),
@@ -36,8 +36,7 @@ class UserDashboard < Administrate::BaseDashboard
     updated_at: Field::DateTime,
     pubsub_token: Field::String,
     type: Field::Select.with_options(collection: [nil, 'SuperAdmin']),
-    accounts: CountField,
-    access_token: Field::HasOne
+    accounts: CountField
   }.freeze
 
   # COLLECTION_ATTRIBUTES
@@ -68,7 +67,6 @@ class UserDashboard < Administrate::BaseDashboard
     updated_at
     confirmed_at
     account_users
-    access_token
   ].freeze
 
   # FORM_ATTRIBUTES

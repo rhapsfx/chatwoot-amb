@@ -22,6 +22,12 @@ RSpec.describe Account do
   describe 'length validations' do
     let(:account) { create(:account) }
 
+    it 'validates name presence' do
+      account.name = ''
+      account.valid?
+      expect(account.errors[:name]).to include("can't be blank")
+    end
+
     it 'validates name length' do
       account.name = 'a' * 256
       account.valid?
@@ -41,6 +47,170 @@ RSpec.describe Account do
     it 'returns ChatwootApp.max limits' do
       expect(account.usage_limits[:agents]).to eq(ChatwootApp.max_limit)
       expect(account.usage_limits[:inboxes]).to eq(ChatwootApp.max_limit)
+    end
+  end
+
+  describe '#api_and_webhooks_enabled?' do
+    it 'is enabled for self-hosted accounts regardless of the stored feature flag' do
+      account = create(:account)
+      account.disable_features!('api_and_webhooks')
+
+      expect(account.api_and_webhooks_enabled?).to be true
+    end
+  end
+
+  describe '#enforce_mfa?' do
+    let(:account) { create(:account) }
+
+    before do
+      skip('Skipping since MFA is not configured in this environment') unless Chatwoot.encryption_configured?
+    end
+
+    it 'returns false by default' do
+      expect(account.enforce_mfa?).to be false
+    end
+
+    it 'returns true when setting enabled' do
+      account.update!(enforce_mfa: true)
+      expect(account.reload.enforce_mfa?).to be true
+    end
+
+    it 'rejects non-boolean values via settings schema' do
+      expect { account.update!(enforce_mfa: 'true') }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it 'returns false when MFA feature is unavailable' do
+      account.update!(enforce_mfa: true)
+      allow(Chatwoot).to receive(:mfa_enabled?).and_return(false)
+      expect(account.enforce_mfa?).to be false
+    end
+  end
+
+  describe 'captain defaults for new accounts' do
+    it 'does not store Captain model overrides or enable premium Captain features' do
+      InstallationConfig.find_or_initialize_by(name: 'ACCOUNT_LEVEL_FEATURE_DEFAULTS').update!(
+        value: Featurable::FEATURE_LIST,
+        locked: true
+      )
+
+      account = create(:account)
+
+      expect(account).not_to be_feature_enabled('captain_integration')
+      expect(account.captain_models).to be_nil
+    end
+  end
+
+  describe 'conversation unread counts feature flag' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:store) { Conversations::UnreadCounts::Store }
+    let(:inbox_key) { store.inbox_key(account.id, inbox.id) }
+
+    after do
+      store.clear_account!(account.id)
+    end
+
+    it 'clears unread count cache when the feature is enabled' do
+      build_unread_count_cache
+
+      account.enable_features!(:conversation_unread_counts)
+
+      expect(store.base_ready?(account.id)).to be(false)
+      expect(store.assignment_ready?(account.id)).to be(false)
+      expect(store.counts_for_keys([inbox_key])).to eq(inbox_key => 0)
+    end
+
+    it 'clears unread count cache when the feature is disabled' do
+      account.enable_features!(:conversation_unread_counts)
+      build_unread_count_cache
+
+      account.disable_features!(:conversation_unread_counts)
+
+      expect(store.base_ready?(account.id)).to be(false)
+      expect(store.assignment_ready?(account.id)).to be(false)
+      expect(store.counts_for_keys([inbox_key])).to eq(inbox_key => 0)
+    end
+
+    def build_unread_count_cache
+      store.mark_base_ready!(account.id)
+      store.mark_assignment_ready!(account.id)
+      store.add_base_membership(account_id: account.id, inbox_id: inbox.id, label_ids: [], conversation_id: 1)
+    end
+  end
+
+  describe 'resuming delayed automations' do
+    let(:account) { create(:account) }
+
+    it 'reschedules the overdue backlog in the same transaction that re-enables the flag' do
+      row = create(:automation_rule_pending_execution, account: account, due_at: 5.days.ago)
+
+      ActiveRecord::Base.transaction(requires_new: true) do
+        account.enable_features!('delayed_automations')
+        # Still uncommitted: no sweep can see the flag yet, and the backlog is already re-clocked,
+        # so there is no window where the account is sweepable on a stale due_at.
+        expect(row.reload.due_at).to be_within(5.seconds).of(Time.current)
+        raise ActiveRecord::Rollback
+      end
+
+      expect(account.reload.feature_delayed_automations?).to be(false)
+      expect(row.reload.due_at).to be_within(5.seconds).of(5.days.ago)
+    end
+
+    it 'leaves the backlog alone when the flag is turned off' do
+      account.enable_features!('delayed_automations')
+      row = create(:automation_rule_pending_execution, account: account, due_at: 5.days.ago)
+
+      account.disable_features!('delayed_automations')
+
+      expect(row.reload.due_at).to be_within(5.seconds).of(5.days.ago)
+    end
+  end
+
+  describe 'feature flag columns' do
+    let(:account) { described_class.new(name: 'Test Account') }
+
+    it 'configures the account feature flag extension column' do
+      expect(described_class.flag_columns).to include('feature_flags', 'feature_flags_ext_1')
+      expect(described_class.flag_mapping['feature_flags_ext_1']).to eq(
+        feature_whatsapp_manual_transfer: 1,
+        feature_data_import: 1 << 1,
+        feature_api_and_webhooks: 1 << 2,
+        feature_whatsapp_reconfigure: 1 << 3,
+        feature_whatsapp_embedded_signup_inbox_creation: 1 << 4,
+        feature_delayed_automations: 1 << 5,
+        feature_audit_log_ip_address: 1 << 6,
+        feature_captain_classifier: 1 << 7,
+        feature_conversation_monitors: 1 << 8,
+        feature_campaign_analytics: 1 << 9,
+        feature_company_enrichment: 1 << 10,
+        feature_stripe_integration: 1 << 11,
+        feature_mobile_voice_push: 1 << 12,
+        feature_auto_translate: 1 << 13,
+        feature_copilot_workflows: 1 << 14
+      )
+      expect(described_class.flag_mapping['feature_flags_ext_1'][:feature_whatsapp_manual_transfer]).to eq(1)
+      expect(described_class.flag_mapping['feature_flags_ext_1'][:feature_data_import]).to eq(2)
+      expect(described_class.flag_mapping['feature_flags_ext_1'][:feature_whatsapp_embedded_signup_inbox_creation]).to eq(16)
+    end
+
+    it 'keeps existing feature flags on the original column' do
+      expect(described_class.flag_mapping['feature_flags'][:feature_inbound_emails]).to eq(1)
+      expect(described_class.flag_mapping['feature_flags'][:feature_advanced_assignment]).to eq(1 << 62)
+    end
+
+    it 'keeps bulk selected feature assignment compatible with existing feature names' do
+      account.selected_feature_flags = [:feature_ip_lookup, :feature_assignment_v2, :feature_advanced_assignment, :feature_data_import]
+
+      expect(account).to be_feature_ip_lookup
+      expect(account).to be_feature_assignment_v2
+      expect(account).to be_feature_advanced_assignment
+      expect(account).to be_feature_data_import
+      expect(account.selected_feature_flags).to contain_exactly(
+        :feature_ip_lookup,
+        :feature_assignment_v2,
+        :feature_advanced_assignment,
+        :feature_data_import
+      )
     end
   end
 
@@ -159,6 +329,15 @@ RSpec.describe Account do
         account.settings = { auto_resolve_after: nil }
         expect(account).to be_valid
       end
+
+      it 'keeps a saved value valid after the minimum is raised' do
+        with_modified_env AUTO_RESOLVE_MIN_MINUTES: '5' do
+          account.update!(auto_resolve_after: 5)
+        end
+
+        expect(account.reload.update(name: 'Renamed')).to be(true)
+        expect(account.update(auto_resolve_after: 6)).to be(false)
+      end
     end
 
     context 'when auto_resolve_message' do
@@ -192,6 +371,44 @@ RSpec.describe Account do
         expect(account.settings['auto_resolve_message']).to eq(message)
       end
 
+      it 'defaults captain_auto_resolve_mode to legacy when captain_tasks is disabled' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(false)
+
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account).to be_captain_auto_resolve_legacy
+      end
+
+      it 'defaults captain_auto_resolve_mode to evaluated when captain_tasks is enabled' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(true)
+
+        expect(account.captain_auto_resolve_mode).to eq('evaluated')
+        expect(account).to be_captain_auto_resolve_evaluated
+      end
+
+      it 'correctly gets and sets captain_auto_resolve_mode' do
+        account.captain_auto_resolve_mode = 'legacy'
+
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account.settings['captain_auto_resolve_mode']).to eq('legacy')
+        expect(account).to be_captain_auto_resolve_legacy
+      end
+
+      it 'allows clearing captain_auto_resolve_mode to fall back to feature defaults' do
+        allow(account).to receive(:feature_enabled?).with('captain_tasks').and_return(false)
+        account.captain_auto_resolve_mode = nil
+
+        expect(account).to be_valid
+        expect(account.captain_auto_resolve_mode).to eq('legacy')
+        expect(account.settings['captain_auto_resolve_mode']).to be_nil
+      end
+
+      it 'falls back to disabled mode from legacy settings key' do
+        account.settings = { 'captain_disable_auto_resolve' => true }
+
+        expect(account.captain_auto_resolve_mode).to eq('disabled')
+        expect(account).to be_captain_auto_resolve_disabled
+      end
+
       it 'handles nil values correctly' do
         account.auto_resolve_after = nil
         account.auto_resolve_message = nil
@@ -203,12 +420,129 @@ RSpec.describe Account do
     context 'when using with_auto_resolve scope' do
       it 'finds accounts with auto_resolve_after set' do
         account.update(auto_resolve_after: 40 * 24 * 60)
-        expect(described_class.with_auto_resolve).to include(account)
+        expect(described_class.with_auto_resolve.pluck(:id)).to include(account.id)
       end
 
       it 'does not find accounts without auto_resolve_after' do
         account.update(auto_resolve_after: nil)
-        expect(described_class.with_auto_resolve).not_to include(account)
+        expect(described_class.with_auto_resolve.pluck(:id)).not_to include(account.id)
+      end
+    end
+
+    context 'when support_email is set' do
+      it 'allows a plain email address' do
+        account.support_email = 'support@example.com'
+        expect(account).to be_valid
+      end
+
+      it 'allows display-name format' do
+        account.support_email = 'Support Team <support@example.com>'
+        expect(account).to be_valid
+      end
+
+      it 'allows blank values' do
+        account.support_email = ''
+        expect(account).to be_valid
+      end
+
+      it 'rejects malformed strings with no email part' do
+        account.support_email = 'Smith Smith'
+        expect(account).not_to be_valid
+        expect(account.errors[:support_email]).to include(I18n.t('errors.account.support_email.invalid'))
+      end
+    end
+
+    context 'when reporting_timezone is set' do
+      it 'allows valid timezone names' do
+        account.reporting_timezone = 'America/New_York'
+
+        expect(account).to be_valid
+      end
+
+      it 'rejects invalid timezone names' do
+        account.reporting_timezone = 'Invalid/Timezone'
+
+        expect(account).not_to be_valid
+        expect(account.errors[:reporting_timezone]).to include(I18n.t('errors.account.reporting_timezone.invalid'))
+      end
+    end
+  end
+
+  describe 'captain_preferences' do
+    let(:account) { create(:account) }
+
+    describe 'with no saved preferences' do
+      before do
+        account.update!(captain_models: nil)
+      end
+
+      it 'returns defaults from llm.yml' do
+        prefs = account.captain_preferences
+
+        expect(prefs[:features].values).to all(be false)
+
+        Llm::Models.feature_keys.each do |feature|
+          expect(prefs[:models][feature]).to eq(Llm::Models.default_model_for(feature))
+        end
+      end
+
+      it 'returns GPT-5.2 for assistant when Captain V2 is enabled' do
+        account.enable_features!('captain_integration')
+
+        expect(account.captain_preferences[:models]['assistant']).to eq('gpt-5.2')
+        expect(account.reload.captain_models).to be_nil
+      end
+    end
+
+    describe 'with saved model preferences' do
+      it 'returns saved preferences merged with defaults' do
+        account.update!(captain_models: { 'editor' => 'gpt-5-mini', 'assistant' => 'gpt-5.2' })
+
+        prefs = account.captain_preferences
+
+        expect(prefs[:models]['editor']).to eq('gpt-5-mini')
+        expect(prefs[:models]['assistant']).to eq('gpt-5.2')
+        expect(prefs[:models]['copilot']).to eq(Llm::Models.default_model_for('copilot'))
+      end
+    end
+
+    describe 'with saved feature preferences' do
+      it 'returns saved feature states' do
+        account.update!(captain_features: { 'editor' => true, 'assistant' => true })
+
+        prefs = account.captain_preferences
+
+        expect(prefs[:features]['editor']).to be true
+        expect(prefs[:features]['assistant']).to be true
+        expect(prefs[:features]['copilot']).to be false
+      end
+    end
+
+    describe 'validation' do
+      it 'rejects invalid model for a feature' do
+        account.captain_models = { 'help_center_query_translation' => 'gpt-5.1' }
+
+        expect(account).not_to be_valid
+        expect(account.errors[:captain_models].first).to include('not a valid model for help_center_query_translation')
+      end
+
+      it 'accepts valid model for a feature' do
+        account.captain_models = { 'editor' => 'gpt-5-mini', 'help_center_query_translation' => 'gpt-5-mini' }
+
+        expect(account).to be_valid
+      end
+
+      it 'rejects unknown feature keys' do
+        account.captain_models = { 'unknown_feature' => 'gpt-5.1' }
+
+        expect(account).not_to be_valid
+        expect(account.errors[:captain_models]).to include("'unknown_feature' is not a known feature")
+      end
+
+      it 'removes blank model overrides before saving' do
+        account.update!(captain_models: { 'editor' => '', 'assistant' => 'gpt-5.2' })
+
+        expect(account.captain_models).to eq('assistant' => 'gpt-5.2')
       end
     end
   end

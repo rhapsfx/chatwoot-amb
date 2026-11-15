@@ -43,7 +43,8 @@ class Notification < ApplicationRecord
     participating_conversation_new_message: 5,
     sla_missed_first_response: 6,
     sla_missed_next_response: 7,
-    sla_missed_resolution: 8
+    sla_missed_resolution: 8,
+    voice_call_missed: 9
   }.freeze
 
   enum notification_type: NOTIFICATION_TYPES
@@ -81,7 +82,8 @@ class Notification < ApplicationRecord
       notification_type: notification_type,
       primary_actor_id: primary_actor_id,
       primary_actor_type: primary_actor_type,
-      primary_actor: primary_actor.push_event_data.with_indifferent_access.slice('conversation_id', 'id')
+      primary_actor: primary_actor.push_event_data.with_indifferent_access.slice('conversation_id', 'id'),
+      account_id: account_id
     }
   end
 
@@ -180,7 +182,17 @@ class Notification < ApplicationRecord
   end
 
   def dispatch_destroy_event
-    Rails.configuration.dispatcher.dispatch(NOTIFICATION_DELETED, Time.zone.now, notification: self)
+    # Pass serialized data instead of ActiveRecord object to avoid DeserializationError
+    # when the async EventDispatcherJob runs after the notification has been deleted
+    Rails.configuration.dispatcher.dispatch(
+      NOTIFICATION_DELETED,
+      Time.zone.now,
+      notification_data: {
+        id: id,
+        user_id: user_id,
+        account_id: account_id
+      }
+    )
   end
 
   def set_last_activity_at
@@ -196,3 +208,5 @@ class Notification < ApplicationRecord
     }
   end
 end
+
+Notification.prepend_mod_with('Notification')

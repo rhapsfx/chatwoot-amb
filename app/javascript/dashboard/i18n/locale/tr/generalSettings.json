@@ -1,8 +1,8 @@
 {
   "GENERAL_SETTINGS": {
     "LIMIT_MESSAGES": {
-      "CONVERSATION": "Sohbet sınırını aştınız. Hacker planı yalnızca 500 sohbete izin verir.",
-      "INBOXES": "Gelen kutusu sınırını aştınız. Hacker planı yalnızca web sitesi canlı sohbetini destekler. E-posta, WhatsApp gibi ek gelen kutuları ücretli plan gerektirir.",
+      "CONVERSATION": "Konuşma limitini aştınız. Hacker planı yalnızca 500 konuşmaya izin vermektedir.",
+      "INBOXES": "Gelen kutusu limitini aştınız. Hacker planı yalnızca web sitesi canlı sohbetini desteklemektedir. E-posta, WhatsApp gibi ek gelen kutuları ücretli bir plan gerektirir.",
       "AGENTS": "Temsilci sınırını aştınız. Planınız yalnızca {allowedAgents} temsilciye izin veriyor.",
       "NON_ADMIN": "Tüm özellikleri kullanmaya devam etmek için lütfen yöneticinizle iletişime geçin ve planı yükseltin."
     },
@@ -20,10 +20,10 @@
       "BUTTON_TEXT": "Hesabınızı Silin",
       "CONFIRM": {
         "TITLE": "Hesabı Sil",
-        "MESSAGE": "Hesabınızı silmek geri alınamaz. Kalıcı olarak silmek istediğinizi onaylamak için aşağıya hesap adınızı girin.",
+        "MESSAGE": "Hesabınızı silmek geri alınamaz bir işlemdir. Kalıcı olarak silmek istediğinizi onaylamak için aşağıya hesap adınızı girin.",
         "BUTTON_TEXT": "Sil",
         "DISMISS": "İptal Et",
-        "PLACE_HOLDER": "{accountName} yazarak onaylayın"
+        "PLACE_HOLDER": "Onaylamak için lütfen {accountName} yazın"
       },
       "SUCCESS": "Hesap silinmek üzere işaretlendi",
       "FAILURE": "Hesap silinemedi, tekrar deneyin!",
@@ -44,14 +44,43 @@
         "TITLE": "Hesap Kimliği",
         "NOTE": "API tabanlı bir entegrasyon oluşturuyorsanız bu kimlik gereklidir"
       },
+      "TRANSLATION": {
+        "TITLE": "Translation",
+        "NOTE": "Speak every customer's language, whatever languages your team knows.",
+        "CAPTAIN": {
+          "TITLE": "Captain",
+          "NOTE": "AI translations that sound natural and keep your tone."
+        },
+        "GOOGLE": {
+          "TITLE": "Google Çeviri",
+          "NOTE": "Quick, reliable translations from Google.",
+          "NOT_CONNECTED": "Not connected",
+          "CONNECT": "Bağlan",
+          "NOT_CONNECTED_HINT": "Google Translate isn't connected yet."
+        },
+        "UPGRADE": {
+          "NOTE": "Upgrade to a paid plan to translate conversations with Captain or Google Translate.",
+          "BUTTON": "Yükselt"
+        },
+        "AUTO_TRANSLATE": {
+          "TITLE": "Auto-translate conversations",
+          "NOTE": "Read every message in your language. Customers get replies in theirs.",
+          "LOCKED": "Choose a service to turn this on.",
+          "NOT_AVAILABLE": "Auto-translate isn't enabled for this account yet."
+        },
+        "API": {
+          "SUCCESS": "Translation settings updated successfully",
+          "ERROR": "Failed to update translation settings"
+        }
+      },
       "AUTO_RESOLVE": {
-        "TITLE": "Sohbetleri otomatik çöz",
-        "NOTE": "Bu yapılandırma, belirli bir süre etkinlik olmadığında sohbeti otomatik olarak çözmenizi sağlar.",
+        "TITLE": "Konuşmaları Otomatik Çöz",
+        "NOTE": "Bu yapılandırma, belirli bir hareketsizlik süresinden sonra konuşmayı otomatik olarak çözümlemenize olanak tanır.",
         "DURATION": {
-          "LABEL": "Etkinliksizlik süresi",
-          "HELP": "Sohbetin otomatik olarak çözüleceği etkinliksizlik süresi",
+          "LABEL": "Hareketsizlik süresi",
+          "HELP": "Konuşmanın otomatik olarak çözümlenmesinden önceki hareketsizlik süresi",
           "PLACEHOLDER": "30",
-          "ERROR": "Otomatik çözme süresi 10 dakika ile 999 gün arasında olmalıdır",
+          "ERROR": "Auto resolve duration should be between {minDuration} minutes and 999 days",
           "API": {
             "SUCCESS": "Otomatik çözme ayarları başarıyla güncellendi",
             "ERROR": "Otomatik çözme ayarları güncellenemedi"
@@ -59,8 +88,8 @@
         },
         "MESSAGE": {
           "LABEL": "Özel otomatik çözüm mesajı",
-          "PLACEHOLDER": "Sohbet, 15 gün etkinlik olmadığı için sistem tarafından çözüldü olarak işaretlendi",
-          "HELP": "Sohbet otomatik olarak çözüldükten sonra müşteriye gönderilen mesaj"
+          "PLACEHOLDER": "Konuşma, 15 günlük hareketsizlik nedeniyle sistem tarafından çözümlendi olarak işaretlendi",
+          "HELP": "Konuşma otomatik olarak çözüldükten sonra müşteriye gönderilen mesaj"
         },
         "PREFERENCES": "Tercihler",
         "LABEL": {
@@ -94,19 +123,27 @@
       },
       "AUTO_RESOLVE_IGNORE_WAITING": {
         "LABEL": "Yanıtsız sohbetleri hariç tut",
-        "HELP": "Etkinleştirildiğinde, sistem hâlâ temsilci yanıtı bekleyen sohbetleri çözmeyi atlayacaktır."
+        "HELP": "Etkinleştirildiğinde, sistem hâlâ bir temsilcinin yanıtını bekleyen konuşmaları çözümlemeyi atlayacaktır."
       },
       "AUDIO_TRANSCRIPTION": {
-        "TITLE": "Sesli Mesajları Yazıya Döktür",
-        "NOTE": "Sohbetlerdeki sesli mesajları otomatik olarak yazıya dökün. Bir sesli mesaj gönderildiğinde veya alındığında bir metin dökümü oluşturun ve mesajın yanında gösterin.",
+        "TITLE": "Sesli Mesajları Metne Çevir",
+        "NOTE": "Konuşmalardaki sesli mesajları otomatik olarak metne çevirin. Bir sesli mesaj gönderildiğinde veya alındığında bir metin dökümü (transkript) oluşturun ve mesajın yanında görüntüleyin.",
         "API": {
           "SUCCESS": "Sesli mesaj transkripsiyon ayarı başarıyla güncellendi",
-          "ERROR": "Sesli yazıya dökme ayarı güncellenemedi"
+          "ERROR": "Ses transkripsiyon ayarı güncellenirken hata oluştu"
+        }
+      },
+      "ENFORCE_MFA": {
+        "TITLE": "Enforce two-factor authentication",
+        "NOTE": "Require every member of this account to set up two-factor authentication. Members without it will be asked to set it up at their next password sign-in. Sign-ins through Google or SAML are exempt. API access tokens of members who have not set up two-factor authentication stop working for this account until they enrol.",
+        "API": {
+          "SUCCESS": "Two-factor authentication enforcement updated successfully",
+          "ERROR": "Failed to update two-factor authentication enforcement"
         }
       },
       "AUTO_RESOLVE_DURATION": {
-        "LABEL": "Çözüm için etkinliksizlik süresi",
-        "HELP": "Bir sohbette etkinlik yoksa otomatik çözüm için süre",
+        "LABEL": "Çözümleme için hareketsizlik süresi",
+        "HELP": "Bir konuşmanın, hiçbir etkinlik olmazsa otomatik olarak çözümlenmesi gereken süre",
         "PLACEHOLDER": "30",
         "ERROR": "Otomatik çözme süresi 10 dakika ile 999 gün arasında olmalıdır",
         "API": {
@@ -115,8 +152,8 @@
         },
         "UPDATE_BUTTON": "Güncelleme",
         "MESSAGE_LABEL": "Özel çözüm mesajı",
-        "MESSAGE_PLACEHOLDER": "Sohbet, 15 gün etkinlik olmadığı için sistem tarafından çözüldü olarak işaretlendi",
-        "MESSAGE_HELP": "Bu mesaj, bir sohbet sistem tarafından etkinliksizlik nedeniyle otomatik olarak çözüldüğünde müşteriye gönderilir."
+        "MESSAGE_PLACEHOLDER": "Konuşma, 15 günlük hareketsizlik nedeniyle sistem tarafından çözümlendi olarak işaretlendi",
+        "MESSAGE_HELP": "Bu mesaj, bir konuşma hareketsizlik nedeniyle sistem tarafından otomatik olarak çözümlendiğinde müşteriye gönderilir."
       },
       "FEATURES": {
         "INBOUND_EMAIL_ENABLED": "Hesabınız için e-posta ile iletişim devre dışı bırakıldı.",
@@ -125,7 +162,8 @@
     },
     "UPDATE_CHATWOOT": "{latestChatwootVersion} chatwoot sürümü indirilebilir. Lütfen sürümü güncelleyin.",
     "LEARN_MORE": "Daha Fazla",
-    "PAYMENT_PENDING": "Ödemeniz bekliyor. Devam etmek için ödeme bilgilerinizi güncelleyin.",
+    "PAYMENT_PENDING": "Hesabınızın ödemesi gecikmiştir. Aboneliğinizin iptal edilmesini önlemek için lütfen ödeme bilgilerinizi güncelleyin.",
+    "PAYMENT_PENDING_AGENT": "Hesabınızın ödemesi gecikmiştir. Sorunu çözmek için lütfen yöneticinizle iletişime geçin.",
     "UPGRADE": "Chatwoot'u kullanmaya devam etmek için yükseltin",
     "LIMITS_UPGRADE": "Hesabınız kullanım sınırlarını aştı, lütfen Chatwoot'u kullanmaya devam etmek için planınızı yükseltin",
     "OPEN_BILLING": "Fatura Detayları"
@@ -137,37 +175,6 @@
       "NO_OPTIONS": "Liste boş",
       "SELECT_ONE": "Birini seç",
       "SELECT": "Seç"
-    }
-  },
-  "NOTIFICATIONS_PAGE": {
-    "HEADER": "Bildirimler",
-    "MARK_ALL_DONE": "Hepsini Tamamlandı İşaretle",
-    "DELETE_TITLE": "silindi",
-    "UNREAD_NOTIFICATION": {
-      "TITLE": "Okunmamış Bildirimler",
-      "ALL_NOTIFICATIONS": "Tüm bildirimleri görüntüle",
-      "LOADING_UNREAD_MESSAGE": "Okunmamış bildirimler yükleniyor...",
-      "EMPTY_MESSAGE": "Okunmamış bildiriminiz yok"
-    },
-    "LIST": {
-      "LOADING_MESSAGE": "Bildirimler yükleniyor...",
-      "404": "Bildirim yok",
-      "TABLE_HEADER": [
-        "İsim",
-        "Telefon Numarası",
-        "Konuşmalar",
-        "Son Görüşülen"
-      ]
-    },
-    "TYPE_LABEL": {
-      "conversation_creation": "Yeni Görüşme",
-      "conversation_assignment": "Atanan Görüşme",
-      "assigned_conversation_new_message": "Yeni Mesaj",
-      "participating_conversation_new_message": "Yeni Mesaj",
-      "conversation_mention": "Bahset",
-      "sla_missed_first_response": "SLA Missed",
-      "sla_missed_next_response": "SLA Missed",
-      "sla_missed_resolution": "SLA Missed"
     }
   },
   "NETWORK": {
@@ -182,6 +189,7 @@
   },
   "COMMAND_BAR": {
     "SEARCH_PLACEHOLDER": "Ara veya atla",
+    "SNOOZE_PLACEHOLDER": "Type a time e.g. tomorrow, 2 hours, next friday, jan 15...",
     "SECTIONS": {
       "GENERAL": "Genel",
       "REPORTS": "Raporlar",
@@ -191,6 +199,7 @@
       "CHANGE_PRIORITY": "Önceliği Değiştir",
       "CHANGE_TEAM": "Takım Değiştir",
       "SNOOZE_CONVERSATION": "Konuşmayı Ertele",
+      "EXECUTE_MACRO": "Makroyu çalıştır",
       "ADD_LABEL": "Konuşmaya Etiket Ekle",
       "REMOVE_LABEL": "Konuşmadan Etiketi Kaldır",
       "SETTINGS": "Ayarlar",
@@ -199,28 +208,44 @@
       "SNOOZE_NOTIFICATION": "Sessiz bildirim"
     },
     "COMMANDS": {
+      "GO_TO_MY_INBOX": "Gelen Kutuma Git",
       "GO_TO_CONVERSATION_DASHBOARD": "Konuşma Paneline Git",
       "GO_TO_CONTACTS_DASHBOARD": "Kişiler Paneline Git",
+      "GO_TO_CAPTAIN": "Captain'a Git",
+      "GO_TO_CALLS_DASHBOARD": "Aramalar Panosuna Git",
+      "GO_TO_CAMPAIGNS": "Kampanyalara Git",
+      "GO_TO_HELP_CENTER": "Go to Help Center",
       "GO_TO_REPORTS_OVERVIEW": "Raporlara Genel Bakış'a Git",
       "GO_TO_CONVERSATION_REPORTS": "Konuşma Raporlarına Git",
       "GO_TO_AGENT_REPORTS": "Temsilci Raporlarına Git",
       "GO_TO_LABEL_REPORTS": "Etiket Raporlarına Git",
       "GO_TO_INBOX_REPORTS": "Gelen Kutusu Raporlarına Git",
       "GO_TO_TEAM_REPORTS": "Ekip Raporlarına Git",
+      "GO_TO_CSAT_REPORTS": "Go to CSAT Reports",
+      "GO_TO_BOT_REPORTS": "Go to Bot Reports",
+      "GO_TO_SLA_REPORTS": "Go to SLA Reports",
       "GO_TO_SETTINGS_AGENTS": "Temsilci Ayarlarına Git",
       "GO_TO_SETTINGS_TEAMS": "Takım Ayarlarına Git",
       "GO_TO_SETTINGS_INBOXES": "Gelen Kutusu Ayarlarına Git",
+      "GO_TO_SETTINGS_TEMPLATES": "Şablonlara git",
       "GO_TO_SETTINGS_LABELS": "Etiket Ayarlarına Git",
+      "GO_TO_SETTINGS_CUSTOM_ATTRIBUTES": "Go to Custom Attributes",
+      "GO_TO_SETTINGS_AUTOMATION": "Go to Automation",
+      "GO_TO_SETTINGS_MACROS": "Go to Macros",
       "GO_TO_SETTINGS_CANNED_RESPONSES": "Hazır Yanıt Ayarlarına Git",
+      "GO_TO_SETTINGS_SLA": "Go to SLA Settings",
       "GO_TO_SETTINGS_APPLICATIONS": "Uygulama Ayarlarına Git",
+      "GO_TO_SETTINGS_DATA": "Go to Data",
+      "GO_TO_SETTINGS_AUDIT_LOGS": "Go to Audit Logs",
+      "GO_TO_SETTINGS_BILLING": "Go to Billing",
       "GO_TO_SETTINGS_ACCOUNT": "Hesap Ayarlarına Git",
       "GO_TO_SETTINGS_PROFILE": "Profil Ayarlarına Git",
-      "GO_TO_NOTIFICATIONS": "Bildirimlere Git",
       "ADD_LABELS_TO_CONVERSATION": "Konuşmaya Etiket Ekle",
       "ASSIGN_AN_AGENT": "Bir Temsilci Ata",
       "AI_ASSIST": "AI Yardımı",
       "ASSIGN_PRIORITY": "Öncelik Ata",
       "ASSIGN_A_TEAM": "Bir Takım Ata",
+      "EXECUTE_A_MACRO": "Execute a macro",
       "MUTE_CONVERSATION": "Konuşmayı Sessize Al",
       "UNMUTE_CONVERSATION": "Konuşmanın Sessizliğini Kaldır",
       "REMOVE_LABEL_FROM_CONVERSATION": "Konuşmadan Etiketi Kaldır",

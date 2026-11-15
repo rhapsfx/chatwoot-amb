@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useMapGetter, useStore } from 'dashboard/composables/store.js';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useCaptain } from 'dashboard/composables/useCaptain';
+import { usePaymentStatus } from 'dashboard/composables/usePaymentStatus';
 import { format } from 'date-fns';
 import sessionStorage from 'shared/helpers/sessionStorage';
 
@@ -11,27 +12,39 @@ import BillingMeter from './components/BillingMeter.vue';
 import BillingCard from './components/BillingCard.vue';
 import BillingHeader from './components/BillingHeader.vue';
 import DetailItem from './components/DetailItem.vue';
+import PurchaseCreditsModal from './components/PurchaseCreditsModal.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import SettingsLayout from '../SettingsLayout.vue';
 import ButtonV4 from 'next/button/Button.vue';
+import Banner from 'next/banner/Banner.vue';
+import { getCurrencyConfig } from 'dashboard/constants/billing';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const { currentAccount, isOnChatwootCloud } = useAccount();
+const { isPastDue } = usePaymentStatus();
 const {
   captainEnabled,
   captainLimits,
   documentLimits,
   responseLimits,
   fetchLimits,
+  isFetchingLimits,
 } = useCaptain();
 
 const uiFlags = useMapGetter('accounts/getUIFlags');
 const store = useStore();
+const { t } = useI18n();
 
 const BILLING_REFRESH_ATTEMPTED = 'billing_refresh_attempted';
 
 // State for handling refresh attempts and loading
 const isWaitingForBilling = ref(false);
+const purchaseCreditsModalRef = ref(null);
+
+// Currency selection shown to new accounts whose locale supports a non-USD currency.
+const currencySelectionRequired = ref(false);
+const currencyOptions = ref([]);
 
 const customAttributes = computed(() => {
   return currentAccount.value.custom_attributes || {};
@@ -45,6 +58,11 @@ const planName = computed(() => {
   return customAttributes.value.plan_name;
 });
 
+const canPurchaseCredits = computed(() => {
+  const plan = planName.value?.toLowerCase();
+  return plan && plan !== 'hacker';
+});
+
 /**
  * Computed property for subscribed quantity
  * @returns {number|undefined}
@@ -53,11 +71,25 @@ const subscribedQuantity = computed(() => {
   return customAttributes.value.subscribed_quantity;
 });
 
+const billingCurrency = computed(() => {
+  if (!customAttributes.value.billing_currency) return '';
+  return t(
+    getCurrencyConfig(customAttributes.value.billing_currency).i18nLabelKey
+  );
+});
+
 const subscriptionRenewsOn = computed(() => {
   if (!customAttributes.value.subscription_ends_on) return '';
   const endDate = new Date(customAttributes.value.subscription_ends_on);
   // return date as 12 Jan, 2034
   return format(endDate, 'dd MMM, yyyy');
+});
+
+// Set only while a cancellation is scheduled; the plan stays active until this date.
+const subscriptionCancelsOn = computed(() => {
+  if (!customAttributes.value.subscription_cancels_on) return '';
+  const cancelDate = new Date(customAttributes.value.subscription_cancels_on);
+  return format(cancelDate, 'dd MMM, yyyy');
 });
 
 /**
@@ -70,9 +102,12 @@ const hasABillingPlan = computed(() => {
 
 const fetchAccountDetails = async () => {
   if (!hasABillingPlan.value) {
-    await store.dispatch('accounts/subscription');
-    fetchLimits();
+    const data = await store.dispatch('accounts/subscription');
+    currencySelectionRequired.value = !!data?.currency_selection_required;
+    currencyOptions.value = data?.currency_options || [];
   }
+  // Always fetch limits for billing page to show credit usage
+  fetchLimits();
 };
 
 const handleBillingPageLogic = async () => {
@@ -87,6 +122,9 @@ const handleBillingPageLogic = async () => {
 
   // If cloud user, fetch account details first
   await fetchAccountDetails();
+
+  // Waiting on the user to pick a billing currency — don't auto-refresh.
+  if (currencySelectionRequired.value) return;
 
   // If still no billing plan after fetch
   if (!hasABillingPlan.value) {
@@ -109,6 +147,13 @@ const handleBillingPageLogic = async () => {
   }
 };
 
+const onSelectCurrency = async code => {
+  await store.dispatch('accounts/selectBillingCurrency', code);
+  currencySelectionRequired.value = false;
+  // Currency stored and customer creation kicked off — resume the standard wait flow.
+  await handleBillingPageLogic();
+};
+
 const onClickBillingPortal = () => {
   store.dispatch('accounts/checkout');
 };
@@ -117,6 +162,15 @@ const onToggleChatWindow = () => {
   if (window.$chatwoot) {
     window.$chatwoot.toggle();
   }
+};
+
+const openPurchaseCreditsModal = () => {
+  purchaseCreditsModalRef.value?.open();
+};
+
+const handleTopupSuccess = () => {
+  // Refresh limits to show updated credit balance
+  fetchLimits();
 };
 
 onMounted(handleBillingPageLogic);
@@ -130,7 +184,9 @@ onMounted(handleBillingPageLogic);
         ? $t('BILLING_SETTINGS.NO_BILLING_USER')
         : $t('ATTRIBUTES_MGMT.LOADING')
     "
-    :no-records-found="!hasABillingPlan && !isWaitingForBilling"
+    :no-records-found="
+      !hasABillingPlan && !isWaitingForBilling && !currencySelectionRequired
+    "
     :no-records-message="$t('BILLING_SETTINGS.NO_BILLING_USER')"
   >
     <template #header>
@@ -142,7 +198,41 @@ onMounted(handleBillingPageLogic);
       />
     </template>
     <template #body>
-      <section class="grid gap-4">
+      <section v-if="currencySelectionRequired" class="grid gap-4">
+        <BillingCard
+          :title="$t('BILLING_SETTINGS.CURRENCY.SELECT.TITLE')"
+          :description="$t('BILLING_SETTINGS.CURRENCY.SELECT.DESCRIPTION')"
+        >
+          <template #action>
+            <div class="flex gap-2">
+              <ButtonV4
+                v-for="code in currencyOptions"
+                :key="code"
+                sm
+                solid
+                blue
+                :is-loading="uiFlags.isCheckoutInProcess"
+                :disabled="uiFlags.isCheckoutInProcess"
+                @click="onSelectCurrency(code)"
+              >
+                {{ $t(getCurrencyConfig(code).i18nLabelKey) }}
+              </ButtonV4>
+            </div>
+          </template>
+        </BillingCard>
+      </section>
+      <section v-else class="grid gap-4">
+        <Banner
+          v-if="isPastDue"
+          color="ruby"
+          role="alert"
+          class="flex-wrap"
+          :action-label="$t('BILLING_SETTINGS.PAYMENT_RECOVERY.ACTION')"
+          :is-loading="uiFlags.isCheckoutInProcess"
+          @action="onClickBillingPortal"
+        >
+          {{ $t('BILLING_SETTINGS.PAYMENT_RECOVERY.DESCRIPTION') }}
+        </Banner>
         <BillingCard
           :title="$t('BILLING_SETTINGS.MANAGE_SUBSCRIPTION.TITLE')"
           :description="$t('BILLING_SETTINGS.MANAGE_SUBSCRIPTION.DESCRIPTION')"
@@ -166,9 +256,19 @@ onMounted(handleBillingPageLogic);
               :value="subscribedQuantity"
             />
             <DetailItem
-              v-if="subscriptionRenewsOn"
+              v-if="subscriptionCancelsOn"
+              :label="$t('BILLING_SETTINGS.CURRENT_PLAN.CANCELS_ON')"
+              :value="subscriptionCancelsOn"
+            />
+            <DetailItem
+              v-else-if="subscriptionRenewsOn && !isPastDue"
               :label="$t('BILLING_SETTINGS.CURRENT_PLAN.RENEWS_ON')"
               :value="subscriptionRenewsOn"
+            />
+            <DetailItem
+              v-if="billingCurrency"
+              :label="$t('BILLING_SETTINGS.CURRENT_PLAN.CURRENCY')"
+              :value="billingCurrency"
             />
           </div>
         </BillingCard>
@@ -178,9 +278,27 @@ onMounted(handleBillingPageLogic);
           :description="$t('BILLING_SETTINGS.CAPTAIN.DESCRIPTION')"
         >
           <template #action>
-            <ButtonV4 sm faded slate disabled>
-              {{ $t('BILLING_SETTINGS.CAPTAIN.BUTTON_TXT') }}
-            </ButtonV4>
+            <div class="flex gap-2">
+              <ButtonV4
+                sm
+                flushed
+                slate
+                icon="i-lucide-refresh-cw"
+                :is-loading="isFetchingLimits"
+                @click="fetchLimits"
+              >
+                {{ $t('BILLING_SETTINGS.CAPTAIN.REFRESH_CREDITS') }}
+              </ButtonV4>
+              <ButtonV4
+                v-if="canPurchaseCredits"
+                sm
+                solid
+                blue
+                @click="openPurchaseCreditsModal"
+              >
+                {{ $t('BILLING_SETTINGS.TOPUP.BUY_CREDITS') }}
+              </ButtonV4>
+            </div>
           </template>
           <div v-if="captainLimits && responseLimits" class="px-5">
             <BillingMeter
@@ -217,12 +335,16 @@ onMounted(handleBillingPageLogic);
             solid
             slate
             icon="i-lucide-life-buoy"
-            @open="onToggleChatWindow"
+            @click="onToggleChatWindow"
           >
             {{ $t('BILLING_SETTINGS.CHAT_WITH_US.BUTTON_TXT') }}
           </ButtonV4>
         </BillingHeader>
       </section>
+      <PurchaseCreditsModal
+        ref="purchaseCreditsModalRef"
+        @success="handleTopupSuccess"
+      />
     </template>
   </SettingsLayout>
 </template>

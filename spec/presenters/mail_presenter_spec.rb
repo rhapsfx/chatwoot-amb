@@ -41,6 +41,7 @@ RSpec.describe MailPresenter do
                                 :content_type,
                                 :date,
                                 :from,
+                                :headers,
                                 :html_content,
                                 :in_reply_to,
                                 :message_id,
@@ -60,8 +61,72 @@ RSpec.describe MailPresenter do
       expect(data[:auto_reply]).to eq(decorated_mail.auto_reply?)
     end
 
+    it 'includes forwarded headers in serialized_data' do
+      mail_with_headers = Mail.new do
+        from 'Sender <sender@example.com>'
+        to 'Inbox <inbox@example.com>'
+        subject :header
+        body 'Hi'
+        header['X-Original-From'] = 'Original <original@example.com>'
+        header['X-Original-Sender'] = 'original@example.com'
+        header['X-Forwarded-For'] = 'forwarder@example.com'
+      end
+
+      data = described_class.new(mail_with_headers).serialized_data
+
+      expect(data[:headers]).to eq(
+        'x-original-from' => 'Original <original@example.com>',
+        'x-original-sender' => 'original@example.com',
+        'x-forwarded-for' => 'forwarder@example.com'
+      )
+    end
+
+    it 'returns nil headers when forwarding headers are missing' do
+      mail_without_headers = Mail.new do
+        from 'Sender <sender@example.com>'
+        to 'Inbox <inbox@example.com>'
+        subject :header
+        body 'Hi'
+      end
+
+      data = described_class.new(mail_without_headers).serialized_data
+
+      expect(data[:headers]).to be_nil
+    end
+
     it 'give email from in downcased format' do
       expect(decorated_mail.from.first.eql?(mail.from.first.downcase)).to be true
+    end
+
+    describe '#from' do
+      let(:mail_with_sender) { Mail.new { from 'Sender <SENDER@EXAMPLE.COM>' } }
+
+      it 'drops blank reply-to entries and keeps valid reply-to addresses' do
+        allow(mail_with_sender).to receive(:reply_to).and_return([nil, '', 'REPLY@EXAMPLE.COM'])
+
+        expect(described_class.new(mail_with_sender).from).to eq(['reply@example.com'])
+      end
+
+      it 'falls back to from when reply-to has no usable addresses' do
+        allow(mail_with_sender).to receive(:reply_to).and_return([nil, ''])
+
+        expect(described_class.new(mail_with_sender).from).to eq(['sender@example.com'])
+      end
+
+      it 'drops blank entries from the from list' do
+        allow(mail_with_sender).to receive(:reply_to).and_return(nil)
+        allow(mail_with_sender).to receive(:from).and_return([nil, '', 'SENDER@EXAMPLE.COM'])
+
+        expect(described_class.new(mail_with_sender).from).to eq(['sender@example.com'])
+      end
+
+      it 'returns no addresses when both lists lack a sender' do
+        empty_mail = Mail.new
+        allow(empty_mail).to receive(:reply_to).and_return([nil, ''])
+        allow(empty_mail).to receive(:from).and_return([nil, ''])
+
+        expect(described_class.new(empty_mail).from).to eq([])
+      end
     end
 
     it 'parse html content in the mail' do
@@ -142,6 +207,86 @@ RSpec.describe MailPresenter do
       it 'includes auto_reply status in serialized_data' do
         expect(decorated_auto_reply_mail.serialized_data[:auto_reply]).to be true
         expect(decorated_mail.serialized_data[:auto_reply]).to be_falsey
+      end
+    end
+
+    describe 'malformed sender headers' do
+      let(:mail_with_malformed_from) do
+        Mail.new do
+          header['From'] = 'Kevin McDonald <info@example.com'
+          to 'Inbox <inbox@example.com>'
+          subject :header
+          body 'Hi'
+        end
+      end
+
+      let(:mail_with_malformed_reply_to) do
+        Mail.new do
+          from 'Sender <sender@example.com>'
+          to 'Inbox <inbox@example.com>'
+          subject :header
+          body 'Hi'
+          header['Reply-To'] = 'Reply User <reply@example.com'
+        end
+      end
+
+      let(:mail_with_original_sender_header) do
+        Mail.new do
+          from 'Sender <sender@example.com>'
+          to 'Inbox <inbox@example.com>'
+          subject :header
+          body 'Hi'
+          header['Reply-To'] = 'Reply User <reply@example.com'
+          header['X-Original-Sender'] = 'Forwarded Sender <forwarded.sender@example.com>'
+        end
+      end
+
+      let(:mail_with_invalid_original_sender_header) do
+        Mail.new do
+          from 'Sender <sender@example.com>'
+          to 'Inbox <inbox@example.com>'
+          subject :header
+          body 'Hi'
+          header['Reply-To'] = 'Reply User <reply@example.com'
+          header['X-Original-Sender'] = 'not an email address'
+        end
+      end
+
+      it 'returns nil sender values when from header is malformed' do
+        presenter = described_class.new(mail_with_malformed_from)
+
+        expect(presenter.original_sender).to be_nil
+        expect(presenter.sender_name).to be_nil
+        expect(presenter.notification_email_from_chatwoot?).to be(false)
+      end
+
+      it 'falls back to from header when reply_to is malformed' do
+        presenter = described_class.new(mail_with_malformed_reply_to)
+        expect(presenter.original_sender).to eq('sender@example.com')
+      end
+
+      it 'uses parsed X-Original-Sender value when available' do
+        presenter = described_class.new(mail_with_original_sender_header)
+        expect(presenter.original_sender).to eq('forwarded.sender@example.com')
+      end
+
+      it 'falls back to from when X-Original-Sender is invalid' do
+        presenter = described_class.new(mail_with_invalid_original_sender_header)
+        expect(presenter.original_sender).to eq('sender@example.com')
+      end
+
+      it 'matches notification sender emails case-insensitively' do
+        mail_with_uppercase_sender = Mail.new do
+          from 'Chatwoot <ACCOUNTS@CHATWOOT.COM>'
+          to 'Inbox <inbox@example.com>'
+          subject :header
+          body 'Hi'
+        end
+
+        with_modified_env MAILER_SENDER_EMAIL: 'Chatwoot <accounts@chatwoot.com>' do
+          presenter = described_class.new(mail_with_uppercase_sender)
+          expect(presenter.notification_email_from_chatwoot?).to be(true)
+        end
       end
     end
   end

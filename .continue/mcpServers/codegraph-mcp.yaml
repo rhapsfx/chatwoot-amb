@@ -1,0 +1,8 @@
+name: CodeGraph
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: codegraph
+    command: /Users/rhaps/.local/bin/codegraph
+    args:
+      - serve

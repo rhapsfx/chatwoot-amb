@@ -1,4 +1,7 @@
-require_relative '../test_data'
+unless Rails.env.production?
+  test_data_path = File.expand_path('../test_data', __dir__)
+  require_relative '../test_data' if File.exist?("#{test_data_path}.rb")
+end
 
 namespace :data do
   desc 'Generate large, distributed test data'

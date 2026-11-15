@@ -34,10 +34,38 @@ RSpec.describe 'Api::V1::Accounts::BulkActionsController', type: :request do
     context 'when it is an authenticated user' do
       let!(:agent) { create(:user, account: account, role: :agent) }
 
+      before do
+        Conversation.all.find_each { |conversation| create(:inbox_member, inbox: conversation.inbox, user: agent) }
+      end
+
       it 'Ignores bulk_actions for wrong type' do
         post "/api/v1/accounts/#{account.id}/bulk_actions",
              headers: agent.create_new_auth_token,
              params: { type: 'Test', fields: { status: 'snoozed' }, ids: %w[1 2 3] }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'Rejects bulk assignment to an assignee outside the account' do
+        other_user = create(:user, account: create(:account))
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/bulk_actions",
+               headers: agent.create_new_auth_token,
+               params: { type: 'Conversation', fields: { assignee_id: other_user.id }, ids: Conversation.first(2).pluck(:display_id) }
+        end.not_to have_enqueued_job(BulkActionsJob)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'Rejects bulk assignment to a team outside the account' do
+        other_team = create(:team, account: create(:account))
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/bulk_actions",
+               headers: agent.create_new_auth_token,
+               params: { type: 'Conversation', fields: { team_id: other_team.id }, ids: Conversation.first(2).pluck(:display_id) }
+        end.not_to have_enqueued_job(BulkActionsJob)
 
         expect(response).to have_http_status(:unprocessable_entity)
       end
@@ -202,6 +230,10 @@ RSpec.describe 'Api::V1::Accounts::BulkActionsController', type: :request do
     context 'when it is an authenticated user' do
       let!(:agent) { create(:user, account: account, role: :agent) }
 
+      before do
+        Conversation.all.find_each { |conversation| create(:inbox_member, inbox: conversation.inbox, user: agent) }
+      end
+
       it 'Bulk delete conversation labels' do
         Conversation.first.add_labels(%w[support priority_customer])
         Conversation.second.add_labels(%w[support priority_customer])
@@ -222,6 +254,76 @@ RSpec.describe 'Api::V1::Accounts::BulkActionsController', type: :request do
 
         expect(Conversation.first.label_list).to contain_exactly('priority_customer')
         expect(Conversation.second.label_list).to contain_exactly('priority_customer')
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/bulk_actions (contacts)' do
+    context 'when it is an authenticated user' do
+      let!(:agent) { create(:user, account: account, role: :agent) }
+
+      it 'enqueues Contacts::BulkActionJob with permitted params' do
+        contact_one = create(:contact, account: account)
+        contact_two = create(:contact, account: account)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/bulk_actions",
+               headers: agent.create_new_auth_token,
+               params: {
+                 type: 'Contact',
+                 ids: [contact_one.id, contact_two.id],
+                 labels: { add: %w[vip support] },
+                 extra: 'ignored'
+               }
+        end.to have_enqueued_job(Contacts::BulkActionJob).with(
+          account.id,
+          agent.id,
+          hash_including(
+            'ids' => [contact_one.id.to_s, contact_two.id.to_s],
+            'labels' => hash_including('add' => %w[vip support])
+          )
+        )
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'permits contact label removal params' do
+        contact_one = create(:contact, account: account)
+        contact_two = create(:contact, account: account)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/bulk_actions",
+               headers: agent.create_new_auth_token,
+               params: {
+                 type: 'Contact',
+                 ids: [contact_one.id, contact_two.id],
+                 labels: { remove: %w[vip support] },
+                 extra: 'ignored'
+               }
+        end.to have_enqueued_job(Contacts::BulkActionJob).with(
+          account.id,
+          agent.id,
+          hash_including(
+            'ids' => [contact_one.id.to_s, contact_two.id.to_s],
+            'labels' => hash_including('remove' => %w[vip support])
+          )
+        )
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'returns unauthorized for delete action when user is not admin' do
+        contact = create(:contact, account: account)
+
+        post "/api/v1/accounts/#{account.id}/bulk_actions",
+             headers: agent.create_new_auth_token,
+             params: {
+               type: 'Contact',
+               ids: [contact.id],
+               action_name: 'delete'
+             }
+
+        expect(response).to have_http_status(:unauthorized)
       end
     end
   end

@@ -1,12 +1,17 @@
 {
   "REGISTER": {
     "TRY_WOOT": "Create an account",
+    "GET_STARTED": "Get started with Chatwoot",
     "TITLE": "Καταχώρηση",
     "TESTIMONIAL_HEADER": "Το μόνο που χρειάζεται είναι ένα βήμα για να προχωρήσουμε",
     "TESTIMONIAL_CONTENT": "Είστε ένα βήμα μακριά από την εμπλοκή των πελατών σας, και την εύρεση νέων.",
     "TERMS_ACCEPT": "By creating an account, you agree to our <a href=\"https://www.chatwoot.com/terms\">T & C</a> and <a href=\"https://www.chatwoot.com/privacy-policy\">Privacy policy</a>",
     "OAUTH": {
       "GOOGLE_SIGNUP": "Sign up with Google"
+    },
+    "SHOPIFY": {
+      "TITLE": "Set up Chatwoot for your Shopify store",
+      "DESCRIPTION": "Create your account to continue to Shopify App Pricing and choose a plan."
     },
     "COMPANY_NAME": {
       "LABEL": "Επωνυμία εταιρείας",
@@ -44,6 +49,13 @@
       "ERROR_MESSAGE": "Αδυναμία σύνδεσης με τον Woot Server, Παρακαλώ προσπαθήστε αργότερα"
     },
     "SUBMIT": "Create account",
-    "HAVE_AN_ACCOUNT": "Έχετε ήδη ένα λογαριασμό?"
+    "HAVE_AN_ACCOUNT": "Έχετε ήδη ένα λογαριασμό?",
+    "VERIFY_EMAIL": {
+      "TITLE": "Check your inbox",
+      "DESCRIPTION": "We sent a verification link to {email}. Click the link to verify your email and get started.",
+      "RESEND": "Resend verification email",
+      "RESEND_SUCCESS": "Verification email sent. Please check your inbox.",
+      "RESEND_ERROR": "Could not send verification email. Please try again."
+    }
   }
 }

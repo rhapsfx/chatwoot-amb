@@ -1,11 +1,16 @@
 import { computed } from 'vue';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useCamelCase } from 'dashboard/composables/useTransformKeys';
-import { INBOX_TYPES } from 'dashboard/helper/inbox';
+import {
+  INBOX_TYPES,
+  isVoiceCallEnabled,
+  getVoiceCallProvider,
+} from 'dashboard/helper/inbox';
 
 export const INBOX_FEATURES = {
   REPLY_TO: 'replyTo',
   REPLY_TO_OUTGOING: 'replyToOutgoing',
+  INTERACTIVE_MESSAGES: 'interactiveMessages',
 };
 
 // This is a single source of truth for inbox features
@@ -17,14 +22,21 @@ export const INBOX_FEATURE_MAP = {
     INBOX_TYPES.TWITTER,
     INBOX_TYPES.WHATSAPP,
     INBOX_TYPES.TELEGRAM,
+    INBOX_TYPES.TIKTOK,
     INBOX_TYPES.API,
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
   [INBOX_FEATURES.REPLY_TO_OUTGOING]: [
     INBOX_TYPES.WEB,
     INBOX_TYPES.TWITTER,
     INBOX_TYPES.WHATSAPP,
     INBOX_TYPES.TELEGRAM,
+    INBOX_TYPES.TIKTOK,
     INBOX_TYPES.API,
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
+  ],
+  [INBOX_FEATURES.INTERACTIVE_MESSAGES]: [
+    INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS,
   ],
 };
 
@@ -128,9 +140,17 @@ export const useInbox = (inboxId = null) => {
     return channelType.value === INBOX_TYPES.INSTAGRAM;
   });
 
-  const isAVoiceChannel = computed(() => {
-    return channelType.value === INBOX_TYPES.VOICE;
+  const isATiktokChannel = computed(() => {
+    return channelType.value === INBOX_TYPES.TIKTOK;
   });
+
+  const isAnAppleMessagesForBusinessChannel = computed(() => {
+    return channelType.value === INBOX_TYPES.APPLE_MESSAGES_FOR_BUSINESS;
+  });
+
+  const voiceCallEnabled = computed(() => isVoiceCallEnabled(inbox.value));
+
+  const voiceCallProvider = computed(() => getVoiceCallProvider(inbox.value));
 
   return {
     inbox,
@@ -140,6 +160,7 @@ export const useInbox = (inboxId = null) => {
     isASmsInbox,
     isATelegramChannel,
     isATwilioChannel,
+    isATwilioSMSChannel,
     isAWebWidgetInbox,
     isAWhatsAppChannel,
     isAMicrosoftInbox,
@@ -149,6 +170,9 @@ export const useInbox = (inboxId = null) => {
     is360DialogWhatsAppChannel,
     isAnEmailChannel,
     isAnInstagramChannel,
-    isAVoiceChannel,
+    isATiktokChannel,
+    isAnAppleMessagesForBusinessChannel,
+    voiceCallEnabled,
+    voiceCallProvider,
   };
 };

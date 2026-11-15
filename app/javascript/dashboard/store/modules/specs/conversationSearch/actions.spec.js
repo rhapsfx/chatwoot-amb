@@ -77,6 +77,16 @@ describe('#actions', () => {
       expect(dispatch).toHaveBeenCalledWith('messageSearch', { q: 'test' });
       expect(dispatch).toHaveBeenCalledWith('articleSearch', { q: 'test' });
     });
+
+    it('should pass filters to all search actions including articleSearch', async () => {
+      const payload = { q: 'test', since: 1700000000, until: 1732000000 };
+      await actions.fullSearch({ commit, dispatch }, payload);
+
+      expect(dispatch).toHaveBeenCalledWith('contactSearch', payload);
+      expect(dispatch).toHaveBeenCalledWith('conversationSearch', payload);
+      expect(dispatch).toHaveBeenCalledWith('messageSearch', payload);
+      expect(dispatch).toHaveBeenCalledWith('articleSearch', payload);
+    });
   });
 
   describe('#contactSearch', () => {
@@ -89,6 +99,7 @@ describe('#actions', () => {
       expect(commit.mock.calls).toEqual([
         [types.CONTACT_SEARCH_SET_UI_FLAG, { isFetching: true }],
         [types.CONTACT_SEARCH_SET, [{ id: 1 }]],
+        [types.CONTACT_SEARCH_SET_UI_FLAG, { hasMore: false }],
         [types.CONTACT_SEARCH_SET_UI_FLAG, { isFetching: false }],
       ]);
     });
@@ -113,6 +124,7 @@ describe('#actions', () => {
       expect(commit.mock.calls).toEqual([
         [types.CONVERSATION_SEARCH_SET_UI_FLAG, { isFetching: true }],
         [types.CONVERSATION_SEARCH_SET, [{ id: 1 }]],
+        [types.CONVERSATION_SEARCH_SET_UI_FLAG, { hasMore: false }],
         [types.CONVERSATION_SEARCH_SET_UI_FLAG, { isFetching: false }],
       ]);
     });
@@ -137,7 +149,21 @@ describe('#actions', () => {
       expect(commit.mock.calls).toEqual([
         [types.MESSAGE_SEARCH_SET_UI_FLAG, { isFetching: true }],
         [types.MESSAGE_SEARCH_SET, [{ id: 1 }]],
+        [types.MESSAGE_SEARCH_SET_UI_FLAG, { hasMore: false }],
         [types.MESSAGE_SEARCH_SET_UI_FLAG, { isFetching: false }],
+      ]);
+    });
+
+    it('should mark hasMore when the API returns a full page', async () => {
+      const fullPage = Array.from({ length: 15 }, (_, i) => ({ id: i + 1 }));
+      axios.get.mockResolvedValue({
+        data: { payload: { messages: fullPage } },
+      });
+
+      await actions.messageSearch({ commit }, { q: 'test', page: 1 });
+      expect(commit.mock.calls).toContainEqual([
+        types.MESSAGE_SEARCH_SET_UI_FLAG,
+        { hasMore: true },
       ]);
     });
 
@@ -148,6 +174,22 @@ describe('#actions', () => {
         [types.MESSAGE_SEARCH_SET_UI_FLAG, { isFetching: true }],
         [types.MESSAGE_SEARCH_SET_UI_FLAG, { isFetching: false }],
       ]);
+    });
+
+    it('should report success so callers can keep the page counter', async () => {
+      axios.get.mockResolvedValue({
+        data: { payload: { messages: [{ id: 1 }] } },
+      });
+      await expect(
+        actions.messageSearch({ commit }, { q: 'test', page: 2 })
+      ).resolves.toBe(true);
+    });
+
+    it('should report failure so callers can roll the page counter back', async () => {
+      axios.get.mockRejectedValue({});
+      await expect(
+        actions.messageSearch({ commit }, { q: 'test', page: 2 })
+      ).resolves.toBe(false);
     });
   });
 
@@ -161,6 +203,24 @@ describe('#actions', () => {
       expect(commit.mock.calls).toEqual([
         [types.ARTICLE_SEARCH_SET_UI_FLAG, { isFetching: true }],
         [types.ARTICLE_SEARCH_SET, [{ id: 1 }]],
+        [types.ARTICLE_SEARCH_SET_UI_FLAG, { hasMore: false }],
+        [types.ARTICLE_SEARCH_SET_UI_FLAG, { isFetching: false }],
+      ]);
+    });
+
+    it('should handle article search with date filters', async () => {
+      axios.get.mockResolvedValue({
+        data: { payload: { articles: [{ id: 1 }] } },
+      });
+
+      await actions.articleSearch(
+        { commit },
+        { q: 'test', page: 1, since: 1700000000, until: 1732000000 }
+      );
+      expect(commit.mock.calls).toEqual([
+        [types.ARTICLE_SEARCH_SET_UI_FLAG, { isFetching: true }],
+        [types.ARTICLE_SEARCH_SET, [{ id: 1 }]],
+        [types.ARTICLE_SEARCH_SET_UI_FLAG, { hasMore: false }],
         [types.ARTICLE_SEARCH_SET_UI_FLAG, { isFetching: false }],
       ]);
     });

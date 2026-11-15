@@ -1,7 +1,6 @@
-<!-- DEPRECIATED -->
-<!-- TODO: Replace this banner component with NextBanner "app/javascript/dashboard/components-next/banner/Banner.vue" -->
 <script setup>
-import { computed } from 'vue';
+import { computed, useSlots } from 'vue';
+import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const props = defineProps({
   color: {
@@ -14,17 +13,26 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['action']);
+const slots = useSlots();
+
+const hasActions = computed(() => Boolean(props.actionLabel || slots.actions));
 
 const bannerClass = computed(() => {
   const classMap = {
-    slate: 'bg-n-slate-3 border-n-slate-4 text-n-slate-11',
-    amber: 'bg-n-amber-3 border-n-amber-4 text-n-amber-11',
-    teal: 'bg-n-teal-3 border-n-teal-4 text-n-teal-11',
-    ruby: 'bg-n-ruby-3 border-n-ruby-4 text-n-ruby-11',
-    blue: 'bg-n-blue-3 border-n-blue-4 text-n-blue-11',
+    slate:
+      'bg-n-slate-3 border-n-slate-4 text-n-slate-11 [&_.link]:text-n-slate-11',
+    amber:
+      'bg-n-amber-3 border-n-amber-4 text-n-amber-11 [&_.link]:text-n-amber-11',
+    teal: 'bg-n-teal-3 border-n-teal-4 text-n-teal-11 [&_.link]:text-n-teal-11',
+    ruby: 'bg-n-ruby-3 border-n-ruby-4 text-n-ruby-11 [&_.link]:text-n-ruby-11',
+    blue: 'bg-n-blue-3 border-n-blue-4 text-n-blue-11 [&_.link]:text-n-blue-11',
   };
 
   return classMap[props.color];
@@ -43,6 +51,7 @@ const buttonClass = computed(() => {
 });
 
 const triggerAction = () => {
+  if (props.isLoading) return;
   emit('action');
 };
 </script>
@@ -53,23 +62,26 @@ const triggerAction = () => {
     :class="[
       bannerClass,
       {
-        'py-2 px-3': !actionLabel,
-        'pl-3 p-2': actionLabel,
+        'py-2 px-3': !hasActions,
+        'ps-3 p-2': hasActions,
       },
     ]"
   >
     <div>
       <slot />
     </div>
-    <div>
-      <button
-        v-if="actionLabel"
-        class="px-3 py-1 w-auto grid place-content-center rounded-lg"
-        :class="buttonClass"
-        @click="triggerAction"
-      >
-        {{ actionLabel }}
-      </button>
+    <div v-if="hasActions" class="flex-shrink-0">
+      <slot name="actions">
+        <button
+          class="px-3 py-1 w-auto grid place-content-center rounded-lg whitespace-nowrap"
+          :class="buttonClass"
+          :disabled="isLoading"
+          @click="triggerAction"
+        >
+          <Spinner v-if="isLoading" :size="16" />
+          <span v-else>{{ actionLabel }}</span>
+        </button>
+      </slot>
     </div>
   </div>
 </template>

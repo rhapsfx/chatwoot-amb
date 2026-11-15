@@ -4,12 +4,14 @@ import { useI18n } from 'vue-i18n';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { dynamicTime } from 'shared/helpers/timeHelper';
+import { useExactTimestamp } from 'shared/composables/useExactTimestamp';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import ContactLabels from 'dashboard/components-next/Contacts/ContactLabels/ContactLabels.vue';
 import ContactsForm from 'dashboard/components-next/Contacts/ContactsForm/ContactsForm.vue';
 import ConfirmContactDeleteDialog from 'dashboard/components-next/Contacts/ContactsForm/ConfirmContactDeleteDialog.vue';
+import Policy from 'dashboard/components/policy.vue';
 
 const props = defineProps({
   selectedContact: {
@@ -19,6 +21,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['goToContactsList']);
+
+const exactTimestamp = useExactTimestamp();
 
 const { t } = useI18n();
 const store = useStore();
@@ -69,7 +73,14 @@ const handleFormUpdate = updatedData => {
 const updateContact = async () => {
   try {
     const { customAttributes, ...basicContactData } = contactData.value;
-    await store.dispatch('contacts/update', basicContactData);
+    await store.dispatch('contacts/update', {
+      ...basicContactData,
+      resolveLegacyCompany: true,
+    });
+    Object.assign(
+      contactData.value,
+      store.getters['contacts/getContactById'](props.selectedContact.id)
+    );
     await store.dispatch(
       'contacts/fetchContactableInbox',
       props.selectedContact.id
@@ -147,13 +158,29 @@ const handleAvatarDelete = async () => {
               v-if="selectedContact?.identifier"
               class="i-ph-activity text-n-slate-10 size-4"
             />
-            {{ $t('CONTACTS_LAYOUT.DETAILS.CREATED_AT', { date: createdAt }) }}
+            <span
+              v-tooltip.top="{
+                content: exactTimestamp(contactData?.createdAt),
+                delay: { show: 500, hide: 0 },
+              }"
+            >
+              {{
+                $t('CONTACTS_LAYOUT.DETAILS.CREATED_AT', { date: createdAt })
+              }}
+            </span>
             •
-            {{
-              $t('CONTACTS_LAYOUT.DETAILS.LAST_ACTIVITY', {
-                date: lastActivityAt,
-              })
-            }}
+            <span
+              v-tooltip.top="{
+                content: exactTimestamp(contactData?.lastActivityAt),
+                delay: { show: 500, hide: 0 },
+              }"
+            >
+              {{
+                $t('CONTACTS_LAYOUT.DETAILS.LAST_ACTIVITY', {
+                  date: lastActivityAt,
+                })
+              }}
+            </span>
           </span>
         </div>
       </div>
@@ -174,27 +201,29 @@ const handleAvatarDelete = async () => {
         @click="updateContact"
       />
     </div>
-    <div
-      class="flex flex-col items-start w-full gap-4 pt-6 border-t border-n-strong"
-    >
-      <div class="flex flex-col gap-2">
-        <h6 class="text-base font-medium text-n-slate-12">
-          {{ t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT') }}
-        </h6>
-        <span class="text-sm text-n-slate-11">
-          {{ t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT_DESCRIPTION') }}
-        </span>
+    <Policy :permissions="['administrator']">
+      <div
+        class="flex flex-col items-start w-full gap-4 pt-6 border-t border-n-strong"
+      >
+        <div class="flex flex-col gap-2">
+          <h6 class="text-base font-medium text-n-slate-12">
+            {{ t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT') }}
+          </h6>
+          <span class="text-sm text-n-slate-11">
+            {{ t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT_DESCRIPTION') }}
+          </span>
+        </div>
+        <Button
+          :label="t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT')"
+          color="ruby"
+          @click="openConfirmDeleteContactDialog"
+        />
       </div>
-      <Button
-        :label="t('CONTACTS_LAYOUT.DETAILS.DELETE_CONTACT')"
-        color="ruby"
-        @click="openConfirmDeleteContactDialog"
+      <ConfirmContactDeleteDialog
+        ref="confirmDeleteContactDialogRef"
+        :selected-contact="selectedContact"
+        @go-to-contacts-list="emit('goToContactsList')"
       />
-    </div>
-    <ConfirmContactDeleteDialog
-      ref="confirmDeleteContactDialogRef"
-      :selected-contact="selectedContact"
-      @go-to-contacts-list="emit('goToContactsList')"
-    />
+    </Policy>
   </div>
 </template>

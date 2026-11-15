@@ -1,13 +1,16 @@
 import advancedFilters from './advancedFilters.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
+import appleMessages from './appleMessages.json';
 import attributesMgmt from './attributesMgmt.json';
 import auditLogs from './auditLogs.json';
 import automation from './automation.json';
 import bulkActions from './bulkActions.json';
+import calls from './calls.json';
 import campaign from './campaign.json';
 import cannedMgmt from './cannedMgmt.json';
 import chatlist from './chatlist.json';
+import companies from './companies.json';
 import components from './components.json';
 import contact from './contact.json';
 import contactFilters from './contactFilters.json';
@@ -33,22 +36,31 @@ import setNewPassword from './setNewPassword.json';
 import settings from './settings.json';
 import signup from './signup.json';
 import sla from './sla.json';
+import snooze from './snooze.json';
 import teamsSettings from './teamsSettings.json';
 import whatsappTemplates from './whatsappTemplates.json';
+import whatsappTemplateMgmt from './whatsappTemplateMgmt.json';
 import contentTemplates from './contentTemplates.json';
+import templates from './templates.json';
 import mfa from './mfa.json';
+import onboarding from './onboarding.json';
+import sessionLimit from './sessionLimit.json';
+import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
   ...agentBots,
   ...agentMgmt,
+  ...appleMessages,
   ...attributesMgmt,
   ...auditLogs,
   ...automation,
   ...bulkActions,
+  ...calls,
   ...campaign,
   ...cannedMgmt,
   ...chatlist,
+  ...companies,
   ...components,
   ...contact,
   ...contactFilters,
@@ -74,8 +86,14 @@ export default {
   ...settings,
   ...signup,
   ...sla,
+  ...snooze,
   ...teamsSettings,
   ...whatsappTemplates,
+  ...whatsappTemplateMgmt,
   ...contentTemplates,
+  ...templates,
   ...mfa,
+  ...onboarding,
+  ...sessionLimit,
+  ...yearInReview,
 };

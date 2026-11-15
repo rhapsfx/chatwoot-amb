@@ -4,6 +4,7 @@
 #
 #  id                        :integer          not null, primary key
 #  additional_attributes     :jsonb
+#  apple_msp_payload         :jsonb
 #  content                   :text
 #  content_attributes        :json
 #  content_type              :integer          default("text"), not null
@@ -20,7 +21,7 @@
 #  conversation_id           :integer          not null
 #  inbox_id                  :integer          not null
 #  sender_id                 :bigint
-#  source_id                 :string
+#  source_id                 :text
 #
 # Indexes
 #
@@ -34,6 +35,7 @@
 #  index_messages_on_conversation_id                    (conversation_id)
 #  index_messages_on_created_at                         (created_at)
 #  index_messages_on_inbox_id                           (inbox_id)
+#  index_messages_on_sender_and_created                 (sender_type,sender_id,created_at)
 #  index_messages_on_sender_type_and_sender_id          (sender_type,sender_id)
 #  index_messages_on_source_id                          (source_id)
 #
@@ -55,6 +57,7 @@ class Message < ApplicationRecord
           'category': { 'type': 'string' },
           'language': { 'type': 'string' },
           'namespace': { 'type': 'string' },
+          'content_mode': { 'type': 'string', 'enum': %w[raw_template rendered] },
           'processed_params': { 'type': 'object' }
         },
         'required': %w[name]
@@ -81,6 +84,8 @@ class Message < ApplicationRecord
 
   # when you have a temperory id in your frontend and want it echoed back via action cable
   attr_accessor :echo_id
+  # Transient flag used to skip waiting_since clearing for specific bot/system messages.
+  attr_accessor :preserve_waiting_since
 
   enum message_type: { incoming: 0, outgoing: 1, activity: 2, template: 3 }
   enum content_type: {
@@ -96,7 +101,18 @@ class Message < ApplicationRecord
     input_csat: 9,
     integrations: 10,
     sticker: 11,
-    voice_call: 12
+    voice_call: 12,
+    apple_list_picker: 13,
+    apple_time_picker: 14,
+    apple_quick_reply: 15,
+    apple_pay: 16,
+    apple_rich_link: 17,
+    apple_authentication: 18,
+    apple_form: 19,
+    apple_custom_app: 20,
+    apple_form_response: 21,
+    apple_custom_payload: 22,
+    apple_invitation: 23
   }
   enum status: { sent: 0, delivered: 1, read: 2, failed: 3 }
   # [:submitted_email, :items, :submitted_values] : Used for bot message types
@@ -108,14 +124,21 @@ class Message < ApplicationRecord
   # [:data] : Used for structured content types such as voice_call
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
-                                         :translations, :in_reply_to_external_id, :is_unsupported, :data], coder: JSON
+                                         :translations, :translation_failed, :translation_provider, :source_language,
+                                         :in_reply_to_external_id, :is_unsupported, :data, :sections, :event, :summary_text,
+                                         :images, :timezone_offset, :received_title, :received_subtitle, :received_style,
+                                         :reply_title, :reply_subtitle, :reply_style, :reply_image_title, :reply_image_subtitle,
+                                         :reply_secondary_subtitle, :reply_tertiary_subtitle,
+                                         :url, :title, :description, :rich_link_data_ref, :image_url, :image_data, :image_mime_type,
+                                         :site_name, :favicon_url], coder: JSON
 
-  store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
+  store :external_source_ids, accessors: [:slack, :apple_messages], coder: JSON, prefix: :external_source_id
 
   scope :created_since, ->(datetime) { where('created_at > ?', datetime) }
   scope :chat, -> { where.not(message_type: :activity).where(private: false) }
-  scope :non_activity_messages, -> { where.not(message_type: :activity).reorder('id desc') }
+  scope :non_activity_messages, -> { where.not(message_type: :activity).reorder('created_at desc') }
   scope :today, -> { where("date_trunc('day', created_at) = ?", Date.current) }
+  scope :not_forwarded, -> { where("(messages.content_attributes #>> '{}')::jsonb -> 'forwarded_message_id' IS NULL") }
   scope :voice_calls, -> { where(content_type: :voice_call) }
 
   # TODO: Get rid of default scope
@@ -125,7 +148,7 @@ class Message < ApplicationRecord
 
   belongs_to :account
   belongs_to :inbox
-  belongs_to :conversation, touch: true
+  belongs_to :conversation
   belongs_to :sender, polymorphic: true, optional: true
 
   has_many :attachments, dependent: :destroy, autosave: true, before_add: :validate_attachments_limit
@@ -150,16 +173,9 @@ class Message < ApplicationRecord
     )
     data[:echo_id] = echo_id if echo_id.present?
     data[:attachments] = attachments.map(&:push_event_data) if attachments.present?
+    # Normalize sender_type to match frontend expectations
+    data[:sender_type] = normalize_sender_type(data[:sender_type])
     merge_sender_attributes(data)
-  end
-
-  def search_data
-    data = attributes.symbolize_keys
-    data[:conversation] = conversation.present? ? conversation_push_event_data : nil
-    data[:attachments] = attachments.map(&:push_event_data) if attachments.present?
-    data[:sender] = sender.push_event_data if sender
-    data[:inbox] = inbox
-    data
   end
 
   def conversation_push_event_data
@@ -177,13 +193,20 @@ class Message < ApplicationRecord
     data
   end
 
+  def webhook_push_event_data
+    push_event_data.merge(
+      content: Messages::WebhookContentNormalizer.normalize(content),
+      processed_message_content: Messages::WebhookContentNormalizer.normalize(processed_message_content)
+    )
+  end
+
   def webhook_data
     data = {
       account: account.webhook_data,
       additional_attributes: additional_attributes,
       content_attributes: content_attributes,
       content_type: content_type,
-      content: outgoing_content,
+      content: webhook_content,
       conversation: conversation.webhook_data,
       created_at: created_at,
       id: id,
@@ -202,12 +225,21 @@ class Message < ApplicationRecord
     MessageContentPresenter.new(self).outgoing_content
   end
 
+  # Raw content with survey URL (no markdown rendering) for webhook consumers
+  def webhook_content
+    MessageContentPresenter.new(self).webhook_content
+  end
+
   def email_notifiable_message?
     return false if private?
     return false if %w[outgoing template].exclude?(message_type)
     return false if template? && %w[input_csat text].exclude?(content_type)
 
     true
+  end
+
+  def forwarded?
+    content_attributes['forwarded_message_id'].present?
   end
 
   def auto_reply_email?
@@ -222,6 +254,7 @@ class Message < ApplicationRecord
     return false if conversation.messages.outgoing
                                 .where.not(sender_type: ['AgentBot', 'Captain::Assistant'])
                                 .where.not(private: true)
+                                .not_forwarded
                                 .where("(additional_attributes->'campaign_id') is null").count > 1
 
     true
@@ -259,7 +292,41 @@ class Message < ApplicationRecord
     true
   end
 
+  def search_data
+    Messages::SearchDataPresenter.new(self).search_data
+  end
+
+  # Returns message content suitable for LLM consumption
+  # Falls back to audio transcription or attachment placeholder when content is nil
+  def content_for_llm
+    return content if content.present?
+
+    audio_transcription = attachments
+                          .where(file_type: :audio)
+                          .filter_map { |att| att.meta&.dig('transcribed_text') }
+                          .join(' ')
+                          .presence
+    return "[Voice Message] #{audio_transcription}" if audio_transcription.present?
+
+    '[Attachment]' if attachments.any?
+  end
+
   private
+
+  def normalize_sender_type(sender_type)
+    case sender_type
+    when 'AgentBot'
+      'agent_bot'
+    when 'User', 'AccountUser'
+      'User'
+    when 'Contact'
+      'Contact'
+    when 'Captain::Assistant'
+      'captain_assistant'
+    else
+      sender_type&.underscore
+    end
+  end
 
   def prevent_message_flooding
     # Added this to cover the validation specs in messages
@@ -294,13 +361,30 @@ class Message < ApplicationRecord
   end
 
   def ensure_content_type
+    # Don't override content_type if it's already set to an Apple Messages type
+    return if content_type.present? && content_type.start_with?('apple_')
+
+    # For Apple Messages, try to infer content_type from content_attributes
+    if content_type.blank? && content_attributes.present?
+      if content_attributes.key?('items') && content_attributes.key?('summary_text')
+        self.content_type = 'apple_quick_reply'
+        return
+      elsif content_attributes.key?('sections')
+        self.content_type = 'apple_list_picker'
+        return
+      elsif content_attributes.key?('event')
+        self.content_type = 'apple_time_picker'
+        return
+      end
+    end
+
     self.content_type ||= Message.content_types[:text]
   end
 
   def execute_after_create_commit_callbacks
     # rails issue with order of active record callbacks being executed https://github.com/rails/rails/issues/20911
     reopen_conversation
-    notify_via_mail
+    mark_pending_conversation_as_open_for_human_response
     set_conversation_activity
     dispatch_create_events
     send_reply
@@ -313,12 +397,25 @@ class Message < ApplicationRecord
   end
 
   def update_waiting_since
-    if human_response? && !private && conversation.waiting_since.present?
+    clear_waiting_since_on_outgoing_response if conversation.waiting_since.present? && !private
+    set_waiting_since_on_incoming_message
+  end
+
+  def clear_waiting_since_on_outgoing_response
+    if human_response?
       Rails.configuration.dispatcher.dispatch(
         REPLY_CREATED, Time.zone.now, waiting_since: conversation.waiting_since, message: self
       )
       conversation.update(waiting_since: nil)
+      return
     end
+
+    # Bot responses also clear waiting_since (simpler than checking on next customer message)
+    conversation.update(waiting_since: nil) if bot_response? && !preserve_waiting_since
+  end
+
+  def set_waiting_since_on_incoming_message
+    # Set waiting_since when customer sends a message (if currently blank)
     conversation.update(waiting_since: created_at) if incoming? && conversation.waiting_since.blank?
   end
 
@@ -326,10 +423,17 @@ class Message < ApplicationRecord
     # if the sender is not a user, it's not a human response
     # if automation rule id is present, it's not a human response
     # if campaign id is present, it's not a human response
+    # external echo messages are responses sent from the native app (WhatsApp Business, Instagram)
+    # forwarded emails go to a third party, not to the contact
     outgoing? &&
+      !forwarded? &&
       content_attributes['automation_rule_id'].blank? &&
       additional_attributes['campaign_id'].blank? &&
-      sender.is_a?(User)
+      (sender.is_a?(User) || content_attributes['external_echo'].present?)
+  end
+
+  def bot_response?
+    outgoing? && sender_type.in?(['AgentBot', 'Captain::Assistant'])
   end
 
   def dispatch_create_events
@@ -352,6 +456,9 @@ class Message < ApplicationRecord
   end
 
   def send_reply
+    # Skip if explicitly marked to skip (e.g., when template attachments will be added after creation)
+    return if @skip_send_reply_job
+
     # FIXME: Giving it few seconds for the attachment to be uploaded to the service
     # active storage attaches the file only after commit
     attachments.blank? ? ::SendReplyJob.perform_later(id) : ::SendReplyJob.set(wait: 2.seconds).perform_later(id)
@@ -364,6 +471,18 @@ class Message < ApplicationRecord
     conversation.open! if conversation.snoozed?
 
     reopen_resolved_conversation if conversation.resolved?
+  end
+
+  def mark_pending_conversation_as_open_for_human_response
+    return unless captain_pending_conversation?
+    return unless human_response?
+    return if private?
+
+    conversation.open!
+  end
+
+  def captain_pending_conversation?
+    false
   end
 
   def reopen_resolved_conversation
@@ -386,61 +505,22 @@ class Message < ApplicationRecord
     ::MessageTemplates::HookExecutionService.new(message: self).perform
   end
 
-  def email_notifiable_webwidget?
-    inbox.web_widget? && inbox.channel.continuity_via_email
-  end
-
-  def email_notifiable_api_channel?
-    inbox.api? && inbox.account.feature_enabled?('email_continuity_on_api_channel')
-  end
-
-  def email_notifiable_channel?
-    email_notifiable_webwidget? || %w[Email].include?(inbox.inbox_type) || email_notifiable_api_channel?
-  end
-
-  def can_notify_via_mail?
-    return unless email_notifiable_message?
-    return unless email_notifiable_channel?
-    return if conversation.contact.email.blank?
-
-    true
-  end
-
-  def notify_via_mail
-    return unless can_notify_via_mail?
-
-    trigger_notify_via_mail
-  end
-
-  def trigger_notify_via_mail
-    return EmailReplyWorker.perform_in(1.second, id) if inbox.inbox_type == 'Email'
-
-    # will set a redis key for the conversation so that we don't need to send email for every new message
-    # last few messages coupled together is sent every 2 minutes rather than one email for each message
-    # if redis key exists there is an unprocessed job that will take care of delivering the email
-    return if Redis::Alfred.get(conversation_mail_key).present?
-
-    Redis::Alfred.setex(conversation_mail_key, id)
-    ConversationReplyEmailWorker.perform_in(2.minutes, conversation.id, id)
-  end
-
-  def conversation_mail_key
-    format(::Redis::Alfred::CONVERSATION_MAILER_KEY, conversation_id: conversation.id)
-  end
-
   def validate_attachments_limit(_attachment)
     errors.add(:attachments, message: 'exceeded maximum allowed') if attachments.size >= NUMBER_OF_PERMITTED_ATTACHMENTS
   end
 
   def set_conversation_activity
     # rubocop:disable Rails/SkipsModelValidations
-    conversation.update_columns(last_activity_at: created_at)
+    conversation.update_columns(last_activity_at: created_at, updated_at: Time.current)
     # rubocop:enable Rails/SkipsModelValidations
   end
 
   def reindex_for_search
+    return unless respond_to?(:reindex)
+
     reindex(mode: :async)
   end
 end
 
 Message.prepend_mod_with('Message')
+Message.include_mod_with('Concerns::Message')

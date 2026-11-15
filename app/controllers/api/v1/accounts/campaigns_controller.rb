@@ -13,7 +13,13 @@ class Api::V1::Accounts::CampaignsController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @campaign.update!(campaign_params)
+    @campaign.with_lock do
+      if @campaign.one_off? && !@campaign.active?
+        render json: { error: 'The campaign has already started' }, status: :unprocessable_entity
+      else
+        @campaign.update!(campaign_params)
+      end
+    end
   end
 
   def destroy
@@ -24,11 +30,11 @@ class Api::V1::Accounts::CampaignsController < Api::V1::Accounts::BaseController
   private
 
   def campaign
-    @campaign ||= Current.account.campaigns.find_by(display_id: params[:id])
+    @campaign ||= Current.account.campaigns.find_by!(display_id: params[:id])
   end
 
   def campaign_params
     params.require(:campaign).permit(:title, :description, :message, :enabled, :trigger_only_during_business_hours, :inbox_id, :sender_id,
-                                     :scheduled_at, audience: [:type, :id], trigger_rules: {}, template_params: {})
+                                     :scheduled_at, audience: [:type, :id, :phone], trigger_rules: {}, template_params: {})
   end
 end

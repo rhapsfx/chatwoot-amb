@@ -27,6 +27,7 @@ const initialState = {
     conversationFaqs: false,
     memories: false,
     citations: false,
+    contactAttributes: false,
   },
 };
 
@@ -59,6 +60,7 @@ const updateStateFromAssistant = assistant => {
     conversationFaqs: config.feature_faq || false,
     memories: config.feature_memory || false,
     citations: config.feature_citation || false,
+    contactAttributes: config.feature_contact_attributes || false,
   };
 };
 
@@ -79,6 +81,7 @@ const handleBasicInfoUpdate = async () => {
       feature_faq: state.features.conversationFaqs,
       feature_memory: state.features.memories,
       feature_citation: state.features.citations,
+      feature_contact_attributes: state.features.contactAttributes,
     },
   };
 
@@ -114,10 +117,12 @@ watch(
 
     <Editor
       v-model="state.description"
+      :max-length="500"
       :label="t('CAPTAIN.ASSISTANTS.FORM.DESCRIPTION.LABEL')"
       :placeholder="t('CAPTAIN.ASSISTANTS.FORM.DESCRIPTION.PLACEHOLDER')"
       :message="formErrors.description"
       :message-type="formErrors.description ? 'error' : 'info'"
+      class="z-0"
     />
 
     <div class="flex flex-col gap-2">
@@ -136,6 +141,10 @@ watch(
         <label class="flex items-center gap-2">
           <input v-model="state.features.citations" type="checkbox" />
           {{ t('CAPTAIN.ASSISTANTS.FORM.FEATURES.ALLOW_CITATIONS') }}
+        </label>
+        <label class="flex items-center gap-2">
+          <input v-model="state.features.contactAttributes" type="checkbox" />
+          {{ t('CAPTAIN.ASSISTANTS.FORM.FEATURES.ALLOW_CONTACT_ATTRIBUTES') }}
         </label>
       </div>
     </div>

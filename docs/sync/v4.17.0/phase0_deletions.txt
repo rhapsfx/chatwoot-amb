@@ -1,0 +1,11 @@
+app/javascript/dashboard/components-next/captain/pageComponents/document/RelatedResponses.vue
+app/javascript/dashboard/components-next/sidebar/SidebarNotificationBell.vue
+app/javascript/dashboard/components/widgets/mentions/MentionBox.vue
+app/javascript/dashboard/routes/dashboard/captain/assistants/settings/Settings.vue
+app/javascript/dashboard/routes/dashboard/captain/responses/Pending.vue
+app/javascript/dashboard/routes/dashboard/notifications/components/NotificationTable.vue
+app/javascript/dashboard/routes/dashboard/notifications/components/NotificationsView.vue
+app/javascript/dashboard/routes/dashboard/notifications/routes.js
+app/javascript/dashboard/routes/dashboard/settings/reports/components/heatmaps/HeatmapTooltip.vue
+app/javascript/dashboard/routes/dashboard/settings/reports/components/heatmaps/composables/useHeatmapTooltip.js
+lib/tasks/onboarding.rake

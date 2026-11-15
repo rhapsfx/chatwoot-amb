@@ -5,6 +5,9 @@
     "LOADING": "Buscando etiquetas",
     "DESCRIPTION": "As etiquetas ajudam você a categorizar e priorizar conversas e leads. Você pode atribuir uma etiqueta a uma conversa ou contato usando o painel lateral.",
     "LEARN_MORE": "Aprenda mais sobre etiquetas",
+    "COUNT": "{n} etiqueta | {n} etiquetas",
+    "SEARCH_PLACEHOLDER": "Pesquisar etiquetas...",
+    "NO_RESULTS": "Nenhuma etiqueta encontrada correspondente à sua busca",
     "SEARCH_404": "Não existem itens correspondentes a esta consulta",
     "LIST": {
       "404": "Não há etiquetas disponíveis nesta conta.",
@@ -13,7 +16,8 @@
       "TABLE_HEADER": {
         "NAME": "Nome",
         "DESCRIPTION": "Descrição",
-        "COLOR": "Cor"
+        "COLOR": "Cor",
+        "ACTION": "Ações"
       }
     },
     "FORM": {
@@ -38,20 +42,6 @@
       "CREATE": "Criar",
       "DELETE": "Excluir",
       "CANCEL": "Cancelar"
-    },
-    "SUGGESTIONS": {
-      "TOOLTIP": {
-        "SINGLE_SUGGESTION": "Adicionar etiqueta à conversa",
-        "MULTIPLE_SUGGESTION": "Selecione esta etiqueta",
-        "DESELECT": "Desmarcar etiqueta",
-        "DISMISS": "Descartar sugestão"
-      },
-      "POWERED_BY": "Chatwoot AI",
-      "DISMISS": "Recusar",
-      "ADD_SELECTED_LABELS": "Adicionar etiquetas selecionadas",
-      "ADD_SELECTED_LABEL": "Adicionar etiqueta selecionada",
-      "ADD_ALL_LABELS": "Adicionar todas as etiquetas",
-      "SUGGESTED_LABELS": "Etiquetas sugeridos"
     },
     "ADD": {
       "TITLE": "Adicionar etiqueta",
