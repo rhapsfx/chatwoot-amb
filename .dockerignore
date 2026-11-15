@@ -5,8 +5,6 @@
 
 # Documentation (keep deployment docs)
 *.md
-!GCP_DEPLOYMENT_GUIDE.md
-!GCP_QUICK_REFERENCE.md
 docs/
 
 # Environment files

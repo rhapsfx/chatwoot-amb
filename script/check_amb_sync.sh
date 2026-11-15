@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-merge guard for upstream syncs: verifies the AMB invariants documented in
-# docs/PHASE_7_SYNC_SUMMARY.md and docs/sync-v4.19.1/UPGRADE_PLAN.md still hold.
+# docs/sync/phase-7-summary.md and docs/sync/v4.19.1/UPGRADE_PLAN.md still hold.
 # Usage: script/check_amb_sync.sh   (exit 1 if any check fails)
 cd "$(git rev-parse --show-toplevel)" || exit 1
 

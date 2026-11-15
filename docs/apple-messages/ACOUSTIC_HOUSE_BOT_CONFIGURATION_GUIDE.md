@@ -551,10 +551,9 @@ end
 
 ## 📚 Related Documentation
 
-- **[README_BOT_SERVICE.md](../../archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md)** - Overview and quick start (archived)
-- **[RUBY_BOT_SERVICE_GUIDE.md](../../archive/n8n-legacy/docs/apple-messages/RUBY_BOT_SERVICE_GUIDE.md)** - Technical implementation details (archived)
+- **[Bot service README](bot-service/README.md)** - Overview and quick start
+- **[Ruby bot service guide](bot-service/ruby-bot-service-guide.md)** - Technical implementation details
 - **PHASE_1_IMPLEMENTATION_SUMMARY.md** - Phase 1 development log
-- **[CHATWOOT_BOT_INTEGRATION_PROPOSAL.md](../../archive/n8n-legacy/docs/apple-messages/CHATWOOT_BOT_INTEGRATION_PROPOSAL.md)** - Architecture proposal (archived)
 
 ---
 

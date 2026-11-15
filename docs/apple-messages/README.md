@@ -37,72 +37,30 @@ SharedAppleImage.create!(
 
 ## Directory Structure
 
+Counts, not a file-by-file dump — the previous listing drifted within weeks.
+List an area with `ls` or read its guide.
+
 ```
 docs/apple-messages/
-├── README.md                              # This file
-├── APPLE_PAY_GUIDE.md                     # Unified Apple Pay integration guide (1462 lines)
-├── case-normalization-specification.md    # CaseTransformer technical specification
-├── fixes/                                 # Bug fixes and patches
-│   └── WEBHOOK_JWT_FIX.md
-├── phases/                                # Phase completion reports
-│   ├── PHASE_1_COMPLETE.md                # CaseTransformer module + API normalization
-│   ├── PHASE_3_COMPLETE.md                # Service layer cleanup completion
-│   └── MIGRATION_IMPLEMENTATION_COMPLETE.md  # Database migration (Phase 2)
-├── reports/                               # Analysis and status reports
-│   ├── APPLE_MESSAGES_I18N_REPORT.md      # Internationalization analysis
-│   └── APPLE_MSP_MISSING_FEATURES_CHECKLIST.md  # Missing features tracking
-├── implementation/                        # Implementation guides (10 files)
-│   ├── APPLE_MESSAGES_FOR_BUSINESS_INTEGRATION_PLAN.md
-│   ├── APPLE_MSP_COMPLETE_IMPLEMENTATION_GUIDE.md
-│   ├── APPLE_MSP_FRONTEND_INTEGRATION.md
-│   ├── APPLE_MSP_PHASE_1_IMPLEMENTATION.md
-│   ├── APPLE_MESSAGES_LIST_PICKER_IMPLEMENTATION.md
-│   ├── APPLE_RICH_LINK_FAVICON_IMPLEMENTATION.md
-│   ├── APPLE_MSP_OUTGOING_SERVICES.md     # Outgoing services documentation
-│   ├── APPLE_WEBHOOK_REFACTORING.md       # Webhook refactoring guide
-│   ├── PAYLOAD_VALIDATION_IMPLEMENTATION.md  # Payload validation patterns
-│   └── APPLE_TYPING_INDICATOR_IMPLEMENTATION.md  # Typing indicator support
-├── guides/                                # User and configuration guides (6 files)
-│   ├── APPLE_MESSAGES_OAUTH2_APPLEPAY_CONFIGURATION_GUIDE.md
-│   ├── APPLE_MESSAGES_TROUBLESHOOTING_GUIDE.md
-│   ├── CHATWOOT_MESSAGING_CHANNEL_GUIDE.md
-│   ├── MIGRATION_GUIDE.md                 # CaseTransformer migration procedures
-│   ├── WEBHOOK_DEPLOYMENT_GUIDE.md        # Webhook deployment guide
-│   └── APPLE_MESSAGES_TEMPLATE_CREATION.md  # Template creation guide
-├── scripts/                               # Scripts and utilities
-│   ├── test/                              # Test scripts
-│   │   ├── test_apple_integration.sh
-│   │   ├── test_apple_message_delivery.rb
-│   │   ├── test_favicon_fallback.rb
-│   │   ├── test_url_message_splitting.rb
-│   │   └── test_webhook_endpoint.rb
-│   ├── debug/                             # Debug utilities
-│   │   ├── debug_api_response.rb
-│   │   ├── debug_attachment.rb
-│   │   ├── debug_time_picker_payload.rb
-│   │   └── test_apple_typing_indicator.rb
-│   ├── utilities/                         # Utility scripts
-│   │   ├── check_apple_channels.rb
-│   │   ├── check_apple_config.rb
-│   │   ├── check_messages.rb
-│   │   ├── update_apple_webhook_url.rb
-│   │   ├── apple_messages_json_output.rb
-│   │   ├── corrected_apple_messages_payloads.rb
-│   │   └── compare_time_picker_formats.rb
-│   ├── dry_run_normalization.rb           # CaseTransformer normalization analyzer
-│   ├── verify_normalization.rb            # Database normalization verification
-│   ├── rollback_normalization.rb          # Emergency rollback script
-│   ├── test_apple_idr.rb                  # Interactive data request tests
-│   ├── test_list_picker_idr_flow.rb       # List picker IDR flow tests
-│   ├── validate_apple_idr.rb              # IDR validation
-│   ├── debug_apple_data.rb                # Apple data debugging
-│   └── debug_imessage_saving.rb           # iMessage saving debug
-└── data/                                  # Sample data and test results
-    ├── apple_messages_payloads.json
-    ├── corrected_apple_messages_payloads.json
-    ├── corrected_msp_test_results.json
-    └── final_msp_test_results.json
+├── README.md                    # this file (index for the whole area)
+├── START_HERE.md                # Acoustic House bot: implementation completion report
+├── APPLE_PAY_GUIDE.md           # Apple Pay integration (merchant, gateway, checklist)
+├── APPLE_PAY_TEST_MODE.md       # exercising Apple Pay in test mode
+├── APPLE_WALLET_GUIDE.md        # Wallet passes (certificates, templates)
+├── case-normalization-specification.md   # CaseTransformer rules — read before any AMB change
+├── guides/            (6 files) # OAuth2/applepay configuration, troubleshooting, channel setup, migration, webhook deployment, template creation
+├── implementation/   (21 files) # design docs + implementation plans (images, list picker, typing indicator, payload validation, …)
+├── reports/           (1 file)  # APPLE_MSP_MISSING_FEATURES_CHECKLIST.md
+├── fixes/             (2 files) # bot API time-picker fix, timeslot preservation logic
+├── bot-service/       (2 files) # current Ruby bot service: overview + technical guide
+├── scripts/          (12 files) # test/, utilities/, normalization analyzers + rollback
+└── data/              (4 files) # sample payloads and MSP test results
 ```
+
+The remaining ~43 topic docs at this level cover individual features
+(`IMAGE_*.md`, `SHARED_*.md`, `LIST_PICKER_*`, `TIME_PICKER_*`,
+`PHASE_*`, `ACOUSTIC_HOUSE_*`, …). See "Key Documentation" below for the
+essential entry points.
 
 ## Key Documentation
 

@@ -1059,7 +1059,7 @@ rails runner "
 
 ### Documentation
 - **Architecture**: `docs/apple-messages/IMAGE_ARCHITECTURE_LONG_TERM_PLAN.md`
-- **API Reference**: `docs/api/shared_apple_images_api.md`
+- **API Reference**: `docs/features/shared-apple-images/api.md`
 - **Usage Guide**: `docs/apple-messages/SHARED_IMAGES_USAGE.md`
 - **Original Design**: `docs/apple-messages/implementation/UNIFIED_TEMPLATE_APPROACH.md`
 

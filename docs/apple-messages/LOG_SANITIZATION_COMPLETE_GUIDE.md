@@ -687,7 +687,7 @@ return true if value.match?(%r{\Adata:image/[a-z]+;base64,}i)
 ### Documentation
 
 - `docs/apple-messages/LOG_SANITIZATION_COMPLETE_GUIDE.md` - This file
-- `docs/log-sanitization-unified-solution.md` - Rails global sanitizer guide
+- `docs/operations/archive/log-sanitization-unified-solution.md` - Rails global sanitizer guide
 - `docs/apple-messages/CUSTOM_PAYLOAD_FEATURE_PLAN.md` - Custom payload feature (references logging)
 
 ---

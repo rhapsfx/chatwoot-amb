@@ -62,7 +62,7 @@ Your Acoustic House Bot implementation is **100% complete** with full feature pa
 ✅ PHASE_4_IMPLEMENTATION_SUMMARY.md
 ✅ PHASE_4_TESTING_GUIDE.md
 ✅ SUMMARY_LIST_PICKER_REFERENCE.md
-✅ README_BOT_SERVICE.md (existing, now archived in archive/n8n-legacy/docs/apple-messages/)
+✅ bot-service/README.md (current bot service overview)
 ```
 
 ### **Scripts** (2 master scripts created)
@@ -189,7 +189,7 @@ Phase-specific documentation:
 → `ACOUSTIC_HOUSE_BOT_COMPLETE_IMPLEMENTATION_REPORT.md` (this document's big brother)
 
 ### **🚨 Want Quick Start?**
-→ `archive/n8n-legacy/docs/apple-messages/README_BOT_SERVICE.md` (overview and commands, archived)
+→ `bot-service/README.md` (overview and commands)
 
 ---
 

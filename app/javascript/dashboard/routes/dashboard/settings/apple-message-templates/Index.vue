@@ -45,7 +45,7 @@ const botApiBanner = {
   tokenLabel: 'Get your API token:',
   tokenPath: 'Profile → Settings → Access Token',
   docsLabel: 'Full documentation:',
-  docsPath: 'docs/api/BOT_TEMPLATES_API.md',
+  docsPath: 'docs/reference/api/bot-templates-api.md',
   docsSuffix: 'in the project root',
 };
 

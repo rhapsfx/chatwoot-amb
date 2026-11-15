@@ -22,35 +22,23 @@ Essential technical documentation for working with the MessageTemplate system:
    - Error response codes
    - Best practices for template usage
 
-3. **[SENDING_FILES_VIA_BOT_API.md](../../archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md)** - File Attachments Guide (archived)
-   - Current file attachment patterns
-   - Implementation details
-   - API usage examples
-
 ### Additional Documentation
 
 #### Examples (`examples/`)
 - **[GUITAR_FORM_TEMPLATE.md](./examples/GUITAR_FORM_TEMPLATE.md)** - Example template implementation
 
 #### Fixes (`fixes/`)
-- **[BLOCK_EDITOR_FIX.md](./fixes/BLOCK_EDITOR_FIX.md)** - Block editor bug fixes
 - **[FIX_TEMPLATES_NOT_SHOWING.md](./fixes/FIX_TEMPLATES_NOT_SHOWING.md)** - Template visibility fixes
 - **[GUITAR_FORM_FIXES.md](./fixes/GUITAR_FORM_FIXES.md)** - Guitar form specific fixes
-- **[TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md](./fixes/TEMPLATE_EDITOR_IMAGE_DISPLAY_FIX.md)** - Image display fixes
-- **[TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md](./fixes/TEMPLATE_MIGRATION_IMAGE_FORMAT_FIX.md)** - Migration image format fixes
-
-#### Reports (`reports/`)
-- **[PHASE_1_IMPLEMENTATION_SUMMARY.md](./reports/PHASE_1_IMPLEMENTATION_SUMMARY.md)** - Phase 1 completion details
-- **[BOT_RENDERER_VERIFICATION_REPORT.md](./reports/BOT_RENDERER_VERIFICATION_REPORT.md)** - Template rendering verification
 
 #### Testing (`testing/`)
 - **[TEMPLATE_ATTACHMENT_TESTS.md](./testing/TEMPLATE_ATTACHMENT_TESTS.md)** - Comprehensive test documentation
-- **[TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md](./testing/TEMPLATE_ATTACHMENT_TESTS_SUMMARY.md)** - Test suite summary
 - **[TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md](./testing/TEMPLATE_ATTACHMENT_TESTS_QUICK_REFERENCE.md)** - Quick test reference
 - **[TEST_FILES_MANIFEST.txt](./testing/TEST_FILES_MANIFEST.txt)** - Test file inventory
 
 ### Related Documentation
-- **[../bot-migration/COMPLETE_MIGRATION_SUMMARY.md](../bot-migration/COMPLETE_MIGRATION_SUMMARY.md)** - Bot migration toolkit
+- **[../archive/bot-migration/APPLE_BOT_MIGRATION_GUIDE.md](../archive/bot-migration/APPLE_BOT_MIGRATION_GUIDE.md)** - Bot migration guide (archived)
+- **[../reference/api/template-schema-reference.md](../reference/api/template-schema-reference.md)** - MessageTemplate payload schema
 - **[../../CLAUDE.md](../../CLAUDE.md)** - Project development guidelines
 
 ---
@@ -350,11 +338,10 @@ All Apple Messages features use CaseTransformer:
 For questions about:
 - **Architecture**: See MESSAGETEMPLATE_ARCHITECTURE.md (Section 8: Critical Patterns)
 - **API Usage**: See MESSAGETEMPLATE_API_REFERENCE.md
-- **Current Implementation**: See `archive/n8n-legacy/docs/templates/SENDING_FILES_VIA_BOT_API.md` (archived)
+- **Attachments**: See MESSAGETEMPLATE_ARCHITECTURE.md (attachment options) and [bot templates API reference](../reference/api/bot-templates-api.md)
 - **Examples**: See examples/GUITAR_FORM_TEMPLATE.md
 - **Testing**: See testing/ directory for comprehensive test documentation
 - **Bug Fixes**: See fixes/ directory for known issues and solutions
-- **Implementation Reports**: See reports/ directory for project summaries
 
 ---
 

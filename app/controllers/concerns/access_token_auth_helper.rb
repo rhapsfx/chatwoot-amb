@@ -18,7 +18,7 @@ module AccessTokenAuthHelper
   end
 
   def legacy_access_token
-    # X-Api-Access-Token and the query param are used by bots/n8n (some proxies strip the plain api_access_token header)
+    # X-Api-Access-Token and the query param are used by bot integrations (some proxies strip the plain api_access_token header)
     request.headers['X-Api-Access-Token'] || request.headers[:api_access_token] || request.headers[:HTTP_API_ACCESS_TOKEN] ||
       params[:api_access_token]
   end

@@ -277,7 +277,7 @@ Potential improvements:
 ## Related Documentation
 
 - `docs/apple-messages/case-normalization-specification.md` - CaseTransformer integration
-- `docs/api/BOT_TEMPLATES_API.md` - BOT Templates API documentation
+- `docs/reference/api/bot-templates-api.md` - BOT Templates API documentation
 - `app/models/concerns/content_attribute_validator.rb` - Database-level validation
 - `AGENTS.md` - Apple Messages for Business development guidelines
 
