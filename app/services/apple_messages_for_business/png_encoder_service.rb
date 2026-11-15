@@ -60,10 +60,10 @@ class AppleMessagesForBusiness::PngEncoderService
                 .source(source_path)
                 .resize_to_limit(width, height)
                 .convert('png')
-                # Flatten transparency onto white - PNG keeps alpha, but a consistent background
-                # avoids surprises if a downstream consumer doesn't render transparency.
+                # Keep transparency: list picker icons and provider logos are drawn on the
+                # message bubble, so flattening onto white paints opaque squares around them.
                 .custom do |cmd|
-                  cmd.background('white').flatten.strip
+                  cmd.strip
                   cmd.colors(colors) if colors
                 end
                 .call
