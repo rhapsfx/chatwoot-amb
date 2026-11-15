@@ -159,7 +159,12 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     # Fetch and encode images if image identifiers are provided
     images = fetch_images
 
-    request_identifier = @payment_data['request_identifier'] || SecureRandom.uuid
+    # Apple requires requestIdentifier to be an RFC 4122 UUID. Callers such as the
+    # Acoustic House bot pass a handler name ("applepay_1018"), which Apple rejects
+    # with 400, so normalise instead of forwarding it. Bot routing falls back to the
+    # current state (state_inferred_handler_id) for UUID identifiers.
+    request_identifier = @payment_data['request_identifier']
+    request_identifier = SecureRandom.uuid unless AppleMessagesForBusiness::UuidValidator.valid?(request_identifier)
 
     # Persist the authoritative transaction total server-side so the payment
     # gateway callback can verify the amount it's asked to charge instead of
