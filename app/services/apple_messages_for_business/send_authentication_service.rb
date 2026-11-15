@@ -166,12 +166,14 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
       end
     end
 
-    {
-      bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
-      data: data_hash,
-      receivedMessage: build_received_message,
-      replyMessage: build_reply_message
-    }
+    drop_unbacked_image_identifiers(
+      {
+        bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.icloud.apps.messages.business.extension',
+        data: data_hash,
+        receivedMessage: build_received_message,
+        replyMessage: build_reply_message
+      }
+    )
   end
 
   def build_oauth_data

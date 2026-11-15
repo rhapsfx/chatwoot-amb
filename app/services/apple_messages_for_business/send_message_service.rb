@@ -386,7 +386,28 @@ class AppleMessagesForBusiness::SendMessageService
       base_data[:data][:images] = images if images.present?
     end
 
+    drop_unbacked_image_identifiers(base_data)
+  end
+
+  # Apple rejects an imageIdentifier that has no matching entry in data.images. An
+  # image can go missing (not uploaded, or too large to encode as PNG), so drop the
+  # reference and still deliver the message instead of failing the whole send.
+  def drop_unbacked_image_identifiers(base_data)
+    identifiers = Array(base_data.dig(:data, :images)).map { |image| image[:identifier] || image['identifier'] }
+
+    base_data[:receivedMessage] = without_unbacked_image(base_data[:receivedMessage], identifiers)
+    base_data[:replyMessage] = without_unbacked_image(base_data[:replyMessage], identifiers)
     base_data
+  end
+
+  def without_unbacked_image(message, identifiers)
+    return message unless message.is_a?(Hash)
+
+    identifier = message[:imageIdentifier] || message['imageIdentifier']
+    return message if identifier.blank? || identifiers.include?(identifier)
+
+    Rails.logger.warn "[AMB Send] Dropping imageIdentifier #{identifier.inspect} - image not in data.images"
+    message.except(:imageIdentifier, 'imageIdentifier')
   end
 
   # Apple's spec requires requestIdentifier to be a valid RFC 4122 UUID. Prefer a caller-supplied

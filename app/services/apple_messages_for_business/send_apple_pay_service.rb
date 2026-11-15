@@ -187,12 +187,14 @@ class AppleMessagesForBusiness::SendApplePayService < AppleMessagesForBusiness::
     # This matches Apple's reference implementation in 16_send_rich_apple_pay_request.py
     data_object[:images] = images if images.any?
 
-    {
-      receivedMessage: build_received_message,
-      replyMessage: build_reply_message,
-      bid: @channel.imessage_extension_bid || default_bid,
-      data: data_object
-    }
+    drop_unbacked_image_identifiers(
+      {
+        receivedMessage: build_received_message,
+        replyMessage: build_reply_message,
+        bid: @channel.imessage_extension_bid || default_bid,
+        data: data_object
+      }
+    )
   end
 
   # Build the paymentRequest structure according to Apple Pay specification

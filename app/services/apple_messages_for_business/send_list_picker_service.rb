@@ -72,7 +72,7 @@ class AppleMessagesForBusiness::SendListPickerService < AppleMessagesForBusiness
       end
     end
 
-    base_data
+    drop_unbacked_image_identifiers(base_data)
   end
 
   def save_images_to_storage

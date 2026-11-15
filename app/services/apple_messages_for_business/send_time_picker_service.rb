@@ -28,7 +28,7 @@ class AppleMessagesForBusiness::SendTimePickerService < AppleMessagesForBusiness
 
     Rails.logger.info "[AMB TimePicker] build_interactive_data - Images in data: #{images&.length || 0}"
 
-    base_data
+    drop_unbacked_image_identifiers(base_data)
   end
 
   private
