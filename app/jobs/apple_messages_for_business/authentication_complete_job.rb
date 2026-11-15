@@ -7,7 +7,7 @@
 class AppleMessagesForBusiness::AuthenticationCompleteJob < ApplicationJob
   queue_as :default
 
-  def perform(channel_id:, auth_key:, user_data:, provider:, destination_id:)
+  def perform(channel_id:, user_data:, provider:, destination_id:)
     Rails.logger.info "[AMB Auth Job] Starting authentication completion for destination_id: #{destination_id}"
     Rails.logger.info "[AMB Auth Job] User data: #{user_data.inspect}"
 

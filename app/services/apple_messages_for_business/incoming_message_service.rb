@@ -1,6 +1,7 @@
 class AppleMessagesForBusiness::IncomingMessageService
   include ::FileTypeHelper
   include AppleMessagesForBusiness::Concerns::Utf8Logging
+  include AppleMessagesForBusiness::Concerns::ListPickerResponse
 
   def initialize(inbox:, params:, headers:)
     @inbox = inbox
@@ -464,17 +465,12 @@ class AppleMessagesForBusiness::IncomingMessageService
       end
       return 'Time Picker Response'
     elsif data_keys.include?('listPicker')
-      # List picker response - try to extract selected item(s) from replyMessage or sections
-      list_picker = interactive_data['data']['listPicker']
-      if list_picker && list_picker['sections']
-        # Look for selected items in the "You Selected" section or similar
-        selected_section = list_picker['sections'].find { |s| s['title']&.include?('Selected') }
-        if selected_section && selected_section['items']&.any?
-          # Handle multiple selections
-          selected_titles = selected_section['items'].filter_map { |item| item['title'] }
-          return selected_titles.join(', ') if selected_titles.any?
-        end
-      end
+      # List picker response - Apple rebuilds the sections, so the selection is the
+      # section with the lowest `order`; section titles are localized.
+      selected_titles = selected_list_picker_items(interactive_data['data']['listPicker'])
+                        .filter_map { |item| item['title'] }
+      return selected_titles.join(', ') if selected_titles.any?
+
       return 'List Picker Response'
     elsif data_keys.include?('authenticate')
       return 'Authentication Response'
@@ -1436,38 +1432,27 @@ class AppleMessagesForBusiness::IncomingMessageService
     Rails.logger.info "[Bot] Authentication status: #{status}"
 
     if status == 'success'
-      # Get stored authentication result from Redis
-      # Use source_id method to get the Apple Messages source ID
-      destination_id = source_id
-      auth_key = "apple_auth_result:#{@inbox.channel.id}:#{destination_id}"
-      Rails.logger.info "[Bot] 🔍 Looking for Redis key: #{auth_key}"
-      Rails.logger.info "[Bot] 🔍 Channel ID: #{@inbox.channel.id}, Source ID: #{destination_id}"
+      # Account linking happens here and only here: the response must echo the
+      # requestIdentifier we issued and come from the OpaqueID the request was sent
+      # to. The pending identity is consumed, so a replayed response links nothing.
+      request_identifier = data['requestIdentifier']
+      auth_result = AppleMessagesForBusiness::AuthenticationService.new(@inbox.channel).consume_authentication_result(
+        request_identifier: request_identifier,
+        source_id: source_id
+      )
 
-      begin
-        auth_result_json = Redis::Alfred.get(auth_key)
-        Rails.logger.info "[Bot] 🔍 Redis returned: #{auth_result_json.present? ? 'data found' : 'nil'}"
+      if auth_result
+        AppleMessagesForBusiness::AuthenticationCompleteJob.perform_later(
+          channel_id: @inbox.channel.id,
+          user_data: auth_result['user'],
+          provider: auth_result['provider'],
+          destination_id: source_id
+        )
 
-        if auth_result_json
-          auth_result = JSON.parse(auth_result_json)
-          Rails.logger.info "[Bot] Found stored authentication result for #{destination_id}"
-          Rails.logger.info "[Bot] 🔍 Auth result keys: #{auth_result.keys.inspect}"
-
-          # Trigger job to update contact and send confirmation
-          AppleMessagesForBusiness::AuthenticationCompleteJob.perform_later(
-            channel_id: @inbox.channel.id,
-            auth_key: auth_key,
-            user_data: auth_result['user'],
-            provider: auth_result['provider'],
-            destination_id: destination_id
-          )
-
-          Rails.logger.info '[Bot] ✅ AuthenticationCompleteJob enqueued'
-        else
-          Rails.logger.error "[Bot] ❌ No stored authentication result found for key: #{auth_key}"
-        end
-      rescue StandardError => e
-        Rails.logger.error "[Bot] ❌ Error during Redis lookup or job enqueue: #{e.message}"
-        Rails.logger.error "[Bot] ❌ Backtrace: #{e.backtrace.first(5).join("\n")}"
+        Rails.logger.info "[Bot] ✅ AuthenticationCompleteJob enqueued for request #{request_identifier.inspect}"
+      else
+        Rails.logger.error '[Bot] ❌ No pending authentication matches ' \
+                           "request #{request_identifier.inspect} for #{source_id.inspect} - not linking"
       end
     else
       Rails.logger.error "[Bot] ❌ Authentication failed with status: #{status}"

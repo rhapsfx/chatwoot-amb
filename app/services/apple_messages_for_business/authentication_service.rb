@@ -1,9 +1,32 @@
 class AppleMessagesForBusiness::AuthenticationService
   include ApplicationHelper
 
+  # The callback must be turned into a linked account quickly; anything older is
+  # stale state we refuse to act on.
+  AUTH_RESULT_TTL = 10.minutes.to_i
+
   def initialize(channel)
     @channel = channel
     @key_pair_service = AppleMessagesForBusiness::KeyPairService.instance
+  end
+
+  # Atomically reads and deletes the OAuth state. A state may be used once: a
+  # replayed callback gets nil and must be rejected.
+  # https://register.apple.com/resources/messages/msp-rest-api/type-interactive#validating-the-authentication-response
+  def self.consume_oauth_state(state)
+    return nil if state.blank?
+
+    key = "oauth_state:#{state}"
+    value = Redis::Alfred.with do |redis|
+      redis.multi do |transaction|
+        transaction.get(key)
+        transaction.del(key)
+      end
+    end.first
+
+    value.present? ? JSON.parse(value) : nil
+  rescue JSON::ParserError
+    nil
   end
 
   def create_authentication_request(oauth2_provider, redirect_uri, state = nil)
@@ -28,9 +51,8 @@ class AppleMessagesForBusiness::AuthenticationService
     request_data
   end
 
-  def process_oauth2_callback(code, state, provider)
-    auth_session = get_auth_session(state)
-    return { error: 'Invalid state parameter' } unless auth_session
+  def process_oauth2_callback(code, oauth_session, provider)
+    return { error: 'Invalid or expired state' } if oauth_session.blank?
 
     # Build redirect_uri using the provider from the session
     redirect_uri = build_redirect_uri_for_callback(provider)
@@ -47,8 +69,52 @@ class AppleMessagesForBusiness::AuthenticationService
       user: user_data,
       provider: provider,
       access_token: token_response[:access_token],
-      authenticated_at: Time.current
+      authenticated_at: Time.current,
+      request_identifier: oauth_session['request_identifier'],
+      destination_id: oauth_session['destination_id']
     }
+  end
+
+  # Keeps the identity produced by the OAuth callback in a pending state. It is
+  # not attached to the contact until the interactive authentication response
+  # arrives for the same requestIdentifier.
+  def store_authentication_result(request_identifier:, destination_id:, provider:, user:, authenticated_at:)
+    return if request_identifier.blank?
+
+    Redis::Alfred.setex(
+      auth_result_key(request_identifier),
+      {
+        user: user,
+        provider: provider,
+        authenticated_at: authenticated_at,
+        channel_id: @channel.id,
+        destination_id: destination_id
+      }.to_json,
+      AUTH_RESULT_TTL
+    )
+  end
+
+  # Returns the pending identity for this request and deletes it, so a response
+  # can only ever link once. Returns nil unless the interactive response came
+  # from the OpaqueID the request was sent to.
+  def consume_authentication_result(request_identifier:, source_id:)
+    return nil if request_identifier.blank? || source_id.blank?
+
+    key = auth_result_key(request_identifier)
+    raw = Redis::Alfred.with do |redis|
+      redis.multi do |transaction|
+        transaction.get(key)
+        transaction.del(key)
+      end
+    end.first
+    return nil if raw.blank?
+
+    result = JSON.parse(raw)
+    return nil unless ActiveSupport::SecurityUtils.secure_compare(result['destination_id'].to_s, source_id.to_s)
+
+    result
+  rescue JSON::ParserError
+    nil
   end
 
   def generate_landing_page_url(oauth2_provider, success_url, cancel_url = nil)
@@ -107,17 +173,8 @@ class AppleMessagesForBusiness::AuthenticationService
     @channel.update!(auth_sessions: auth_sessions)
   end
 
-  def get_auth_session(state)
-    # Read from Redis (where SendAuthenticationService stores it)
-    state_key = "oauth_state:#{state}"
-    state_data = Redis::Alfred.get(state_key)
-    return nil unless state_data
-
-    begin
-      JSON.parse(state_data)
-    rescue JSON::ParserError
-      nil
-    end
+  def auth_result_key(request_identifier)
+    "apple_auth_result:#{request_identifier}"
   end
 
   def store_landing_context(state, success_url, cancel_url)

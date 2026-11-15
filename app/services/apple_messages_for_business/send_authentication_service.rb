@@ -150,7 +150,7 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
 
     data_hash = {
       version: '2.0',
-      requestIdentifier: SecureRandom.uuid,
+      requestIdentifier: request_identifier,
       authenticate: {
         oauth2: build_oauth_data
       }
@@ -177,11 +177,9 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
   def build_oauth_data
     provider = @authentication_data['provider'] || @authentication_data[:provider]
 
-    # Generate state and store in Redis for CSRF protection
-    state = SecureRandom.hex(32)
-
-    # Store state and provider in Redis for later verification
-    store_oauth_state(state, provider, nil)
+    # Store state + requestIdentifier in Redis for later correlation
+    state = oauth_state
+    store_oauth_state(state, provider, request_identifier)
 
     # Build redirect URI for OAuth callback
     redirect_uri = build_redirect_uri(state, provider)
@@ -207,13 +205,25 @@ class AppleMessagesForBusiness::SendAuthenticationService < AppleMessagesForBusi
     AppleMessagesForBusiness::CaseTransformer.to_apple_format(oauth2_data)
   end
 
-  def store_oauth_state(state, provider, _code_verifier)
-    # Store state and provider in Redis for CSRF protection
-    # Expires in 10 minutes
+  # One value per authentication message: the interactive response echoes it,
+  # so it must be the same identifier that the OAuth state is bound to.
+  def request_identifier
+    @request_identifier ||= SecureRandom.uuid
+  end
+
+  def oauth_state
+    @oauth_state ||= SecureRandom.hex(32)
+  end
+
+  def store_oauth_state(state, provider, request_identifier)
+    # Store state, destination and requestIdentifier in Redis. The callback consumes
+    # this key once, and the interactive response must echo request_identifier.
+    # Expires in 10 minutes.
     oauth_state_data = {
       channel_id: @channel.id,
       destination_id: @destination_id,
-      provider: provider
+      provider: provider,
+      request_identifier: request_identifier
     }.to_json
 
     Redis::Alfred.setex("oauth_state:#{state}", oauth_state_data, 600)

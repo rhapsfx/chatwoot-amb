@@ -125,7 +125,7 @@ class AppleMessagesForBusiness::FormService
     form_data = {
       bid: 'com.apple.messages.MSMessageExtensionBalloonPlugin:com.apple.messages.form:form',
       data: {
-        version: @form_config['version'] || '1.2',
+        version: '1.2', # current schema; 1.1 is no longer supported by the service
         requestIdentifier: SecureRandom.uuid,
         form: build_form_structure
       },

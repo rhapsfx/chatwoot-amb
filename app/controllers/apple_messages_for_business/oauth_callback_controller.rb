@@ -1,6 +1,6 @@
 class AppleMessagesForBusiness::OauthCallbackController < ApplicationController
   skip_before_action :set_current_user
-  before_action :find_channel
+  before_action :find_channel, only: :callback
 
   def callback
     Rails.logger.info "[OAuth Callback] callback method called - code present: #{params[:code].present?}, state: #{params[:state]}"
@@ -8,14 +8,14 @@ class AppleMessagesForBusiness::OauthCallbackController < ApplicationController
     return render_error('Missing authorization code') unless params[:code]
     return render_error('Missing state parameter') unless params[:state]
 
-    provider = extract_provider_from_state(params[:state])
+    provider = @oauth_state['provider']
     Rails.logger.info "[OAuth Callback] Extracted provider: #{provider}"
     return render_error('Invalid provider') unless provider
 
     auth_service = AppleMessagesForBusiness::AuthenticationService.new(@channel)
     Rails.logger.info '[OAuth Callback] Calling process_oauth2_callback'
 
-    result = auth_service.process_oauth2_callback(params[:code], params[:state], provider)
+    result = auth_service.process_oauth2_callback(params[:code], @oauth_state, provider)
     Rails.logger.info "[OAuth Callback] process_oauth2_callback result: #{result.inspect}"
 
     if result[:error]
@@ -31,95 +31,57 @@ class AppleMessagesForBusiness::OauthCallbackController < ApplicationController
     render_error("Authentication failed: #{e.message}")
   end
 
-  def landing_page
-    return render_error('Missing state parameter') unless params[:state]
-
-    provider = extract_provider_from_state(params[:state])
-    return render_error('Invalid provider') unless provider
-
-    landing_service = AppleMessagesForBusiness::LandingPageService.new(@channel)
-    page_data = landing_service.generate_landing_page(params[:state], provider)
-
-    render html: page_data[:html].html_safe, content_type: page_data[:content_type], status: page_data[:status]
-  end
-
   private
 
   def find_channel
-    # Get channel_id and destination_id from Redis state (stored during OAuth initiation)
+    # The OAuth state is single-use: consume it here, so a replayed callback is rejected.
     Rails.logger.info "[OAuth Callback] Starting find_channel - state: #{params[:state]}"
     return render_error('Missing state parameter') unless params[:state]
 
-    state_key = "oauth_state:#{params[:state]}"
-    state_data = Redis::Alfred.get(state_key)
-    Rails.logger.info "[OAuth Callback] State data from Redis: #{state_data.inspect}"
-    return render_error('Invalid or expired state') unless state_data
+    @oauth_state = AppleMessagesForBusiness::AuthenticationService.consume_oauth_state(params[:state])
+    Rails.logger.info "[OAuth Callback] Consumed state: #{@oauth_state.inspect}"
 
-    begin
-      state_json = JSON.parse(state_data)
-      channel_id = state_json['channel_id']
-      @destination_id = state_json['destination_id']
-      Rails.logger.info "[OAuth Callback] Parsed state - channel_id: #{channel_id}, destination_id: #{@destination_id}"
+    # A second callback for the same state lands here. The identity provider does not
+    # enforce single-use, so reject it and let the user start the flow again.
+    return render_error('Invalid or expired state', status: 'failure') unless @oauth_state
 
-      @channel = Channel::AppleMessagesForBusiness.find(channel_id)
-      Rails.logger.info "[OAuth Callback] Found channel: #{@channel.id}"
-    rescue JSON::ParserError => e
-      Rails.logger.error "[OAuth Callback] JSON parse error: #{e.message}"
-      render_error('Invalid state format')
-    rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "[OAuth Callback] Channel not found: #{e.message}"
-      render_error('Channel not found')
-    rescue StandardError => e
-      Rails.logger.error "[OAuth Callback] Unexpected error in find_channel: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      render_error('Internal error')
-    end
-  end
-
-  def extract_provider_from_state(state)
-    # Extract provider from Redis state
-    state_key = "oauth_state:#{state}"
-    state_data = Redis::Alfred.get(state_key)
-    return nil unless state_data
-
-    begin
-      state_json = JSON.parse(state_data)
-      state_json['provider']
-    rescue JSON::ParserError
-      nil
-    end
+    @destination_id = @oauth_state['destination_id']
+    @channel = Channel::AppleMessagesForBusiness.find(@oauth_state['channel_id'])
+    Rails.logger.info "[OAuth Callback] Found channel: #{@channel.id}, destination_id: #{@destination_id}"
+  rescue ActiveRecord::RecordNotFound => e
+    Rails.logger.error "[OAuth Callback] Channel not found: #{e.message}"
+    render_error('Channel not found')
+  rescue StandardError => e
+    Rails.logger.error "[OAuth Callback] Unexpected error in find_channel: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    render_error('Internal error')
   end
 
   def render_success(result, provider)
-    # Store the successful authentication for processing when we receive the webhook
-    store_authentication_result(result, provider)
+    # Keep the identity pending until the interactive authentication response arrives
+    persist_authentication_result(result, provider)
 
     # Redirect to messages-auth:// URL scheme to close the authentication window
     # Apple will then send a webhook to /message endpoint with authentication response
     redirect_to 'messages-auth://?status=success', allow_other_host: true
   end
 
-  def render_error(error_message)
-    # Redirect to messages-auth:// URL scheme with error status
-    redirect_to "messages-auth://?status=error&error=#{CGI.escape(error_message)}", allow_other_host: true
+  def render_error(error_message, status: 'error')
+    # Redirect to messages-auth:// URL scheme with the given status
+    redirect_to "messages-auth://?status=#{status}&error=#{CGI.escape(error_message)}", allow_other_host: true
   end
 
-  def store_authentication_result(result, provider)
-    # Store the authentication result temporarily for processing when webhook arrives
-    auth_key = "apple_auth_result:#{@channel.id}:#{@destination_id}"
-
-    Redis::Alfred.setex(
-      auth_key,
-      {
-        user: result[:user],
-        provider: provider,
-        authenticated_at: result[:authenticated_at],
-        channel_id: @channel.id,
-        destination_id: @destination_id
-      }.to_json,
-      3600 # 1 hour
+  # Stored against the requestIdentifier, not the destination: the interactive
+  # response has to echo it before the account is linked.
+  def persist_authentication_result(result, provider)
+    AppleMessagesForBusiness::AuthenticationService.new(@channel).store_authentication_result(
+      request_identifier: result[:request_identifier],
+      destination_id: result[:destination_id] || @destination_id,
+      provider: provider,
+      user: result[:user],
+      authenticated_at: result[:authenticated_at]
     )
 
-    Rails.logger.info "[OAuth Callback] Stored authentication result in Redis with key: #{auth_key}"
+    Rails.logger.info "[OAuth Callback] Stored pending identity for request #{result[:request_identifier].inspect}"
   end
 end

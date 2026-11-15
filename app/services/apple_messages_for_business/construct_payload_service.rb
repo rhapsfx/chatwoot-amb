@@ -88,21 +88,16 @@ class AppleMessagesForBusiness::ConstructPayloadService
     :link
   end
 
-  # NOTE: the exact request-body shape Apple's live /v1/constructPayload endpoint expects for
-  # type: music / type: maps is NOT documented in our vendored spec (construct-payload.md only
-  # shows a worked example for type: link / App Clips). The shapes below are a best guess from
-  # the doc's URL-type table and are NOT verified against Apple's real endpoint - confirm via
-  # Apple's Postman collection/MSP support, or live sandbox testing, before relying on them.
-  # TODO: verify music/maps request schema against Apple's real API before enabling in production.
+  # Apple's spec documents a single request shape for every supported URL type
+  # (App Clips, Apple Music, Apple Maps): type "link" with a link.url. `version` is a
+  # string - the integer 1 (or a numeric 1.0) is rejected with 400 Bad Request.
+  # https://register.apple.com/resources/messages/msp-rest-api/construct-payload
   def build_request_payload
-    case url_type
-    when :music
-      { 'type' => 'music', 'music' => { 'url' => @url }, 'version' => 1.0 }
-    when :maps
-      { 'type' => 'maps', 'maps' => { 'url' => @url }, 'version' => 1.0 }
-    else
-      { 'type' => 'link', 'link' => { 'url' => @url, 'store_region' => @store_region }, 'version' => 1.0 }
-    end
+    {
+      'type' => 'link',
+      'link' => { 'url' => @url, 'store_region' => @store_region },
+      'version' => '1.0'
+    }
   end
 
   def call_apple_construct_payload(payload)

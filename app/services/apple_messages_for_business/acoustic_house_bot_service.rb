@@ -2,6 +2,7 @@
 
 class AppleMessagesForBusiness::AcousticHouseBotService
   include AppleMessagesForBusiness::BotLogging
+  include AppleMessagesForBusiness::Concerns::ListPickerResponse
 
   # Template dependencies for deployment automation
   # These templates must exist for the bot to function correctly
@@ -585,10 +586,16 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     handle_form_or_name_prompt
   end
 
+  # Forms render on Mac too, but Mac devices may omit FORM from the capability
+  # list, so a blank list must not be treated as "unsupported".
+  # https://register.apple.com/resources/messages/msp-rest-api/common-specs#http-headers
+  def supports_apple_forms?
+    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities').to_s
+    capabilities.blank? || capabilities.include?('FORM')
+  end
+
   def handle_form_or_name_prompt
-    # Check if device supports Apple Messages Forms
-    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-    supports_forms = capabilities.include?('FORM')
+    supports_forms = supports_apple_forms?
 
     if supports_forms
       send_text_message('We would love to know a bit more about you, can you please fill up the following form so we know how to address you? 👇')
@@ -855,19 +862,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                   # Standard format - extract from listPicker sections
                   data = interactive_data['data'] || {}
                   list_picker = data['listPicker'] || {}
-                  sections = list_picker['sections'] || []
 
-                  # Find the selected item across all sections
-                  guitar_name = nil
-                  sections.each do |section|
-                    items = section['items'] || []
-                    selected_item = items.find { |item| item['title'].present? }
-                    next unless selected_item
-
-                    guitar_name = selected_item['title']
-                    log_info "[Bot] 🎸 Standard format (listPicker) guitar selection: #{utf8_encode(guitar_name)}"
-                    break
-                  end
+                  # The selection is the lowest-order section; titles are localized.
+                  guitar_name = selected_list_picker_items(list_picker).first&.dig('title')
+                  log_info "[Bot] 🎸 Standard format (listPicker) guitar selection: #{utf8_encode(guitar_name)}" if guitar_name.present?
 
                   # Fallback to old reply format if list picker format didn't work
                   if guitar_name.blank?
@@ -1660,9 +1658,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_form_demo
     # Demo mode: just show the form, don't continue flow
-    # Check if device supports Apple Messages Forms
-    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-    supports_forms = capabilities.include?('FORM')
+    supports_forms = supports_apple_forms?
 
     if supports_forms
       send_text_message("Here's our guitar information form 👇")
@@ -1670,7 +1666,7 @@ class AppleMessagesForBusiness::AcousticHouseBotService
         send_text_message("The guitar info form template ('ah_guitar_info_form') is not configured yet. Please create it in the Templates section.")
       end
     else
-      send_text_message('Your device does not support FORM, please switch to an iOS device')
+      send_text_message("This device can't display the form. Update to iOS 18.4 / iPadOS 18.4 or later, or type your name.")
     end
     # State will be set to DEMO_MODE by handle_keyword_message
   end
@@ -1692,15 +1688,13 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
   def handle_large_form_demo
     # Demo mode: send large content form (template 343)
-    # Check if device supports Apple Messages Forms
-    capabilities = @contact.additional_attributes&.dig('apple_messages_capabilities') || ''
-    supports_forms = capabilities.include?('FORM')
+    supports_forms = supports_apple_forms?
 
     if supports_forms
       send_text_message('Here\'s a form with large content:')
       send_large_content_form
     else
-      send_text_message('Your device does not support FORM, please switch to an iOS device')
+      send_text_message("This device can't display the form. Update to iOS 18.4 / iPadOS 18.4 or later, or type your name.")
     end
     # State will be set to DEMO_MODE by handle_keyword_message
   end
@@ -1753,14 +1747,9 @@ class AppleMessagesForBusiness::AcousticHouseBotService
     # Idempotency guard: prevent processing the same menu selection twice
     # Use conversation ID + timestamp + selection data as the unique key
     # This prevents duplicate processing even if multiple message objects are created
-    selected_menu_identifier = interactive_data.dig('data', 'reply', 'identifier') ||
-                               interactive_data.dig('data', 'listPicker', 'sections')&.find do |section|
-                                 section['title'] == 'You Selected'
-                               end&.dig('items', 0, 'identifier')
-    selected_menu_title = interactive_data.dig('data', 'reply', 'title') ||
-                          interactive_data.dig('data', 'listPicker', 'sections')&.find do |section|
-                            section['title'] == 'You Selected'
-                          end&.dig('items', 0, 'title')
+    selected_menu_item = selected_list_picker_items(interactive_data.dig('data', 'listPicker')).first
+    selected_menu_identifier = interactive_data.dig('data', 'reply', 'identifier') || selected_menu_item&.dig('identifier')
+    selected_menu_title = interactive_data.dig('data', 'reply', 'title') || selected_menu_item&.dig('title')
     selection_data = interactive_data['ldtext'] || selected_menu_identifier || selected_menu_title ||
                      interactive_data.dig('data', 'listPicker', 'sections')&.to_json || 'unknown'
     selection_hash = Digest::MD5.hexdigest("#{@conversation.id}:#{selection_data}")
@@ -1850,13 +1839,10 @@ class AppleMessagesForBusiness::AcousticHouseBotService
       # Standard format - extract from listPicker selected section or data.reply
       data = interactive_data['data'] || {}
       list_picker = data['listPicker'] || {}
-      sections = list_picker['sections'] || []
-
-      selected_section = sections.find { |section| section['title'] == 'You Selected' }
-      selected_item = selected_section&.dig('items', 0)
+      selected_item = selected_list_picker_items(list_picker).first
 
       # Fallback: in some payloads, selected item is explicitly flagged
-      selected_item ||= sections.flat_map { |section| section['items'] || [] }.find { |item| item['selected'] == true }
+      selected_item ||= Array(list_picker['sections']).flat_map { |section| section['items'] || [] }.find { |item| item['selected'] == true }
 
       selected_item_title = selected_item&.dig('title') || data.dig('reply', 'title')
       selection_identifier = selected_item&.dig('identifier') || data.dig('reply', 'identifier')
@@ -2485,13 +2471,8 @@ class AppleMessagesForBusiness::AcousticHouseBotService
                        # Find the identifier (should be a number string)
                        objects.find { |obj| obj.is_a?(String) && obj.match?(/^\d+$/) }
                      elsif interactive_data.dig('data', 'listPicker', 'sections').present?
-                       # List picker format with sections - extract from "You Selected" section
-                       sections = interactive_data.dig('data', 'listPicker', 'sections') || []
-                       selected_section = sections.find { |s| s['title'] == 'You Selected' }
-                       if selected_section
-                         selected_item = selected_section.dig('items', 0)
-                         selected_item&.fetch('identifier', nil)
-                       end
+                       # List picker response: the selection is the lowest-order section
+                       selected_list_picker_identifier(interactive_data.dig('data', 'listPicker'))
                      else
                        # Standard format
                        interactive_data.dig('data', 'reply', 'identifier')
@@ -2879,13 +2860,11 @@ class AppleMessagesForBusiness::AcousticHouseBotService
 
     data = interactive_data['data'] || {}
     list_picker = data['listPicker'] || {}
-    sections = list_picker['sections'] || []
 
-    # Standard format: look for the 'You Selected' echo section first
-    selected_section = sections.find { |s| s['title'] == 'You Selected' }
-    selected_item = selected_section&.dig('items', 0)
+    # Standard format: the selection is the lowest-order section
+    selected_item = selected_list_picker_items(list_picker).first
     # Fallback: find the item explicitly flagged as selected
-    selected_item ||= sections.flat_map { |s| s['items'] || [] }.find { |item| item['selected'] == true }
+    selected_item ||= Array(list_picker['sections']).flat_map { |s| s['items'] || [] }.find { |item| item['selected'] == true }
 
     identifier = selected_item&.dig('identifier')
     return identifier.to_s if identifier.present?
